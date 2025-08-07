@@ -219,6 +219,15 @@ class SmugMugAPI:
             logger.error(f"Failed to get node children for {node_id}: {e}")
             raise
     
+    async def get_node(self, node_id: str) -> Dict[str, Any]:
+        """Get details for a specific node"""
+        try:
+            result = await self._make_request(f"/node/{node_id}")
+            return result.get('Node', {})
+        except Exception as e:
+            logger.error(f"Failed to get node {node_id}: {e}")
+            raise
+    
     async def search_images(
         self,
         username: str,

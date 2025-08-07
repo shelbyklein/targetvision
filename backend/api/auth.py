@@ -33,7 +33,7 @@ class ConnectResponse(BaseModel):
 class CallbackRequest(BaseModel):
     oauth_token: str
     oauth_verifier: str
-    state: str
+    state: Optional[str] = None  # Optional for compatibility
 
 
 class ConnectionStatus(BaseModel):
@@ -60,22 +60,19 @@ async def smugmug_connect(request: Request):
         if not oauth_token or not oauth_token_secret:
             raise HTTPException(status_code=500, detail="Failed to get request token")
         
-        # Generate state for CSRF protection
-        state = secrets.token_urlsafe(32)
+        # Step 2: Get authorization URL (OAuth 1.0a doesn't support state)
+        auth_url, _ = oauth.get_authorization_url(oauth_token)
         
-        # Step 2: Get authorization URL
-        auth_url, _ = oauth.get_authorization_url(oauth_token, state)
-        
-        # Store request token and secret for callback (use Redis in production)
-        oauth_state_storage[state] = {
-            'oauth_token': oauth_token,
+        # Store request token secret for callback, using oauth_token as key
+        oauth_state_storage[oauth_token] = {
             'oauth_token_secret': oauth_token_secret,
             'created_at': datetime.utcnow().isoformat()
         }
         
-        logger.info(f"OAuth flow initiated with state: {state[:10]}...")
+        logger.info(f"OAuth flow initiated with token: {oauth_token[:10]}...")
         
-        return ConnectResponse(auth_url=auth_url, state=state)
+        # Still return a state for frontend compatibility, but it won't be used
+        return ConnectResponse(auth_url=auth_url, state=oauth_token)
         
     except Exception as e:
         logger.error(f"Failed to initiate OAuth: {e}")
@@ -89,22 +86,17 @@ async def smugmug_callback_post(callback_data: CallbackRequest):
     Exchange request token for access token
     """
     try:
-        # Verify state to prevent CSRF
-        stored_data = oauth_state_storage.get(callback_data.state)
+        # Look up stored data using oauth_token (OAuth 1.0a doesn't support state)
+        stored_data = oauth_state_storage.get(callback_data.oauth_token)
         if not stored_data:
-            logger.error(f"Invalid state: {callback_data.state}")
-            raise HTTPException(status_code=400, detail="Invalid state")
+            logger.error(f"Invalid oauth_token: {callback_data.oauth_token}")
+            raise HTTPException(status_code=400, detail="Invalid oauth token")
         
-        # Check if state is not expired (5 minutes TTL)
+        # Check if token is not expired (5 minutes TTL)
         created_at = datetime.fromisoformat(stored_data['created_at'])
         if datetime.utcnow() - created_at > timedelta(minutes=5):
-            del oauth_state_storage[callback_data.state]
-            raise HTTPException(status_code=400, detail="State expired")
-        
-        # Verify oauth_token matches
-        if stored_data['oauth_token'] != callback_data.oauth_token:
-            logger.error("OAuth token mismatch")
-            raise HTTPException(status_code=400, detail="Token mismatch")
+            del oauth_state_storage[callback_data.oauth_token]
+            raise HTTPException(status_code=400, detail="Token expired")
         
         oauth = SmugMugOAuth()
         
@@ -145,8 +137,8 @@ async def smugmug_callback_post(callback_data: CallbackRequest):
             'connected_at': datetime.utcnow().isoformat()
         }
         
-        # Clean up state
-        del oauth_state_storage[callback_data.state]
+        # Clean up stored token data
+        del oauth_state_storage[callback_data.oauth_token]
         
         logger.info(f"User {username} successfully connected")
         

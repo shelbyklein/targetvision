@@ -23,6 +23,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import authentication routes
 from api.auth import router as auth_router
+from api.gallery import router as gallery_router
 
 app = FastAPI(title="TargetVision with SmugMug Integration")
 
@@ -430,6 +431,7 @@ async def list_photos():
 
 # Include authentication router
 app.include_router(auth_router)
+app.include_router(gallery_router)
 
 if __name__ == "__main__":
     import uvicorn

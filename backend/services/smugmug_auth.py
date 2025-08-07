@@ -80,20 +80,19 @@ class SmugMugOAuth:
     def get_authorization_url(self, request_token: str, state: Optional[str] = None) -> str:
         """
         Step 2: Build authorization URL for user
+        Note: OAuth 1.0a doesn't support state parameter
         """
-        if not state:
-            state = secrets.token_urlsafe(32)
-        
         params = {
             'oauth_token': request_token,
             'Access': 'Full',  # Request full access
             'Permissions': 'Read',  # Read-only permissions
-            'state': state
+            # Don't include state - OAuth 1.0a doesn't support it
         }
         
         auth_url = f"{self.authorize_url}?{urlencode(params)}"
         logger.info(f"Authorization URL generated: {auth_url[:50]}...")
         
+        # Return state for compatibility, but it won't be in the callback
         return auth_url, state
     
     async def exchange_token(
