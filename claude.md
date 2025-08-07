@@ -3,20 +3,23 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-A **web-based** RAG (Retrieval Augmented Generation) application for photo libraries that enables users to search and interact with their photos through natural language via a modern web browser. The system uses LLMs to generate descriptions of photos, stores them in a vector database, and provides a web-based chat interface for semantic search and conversation about the photo collection.
+A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that connects to users' SmugMug accounts to access photos, generates AI-powered metadata using LLMs, and provides intelligent search capabilities. The system features a metadata management interface where users can review and edit LLM-generated descriptions, ensuring quality and accuracy of the AI-enhanced photo library.
 
-### Web Application Features
-- Browser-based access (no installation required)
-- Responsive design for desktop, tablet, and mobile
-- Real-time chat interface with WebSocket support
-- Drag-and-drop photo upload
-- Progressive Web App (PWA) capabilities for offline access
+### Key Features
+- **SmugMug Integration**: OAuth-based connection to SmugMug accounts
+- **AI Metadata Generation**: Automatic description generation using Claude Vision API
+- **Metadata Management**: Review, edit, and approve AI-generated descriptions
+- **Intelligent Search**: RAG-powered search across original and AI metadata
+- **Real-time Chat**: Natural language queries about photo collection
+- **Batch Processing**: Efficient processing of large photo libraries
 
 ## Key Requirements
-- LLM integration for photo description generation
+- SmugMug OAuth authentication and API integration
+- LLM integration for photo description generation (Claude Vision API)
 - Vector database for storing and querying photo embeddings
+- Metadata management system with versioning and approval workflow
+- Hybrid search combining SmugMug and AI-generated metadata
 - Chat interface for natural language queries
-- Semantic filtering based on photo descriptions and user prompts
 
 ## Architecture Recommendations
 
@@ -39,29 +42,29 @@ A **web-based** RAG (Retrieval Augmented Generation) application for photo libra
 
 ### Core Components to Implement
 
-1. **Photo Processor Service**
-   - Batch processing of photo albums
-   - Generate descriptions using vision-language models
-   - Create embeddings for semantic search
-   - Store metadata and vectors in database
+1. **SmugMug Integration Service**
+   - OAuth authentication flow
+   - Photo and album synchronization
+   - Incremental sync based on changes
+   - Rate limiting and error handling
 
-2. **RAG Pipeline**
-   - Query embedding generation
-   - Vector similarity search
-   - Context retrieval and ranking
-   - Response generation with LLM
+2. **Metadata Processing Service**
+   - Fetch images from SmugMug URLs
+   - Generate descriptions using Claude Vision API
+   - Create and store embedding vectors
+   - Queue management for batch processing
 
-3. **Chat Interface**
-   - Real-time message handling
-   - Query history management
-   - Photo result display with descriptions
-   - Filter refinement capabilities
+3. **Metadata Management Interface**
+   - Review and edit AI descriptions
+   - Bulk operations (approve, regenerate)
+   - Version history tracking
+   - Export functionality (CSV/JSON)
 
-4. **Data Storage**
-   - Vector store for embeddings
-   - Metadata storage for photo details
-   - Conversation history persistence
-   - User session management
+4. **Hybrid Search System**
+   - Combine SmugMug metadata with AI descriptions
+   - Vector similarity search using pgvector
+   - Filter by processing status and approval
+   - Natural language query processing
 
 ## Development Commands
 
@@ -111,14 +114,14 @@ npm run lint
 
 ## Implementation Priority
 
-1. Set up project structure and dependencies
-2. Implement photo ingestion and description generation
-3. Set up vector database and embedding pipeline
-4. Create basic API endpoints for search
-5. Build minimal chat interface
-6. Add semantic filtering and ranking
-7. Enhance UI/UX with photo galleries
-8. Add authentication and user management
+1. Register SmugMug API application and get credentials
+2. Implement OAuth authentication flow
+3. Create SmugMug photo sync service
+4. Build metadata management database schema
+5. Implement LLM processing pipeline
+6. Create metadata management UI
+7. Add hybrid search functionality
+8. Enhance chat interface with RAG
 
 ## Technical Considerations
 

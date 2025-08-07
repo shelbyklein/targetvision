@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, MessageSquare, Search, Image as ImageIcon } from 'lucide-react'
+import { Camera, MessageSquare, Search, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import ChatInterface from '@/components/ChatInterface'
-import PhotoUpload from '@/components/PhotoUpload'
+import SmugMugConnect from '@/components/SmugMugConnect'
 import PhotoGallery from '@/components/PhotoGallery'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'upload' | 'gallery'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'smugmug' | 'gallery'>('chat')
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -52,15 +52,15 @@ export default function Home() {
               <span>Chat & Search</span>
             </button>
             <button
-              onClick={() => setActiveTab('upload')}
+              onClick={() => setActiveTab('smugmug')}
               className={`flex-1 px-6 py-4 flex items-center justify-center gap-2 transition-colors ${
-                activeTab === 'upload'
+                activeTab === 'smugmug'
                   ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
                   : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
               }`}
             >
-              <Upload size={20} />
-              <span>Upload Photos</span>
+              <Camera size={20} />
+              <span>SmugMug</span>
             </button>
             <button
               onClick={() => setActiveTab('gallery')}
@@ -77,7 +77,7 @@ export default function Home() {
 
           <div className="p-6">
             {activeTab === 'chat' && <ChatInterface />}
-            {activeTab === 'upload' && <PhotoUpload />}
+            {activeTab === 'smugmug' && <SmugMugConnect />}
             {activeTab === 'gallery' && <PhotoGallery />}
           </div>
         </div>

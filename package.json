@@ -1,0 +1,42 @@
+{
+  "name": "targetvision",
+  "version": "1.0.0",
+  "description": "SmugMug-integrated RAG application for intelligent photo search",
+  "private": true,
+  "scripts": {
+    "dev": "./scripts/dev-start.sh",
+    "build": "./scripts/build-prod.sh",
+    "start": "make start",
+    "stop": "make stop",
+    "test": "make test",
+    "lint": "make lint",
+    "clean": "make clean",
+    "setup": "make setup",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && source venv/bin/activate && uvicorn app_simple:app --reload --host 0.0.0.0 --port 7050",
+    "build:frontend": "cd frontend && npx next build",
+    "type-check": "cd frontend && npm run type-check",
+    "install:all": "npm run install:frontend && npm run install:backend",
+    "install:frontend": "cd frontend && npm install",
+    "install:backend": "cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shelbyklein/targetvision.git"
+  },
+  "keywords": [
+    "smugmug",
+    "photos",
+    "ai",
+    "rag",
+    "search",
+    "nextjs",
+    "fastapi"
+  ],
+  "author": "TargetVision Team",
+  "license": "MIT"
+}

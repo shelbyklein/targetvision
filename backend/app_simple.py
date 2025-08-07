@@ -12,12 +12,19 @@ import os
 from sentence_transformers import SentenceTransformer
 import json
 import uuid
+import sys
 
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
-app = FastAPI(title="TargetVision with Claude")
+# Add the current directory to path for imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Import authentication routes
+from api.auth import router as auth_router
+
+app = FastAPI(title="TargetVision with SmugMug Integration")
 
 # Configure CORS
 app.add_middleware(
@@ -421,7 +428,11 @@ async def list_photos():
         "photos": list(photo_store.values())
     }
 
+# Include authentication router
+app.include_router(auth_router)
+
 if __name__ == "__main__":
+    import uvicorn
     print("\n🚀 Starting TargetVision with Claude Integration...")
     print("✨ Claude API: Connected")
     print("🧠 Embeddings: Local (all-MiniLM-L6-v2)")

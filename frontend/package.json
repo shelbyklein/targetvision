@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "build:prod": "npm run type-check && npm run build",
+    "dev:debug": "NODE_OPTIONS='--inspect' next dev",
+    "clean": "rm -rf .next node_modules/.cache"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",

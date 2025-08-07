@@ -1,9 +1,9 @@
 # Tasks Tracker
 
 ## Active Sprint
-**Sprint**: Foundation Setup
+**Sprint**: SmugMug Integration Sprint
 **Duration**: 2025-01-07 to 2025-01-21
-**Goal**: Establish project foundation and core infrastructure
+**Goal**: Pivot to SmugMug integration and metadata management system
 
 ---
 
@@ -21,7 +21,7 @@
 
 | ID | Task | Assignee | Started | Target | Progress | Notes |
 |----|------|----------|---------|--------|----------|-------|
-| T001 | Project structure setup | - | 2025-01-07 | 2025-01-08 | 0% | Creating initial directories and configs |
+| | | | | | | |
 
 ---
 
@@ -29,15 +29,18 @@
 
 | ID | Task | Priority | Estimated Hours | Dependencies | Description |
 |----|------|----------|-----------------|--------------|-------------|
-| T002 | Initialize git repository | High | 0.5 | None | Set up git, create .gitignore |
-| T003 | Choose backend framework | High | 2 | None | Evaluate Python FastAPI vs Node.js options |
-| T004 | Set up PostgreSQL with pgvector | High | 3 | T003 | Install and configure database |
-| T005 | Create database schema | High | 4 | T004 | Design and implement tables |
-| T006 | Set up development environment | Medium | 2 | T003 | Configure venv/npm, install dependencies |
-| T007 | Create API boilerplate | Medium | 3 | T003, T006 | Basic FastAPI/Express setup |
-| T008 | Configure environment variables | Medium | 1 | T007 | Set up .env structure |
-| T009 | Implement logging system | Low | 2 | T007 | Structured logging setup |
-| T010 | Add health check endpoint | Low | 1 | T007 | Basic monitoring endpoint |
+| T100 | Register SmugMug API application | Critical | 1 | None | Get API key and secret from SmugMug |
+| T101 | Implement OAuth authentication | Critical | 4 | T100 | OAuth flow for SmugMug connection |
+| T102 | Create SmugMug API service | High | 4 | T101 | Python service for API calls |
+| T103 | Design metadata storage schema | High | 2 | None | Database schema for LLM metadata |
+| T104 | Build photo sync service | High | 5 | T102, T103 | Sync photos from SmugMug |
+| T105 | Create metadata manager UI | High | 6 | T103 | Tab for managing LLM descriptions |
+| T106 | Implement LLM processing queue | High | 4 | T104 | Queue system for photo processing |
+| T107 | Add metadata versioning | Medium | 3 | T103 | Track metadata history |
+| T108 | Create bulk operations API | Medium | 3 | T105 | Bulk approve/edit/regenerate |
+| T109 | Implement incremental sync | Medium | 3 | T104 | Sync only changed albums |
+| T110 | Add export functionality | Low | 2 | T105 | Export metadata to CSV/JSON |
+| T111 | Create processing dashboard | Low | 3 | T106 | Stats and monitoring UI |
 
 ---
 
@@ -46,24 +49,37 @@
 | ID | Task | Completed | Time Spent | Outcome |
 |----|------|-----------|------------|---------|
 | T000 | Create project documentation structure | 2025-01-07 | 1h | Created @claude_docs folder with templates |
+| T001 | Project structure setup | 2025-01-07 | 2h | Created full project structure with backend and frontend |
+| T002 | Initialize git repository | 2025-01-07 | 0.5h | Git repo initialized with .gitignore |
+| T003 | Choose backend framework | 2025-01-07 | 1h | Selected FastAPI with Python |
+| T004 | Set up PostgreSQL alternative | 2025-01-07 | 2h | Using in-memory store for MVP, pgvector ready |
+| T005 | Create basic data models | 2025-01-07 | 2h | Photo and chat models implemented |
+| T006 | Set up development environment | 2025-01-07 | 1h | Python venv and Next.js configured |
+| T007 | Create API boilerplate | 2025-01-07 | 2h | FastAPI backend with core endpoints |
+| T008 | Configure environment variables | 2025-01-07 | 0.5h | .env files created for backend/frontend |
+| T011 | Frontend setup with Next.js | 2025-01-07 | 3h | Full Next.js app with TypeScript |
+| T012 | Create UI components | 2025-01-07 | 4h | PhotoUpload, PhotoGallery, ChatInterface |
+| T013 | Integrate Claude API | 2025-01-07 | 2h | Claude vision API for photo descriptions |
+| T014 | Logo and branding integration | 2025-01-07 | 1h | TargetVision logo added to site |
+| T015 | Fix gallery display issues | 2025-01-07 | 1h | Connected gallery to backend, fixed image display |
 
 ---
 
 ## Backlog
 
 ### High Priority
-- [ ] Integrate OpenAI Vision API
-- [ ] Set up vector embedding pipeline
-- [ ] Create photo upload endpoint
-- [ ] Implement basic search functionality
-- [ ] Design chat interface mockups
+- [ ] SmugMug OAuth implementation
+- [ ] Photo sync from SmugMug
+- [ ] Metadata management system
+- [ ] LLM processing pipeline for SmugMug photos
+- [ ] Update search to include SmugMug data
 
 ### Medium Priority
-- [ ] Add photo thumbnail generation
-- [ ] Implement batch processing
-- [ ] Create album management
-- [ ] Set up Redis caching
-- [ ] Add user authentication
+- [ ] Incremental sync optimization
+- [ ] Metadata approval workflow
+- [ ] Bulk operations interface
+- [ ] Processing queue management
+- [ ] SmugMug rate limit handling
 
 ### Low Priority
 - [ ] Dark mode support
@@ -127,7 +143,9 @@
 
 | ID | Description | Impact | Effort | Priority | Added |
 |----|-------------|--------|--------|----------|-------|
-| TD001 | Need to decide on primary tech stack | High | Medium | Urgent | 2025-01-07 |
+| TD001 | Need to decide on primary tech stack | High | Medium | Resolved | 2025-01-07 |
+| TD002 | Photo upload replaced with SmugMug | High | High | Active | 2025-01-07 |
+| TD003 | Need SmugMug API credentials | Critical | Low | Urgent | 2025-01-07 |
 
 ---
 

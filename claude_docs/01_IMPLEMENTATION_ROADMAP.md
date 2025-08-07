@@ -1,88 +1,103 @@
 # Implementation Roadmap
 
-## Project: Photo Library RAG Web Application
+## Project: SmugMug-Integrated Photo RAG Application
 **Last Updated**: 2025-01-07
-**Status**: Implementation Phase
-**Type**: Full-Stack Web Application
+**Status**: Pivoting to SmugMug Integration
+**Type**: Full-Stack Web Application with SmugMug API Integration
 
 ---
 
-## Phase 1: Foundation Setup ⏳
+## Phase 1: Foundation Setup ✅
 **Target**: Week 1-2
+**Status**: COMPLETED (2025-01-07)
 
 ### 1.1 Project Initialization
-- [ ] Initialize git repository
-- [ ] Choose primary tech stack (Python vs Node.js backend)
-- [ ] Set up project structure
-- [ ] Configure development environment
-- [ ] Create .gitignore and .env.example
+- [x] Initialize git repository
+- [x] Choose primary tech stack (Python FastAPI backend)
+- [x] Set up project structure
+- [x] Configure development environment
+- [x] Create .gitignore and .env.example
 
 ### 1.2 Database Setup
-- [ ] Install PostgreSQL with pgvector extension
-- [ ] Design database schema for photos metadata
-- [ ] Create tables for:
-  - Photos (id, path, upload_date, album_id)
-  - Albums (id, name, created_date)
-  - Photo_Descriptions (photo_id, description, embedding)
+- [x] Design data models for photos metadata (in-memory for MVP)
+- [ ] Install PostgreSQL with pgvector extension (deferred to Phase 2)
+- [x] Create models for:
+  - Photos (id, path, upload_date, description)
+  - Photo_Descriptions (using Claude Vision API)
   - Chat_History (id, user_query, response, timestamp)
-- [ ] Set up database migrations
+- [ ] Set up database migrations (pending PostgreSQL)
 
 ### 1.3 Web Backend API Foundation
-- [ ] Set up FastAPI web server structure
-- [ ] Configure CORS for web client access
-- [ ] Create RESTful API endpoints
-- [ ] Set up WebSocket support for real-time chat
-- [ ] Configure web security middleware (CSRF, rate limiting)
-- [ ] Create health check endpoint for monitoring
-- [ ] Set up structured logging for web requests
-- [ ] Configure environment variables for development/production
+- [x] Set up FastAPI web server structure
+- [x] Configure CORS for web client access
+- [x] Create RESTful API endpoints (/photos/upload, /photos/list, /photos/search)
+- [x] Set up WebSocket support for real-time chat
+- [x] Create health check endpoint
+- [x] Set up basic logging
+- [x] Configure environment variables for development
+
+### 1.4 Frontend Foundation (Added)
+- [x] Set up Next.js 14 with TypeScript
+- [x] Create responsive UI with Tailwind CSS
+- [x] Implement PhotoUpload component with drag-and-drop
+- [x] Create PhotoGallery with search functionality
+- [x] Build ChatInterface with WebSocket connection
+- [x] Add dark mode support
+- [x] Integrate TargetVision branding and logo
 
 ---
 
-## Phase 2: Photo Processing Pipeline 🖼️
+## Phase 2: SmugMug Integration & OAuth 🔐
 **Target**: Week 3-4
 
-### 2.1 Web-Based Photo Ingestion
-- [ ] Create multipart form upload endpoint
-- [ ] Implement browser-side file validation
-- [ ] Add drag-and-drop upload interface
-- [ ] Set up cloud storage (S3/GCS) for web scalability
-- [ ] Implement progress tracking for uploads
-- [ ] Create batch upload with web UI feedback
-- [ ] Generate responsive thumbnails for web display
+### 2.1 SmugMug API Setup
+- [ ] Register application with SmugMug for API access
+- [ ] Implement OAuth 2.0 authentication flow
+- [ ] Create SmugMug API client service
+- [ ] Set up token storage and refresh mechanism
+- [ ] Add "Connect SmugMug" UI component
+- [ ] Handle OAuth callbacks and error states
+- [ ] Implement account disconnection flow
 
-### 2.2 Vision Model Integration
-- [ ] Integrate OpenAI Vision API or CLIP
-- [ ] Create photo description generation service
-- [ ] Implement batch processing for albums
-- [ ] Add retry logic for API failures
-- [ ] Store descriptions in database
+### 2.2 Photo Sync Service
+- [ ] Fetch user's albums from SmugMug
+- [ ] Retrieve photo metadata and URLs
+- [ ] Implement incremental sync based on LastUpdated
+- [ ] Cache SmugMug responses for efficiency
+- [ ] Create background sync scheduler
+- [ ] Handle rate limiting and retries
+- [ ] Store SmugMug photo references locally
 
-### 2.3 Embedding Generation
-- [ ] Set up embedding model (OpenAI Ada or Sentence Transformers)
-- [ ] Generate embeddings for photo descriptions
-- [ ] Store embeddings in pgvector
-- [ ] Create embedding update pipeline
-- [ ] Implement caching mechanism
+### 2.3 Metadata Management System
+- [ ] Design metadata storage schema
+- [ ] Create metadata CRUD operations
+- [ ] Implement metadata versioning/history
+- [ ] Add approval workflow for LLM descriptions
+- [ ] Build metadata export functionality
+- [ ] Create bulk operations API
+- [ ] Track processing status per photo
 
 ---
 
-## Phase 3: RAG Implementation 🤖
+## Phase 3: LLM Processing & RAG Implementation 🤖
 **Target**: Week 5-6
 
-### 3.1 Vector Search
-- [ ] Implement similarity search queries
-- [ ] Create hybrid search (vector + metadata)
-- [ ] Add filtering capabilities (date, album, etc.)
-- [ ] Optimize search performance
-- [ ] Implement result ranking
+### 3.1 LLM Processing Pipeline
+- [ ] Fetch images from SmugMug URLs
+- [ ] Process with Claude Vision API
+- [ ] Generate detailed descriptions
+- [ ] Create embedding vectors
+- [ ] Store in pgvector database
+- [ ] Implement batch processing queue
+- [ ] Add processing status tracking
 
-### 3.2 LLM Integration
-- [ ] Set up LangChain or LlamaIndex
-- [ ] Create prompt templates
-- [ ] Implement context retrieval
-- [ ] Add conversation memory
-- [ ] Create response generation pipeline
+### 3.2 Vector Search & RAG
+- [ ] Implement similarity search queries
+- [ ] Create hybrid search (vector + SmugMug metadata)
+- [ ] Combine SmugMug data with LLM descriptions
+- [ ] Add filtering by album, date, processing status
+- [ ] Optimize search performance
+- [ ] Implement relevance scoring
 
 ### 3.3 Query Processing
 - [ ] Parse user queries for intent
@@ -106,19 +121,23 @@
 - [ ] Configure environment variables for API URLs
 - [ ] Add SEO meta tags and Open Graph support
 
-### 4.2 Chat Interface
-- [ ] Design chat UI components
-- [ ] Implement message display
-- [ ] Add typing indicators
-- [ ] Create message input with validation
-- [ ] Implement WebSocket/SSE for real-time updates
+### 4.2 Metadata Manager Interface
+- [ ] Create metadata management tab
+- [ ] Build photo grid with metadata display
+- [ ] Implement inline editing capabilities
+- [ ] Add bulk selection and operations
+- [ ] Create filtering by processing status
+- [ ] Show processing statistics dashboard
+- [ ] Add export functionality (CSV/JSON)
 
-### 4.3 Photo Gallery
-- [ ] Create photo grid component
-- [ ] Implement photo modal viewer
-- [ ] Add lazy loading for images
-- [ ] Create album navigation
-- [ ] Implement search result display
+### 4.3 SmugMug Gallery Integration
+- [ ] Display photos from SmugMug URLs
+- [ ] Show SmugMug album structure
+- [ ] Add sync status indicators
+- [ ] Implement lazy loading for thumbnails
+- [ ] Create "Process with AI" controls
+- [ ] Show metadata overlay on photos
+- [ ] Handle private/password-protected albums
 
 ### 4.4 Web User Experience
 - [ ] Add skeleton loaders for better perceived performance
@@ -192,10 +211,12 @@
 ## Milestones & Success Metrics
 
 ### MVP Milestone (End of Phase 3)
-- ✅ Photos can be uploaded and processed
-- ✅ Descriptions are generated and stored
-- ✅ Basic search functionality works
-- ✅ Chat interface responds to queries
+- ✅ SmugMug account connected via OAuth
+- ✅ Photos synced from SmugMug
+- ✅ LLM descriptions generated for photos
+- ✅ Metadata management interface functional
+- ✅ Search works across SmugMug + LLM data
+- ✅ Chat interface provides intelligent responses
 
 ### Beta Release (End of Phase 5)
 - ✅ Full chat functionality with context
