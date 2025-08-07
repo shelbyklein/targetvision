@@ -30,10 +30,8 @@
 | ID | Task | Priority | Estimated Hours | Dependencies | Description |
 |----|------|----------|-----------------|--------------|-------------|
 | T100 | Register SmugMug API application | Critical | 1 | None | Get API key and secret from SmugMug |
-| T101 | Implement OAuth authentication | Critical | 4 | T100 | OAuth flow for SmugMug connection |
-| T102 | Create SmugMug API service | High | 4 | T101 | Python service for API calls |
 | T103 | Design metadata storage schema | High | 2 | None | Database schema for LLM metadata |
-| T104 | Build photo sync service | High | 5 | T102, T103 | Sync photos from SmugMug |
+| T104 | Build photo sync service | High | 5 | T103 | Sync photos from SmugMug |
 | T105 | Create metadata manager UI | High | 6 | T103 | Tab for managing LLM descriptions |
 | T106 | Implement LLM processing queue | High | 4 | T104 | Queue system for photo processing |
 | T107 | Add metadata versioning | Medium | 3 | T103 | Track metadata history |
@@ -62,6 +60,9 @@
 | T013 | Integrate Claude API | 2025-01-07 | 2h | Claude vision API for photo descriptions |
 | T014 | Logo and branding integration | 2025-01-07 | 1h | TargetVision logo added to site |
 | T015 | Fix gallery display issues | 2025-01-07 | 1h | Connected gallery to backend, fixed image display |
+| T016 | SmugMug OAuth implementation | 2025-01-07 | 3h | OAuth 1.0a authentication flow implemented |
+| T017 | SmugMug API service | 2025-01-07 | 2h | API client for albums and photos |
+| T018 | Fix development environment | 2025-01-07 | 1.5h | Fixed dependencies and OAuth compatibility issues |
 
 ---
 
