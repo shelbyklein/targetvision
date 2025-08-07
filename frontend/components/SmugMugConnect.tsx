@@ -18,9 +18,24 @@ export default function SmugMugConnect() {
   const [user, setUser] = useState<SmugMugUser | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Check connection status on mount
+  // Check connection status on mount and when localStorage changes
   useEffect(() => {
     checkConnectionStatus()
+    
+    // Also check if user was just connected via callback
+    const smugmugUser = localStorage.getItem('smugmug_user')
+    if (smugmugUser) {
+      try {
+        const userData = JSON.parse(smugmugUser)
+        setUser({
+          username: userData.username,
+          connected_at: new Date().toISOString()
+        })
+        setIsConnected(true)
+      } catch (e) {
+        console.error('Failed to parse smugmug user data:', e)
+      }
+    }
   }, [])
 
   const checkConnectionStatus = async () => {

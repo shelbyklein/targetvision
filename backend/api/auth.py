@@ -82,6 +82,90 @@ async def smugmug_connect(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/smugmug/callback")
+async def smugmug_callback_post(callback_data: CallbackRequest):
+    """
+    Handle SmugMug OAuth callback (POST)
+    Exchange request token for access token
+    """
+    try:
+        # Verify state to prevent CSRF
+        stored_data = oauth_state_storage.get(callback_data.state)
+        if not stored_data:
+            logger.error(f"Invalid state: {callback_data.state}")
+            raise HTTPException(status_code=400, detail="Invalid state")
+        
+        # Check if state is not expired (5 minutes TTL)
+        created_at = datetime.fromisoformat(stored_data['created_at'])
+        if datetime.utcnow() - created_at > timedelta(minutes=5):
+            del oauth_state_storage[callback_data.state]
+            raise HTTPException(status_code=400, detail="State expired")
+        
+        # Verify oauth_token matches
+        if stored_data['oauth_token'] != callback_data.oauth_token:
+            logger.error("OAuth token mismatch")
+            raise HTTPException(status_code=400, detail="Token mismatch")
+        
+        oauth = SmugMugOAuth()
+        
+        # Step 3: Exchange for access token
+        access_token_data = await oauth.exchange_token(
+            oauth_token=callback_data.oauth_token,
+            oauth_verifier=callback_data.oauth_verifier,
+            request_token_secret=stored_data['oauth_token_secret']
+        )
+        
+        access_token = access_token_data.get('oauth_token')
+        access_token_secret = access_token_data.get('oauth_token_secret')
+        
+        if not access_token or not access_token_secret:
+            raise HTTPException(status_code=500, detail="Failed to get access token")
+        
+        # Get user info using the access token
+        api_key = os.getenv('SMUGMUG_API_KEY')
+        api_secret = os.getenv('SMUGMUG_API_SECRET')
+        
+        smugmug_api = SmugMugAPI(
+            access_token=access_token,
+            access_token_secret=access_token_secret,
+            api_key=api_key,
+            api_secret=api_secret
+        )
+        
+        user_info = await smugmug_api.get_authenticated_user()
+        username = user_info.get('NickName', 'Unknown')
+        
+        # Store tokens (in production, store in database with user association)
+        # For demo, using simple in-memory storage
+        user_id = f"user_{username}"
+        user_tokens[user_id] = {
+            'access_token': oauth.encrypt_token(access_token),
+            'access_token_secret': oauth.encrypt_token(access_token_secret),
+            'username': username,
+            'connected_at': datetime.utcnow().isoformat()
+        }
+        
+        # Clean up state
+        del oauth_state_storage[callback_data.state]
+        
+        logger.info(f"User {username} successfully connected")
+        
+        # Return JSON response with user info
+        return JSONResponse(content={
+            'success': True,
+            'user': {
+                'username': username,
+                'connected': True
+            }
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/smugmug/callback")
 async def smugmug_callback(
     oauth_token: str,
@@ -90,7 +174,7 @@ async def smugmug_callback(
     request: Request
 ):
     """
-    Handle SmugMug OAuth callback
+    Handle SmugMug OAuth callback (GET - for direct browser redirect)
     Exchange request token for access token
     """
     try:
