@@ -1,0 +1,32 @@
+{
+"mcpServers": {
+    "ddg-search": {
+        "command": "uvx",
+        "args": ["duckduckgo-mcp-server"]
+        },
+    "puppeteer": {
+        "command": "npx",
+        "args": ["-y", "puppeteer-mcp-server"],
+        "env": {}
+        },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+        ]
+      },
+    "browsermcp": {
+      "command": "npx",
+      "args": ["@browsermcp/mcp@latest"]
+    }
+    }
+}

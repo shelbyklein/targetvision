@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.pid
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Node (for frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Production builds
+/build
+/dist
+/.next
+/out
+
+# Photos and uploads
+/uploads/
+/temp/
+/photos/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+!sample_photos/
+
+# ML Models
+/models/
+*.ckpt
+*.pth
+*.h5
+
+# Vector DB
+/chroma_db/
+/qdrant_storage/
+
+# Misc
+.cache/
+*.tmp
+.thumbs.db
