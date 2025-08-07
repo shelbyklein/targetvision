@@ -51,13 +51,16 @@
 **Target**: Week 3-4
 **Status**: IN PROGRESS
 
-### 2.1 SmugMug API Setup
-- [ ] Register application with SmugMug for API access
+### 2.1 SmugMug API Setup ✅
+- [x] Register application with SmugMug for API access (credentials obtained)
 - [x] Implement OAuth 1.0a authentication flow (SmugMug uses OAuth 1.0a, not 2.0)
 - [x] Create SmugMug API client service
 - [x] Set up token storage and encryption mechanism
 - [x] Add "Connect SmugMug" UI component
 - [x] Handle OAuth callbacks and error states
+- [x] Create callback handler page for OAuth redirect
+- [x] Fix OAuth parameter duplication issues
+- [x] Implement popup window handling with postMessage
 - [ ] Implement account disconnection flow
 - [x] Fix development environment and dependencies
 

@@ -1,7 +1,9 @@
 # SmugMug OAuth Setup Guide
 
 ## Overview
-This guide covers the complete OAuth 2.0 setup process for integrating SmugMug API with TargetVision, including registration, implementation, and security best practices.
+This guide covers the complete OAuth 1.0a setup process for integrating SmugMug API with TargetVision, including registration, implementation, and security best practices.
+
+**Important**: SmugMug uses OAuth 1.0a (not OAuth 2.0) for authentication.
 
 ---
 
@@ -44,16 +46,17 @@ SMUGMUG_CALLBACK_URL=http://localhost:3000/auth/smugmug/callback
 
 ## Step 2: OAuth Flow Implementation
 
-### 2.1 Backend OAuth Service
+### 2.1 Backend OAuth Service (ACTUAL IMPLEMENTATION)
 
 Create `backend/services/smugmug_auth.py`:
 
 ```python
 import os
 import secrets
-from urllib.parse import urlencode
-from authlib.integrations.starlette_client import OAuth
-from fastapi import HTTPException
+import httpx
+from urllib.parse import parse_qs
+from authlib.integrations.httpx_client import OAuth1Auth
+from cryptography.fernet import Fernet
 
 class SmugMugOAuth:
     def __init__(self):
@@ -61,40 +64,79 @@ class SmugMugOAuth:
         self.api_secret = os.getenv('SMUGMUG_API_SECRET')
         self.callback_url = os.getenv('SMUGMUG_CALLBACK_URL')
         
-        # OAuth endpoints
+        # OAuth 1.0a endpoints
         self.request_token_url = 'https://secure.smugmug.com/services/oauth/1.0a/getRequestToken'
         self.authorize_url = 'https://secure.smugmug.com/services/oauth/1.0a/authorize'
         self.access_token_url = 'https://secure.smugmug.com/services/oauth/1.0a/getAccessToken'
+        
+        # Initialize encryption
+        encryption_key = os.getenv('ENCRYPTION_KEY')
+        if encryption_key:
+            self.cipher = Fernet(encryption_key.encode())
+        else:
+            self.cipher = Fernet(Fernet.generate_key())
     
-    def get_authorization_url(self, state: str = None):
-        """Generate OAuth authorization URL"""
+    async def get_request_token(self):
+        """Step 1: Get request token from SmugMug"""
+        oauth_auth = OAuth1Auth(
+            client_id=self.api_key,
+            client_secret=self.api_secret,
+            redirect_uri=self.callback_url  # Important: use redirect_uri, not callback_uri
+        )
+        
+        async with httpx.AsyncClient() as client:
+            # OAuth params are included in Authorization header by OAuth1Auth
+            response = await client.post(
+                self.request_token_url,
+                auth=oauth_auth
+            )
+            response.raise_for_status()
+            
+            # Parse the response
+            token_data = parse_qs(response.text)
+            return {
+                'oauth_token': token_data['oauth_token'][0],
+                'oauth_token_secret': token_data['oauth_token_secret'][0]
+            }
+    
+    def get_authorization_url(self, request_token: str, state: str = None):
+        """Step 2: Build authorization URL for user"""
         if not state:
             state = secrets.token_urlsafe(32)
         
         params = {
-            'oauth_callback': self.callback_url,
+            'oauth_token': request_token,
             'Access': 'Full',
             'Permissions': 'Read',
             'state': state
         }
         
-        # Get request token first
-        request_token = self._get_request_token()
-        
-        # Build authorization URL
-        auth_url = f"{self.authorize_url}?{urlencode(params)}&oauth_token={request_token}"
-        
+        auth_url = f"{self.authorize_url}?{urlencode(params)}"
         return auth_url, state
     
-    def exchange_token(self, oauth_token: str, oauth_verifier: str):
-        """Exchange OAuth token for access token"""
-        # Implementation for token exchange
-        pass
-    
-    def refresh_token(self, refresh_token: str):
-        """Refresh expired access token"""
-        # Implementation for token refresh
-        pass
+    async def exchange_token(self, oauth_token: str, oauth_verifier: str, 
+                           request_token_secret: str):
+        """Step 3: Exchange request token for access token"""
+        oauth_auth = OAuth1Auth(
+            client_id=self.api_key,
+            client_secret=self.api_secret,
+            token=oauth_token,
+            token_secret=request_token_secret,
+            verifier=oauth_verifier  # Include verifier in OAuth1Auth
+        )
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                self.access_token_url,
+                auth=oauth_auth
+            )
+            response.raise_for_status()
+            
+            token_data = parse_qs(response.text)
+            return {
+                'oauth_token': token_data['oauth_token'][0],
+                'oauth_token_secret': token_data['oauth_token_secret'][0]
+            }
 ```
 
 ### 2.2 FastAPI OAuth Endpoints
@@ -412,27 +454,41 @@ DATABASE_ENCRYPTION=true
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues (SOLVED)
 
-1. **"Invalid callback URL"**
-   - Ensure callback URL in app settings matches exactly
-   - Include protocol (http/https)
-   - Check for trailing slashes
+1. **"duplicated_oauth_protocol_parameter" error**
+   - **Problem**: OAuth parameters sent in both query string and Authorization header
+   - **Solution**: Use OAuth1Auth with parameters in constructor, not as query params
+   ```python
+   # WRONG
+   response = await client.post(url, params={'oauth_callback': callback})
+   
+   # CORRECT
+   oauth_auth = OAuth1Auth(client_id=key, client_secret=secret, redirect_uri=callback)
+   response = await client.post(url, auth=oauth_auth)
+   ```
 
-2. **"Access denied" error**
-   - User may have denied permissions
-   - Check required scopes are requested
-   - Verify API key is active
+2. **OAuth popup not closing after authorization**
+   - **Problem**: Callback page doesn't communicate with opener window
+   - **Solution**: Use postMessage to notify parent window and close popup
+   ```javascript
+   if (window.opener) {
+     window.opener.postMessage({ type: 'smugmug_connected', user }, origin)
+     window.close()
+   }
+   ```
 
-3. **Token refresh failing**
-   - Refresh token may be expired
-   - User needs to re-authenticate
-   - Check token storage encryption
+3. **404 on callback URL**
+   - **Problem**: Missing route handler for callback page
+   - **Solution**: Create /app/auth/smugmug/callback/page.tsx in Next.js
 
-4. **CORS errors**
-   - Add SmugMug domains to CORS whitelist
-   - Use backend proxy for API calls
-   - Check preflight request handling
+4. **Import errors with authlib**
+   - **Problem**: OAuth1Session deprecated in newer authlib versions
+   - **Solution**: Use OAuth1Auth instead of OAuth1Session
+
+5. **sentence-transformers compatibility**
+   - **Problem**: Version 2.2.2 incompatible with newer huggingface_hub
+   - **Solution**: Update to sentence-transformers==3.0.1
 
 ### Debug Logging
 

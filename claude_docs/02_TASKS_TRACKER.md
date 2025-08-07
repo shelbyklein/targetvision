@@ -29,7 +29,7 @@
 
 | ID | Task | Priority | Estimated Hours | Dependencies | Description |
 |----|------|----------|-----------------|--------------|-------------|
-| T100 | Register SmugMug API application | Critical | 1 | None | Get API key and secret from SmugMug |
+| T100 | Test SmugMug OAuth flow end-to-end | Critical | 0.5 | None | Verify complete OAuth flow works |
 | T103 | Design metadata storage schema | High | 2 | None | Database schema for LLM metadata |
 | T104 | Build photo sync service | High | 5 | T103 | Sync photos from SmugMug |
 | T105 | Create metadata manager UI | High | 6 | T103 | Tab for managing LLM descriptions |
@@ -63,6 +63,9 @@
 | T016 | SmugMug OAuth implementation | 2025-01-07 | 3h | OAuth 1.0a authentication flow implemented |
 | T017 | SmugMug API service | 2025-01-07 | 2h | API client for albums and photos |
 | T018 | Fix development environment | 2025-01-07 | 1.5h | Fixed dependencies and OAuth compatibility issues |
+| T019 | OAuth callback handler | 2025-01-07 | 1h | Created callback page and POST endpoint |
+| T020 | Fix OAuth parameter duplication | 2025-01-07 | 0.5h | Fixed OAuth1Auth parameter handling |
+| T021 | OAuth popup window handling | 2025-01-07 | 0.5h | Added postMessage communication and auto-close |
 
 ---
 
