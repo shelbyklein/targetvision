@@ -46,17 +46,18 @@ class SmugMugOAuth:
         Step 1: Get request token from SmugMug
         Returns dict with oauth_token and oauth_token_secret
         """
+        # OAuth1Auth will include the callback in the OAuth signature
         oauth_auth = OAuth1Auth(
             client_id=self.api_key,
-            client_secret=self.api_secret
+            client_secret=self.api_secret,
+            redirect_uri=self.callback_url
         )
         
         try:
             async with httpx.AsyncClient() as client:
-                # Add callback URL to the request
+                # Don't add oauth_callback as a separate param - it's included in OAuth signature
                 response = await client.post(
                     self.request_token_url,
-                    params={'oauth_callback': self.callback_url},
                     auth=oauth_auth
                 )
                 response.raise_for_status()
@@ -105,18 +106,20 @@ class SmugMugOAuth:
         Step 3: Exchange request token for access token
         Returns dict with oauth_token and oauth_token_secret
         """
+        # Include verifier in OAuth1Auth initialization
         oauth_auth = OAuth1Auth(
             client_id=self.api_key,
             client_secret=self.api_secret,
             token=oauth_token,
-            token_secret=request_token_secret
+            token_secret=request_token_secret,
+            verifier=oauth_verifier
         )
         
         try:
             async with httpx.AsyncClient() as client:
+                # Don't add oauth_verifier as a separate param - it's included in OAuth signature
                 response = await client.post(
                     self.access_token_url,
-                    params={'oauth_verifier': oauth_verifier},
                     auth=oauth_auth
                 )
                 response.raise_for_status()
