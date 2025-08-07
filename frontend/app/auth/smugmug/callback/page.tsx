@@ -9,8 +9,12 @@ function CallbackContent() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [message, setMessage] = useState('Completing authorization...')
+  const [isPopup, setIsPopup] = useState(false)
 
   useEffect(() => {
+    // Check if we're in a popup window
+    setIsPopup(!!window.opener)
+    
     const handleCallback = async () => {
       const oauthToken = searchParams.get('oauth_token')
       const oauthVerifier = searchParams.get('oauth_verifier')
@@ -50,14 +54,46 @@ function CallbackContent() {
         setStatus('success')
         setMessage('Successfully connected to SmugMug!')
         
-        // Redirect to home page after a short delay
-        setTimeout(() => {
-          router.push('/')
-        }, 2000)
+        // If we're in a popup, communicate back to the opener and close
+        if (window.opener) {
+          window.opener.postMessage(
+            { 
+              type: 'smugmug_connected', 
+              user: data.user 
+            }, 
+            window.location.origin
+          )
+          
+          // Close the popup after a short delay
+          setTimeout(() => {
+            window.close()
+          }, 1500)
+        } else {
+          // If not in a popup, redirect to home page
+          setTimeout(() => {
+            router.push('/')
+          }, 2000)
+        }
       } catch (error) {
         console.error('OAuth callback error:', error)
         setStatus('error')
         setMessage(error instanceof Error ? error.message : 'Failed to complete authorization')
+        
+        // If we're in a popup, communicate the error back to the opener
+        if (window.opener) {
+          window.opener.postMessage(
+            { 
+              type: 'smugmug_error', 
+              message: error instanceof Error ? error.message : 'Failed to complete authorization'
+            }, 
+            window.location.origin
+          )
+          
+          // Close the popup after a delay
+          setTimeout(() => {
+            window.close()
+          }, 3000)
+        }
       }
     }
 
@@ -101,10 +137,25 @@ function CallbackContent() {
           
           {status === 'error' && (
             <button
-              onClick={() => router.push('/')}
+              onClick={() => {
+                if (window.opener) {
+                  window.close()
+                } else {
+                  router.push('/')
+                }
+              }}
               className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
             >
-              Return Home
+              {isPopup ? 'Close Window' : 'Return Home'}
+            </button>
+          )}
+          
+          {status === 'success' && isPopup && (
+            <button
+              onClick={() => window.close()}
+              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+            >
+              Close this window
             </button>
           )}
         </div>

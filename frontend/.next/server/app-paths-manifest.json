@@ -1,4 +1,4 @@
 {
-  "/page": "app/page.js",
-  "/auth/smugmug/callback/page": "app/auth/smugmug/callback/page.js"
+  "/auth/smugmug/callback/page": "app/auth/smugmug/callback/page.js",
+  "/page": "app/page.js"
 }
