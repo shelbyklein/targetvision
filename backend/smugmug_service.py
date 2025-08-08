@@ -18,7 +18,7 @@ class SmugMugService:
         
     async def get_current_user(self) -> Optional[Dict]:
         """Get current authenticated user information"""
-        url = f"{self.api_base}/api/v2!authuser"
+        url = f"{self.api_base}!authuser"
         
         response = await self.oauth.make_authenticated_request(
             "GET", url, self.access_token, self.access_token_secret
