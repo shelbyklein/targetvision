@@ -340,9 +340,19 @@ class TargetVisionApp {
                     <span class="hidden sm:inline">${statusInfo.text}</span>
                 </div>
                 
+                <!-- Lightbox button -->
+                <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button class="lightbox-btn w-8 h-8 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full flex items-center justify-center text-white transition-all" 
+                            onclick="event.stopPropagation()">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </button>
+                </div>
+                
                 <!-- Selection checkbox (only for synced photos) -->
                 ${photo.is_synced ? `
-                    <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <div class="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                         <input type="checkbox" 
                                class="photo-checkbox w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500" 
                                data-photo-id="${photo.smugmug_id}"
@@ -350,13 +360,8 @@ class TargetVisionApp {
                     </div>
                 ` : ''}
                 
-                <!-- Hover overlay -->
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center z-10">
-                    <div class="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </div>
+                <!-- Hover overlay for visual feedback -->
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all z-10">
                 </div>
             </div>
             
@@ -367,13 +372,31 @@ class TargetVisionApp {
             </div>
         `;
         
-        // Add click handler
+        // Add click handler - clicking thumbnail selects photo
         div.addEventListener('click', (e) => {
-            if (e.target.type === 'checkbox') return;
-            this.showPhotoModal(photo);
+            // Don't select if clicking on buttons or checkboxes
+            if (e.target.type === 'checkbox' || e.target.closest('button')) return;
+            
+            // If photo is synced, toggle selection
+            if (photo.is_synced) {
+                const checkbox = div.querySelector('.photo-checkbox');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    this.togglePhotoSelection(photo.smugmug_id, checkbox.checked);
+                }
+            }
         });
         
-        // Add checkbox handler
+        // Add lightbox button handler
+        const lightboxBtn = div.querySelector('.lightbox-btn');
+        if (lightboxBtn) {
+            lightboxBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showPhotoModal(photo);
+            });
+        }
+        
+        // Add checkbox handler for direct checkbox clicks
         const checkbox = div.querySelector('.photo-checkbox');
         if (checkbox) {
             checkbox.addEventListener('change', (e) => {
@@ -828,17 +851,22 @@ class TargetVisionApp {
                 />
                 
                 <!-- Relevance score -->
-                <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full z-20">
                     ${Math.round(score * 100)}%
                 </div>
                 
-                <!-- Hover overlay -->
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
-                    <div class="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <!-- Lightbox button -->
+                <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button class="lightbox-btn w-8 h-8 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full flex items-center justify-center text-white transition-all" 
+                            onclick="event.stopPropagation()">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
-                    </div>
+                    </button>
+                </div>
+                
+                <!-- Hover overlay for visual feedback -->
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all z-10">
                 </div>
             </div>
             
@@ -849,7 +877,14 @@ class TargetVisionApp {
             </div>
         `;
         
-        div.addEventListener('click', () => this.showPhotoModal(photo));
+        // Add lightbox button handler for search results
+        const lightboxBtn = div.querySelector('.lightbox-btn');
+        if (lightboxBtn) {
+            lightboxBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showPhotoModal(photo);
+            });
+        }
         
         return div;
     }
