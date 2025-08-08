@@ -5,6 +5,47 @@ from sqlalchemy.sql import func
 from database import Base
 from datetime import datetime
 
+class Album(Base):
+    """SmugMug album metadata"""
+    __tablename__ = "albums"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    smugmug_id = Column(String(255), unique=True, nullable=False, index=True)
+    smugmug_uri = Column(String(500))
+    title = Column(String(255))
+    description = Column(Text)
+    keywords = Column(ARRAY(Text), default=[])
+    photo_count = Column(Integer, default=0)
+    image_count = Column(Integer, default=0)
+    video_count = Column(Integer, default=0)
+    album_key = Column(String(255))  # SmugMug album key
+    url_name = Column(String(255))   # SmugMug URL name
+    privacy = Column(String(50))     # Public, Unlisted, Private
+    security_type = Column(String(50))
+    sort_method = Column(String(50))
+    sort_direction = Column(String(10))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationship to photos
+    photos = relationship("Photo", back_populates="album")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "smugmug_id": self.smugmug_id,
+            "title": self.title,
+            "description": self.description,
+            "keywords": self.keywords,
+            "photo_count": self.photo_count,
+            "image_count": self.image_count,
+            "video_count": self.video_count,
+            "album_key": self.album_key,
+            "url_name": self.url_name,
+            "privacy": self.privacy,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
 class Photo(Base):
     """SmugMug photo metadata"""
     __tablename__ = "photos"
@@ -17,16 +58,19 @@ class Photo(Base):
     title = Column(String(255))
     caption = Column(Text)
     keywords = Column(ARRAY(Text), default=[])
-    album_name = Column(String(255))
-    album_uri = Column(String(500))
+    album_id = Column(Integer, ForeignKey("albums.id"), nullable=True, index=True)
+    album_name = Column(String(255))  # Keep for backwards compatibility
+    album_uri = Column(String(500))   # Keep for backwards compatibility
     width = Column(Integer)
     height = Column(Integer)
     format = Column(String(50))
     file_size = Column(Integer)
+    processing_status = Column(String(50), default="not_processed")  # not_processed, processing, completed, failed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationship to AI metadata
+    # Relationships
+    album = relationship("Album", back_populates="photos")
     ai_metadata = relationship("AIMetadata", back_populates="photo", uselist=False, cascade="all, delete-orphan")
     
     def to_dict(self):
@@ -36,12 +80,15 @@ class Photo(Base):
             "title": self.title,
             "caption": self.caption,
             "keywords": self.keywords,
+            "album_id": self.album_id,
             "album_name": self.album_name,
             "image_url": self.image_url,
             "thumbnail_url": self.thumbnail_url,
             "width": self.width,
             "height": self.height,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "processing_status": self.processing_status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "has_ai_metadata": self.ai_metadata is not None
         }
 
 class AIMetadata(Base):

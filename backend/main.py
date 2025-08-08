@@ -12,7 +12,7 @@ load_dotenv()
 
 # Import our modules
 from database import get_db, init_db, test_connection
-from models import Photo, AIMetadata, OAuthToken, ProcessingQueue
+from models import Album, Photo, AIMetadata, OAuthToken, ProcessingQueue
 from smugmug_auth import SmugMugOAuth
 from smugmug_service import SmugMugService
 from ai_processor import ai_processor
@@ -169,6 +169,365 @@ async def auth_status(db: Session = Depends(get_db)):
         }
     
     return {"authenticated": False}
+
+# SmugMug Direct API Endpoints (Real-time data)
+@app.get("/smugmug/albums", response_model=List[Dict])
+async def list_smugmug_albums(db: Session = Depends(get_db)):
+    """Fetch all albums directly from SmugMug API with processing status"""
+    
+    # Get stored access token
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    # Initialize SmugMug service
+    service = SmugMugService(token.access_token, token.access_token_secret)
+    
+    try:
+        # Fetch albums from SmugMug API
+        smugmug_albums = await service.get_user_albums()
+        
+        if not smugmug_albums:
+            return []
+        
+        # Enhance with local processing statistics
+        result = []
+        from sqlalchemy import func, case
+        
+        for album in smugmug_albums:
+            album_data = {
+                "smugmug_id": album.get("AlbumKey", ""),
+                "smugmug_uri": album.get("Uri", ""),
+                "title": album.get("Name", "Untitled Album"),
+                "description": album.get("Description", ""),
+                "image_count": album.get("ImageCount", 0),
+                "privacy": album.get("Privacy", ""),
+                "sort_method": album.get("SortMethod", ""),
+                "url_name": album.get("UrlName", ""),
+                "created_at": album.get("Date", ""),
+                "modified_at": album.get("LastUpdated", "")
+            }
+            
+            # Get local processing statistics if album exists in DB
+            local_album = db.query(Album).filter_by(smugmug_id=album.get("Uri", "")).first()
+            if local_album:
+                stats = db.query(
+                    func.count(Photo.id).label('synced_photo_count'),
+                    func.sum(case((Photo.processing_status == 'completed', 1), else_=0)).label('processed_count'),
+                    func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed_count')
+                ).filter(Photo.album_id == local_album.id).first()
+                
+                album_data.update({
+                    'local_album_id': local_album.id,
+                    'synced_photo_count': int(stats.synced_photo_count or 0),
+                    'processed_count': int(stats.processed_count or 0),
+                    'ai_processed_count': int(stats.ai_processed_count or 0),
+                    'processing_progress': round((int(stats.ai_processed_count or 0) / max(int(stats.synced_photo_count or 1), 1)) * 100, 1),
+                    'is_synced': True
+                })
+            else:
+                album_data.update({
+                    'local_album_id': None,
+                    'synced_photo_count': 0,
+                    'processed_count': 0,
+                    'ai_processed_count': 0,
+                    'processing_progress': 0.0,
+                    'is_synced': False
+                })
+            
+            result.append(album_data)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching SmugMug albums: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch albums from SmugMug: {str(e)}")
+
+@app.get("/smugmug/albums/{smugmug_album_key}/photos", response_model=List[Dict])
+async def list_smugmug_album_photos(
+    smugmug_album_key: str,
+    db: Session = Depends(get_db)
+):
+    """Fetch photos from a specific SmugMug album with processing status"""
+    
+    # Get stored access token
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    # Initialize SmugMug service
+    service = SmugMugService(token.access_token, token.access_token_secret)
+    
+    try:
+        # Construct album URI from key
+        album_uri = f"/api/v2/album/{smugmug_album_key}"
+        
+        # Fetch photos from SmugMug API
+        smugmug_photos = await service.get_album_images(album_uri)
+        
+        if not smugmug_photos:
+            return []
+        
+        # Enhance with local processing status
+        result = []
+        
+        for photo in smugmug_photos:
+            photo_metadata = service.extract_photo_metadata(photo)
+            smugmug_id = photo_metadata.get("smugmug_id", "")
+            
+            # Check if photo exists in local database
+            local_photo = db.query(Photo).filter_by(smugmug_id=smugmug_id).first()
+            
+            photo_data = {
+                "smugmug_id": smugmug_id,
+                "smugmug_uri": photo_metadata.get("smugmug_uri", ""),
+                "title": photo_metadata.get("title", ""),
+                "caption": photo_metadata.get("caption", ""),
+                "keywords": photo_metadata.get("keywords", []),
+                "filename": photo_metadata.get("filename", ""),
+                "width": photo_metadata.get("width", 0),
+                "height": photo_metadata.get("height", 0),
+                "image_url": photo_metadata.get("image_url", ""),
+                "thumbnail_url": photo_metadata.get("thumbnail_url", ""),
+                "format": photo_metadata.get("format", ""),
+                "file_size": photo_metadata.get("file_size", 0)
+            }
+            
+            if local_photo:
+                photo_data.update({
+                    'local_photo_id': local_photo.id,
+                    'processing_status': local_photo.processing_status,
+                    'has_ai_metadata': local_photo.ai_metadata is not None,
+                    'is_synced': True,
+                    'synced_at': local_photo.created_at.isoformat() if local_photo.created_at else None
+                })
+                
+                # Include AI metadata if available
+                if local_photo.ai_metadata:
+                    photo_data['ai_metadata'] = {
+                        'description': local_photo.ai_metadata.description,
+                        'ai_keywords': local_photo.ai_metadata.ai_keywords,
+                        'confidence_score': local_photo.ai_metadata.confidence_score,
+                        'processed_at': local_photo.ai_metadata.processed_at.isoformat() if local_photo.ai_metadata.processed_at else None
+                    }
+            else:
+                photo_data.update({
+                    'local_photo_id': None,
+                    'processing_status': 'not_synced',
+                    'has_ai_metadata': False,
+                    'is_synced': False,
+                    'synced_at': None
+                })
+            
+            result.append(photo_data)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching photos from SmugMug album {smugmug_album_key}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch photos from SmugMug: {str(e)}")
+
+@app.post("/smugmug/albums/{smugmug_album_key}/sync")
+async def sync_smugmug_album(
+    smugmug_album_key: str,
+    db: Session = Depends(get_db)
+):
+    """Sync a specific SmugMug album to local database for processing"""
+    
+    # Get stored access token
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    # Initialize SmugMug service
+    service = SmugMugService(token.access_token, token.access_token_secret)
+    
+    try:
+        # Get album info from SmugMug
+        albums = await service.get_user_albums()
+        target_album = None
+        
+        for album in albums:
+            if album.get("AlbumKey") == smugmug_album_key:
+                target_album = album
+                break
+        
+        if not target_album:
+            raise HTTPException(status_code=404, detail="Album not found in SmugMug")
+        
+        album_uri = target_album.get("Uri", "")
+        album_name = target_album.get("Name", "Untitled Album")
+        
+        # Check if album already exists in local database
+        existing_album = db.query(Album).filter_by(smugmug_id=album_uri).first()
+        
+        if not existing_album:
+            # Create new album in database
+            new_album = Album(
+                smugmug_id=album_uri,
+                smugmug_uri=album_uri,
+                title=album_name,
+                description=target_album.get("Description", ""),
+                keywords=target_album.get("Keywords", "").split(";") if target_album.get("Keywords") else [],
+                photo_count=target_album.get("ImageCount", 0),
+                image_count=target_album.get("ImageCount", 0),
+                album_key=smugmug_album_key,
+                url_name=target_album.get("UrlName", ""),
+                privacy=target_album.get("Privacy", ""),
+                sort_method=target_album.get("SortMethod", "")
+            )
+            db.add(new_album)
+            db.commit()
+            db.refresh(new_album)
+            album_id = new_album.id
+        else:
+            album_id = existing_album.id
+        
+        # Get photos from SmugMug and sync them
+        photos = await service.get_album_images(album_uri)
+        synced_count = 0
+        
+        for photo in photos:
+            photo_metadata = service.extract_photo_metadata(photo, album_name)
+            smugmug_id = photo_metadata.get("smugmug_id", "")
+            
+            if not smugmug_id:
+                continue
+            
+            # Check if photo already exists
+            existing_photo = db.query(Photo).filter_by(smugmug_id=smugmug_id).first()
+            
+            if not existing_photo:
+                # Create new photo
+                new_photo = Photo(
+                    smugmug_id=smugmug_id,
+                    smugmug_uri=photo_metadata.get("smugmug_uri"),
+                    image_url=photo_metadata.get("image_url"),
+                    thumbnail_url=photo_metadata.get("thumbnail_url"),
+                    title=photo_metadata.get("title"),
+                    caption=photo_metadata.get("caption"),
+                    keywords=photo_metadata.get("keywords", []),
+                    album_id=album_id,
+                    album_name=album_name,
+                    album_uri=album_uri,
+                    width=photo_metadata.get("width"),
+                    height=photo_metadata.get("height"),
+                    format=photo_metadata.get("format"),
+                    file_size=photo_metadata.get("file_size"),
+                    processing_status="not_processed"
+                )
+                db.add(new_photo)
+                synced_count += 1
+            else:
+                # Update existing photo
+                existing_photo.album_id = album_id
+                existing_photo.image_url = photo_metadata.get("image_url") or existing_photo.image_url
+                existing_photo.thumbnail_url = photo_metadata.get("thumbnail_url") or existing_photo.thumbnail_url
+                synced_count += 1
+        
+        db.commit()
+        
+        return {
+            "message": f"Successfully synced album '{album_name}'",
+            "album_name": album_name,
+            "smugmug_album_key": smugmug_album_key,
+            "synced_photos": synced_count,
+            "local_album_id": album_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing SmugMug album {smugmug_album_key}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to sync album: {str(e)}")
+
+# Local Database Album Management Endpoints (for processed items)
+@app.get("/albums", response_model=List[Dict])
+async def list_local_albums(db: Session = Depends(get_db)):
+    """List locally synced albums with photo counts and processing status"""
+    
+    # Get albums with photo counts and processing statistics
+    from sqlalchemy import func
+    
+    from sqlalchemy import case
+    
+    albums_with_stats = db.query(
+        Album,
+        func.count(Photo.id).label('actual_photo_count'),
+        func.sum(case((Photo.processing_status == 'completed', 1), else_=0)).label('processed_count'),
+        func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed_count')
+    ).outerjoin(Photo, Album.id == Photo.album_id)\
+     .group_by(Album.id)\
+     .all()
+    
+    result = []
+    for album, photo_count, processed_count, ai_processed_count in albums_with_stats:
+        album_dict = album.to_dict()
+        album_dict.update({
+            'actual_photo_count': int(photo_count or 0),
+            'processed_count': int(processed_count or 0),
+            'ai_processed_count': int(ai_processed_count or 0),
+            'processing_progress': round((int(ai_processed_count or 0) / max(int(photo_count or 1), 1)) * 100, 1)
+        })
+        result.append(album_dict)
+    
+    return result
+
+@app.get("/albums/{album_id}/photos", response_model=List[Dict])
+async def get_album_photos(
+    album_id: int,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, le=200),
+    processing_status: Optional[str] = Query(default=None, regex="^(not_processed|processing|completed|failed)$"),
+    db: Session = Depends(get_db)
+):
+    """Get photos from a specific album with optional filtering by processing status"""
+    
+    # Verify album exists
+    album = db.query(Album).filter_by(id=album_id).first()
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    
+    # Build query
+    query = db.query(Photo).filter_by(album_id=album_id)
+    
+    # Filter by processing status if specified
+    if processing_status:
+        query = query.filter(Photo.processing_status == processing_status)
+    
+    # Get photos with pagination
+    photos = query.offset(skip).limit(limit).all()
+    
+    return [photo.to_dict() for photo in photos]
+
+@app.get("/albums/{album_id}", response_model=Dict)
+async def get_album(album_id: int, db: Session = Depends(get_db)):
+    """Get single album details with statistics"""
+    
+    album = db.query(Album).filter_by(id=album_id).first()
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    
+    # Get processing statistics
+    from sqlalchemy import func, case
+    stats = db.query(
+        func.count(Photo.id).label('total_photos'),
+        func.sum(case((Photo.processing_status == 'completed', 1), else_=0)).label('processed'),
+        func.sum(case((Photo.processing_status == 'processing', 1), else_=0)).label('processing'),
+        func.sum(case((Photo.processing_status == 'failed', 1), else_=0)).label('failed'),
+        func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed')
+    ).filter(Photo.album_id == album_id).first()
+    
+    album_dict = album.to_dict()
+    album_dict.update({
+        'total_photos': int(stats.total_photos or 0),
+        'processed_photos': int(stats.processed or 0),
+        'processing_photos': int(stats.processing or 0),
+        'failed_photos': int(stats.failed or 0),
+        'ai_processed_photos': int(stats.ai_processed or 0)
+    })
+    
+    return album_dict
 
 # Photo Management Endpoints
 @app.post("/photos/sync")
@@ -353,6 +712,35 @@ async def get_processing_queue_status():
     except Exception as e:
         logger.error(f"Error getting queue status: {e}")
         raise HTTPException(status_code=500, detail="Failed to get queue status")
+
+@app.post("/photos/update-status")
+async def update_photos_processing_status(
+    photo_ids: List[int],
+    status: str = Query(..., regex="^(not_processed|processing|completed|failed)$"),
+    db: Session = Depends(get_db)
+):
+    """Update processing status for multiple photos"""
+    
+    # Validate photos exist
+    photos = db.query(Photo).filter(Photo.id.in_(photo_ids)).all()
+    if not photos:
+        raise HTTPException(status_code=404, detail="No photos found")
+    
+    # Update status
+    from sqlalchemy import func
+    updated_count = 0
+    for photo in photos:
+        photo.processing_status = status
+        photo.updated_at = func.now()
+        updated_count += 1
+    
+    db.commit()
+    
+    return {
+        "message": f"Updated processing status for {updated_count} photos",
+        "updated_count": updated_count,
+        "status": status
+    }
 
 @app.post("/photos/process/queue/add")
 async def add_to_queue(
