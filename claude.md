@@ -8,7 +8,7 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
 ### Key Features
 - **SmugMug Integration**: OAuth-based connection to SmugMug accounts
 - **AI Metadata Generation**: Automatic description generation using Claude Vision API
-- **Metadata Management**: Review, edit, and approve AI-generated descriptions
+- **Metadata Management**: Review, edit, and approve AI-generated descriptions and keywords
 - **Intelligent Search**: RAG-powered search across original and AI metadata
 - **Real-time Chat**: Natural language queries about photo collection
 - **Batch Processing**: Efficient processing of large photo libraries
@@ -17,27 +17,26 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
 - SmugMug OAuth authentication and API integration
 - LLM integration for photo description generation (Claude Vision API)
 - Vector database for storing and querying photo embeddings
-- Metadata management system with versioning and approval workflow
+- Metadata management system
 - Hybrid search combining SmugMug and AI-generated metadata
 - Chat interface for natural language queries
 
-## Architecture Recommendations
+## Architecture 
 
 ### Backend Stack (Web API Server)
 - **Python with FastAPI**: For RESTful web API server
 - **PostgreSQL with pgvector**: For hybrid storage (metadata + vectors)
 - **LangChain or LlamaIndex**: For RAG pipeline orchestration
-- **OpenAI API or Anthropic Claude**: For LLM capabilities
+- **Anthropic Claude**: For LLM capabilities
 - **CLIP or LLaVA**: For image understanding and embedding generation
 - **CORS middleware**: For secure cross-origin web requests
 - **WebSocket support**: For real-time chat communication
 
 ### Frontend Stack (Web Client)
-- **Next.js 14+ with TypeScript**: For server-side rendered web application
-- **React 18+**: For interactive UI components
+- **JAVASCRIPT** for frontend, no typescript
 - **Tailwind CSS**: For responsive web styling
 - **WebSocket client**: For real-time chat updates
-- **Axios or Fetch API**: For HTTP requests to backend
+- **Fetch API**: For HTTP requests to backend
 - **React Query**: For efficient data fetching and caching
 
 ### Core Components to Implement
@@ -65,52 +64,6 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
    - Vector similarity search using pgvector
    - Filter by processing status and approval
    - Natural language query processing
-
-## Development Commands
-
-Since this is a new project, here are the recommended setup commands once the stack is chosen:
-
-### Python Backend (if chosen)
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install fastapi uvicorn langchain openai pillow numpy scikit-learn pgvector sqlalchemy
-
-# Run development server
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-# Run tests
-pytest tests/
-
-# Format code
-black .
-ruff check .
-```
-
-### Web Frontend (Next.js)
-```bash
-# Install dependencies
-cd frontend
-npm install
-
-# Run development server (http://localhost:3000)
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm run start
-
-# Run tests
-npm test
-
-# Lint code
-npm run lint
-```
 
 ## Implementation Priority
 
@@ -147,4 +100,5 @@ npm run lint
 - NEVER create files unless they're absolutely necessary for achieving your goal
 - ALWAYS prefer editing an existing file to creating a new one
 - NEVER proactively create documentation files (*.md) or README files unless explicitly requested
-- allow me to start and stop servers, don't try to do it manually.
+- allow the user to start and stop servers, don't try to do it manually
+- avoid using typescript if possible, native javascript only
