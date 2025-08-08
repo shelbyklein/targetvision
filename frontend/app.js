@@ -882,7 +882,103 @@ class TargetVisionApp {
     // Modal and other functionality
     async showPhotoModal(photo) {
         console.log('Show modal for photo:', photo);
-        // Modal implementation can be added later
+        
+        // Populate modal with photo data
+        const modal = document.getElementById('photo-modal');
+        const modalImage = document.getElementById('modal-image');
+        const modalDimensions = document.getElementById('modal-dimensions');
+        const modalAlbum = document.getElementById('modal-album');
+        const modalOriginalTitle = document.getElementById('modal-original-title');
+        const modalOriginalCaption = document.getElementById('modal-original-caption');
+        const modalOriginalKeywords = document.getElementById('modal-original-keywords');
+        const modalAiSection = document.getElementById('modal-ai-section');
+        const modalNoAi = document.getElementById('modal-no-ai');
+        const modalAiDescription = document.getElementById('modal-ai-description');
+        const modalAiKeywords = document.getElementById('modal-ai-keywords');
+        const modalAiConfidence = document.getElementById('modal-ai-confidence');
+        const modalAiTimestamp = document.getElementById('modal-ai-timestamp');
+        
+        // Set main image - use image_url if available, otherwise thumbnail_url
+        const imageUrl = photo.image_url || photo.thumbnail_url;
+        modalImage.src = imageUrl;
+        modalImage.alt = photo.title || 'Photo';
+        
+        // Set photo info
+        modalDimensions.textContent = `${photo.width || 0} × ${photo.height || 0} pixels`;
+        modalAlbum.textContent = `Album: ${photo.album_name || 'Unknown Album'}`;
+        
+        // Set original metadata
+        modalOriginalTitle.innerHTML = photo.title ? 
+            `<strong>Title:</strong> ${photo.title}` : 
+            '<span class="text-gray-400">No title</span>';
+            
+        modalOriginalCaption.innerHTML = photo.caption ? 
+            `<strong>Caption:</strong> ${photo.caption}` : 
+            '<span class="text-gray-400">No caption</span>';
+            
+        if (photo.keywords && photo.keywords.length > 0) {
+            const keywordTags = photo.keywords.map(keyword => 
+                `<span class="inline-block bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs mr-1 mb-1">${keyword}</span>`
+            ).join('');
+            modalOriginalKeywords.innerHTML = `<strong>Keywords:</strong><br>${keywordTags}`;
+        } else {
+            modalOriginalKeywords.innerHTML = '<span class="text-gray-400">No keywords</span>';
+        }
+        
+        // Handle AI metadata
+        if (photo.ai_metadata || photo.has_ai_metadata) {
+            modalAiSection.classList.remove('hidden');
+            modalNoAi.classList.add('hidden');
+            
+            const aiData = photo.ai_metadata || {};
+            
+            if (aiData.description) {
+                modalAiDescription.textContent = aiData.description;
+            } else {
+                modalAiDescription.textContent = 'No AI description available';
+            }
+            
+            if (aiData.ai_keywords && aiData.ai_keywords.length > 0) {
+                const aiKeywordTags = aiData.ai_keywords.map(keyword => 
+                    `<span class="inline-block bg-blue-200 text-blue-800 px-2 py-1 rounded-full text-xs mr-1 mb-1">${keyword}</span>`
+                ).join('');
+                modalAiKeywords.innerHTML = aiKeywordTags;
+            } else {
+                modalAiKeywords.innerHTML = '<span class="text-blue-400">No AI keywords</span>';
+            }
+            
+            if (aiData.confidence_score) {
+                modalAiConfidence.textContent = `${Math.round(aiData.confidence_score * 100)}% confidence`;
+            } else {
+                modalAiConfidence.textContent = '';
+            }
+            
+            if (aiData.processed_at) {
+                const processedDate = new Date(aiData.processed_at);
+                modalAiTimestamp.textContent = `Processed: ${processedDate.toLocaleString()}`;
+            } else {
+                modalAiTimestamp.textContent = '';
+            }
+            
+        } else {
+            modalAiSection.classList.add('hidden');
+            modalNoAi.classList.remove('hidden');
+        }
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        
+        // Focus trap for accessibility
+        modalImage.focus();
+        
+        // Add keyboard listener for ESC key
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') {
+                this.closeModal();
+                document.removeEventListener('keydown', handleKeydown);
+            }
+        };
+        document.addEventListener('keydown', handleKeydown);
     }
 
     closeModal() {
@@ -894,7 +990,64 @@ class TargetVisionApp {
     }
 
     async processPhotoWithAI() {
-        console.log('Individual photo processing to be implemented');
+        // Get current photo from modal context
+        const modalImage = document.getElementById('modal-image');
+        const photoUrl = modalImage.src;
+        
+        if (!photoUrl) {
+            console.error('No photo selected for AI processing');
+            return;
+        }
+        
+        // Find the photo data from current photos
+        const currentPhoto = this.currentPhotos.find(p => 
+            (p.image_url && p.image_url === photoUrl) || 
+            (p.thumbnail_url && p.thumbnail_url === photoUrl)
+        );
+        
+        if (!currentPhoto || !currentPhoto.local_photo_id) {
+            this.showErrorMessage('Processing Error', 'This photo must be synced to the database before it can be processed with AI.');
+            return;
+        }
+        
+        const processButton = document.getElementById('modal-process-button');
+        const originalText = processButton.textContent;
+        
+        processButton.textContent = 'Processing...';
+        processButton.disabled = true;
+        
+        try {
+            const response = await fetch(`${this.apiBase}/photos/${currentPhoto.local_photo_id}/process`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const result = await response.json();
+            
+            // Update the current photo data
+            const photoIndex = this.currentPhotos.findIndex(p => p.local_photo_id === currentPhoto.local_photo_id);
+            if (photoIndex !== -1) {
+                this.currentPhotos[photoIndex].ai_metadata = result.ai_metadata;
+                this.currentPhotos[photoIndex].has_ai_metadata = true;
+                this.currentPhotos[photoIndex].processing_status = 'completed';
+            }
+            
+            // Refresh the modal with updated data
+            await this.showPhotoModal(this.currentPhotos[photoIndex]);
+            
+            // Refresh the photo grid to show updated status
+            this.displayPhotos();
+            
+            this.showSuccessMessage('AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
+            
+        } catch (error) {
+            console.error('AI processing failed:', error);
+            this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
+            
+            processButton.textContent = originalText;
+            processButton.disabled = false;
+        }
     }
 }
 
