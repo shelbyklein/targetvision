@@ -335,14 +335,14 @@ class TargetVisionApp {
                 />
                 
                 <!-- Status indicator -->
-                <div class="absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center">
+                <div class="absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center z-20">
                     <span class="mr-1">${statusInfo.icon}</span>
                     <span class="hidden sm:inline">${statusInfo.text}</span>
                 </div>
                 
                 <!-- Selection checkbox (only for synced photos) -->
                 ${photo.is_synced ? `
-                    <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                         <input type="checkbox" 
                                class="photo-checkbox w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500" 
                                data-photo-id="${photo.smugmug_id}"
@@ -351,7 +351,7 @@ class TargetVisionApp {
                 ` : ''}
                 
                 <!-- Hover overlay -->
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center z-10">
                     <div class="opacity-0 group-hover:opacity-100 transition-opacity">
                         <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
