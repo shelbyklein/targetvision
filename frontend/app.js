@@ -1,43 +1,91 @@
-// TargetVision Frontend Application
+// TargetVision Finder-Style Frontend Application
 class TargetVisionApp {
     constructor() {
         this.apiBase = 'http://localhost:8000';
-        this.photos = [];
-        this.currentSearch = null;
-        this.currentPage = 0;
-        this.photosPerPage = 20;
+        this.smugmugAlbums = [];
+        this.currentAlbum = null;
+        this.currentPhotos = [];
+        this.selectedPhotos = new Set();
+        this.statusFilter = '';
+        this.currentPage = 'albums';
+        this.chatMessages = [];
+        this.searchResults = [];
         
         this.initializeApp();
     }
 
     async initializeApp() {
         this.bindEventListeners();
+        await this.checkConnectionStatus();
         await this.checkAuthentication();
-        await this.loadPhotos();
+        await this.loadSmugMugAlbums();
     }
 
     bindEventListeners() {
-        // Search functionality
-        document.getElementById('search-button').addEventListener('click', () => this.performSearch());
-        document.getElementById('search-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.performSearch();
+        // Navigation
+        document.getElementById('nav-albums').addEventListener('click', () => this.showPage('albums'));
+        document.getElementById('nav-chat').addEventListener('click', () => this.showPage('chat'));
+        document.getElementById('nav-search').addEventListener('click', () => this.showPage('search'));
+        
+        // Album selection
+        document.getElementById('breadcrumb-albums').addEventListener('click', () => this.showAlbumsView());
+        
+        // Album actions
+        document.getElementById('sync-album').addEventListener('click', () => this.syncCurrentAlbum());
+        document.getElementById('refresh-photos').addEventListener('click', () => this.refreshCurrentPhotos());
+        document.getElementById('sync-all-albums').addEventListener('click', () => this.syncAllAlbums());
+        
+        // Photo selection
+        document.getElementById('select-all').addEventListener('click', () => this.selectAllPhotos());
+        document.getElementById('select-none').addEventListener('click', () => this.clearSelection());
+        document.getElementById('process-selected').addEventListener('click', () => this.processSelectedPhotos());
+        
+        // Filters
+        document.getElementById('status-filter').addEventListener('change', (e) => this.filterPhotos(e.target.value));
+        
+        // Chat functionality
+        document.getElementById('chat-send').addEventListener('click', () => this.sendChatMessage());
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendChatMessage();
         });
-        document.getElementById('clear-search').addEventListener('click', () => this.clearSearch());
+        document.getElementById('chat-input').addEventListener('input', (e) => {
+            document.getElementById('chat-send').disabled = !e.target.value.trim();
+        });
+        document.getElementById('clear-chat').addEventListener('click', () => this.clearChat());
+        
+        // Search functionality
+        document.getElementById('search-main-button').addEventListener('click', () => this.performMainSearch());
+        document.getElementById('search-main-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.performMainSearch();
+        });
+        document.getElementById('clear-main-search').addEventListener('click', () => this.clearMainSearch());
         
         // Modal functionality
         document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
         document.getElementById('photo-modal').addEventListener('click', (e) => {
             if (e.target.id === 'photo-modal') this.closeModal();
         });
-        
-        // Process AI button
         document.getElementById('modal-process-button').addEventListener('click', () => this.processPhotoWithAI());
-        
-        // Retry button
-        document.getElementById('retry-button').addEventListener('click', () => this.loadPhotos());
-        
-        // Load more
-        document.getElementById('load-more-button').addEventListener('click', () => this.loadMorePhotos());
+    }
+
+    // Authentication and Connection
+    async checkConnectionStatus() {
+        try {
+            const response = await fetch(`${this.apiBase}/health`, { 
+                method: 'GET',
+                timeout: 5000 
+            });
+            
+            if (response.ok) {
+                this.connectionStatus = 'connected';
+                document.getElementById('connection-status')?.classList.add('hidden');
+            } else {
+                throw new Error('Server responded with error');
+            }
+        } catch (error) {
+            this.connectionStatus = 'disconnected';
+            this.showConnectionError();
+        }
     }
 
     async checkAuthentication() {
@@ -50,269 +98,339 @@ class TargetVisionApp {
             const error = document.getElementById('auth-error');
             const username = document.getElementById('auth-username');
             
-            loading.classList.add('hidden');
+            if (loading) loading.classList.add('hidden');
             
             if (authStatus.authenticated) {
-                success.classList.remove('hidden');
-                username.textContent = `(@${authStatus.username})`;
+                if (success) success.classList.remove('hidden');
+                if (username) username.textContent = `(@${authStatus.username})`;
             } else {
-                error.classList.remove('hidden');
+                if (error) error.classList.remove('hidden');
             }
         } catch (err) {
             console.error('Authentication check failed:', err);
-            document.getElementById('auth-loading').classList.add('hidden');
-            document.getElementById('auth-error').classList.remove('hidden');
+            const loading = document.getElementById('auth-loading');
+            const error = document.getElementById('auth-error');
+            if (loading) loading.classList.add('hidden');
+            if (error) error.classList.remove('hidden');
         }
     }
 
-    async loadPhotos() {
-        this.showLoading();
+    // Albums Management
+    async loadSmugMugAlbums() {
+        this.showAlbumsLoading();
         
         try {
-            const response = await fetch(`${this.apiBase}/photos?skip=0&limit=${this.photosPerPage}`);
+            const response = await fetch(`${this.apiBase}/smugmug/albums`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
-            this.photos = await response.json();
-            this.displayPhotos(this.photos);
-            this.hideLoading();
+            this.smugmugAlbums = await response.json();
+            this.displayAlbums();
+            this.hideAlbumsLoading();
+            
+        } catch (error) {
+            console.error('Failed to load SmugMug albums:', error);
+            this.showErrorMessage('Failed to Load Albums', 'Could not fetch albums from SmugMug. Please check your connection and try again.', error.message);
+            this.hideAlbumsLoading();
+        }
+    }
+
+    displayAlbums() {
+        const albumsList = document.getElementById('albums-list');
+        const albumCount = document.getElementById('album-count');
+        
+        // Clear loading state
+        const loading = document.getElementById('loading-albums');
+        if (loading) loading.remove();
+        
+        albumCount.textContent = this.smugmugAlbums.length.toString();
+        
+        albumsList.innerHTML = '';
+        
+        if (this.smugmugAlbums.length === 0) {
+            albumsList.innerHTML = `
+                <div class="p-4 text-center text-gray-500">
+                    <p class="text-sm">No albums found</p>
+                </div>
+            `;
+            return;
+        }
+        
+        this.smugmugAlbums.forEach(album => {
+            const albumElement = this.createAlbumListItem(album);
+            albumsList.appendChild(albumElement);
+        });
+    }
+
+    createAlbumListItem(album) {
+        const div = document.createElement('div');
+        div.className = `album-item p-3 border-b border-gray-200 hover:bg-white cursor-pointer transition-colors ${
+            this.currentAlbum && this.currentAlbum.smugmug_id === album.smugmug_id ? 'bg-blue-50 border-blue-200' : ''
+        }`;
+        
+        const syncStatus = album.is_synced ? 'synced' : 'not-synced';
+        const syncIcon = album.is_synced ? '✓' : '○';
+        const syncColor = album.is_synced ? 'text-green-600' : 'text-gray-400';
+        
+        // Processing statistics
+        const processed = album.ai_processed_count || 0;
+        const total = album.image_count || 0;
+        const processedPercent = total > 0 ? Math.round((processed / total) * 100) : 0;
+        
+        div.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center flex-1 min-w-0">
+                    <svg class="h-4 w-4 text-blue-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <span class="text-sm font-medium text-gray-900 truncate">${album.title}</span>
+                </div>
+                <span class="text-xs ${syncColor} ml-2">${syncIcon}</span>
+            </div>
+            
+            <div class="flex items-center justify-between text-xs text-gray-500">
+                <span>${total} photos</span>
+                <span class="text-green-600">${processed} processed</span>
+            </div>
+            
+            ${album.is_synced ? `
+                <div class="mt-2">
+                    <div class="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>AI Processing</span>
+                        <span>${processedPercent}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-1">
+                        <div class="bg-green-500 h-1 rounded-full transition-all" style="width: ${processedPercent}%"></div>
+                    </div>
+                </div>
+            ` : ''}
+        `;
+        
+        div.addEventListener('click', () => this.selectAlbum(album));
+        
+        return div;
+    }
+
+    async selectAlbum(album) {
+        this.currentAlbum = album;
+        
+        // Update UI
+        this.updateAlbumSelection();
+        this.showPhotosView();
+        await this.loadAlbumPhotos(album.smugmug_id);
+    }
+
+    updateAlbumSelection() {
+        // Update sidebar selection
+        document.querySelectorAll('.album-item').forEach(item => {
+            item.classList.remove('bg-blue-50', 'border-blue-200');
+        });
+        
+        // Find and highlight current album
+        const albumItems = document.querySelectorAll('.album-item');
+        albumItems.forEach(item => {
+            const title = item.querySelector('span.font-medium').textContent;
+            if (title === this.currentAlbum.title) {
+                item.classList.add('bg-blue-50', 'border-blue-200');
+            }
+        });
+        
+        // Update breadcrumb
+        document.getElementById('breadcrumb-arrow').classList.remove('hidden');
+        document.getElementById('breadcrumb-current').classList.remove('hidden');
+        document.getElementById('breadcrumb-current').textContent = this.currentAlbum.title;
+        
+        // Update photo panel header
+        document.getElementById('current-album-title').textContent = this.currentAlbum.title;
+        document.getElementById('album-stats').classList.remove('hidden');
+        document.getElementById('album-actions').classList.remove('hidden');
+        
+        // Update sync button based on sync status
+        const syncButton = document.getElementById('sync-album');
+        if (this.currentAlbum.is_synced) {
+            syncButton.textContent = 'Re-sync Album';
+            syncButton.className = 'text-sm px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700';
+        } else {
+            syncButton.textContent = 'Sync Album';
+            syncButton.className = 'text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700';
+        }
+    }
+
+    // Photos Management
+    async loadAlbumPhotos(albumId) {
+        this.showPhotosLoading();
+        this.clearSelection();
+        
+        try {
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            this.currentPhotos = await response.json();
+            this.displayPhotos();
+            this.updatePhotoStats();
+            this.hidePhotosLoading();
             
         } catch (error) {
             console.error('Failed to load photos:', error);
-            this.showError('Failed to load photos. Please try again.', error.message);
+            this.showErrorMessage('Failed to Load Photos', 'Could not fetch photos from this album.', error.message);
+            this.hidePhotosLoading();
         }
     }
 
-    async loadMorePhotos() {
-        const skip = this.photos.length;
+    displayPhotos() {
+        const photoGrid = document.getElementById('photo-grid');
+        const emptyState = document.getElementById('empty-photos');
+        const welcomeState = document.getElementById('welcome-state');
         
-        try {
-            const response = await fetch(`${this.apiBase}/photos?skip=${skip}&limit=${this.photosPerPage}`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const newPhotos = await response.json();
-            if (newPhotos.length > 0) {
-                this.photos = [...this.photos, ...newPhotos];
-                this.displayPhotos(this.photos);
-            } else {
-                document.getElementById('load-more-container').classList.add('hidden');
-            }
-        } catch (error) {
-            console.error('Failed to load more photos:', error);
-        }
-    }
-
-    async performSearch() {
-        const query = document.getElementById('search-input').value.trim();
-        const searchType = document.getElementById('search-type').value;
+        // Hide states
+        welcomeState.classList.add('hidden');
+        emptyState.classList.add('hidden');
         
-        if (!query) return;
-        
-        this.showLoading();
-        
-        try {
-            const response = await fetch(`${this.apiBase}/search?q=${encodeURIComponent(query)}&search_type=${searchType}`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const searchResults = await response.json();
-            this.currentSearch = searchResults;
-            
-            // Convert search results to photo format
-            const searchPhotos = searchResults.photos.map(result => ({
-                ...result.photo,
-                searchScore: result.score,
-                aiDescription: result.description,
-                aiKeywords: result.ai_keywords
-            }));
-            
-            this.displayPhotos(searchPhotos, true);
-            this.showSearchInfo(searchResults);
-            this.hideLoading();
-            
-        } catch (error) {
-            console.error('Search failed:', error);
-            this.showError('Search failed. Please try again.', error.message);
-        }
-    }
-
-    clearSearch() {
-        this.currentSearch = null;
-        document.getElementById('search-input').value = '';
-        document.getElementById('search-info').classList.add('hidden');
-        this.displayPhotos(this.photos);
-    }
-
-    displayPhotos(photos, isSearchResult = false) {
-        const gallery = document.getElementById('photo-gallery');
-        const grid = document.getElementById('photo-grid');
-        const emptyState = document.getElementById('empty-state');
-        const galleryCount = document.getElementById('gallery-count');
-        const loadMoreContainer = document.getElementById('load-more-container');
-        
-        if (photos.length === 0) {
-            gallery.classList.add('hidden');
+        if (this.currentPhotos.length === 0) {
+            photoGrid.classList.add('hidden');
             emptyState.classList.remove('hidden');
             return;
         }
         
-        emptyState.classList.add('hidden');
-        gallery.classList.remove('hidden');
+        // Show photo controls
+        document.getElementById('photo-controls').classList.remove('hidden');
         
-        // Update count
-        if (isSearchResult) {
-            galleryCount.textContent = `Found ${photos.length} matching photos`;
-        } else {
-            galleryCount.textContent = `${photos.length} photos synced from SmugMug`;
+        // Filter photos if needed
+        let photosToShow = this.currentPhotos;
+        if (this.statusFilter) {
+            photosToShow = this.currentPhotos.filter(photo => photo.processing_status === this.statusFilter);
         }
         
-        // Clear and populate grid
-        grid.innerHTML = '';
-        photos.forEach(photo => {
-            const photoCard = this.createPhotoCard(photo, isSearchResult);
-            grid.appendChild(photoCard);
+        photoGrid.classList.remove('hidden');
+        photoGrid.innerHTML = '';
+        
+        photosToShow.forEach(photo => {
+            const photoElement = this.createPhotoCard(photo);
+            photoGrid.appendChild(photoElement);
         });
-        
-        // Show/hide load more button
-        if (isSearchResult || photos.length < this.photosPerPage) {
-            loadMoreContainer.classList.add('hidden');
-        } else {
-            loadMoreContainer.classList.remove('hidden');
-        }
     }
 
-    createPhotoCard(photo, isSearchResult = false) {
-        const card = document.createElement('div');
-        card.className = 'bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden';
+    createPhotoCard(photo) {
+        const div = document.createElement('div');
+        div.className = 'photo-card relative group cursor-pointer';
         
-        // Search score badge
-        const scoreBadge = isSearchResult && photo.searchScore ? 
-            `<div class="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
-                ${(photo.searchScore * 100).toFixed(0)}%
-            </div>` : '';
+        // Status indicator styling
+        const statusConfig = {
+            'completed': { color: 'bg-green-500', icon: '✓', text: 'Processed' },
+            'processing': { color: 'bg-yellow-500', icon: '⏳', text: 'Processing' },
+            'failed': { color: 'bg-red-500', icon: '✗', text: 'Failed' },
+            'not_processed': { color: 'bg-orange-500', icon: '○', text: 'Not Processed' },
+            'not_synced': { color: 'bg-gray-400', icon: '○', text: 'Not Synced' }
+        };
         
-        // AI indicator
-        const aiIndicator = photo.ai_metadata || photo.aiDescription ? 
-            `<div class="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                🤖 AI
-            </div>` : '';
+        const status = photo.processing_status || 'not_synced';
+        const statusInfo = statusConfig[status];
         
-        card.innerHTML = `
-            <div class="relative aspect-square">
+        div.innerHTML = `
+            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
                 <img 
-                    src="${photo.thumbnail_url || photo.image_url}" 
+                    src="${photo.thumbnail_url}" 
                     alt="${photo.title || 'Photo'}"
                     class="w-full h-full object-cover"
                     loading="lazy"
-                >
-                ${scoreBadge}
-                ${aiIndicator}
+                />
+                
+                <!-- Status indicator -->
+                <div class="absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center">
+                    <span class="mr-1">${statusInfo.icon}</span>
+                    <span class="hidden sm:inline">${statusInfo.text}</span>
+                </div>
+                
+                <!-- Selection checkbox (only for synced photos) -->
+                ${photo.is_synced ? `
+                    <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <input type="checkbox" 
+                               class="photo-checkbox w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500" 
+                               data-photo-id="${photo.smugmug_id}"
+                               onclick="event.stopPropagation()">
+                    </div>
+                ` : ''}
+                
+                <!-- Hover overlay -->
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                    <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                </div>
             </div>
-            <div class="p-3">
-                <div class="text-sm text-gray-900 font-medium truncate">
-                    ${photo.title || 'Untitled'}
-                </div>
-                <div class="text-xs text-gray-500 mt-1">
-                    ${photo.album_name || 'No album'}
-                </div>
-                ${isSearchResult && photo.aiDescription ? 
-                    `<div class="text-xs text-blue-600 mt-2 line-clamp-2">
-                        ${photo.aiDescription.substring(0, 100)}...
-                    </div>` : ''}
+            
+            <!-- Photo info -->
+            <div class="mt-2">
+                <p class="text-xs text-gray-600 truncate">${photo.filename || photo.title || 'Untitled'}</p>
+                <p class="text-xs text-gray-400">${photo.width}×${photo.height}</p>
             </div>
         `;
         
-        card.addEventListener('click', () => this.showPhotoModal(photo));
+        // Add click handler
+        div.addEventListener('click', (e) => {
+            if (e.target.type === 'checkbox') return;
+            this.showPhotoModal(photo);
+        });
         
-        return card;
+        // Add checkbox handler
+        const checkbox = div.querySelector('.photo-checkbox');
+        if (checkbox) {
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+                this.togglePhotoSelection(photo.smugmug_id, e.target.checked);
+            });
+        }
+        
+        return div;
     }
 
-    async showPhotoModal(photo) {
-        const modal = document.getElementById('photo-modal');
-        
-        // Set basic photo info
-        document.getElementById('modal-image').src = photo.image_url;
-        document.getElementById('modal-image').alt = photo.title || 'Photo';
-        document.getElementById('modal-dimensions').textContent = 
-            photo.width && photo.height ? `${photo.width} × ${photo.height}` : 'Unknown dimensions';
-        document.getElementById('modal-album').textContent = `Album: ${photo.album_name || 'None'}`;
-        
-        // Set original metadata
-        document.getElementById('modal-original-title').innerHTML = 
-            photo.title ? `<strong>Title:</strong> ${photo.title}` : '<em>No title</em>';
-        document.getElementById('modal-original-caption').innerHTML = 
-            photo.caption ? `<strong>Caption:</strong> ${photo.caption}` : '<em>No caption</em>';
-        
-        const originalKeywords = document.getElementById('modal-original-keywords');
-        if (photo.keywords && photo.keywords.length > 0) {
-            originalKeywords.innerHTML = '<strong>Keywords:</strong> ' + 
-                photo.keywords.map(k => `<span class="bg-gray-200 px-2 py-1 rounded text-xs">${k}</span>`).join(' ');
+    // Selection Management
+    togglePhotoSelection(photoId, isSelected) {
+        if (isSelected) {
+            this.selectedPhotos.add(photoId);
         } else {
-            originalKeywords.innerHTML = '<em>No keywords</em>';
+            this.selectedPhotos.delete(photoId);
         }
-        
-        // Try to get AI metadata if not already present
-        let aiMetadata = photo.ai_metadata || (photo.aiDescription ? {
-            description: photo.aiDescription,
-            ai_keywords: photo.aiKeywords || []
-        } : null);
-        
-        if (!aiMetadata && photo.id) {
-            try {
-                const response = await fetch(`${this.apiBase}/photos/${photo.id}`);
-                if (response.ok) {
-                    const fullPhoto = await response.json();
-                    aiMetadata = fullPhoto.ai_metadata;
-                }
-            } catch (error) {
-                console.error('Failed to fetch AI metadata:', error);
-            }
-        }
-        
-        // Display AI metadata or processing option
-        const aiSection = document.getElementById('modal-ai-section');
-        const noAiSection = document.getElementById('modal-no-ai');
-        
-        if (aiMetadata) {
-            aiSection.classList.remove('hidden');
-            noAiSection.classList.add('hidden');
-            
-            document.getElementById('modal-ai-description').textContent = aiMetadata.description;
-            document.getElementById('modal-ai-confidence').textContent = 
-                aiMetadata.confidence_score ? `${(aiMetadata.confidence_score * 100).toFixed(0)}% confidence` : '';
-            
-            const aiKeywords = document.getElementById('modal-ai-keywords');
-            if (aiMetadata.ai_keywords && aiMetadata.ai_keywords.length > 0) {
-                aiKeywords.innerHTML = aiMetadata.ai_keywords
-                    .map(k => `<span class="bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs">${k}</span>`)
-                    .join(' ');
-            } else {
-                aiKeywords.innerHTML = '<em>No AI keywords generated</em>';
-            }
-            
-            document.getElementById('modal-ai-timestamp').textContent = 
-                aiMetadata.processed_at ? `Processed: ${new Date(aiMetadata.processed_at).toLocaleDateString()}` : '';
-        } else {
-            aiSection.classList.add('hidden');
-            noAiSection.classList.remove('hidden');
-            
-            // Store photo ID for AI processing
-            document.getElementById('modal-process-button').dataset.photoId = photo.id;
-        }
-        
-        modal.classList.remove('hidden');
+        this.updateSelectionUI();
     }
 
-    async processPhotoWithAI() {
-        const button = document.getElementById('modal-process-button');
-        const photoId = button.dataset.photoId;
+    selectAllPhotos() {
+        const syncedPhotos = this.currentPhotos.filter(p => p.is_synced);
+        syncedPhotos.forEach(photo => {
+            this.selectedPhotos.add(photo.smugmug_id);
+            const checkbox = document.querySelector(`[data-photo-id="${photo.smugmug_id}"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+        this.updateSelectionUI();
+    }
+
+    clearSelection() {
+        this.selectedPhotos.clear();
+        document.querySelectorAll('.photo-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        this.updateSelectionUI();
+    }
+
+    updateSelectionUI() {
+        const count = this.selectedPhotos.size;
+        document.getElementById('selection-count').textContent = `${count} selected`;
+        document.getElementById('process-selected').disabled = count === 0;
+    }
+
+    // Processing
+    async syncCurrentAlbum() {
+        if (!this.currentAlbum) return;
         
-        if (!photoId) return;
-        
+        const button = document.getElementById('sync-album');
         const originalText = button.textContent;
-        button.textContent = 'Processing...';
+        
+        button.textContent = 'Syncing...';
         button.disabled = true;
         
         try {
-            const response = await fetch(`${this.apiBase}/photos/${photoId}/process`, {
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${this.currentAlbum.smugmug_id}/sync`, {
                 method: 'POST'
             });
             
@@ -320,55 +438,463 @@ class TargetVisionApp {
             
             const result = await response.json();
             
-            // Refresh the modal with new AI metadata
-            const photoResponse = await fetch(`${this.apiBase}/photos/${photoId}`);
-            if (photoResponse.ok) {
-                const updatedPhoto = await photoResponse.json();
-                this.showPhotoModal(updatedPhoto);
-            }
+            // Reload albums and photos
+            await this.loadSmugMugAlbums();
+            await this.loadAlbumPhotos(this.currentAlbum.smugmug_id);
+            
+            // Update current album reference
+            this.currentAlbum = this.smugmugAlbums.find(a => a.smugmug_id === this.currentAlbum.smugmug_id);
+            this.updateAlbumSelection();
+            
+            this.showSuccessMessage('Album Synced', `Successfully synced ${result.synced_photos} photos from "${result.album_name}"`);
             
         } catch (error) {
-            console.error('AI processing failed:', error);
-            alert('AI processing failed. Please try again.');
+            console.error('Album sync failed:', error);
+            this.showErrorMessage('Sync Failed', 'Could not sync album with local database.', error.message);
         } finally {
             button.textContent = originalText;
             button.disabled = false;
         }
     }
 
+    async processSelectedPhotos() {
+        if (this.selectedPhotos.size === 0) return;
+        
+        const photoIds = Array.from(this.selectedPhotos);
+        
+        // Find local photo IDs for selected SmugMug IDs
+        const localPhotoIds = [];
+        for (const smugmugId of photoIds) {
+            const photo = this.currentPhotos.find(p => p.smugmug_id === smugmugId);
+            if (photo && photo.local_photo_id) {
+                localPhotoIds.push(photo.local_photo_id);
+            }
+        }
+        
+        if (localPhotoIds.length === 0) {
+            this.showErrorMessage('Processing Error', 'Selected photos must be synced before processing.');
+            return;
+        }
+        
+        this.showBatchProgress(0, localPhotoIds.length, 0);
+        
+        try {
+            // Update status to processing
+            await fetch(`${this.apiBase}/photos/update-status?status=processing`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(localPhotoIds)
+            });
+            
+            // Start batch processing
+            const response = await fetch(`${this.apiBase}/photos/process/batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(localPhotoIds)
+            });
+            
+            const result = await response.json();
+            
+            // Show final progress
+            this.showBatchProgress(result.total, result.total, result.processed);
+            
+            // Reload photos and albums
+            await this.loadAlbumPhotos(this.currentAlbum.smugmug_id);
+            await this.loadSmugMugAlbums();
+            
+            this.clearSelection();
+            
+            const message = `Batch processing completed! ${result.processed}/${result.total} photos processed successfully`;
+            if (result.processed !== result.total) {
+                const failed = result.total - result.processed;
+                this.showErrorMessage('Processing Completed with Errors', message + ` (${failed} failed)`);
+            } else {
+                this.showSuccessMessage('Processing Complete', message);
+            }
+            
+        } catch (error) {
+            console.error('Batch processing failed:', error);
+            this.hideBatchProgress();
+            this.showErrorMessage('Processing Failed', 'Batch processing failed. Please try again.');
+        }
+    }
+
+    // UI State Management
+    showAlbumsView() {
+        this.currentAlbum = null;
+        this.clearSelection();
+        
+        // Hide breadcrumb elements
+        document.getElementById('breadcrumb-arrow').classList.add('hidden');
+        document.getElementById('breadcrumb-current').classList.add('hidden');
+        
+        // Reset photo panel
+        document.getElementById('current-album-title').textContent = 'Select an album';
+        document.getElementById('album-stats').classList.add('hidden');
+        document.getElementById('album-actions').classList.add('hidden');
+        document.getElementById('photo-controls').classList.add('hidden');
+        
+        // Show welcome state
+        document.getElementById('welcome-state').classList.remove('hidden');
+        document.getElementById('photo-grid').classList.add('hidden');
+        document.getElementById('empty-photos').classList.add('hidden');
+        
+        // Update album selection
+        document.querySelectorAll('.album-item').forEach(item => {
+            item.classList.remove('bg-blue-50', 'border-blue-200');
+        });
+    }
+
+    showPhotosView() {
+        document.getElementById('welcome-state').classList.add('hidden');
+    }
+
+    showAlbumsLoading() {
+        const loading = document.getElementById('loading-albums');
+        if (!loading) {
+            const albumsList = document.getElementById('albums-list');
+            albumsList.innerHTML = `
+                <div id="loading-albums" class="p-4 text-center text-gray-500">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    Loading albums...
+                </div>
+            `;
+        }
+    }
+
+    hideAlbumsLoading() {
+        const loading = document.getElementById('loading-albums');
+        if (loading) loading.remove();
+    }
+
+    showPhotosLoading() {
+        document.getElementById('loading-photos').classList.remove('hidden');
+        document.getElementById('photo-grid').classList.add('hidden');
+        document.getElementById('empty-photos').classList.add('hidden');
+        document.getElementById('welcome-state').classList.add('hidden');
+    }
+
+    hidePhotosLoading() {
+        document.getElementById('loading-photos').classList.add('hidden');
+    }
+
+    showBatchProgress(processed, total, success) {
+        const progressContainer = document.getElementById('batch-progress');
+        const progressText = document.getElementById('batch-progress-text');
+        const progressBar = document.getElementById('batch-progress-bar');
+        
+        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+        
+        progressText.textContent = `${processed}/${total}`;
+        progressBar.style.width = `${percentage}%`;
+        progressContainer.classList.remove('hidden');
+        
+        if (processed >= total) {
+            setTimeout(() => {
+                progressContainer.classList.add('hidden');
+            }, 3000);
+        }
+    }
+
+    hideBatchProgress() {
+        document.getElementById('batch-progress').classList.add('hidden');
+    }
+
+    updatePhotoStats() {
+        if (!this.currentAlbum) return;
+        
+        const totalPhotos = this.currentAlbum.image_count || 0;
+        const processedPhotos = this.currentAlbum.ai_processed_count || 0;
+        
+        document.getElementById('photo-count').textContent = `${totalPhotos} photos`;
+        document.getElementById('processing-stats').textContent = `${processedPhotos} processed`;
+    }
+
+    filterPhotos(status) {
+        this.statusFilter = status;
+        this.displayPhotos();
+    }
+
+    async refreshCurrentPhotos() {
+        if (this.currentAlbum) {
+            await this.loadAlbumPhotos(this.currentAlbum.smugmug_id);
+        }
+    }
+
+    // Utility Methods
+    showSuccessMessage(title, message) {
+        // Could implement toast notification here
+        alert(`${title}: ${message}`);
+    }
+
+    showErrorMessage(title, message, details = null) {
+        console.error(`${title}: ${message}`, details);
+        // Could implement proper error toast here
+        alert(`${title}: ${message}`);
+    }
+
+    showConnectionError() {
+        const statusElement = document.getElementById('connection-status');
+        if (statusElement) {
+            statusElement.innerHTML = `
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                    <span class="text-yellow-800 text-sm">⚠️ Connection issues detected. Some features may not work properly.</span>
+                </div>
+            `;
+            statusElement.classList.remove('hidden');
+        }
+    }
+
+    // Page Navigation
+    showPage(pageName) {
+        // Hide all pages
+        document.getElementById('page-albums').classList.add('hidden');
+        document.getElementById('page-chat').classList.add('hidden');
+        document.getElementById('page-search').classList.add('hidden');
+        
+        // Remove active state from all nav tabs
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.classList.remove('nav-tab-active');
+        });
+        
+        // Show selected page and activate tab
+        document.getElementById(`page-${pageName}`).classList.remove('hidden');
+        document.getElementById(`nav-${pageName}`).classList.add('nav-tab-active');
+        
+        this.currentPage = pageName;
+        
+        // Initialize page if needed
+        if (pageName === 'chat' && this.chatMessages.length === 0) {
+            this.initializeChatPage();
+        } else if (pageName === 'search') {
+            this.initializeSearchPage();
+        }
+    }
+    
+    initializeChatPage() {
+        // Chat page is ready by default with welcome message
+        console.log('Chat page initialized');
+    }
+    
+    initializeSearchPage() {
+        // Search page is ready by default with welcome state
+        console.log('Search page initialized');
+    }
+
+    // Chat Functionality
+    async sendChatMessage() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        
+        if (!message) return;
+        
+        // Add user message to UI
+        this.addChatMessage('user', message);
+        input.value = '';
+        document.getElementById('chat-send').disabled = true;
+        
+        try {
+            // Call chat API (placeholder for now)
+            this.addChatMessage('system', 'Chat functionality is not yet implemented. This will connect to your photo search and AI analysis system.');
+            
+        } catch (error) {
+            console.error('Chat error:', error);
+            this.addChatMessage('system', 'Sorry, there was an error processing your message.');
+        }
+    }
+    
+    addChatMessage(sender, message) {
+        const messagesContainer = document.getElementById('chat-messages');
+        
+        // Remove welcome state if it exists
+        const welcomeState = messagesContainer.querySelector('.flex.flex-col.items-center.justify-center');
+        if (welcomeState) {
+            welcomeState.remove();
+        }
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+        
+        const bubbleClass = sender === 'user' 
+            ? 'bg-blue-600 text-white' 
+            : 'bg-gray-100 text-gray-900';
+            
+        messageDiv.innerHTML = `
+            <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${bubbleClass}">
+                <p class="text-sm">${message}</p>
+                <p class="text-xs mt-1 opacity-70">${new Date().toLocaleTimeString()}</p>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        this.chatMessages.push({ sender, message, timestamp: new Date() });
+    }
+    
+    clearChat() {
+        const messagesContainer = document.getElementById('chat-messages');
+        messagesContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Start a Conversation</h3>
+                <p class="text-center max-w-md mb-4">Ask me anything about your SmugMug photos! I can help you find specific images, understand their content, or answer questions about your collection.</p>
+                <div class="text-sm text-gray-500 space-y-1">
+                    <p><strong>Try asking:</strong></p>
+                    <p>"Show me photos with medals"</p>
+                    <p>"Find archery competition images"</p>
+                    <p>"What photos have been processed with AI?"</p>
+                </div>
+            </div>
+        `;
+        this.chatMessages = [];
+    }
+
+    // Search Functionality  
+    async performMainSearch() {
+        const input = document.getElementById('search-main-input');
+        const query = input.value.trim();
+        const searchType = document.getElementById('search-main-type').value;
+        
+        if (!query) return;
+        
+        this.showSearchLoading();
+        
+        try {
+            const response = await fetch(`${this.apiBase}/search?q=${encodeURIComponent(query)}&search_type=${searchType}&limit=50`);
+            const results = await response.json();
+            
+            this.searchResults = results.photos || [];
+            this.displaySearchResults(query, results);
+            this.hideSearchLoading();
+            
+        } catch (error) {
+            console.error('Search error:', error);
+            this.hideSearchLoading();
+            this.showSearchError('Search failed. Please try again.');
+        }
+    }
+    
+    displaySearchResults(query, results) {
+        const welcomeState = document.getElementById('search-welcome');
+        const loadingState = document.getElementById('search-loading');
+        const resultsGrid = document.getElementById('search-results-grid');
+        const noResults = document.getElementById('search-no-results');
+        const infoSection = document.getElementById('search-main-info');
+        const resultsText = document.getElementById('search-main-results-text');
+        
+        // Hide states
+        welcomeState.classList.add('hidden');
+        loadingState.classList.add('hidden');
+        noResults.classList.add('hidden');
+        
+        // Show results info
+        infoSection.classList.remove('hidden');
+        resultsText.textContent = `Found ${results.results} results for "${query}"`;
+        
+        if (this.searchResults.length === 0) {
+            noResults.classList.remove('hidden');
+            resultsGrid.classList.add('hidden');
+            return;
+        }
+        
+        // Display results
+        resultsGrid.classList.remove('hidden');
+        const gridContainer = resultsGrid.querySelector('.grid');
+        gridContainer.innerHTML = '';
+        
+        this.searchResults.forEach(result => {
+            const photoCard = this.createSearchResultCard(result);
+            gridContainer.appendChild(photoCard);
+        });
+    }
+    
+    createSearchResultCard(result) {
+        const div = document.createElement('div');
+        div.className = 'search-result-card relative group cursor-pointer';
+        
+        const photo = result.photo || result;
+        const score = result.score || 0;
+        
+        div.innerHTML = `
+            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
+                <img 
+                    src="${photo.thumbnail_url}" 
+                    alt="${photo.title || 'Search result'}"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                />
+                
+                <!-- Relevance score -->
+                <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                    ${Math.round(score * 100)}%
+                </div>
+                
+                <!-- Hover overlay -->
+                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                    <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Photo info -->
+            <div class="mt-2">
+                <p class="text-xs text-gray-600 truncate">${photo.title || 'Untitled'}</p>
+                <p class="text-xs text-gray-400">${photo.album_name || ''}</p>
+            </div>
+        `;
+        
+        div.addEventListener('click', () => this.showPhotoModal(photo));
+        
+        return div;
+    }
+    
+    showSearchLoading() {
+        document.getElementById('search-welcome').classList.add('hidden');
+        document.getElementById('search-results-grid').classList.add('hidden');
+        document.getElementById('search-no-results').classList.add('hidden');
+        document.getElementById('search-loading').classList.remove('hidden');
+    }
+    
+    hideSearchLoading() {
+        document.getElementById('search-loading').classList.add('hidden');
+    }
+    
+    showSearchError(message) {
+        console.error('Search error:', message);
+        // Could show error toast here
+    }
+    
+    clearMainSearch() {
+        document.getElementById('search-main-input').value = '';
+        document.getElementById('search-main-info').classList.add('hidden');
+        document.getElementById('search-results-grid').classList.add('hidden');
+        document.getElementById('search-no-results').classList.add('hidden');
+        document.getElementById('search-welcome').classList.remove('hidden');
+        this.searchResults = [];
+    }
+
+    // Modal and other functionality
+    async showPhotoModal(photo) {
+        console.log('Show modal for photo:', photo);
+        // Modal implementation can be added later
+    }
+
     closeModal() {
         document.getElementById('photo-modal').classList.add('hidden');
     }
 
-    showSearchInfo(searchResults) {
-        const searchInfo = document.getElementById('search-info');
-        const searchText = document.getElementById('search-results-text');
-        
-        searchText.textContent = `Found ${searchResults.results} photos matching "${searchResults.query}" using ${searchResults.search_type} search`;
-        searchInfo.classList.remove('hidden');
+    async syncAllAlbums() {
+        console.log('Sync all albums functionality to be implemented');
     }
 
-    showLoading() {
-        document.getElementById('loading').classList.remove('hidden');
-        document.getElementById('photo-gallery').classList.add('hidden');
-        document.getElementById('empty-state').classList.add('hidden');
-        document.getElementById('error').classList.add('hidden');
-    }
-
-    hideLoading() {
-        document.getElementById('loading').classList.add('hidden');
-    }
-
-    showError(message, details = '') {
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('photo-gallery').classList.add('hidden');
-        document.getElementById('empty-state').classList.add('hidden');
-        
-        const errorDiv = document.getElementById('error');
-        const errorMessage = document.getElementById('error-message');
-        
-        errorMessage.textContent = details ? `${message} (${details})` : message;
-        errorDiv.classList.remove('hidden');
+    async processPhotoWithAI() {
+        console.log('Individual photo processing to be implemented');
     }
 }
 
@@ -376,15 +902,3 @@ class TargetVisionApp {
 document.addEventListener('DOMContentLoaded', () => {
     new TargetVisionApp();
 });
-
-// Add utility CSS classes for line clamping
-const style = document.createElement('style');
-style.textContent = `
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-`;
-document.head.appendChild(style);

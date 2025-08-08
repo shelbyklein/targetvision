@@ -19,14 +19,38 @@
         }
     </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen flex flex-col">
     <!-- Header -->
     <header class="bg-white shadow-sm border-b">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <h1 class="text-2xl font-bold text-gray-900">🎯 TargetVision</h1>
-                    <span class="ml-3 text-sm text-gray-500">AI-Powered Photo Discovery</span>
+                <div class="flex items-center space-x-8">
+                    <div class="flex items-center">
+                        <h1 class="text-2xl font-bold text-gray-900">🎯 TargetVision</h1>
+                        <span class="ml-3 text-sm text-gray-500">AI-Powered Photo Discovery</span>
+                    </div>
+                    
+                    <!-- Navigation Tabs -->
+                    <nav class="flex space-x-1">
+                        <button id="nav-albums" class="nav-tab nav-tab-active px-4 py-2 text-sm font-medium rounded-md transition-colors">
+                            <svg class="h-4 w-4 mr-2 inline" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                            </svg>
+                            Albums
+                        </button>
+                        <button id="nav-chat" class="nav-tab px-4 py-2 text-sm font-medium rounded-md transition-colors">
+                            <svg class="h-4 w-4 mr-2 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                            </svg>
+                            Chat
+                        </button>
+                        <button id="nav-search" class="nav-tab px-4 py-2 text-sm font-medium rounded-md transition-colors">
+                            <svg class="h-4 w-4 mr-2 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            Search
+                        </button>
+                    </nav>
                 </div>
                 
                 <!-- Authentication Status -->
@@ -48,93 +72,313 @@
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Search Section -->
-        <div class="mb-8">
-            <div class="flex flex-col sm:flex-row gap-4">
-                <!-- Search Input -->
-                <div class="flex-1 relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- Connection Status -->
+        <div id="connection-status" class="hidden mb-4 mx-4 mt-4"></div>
+        
+        <!-- Error Toast -->
+        <div id="error-toast" class="hidden mb-4 mx-4"></div>
+
+        <!-- Albums Page -->
+        <div id="page-albums" class="flex-1 flex flex-col overflow-hidden">
+            <!-- Navigation Breadcrumb -->
+            <nav id="breadcrumb" class="flex items-center space-x-2 text-sm text-gray-500 mb-4 mx-4">
+                <button id="breadcrumb-albums" class="hover:text-primary flex items-center">
+                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
+                    </svg>
+                    SmugMug Albums
+                </button>
+                <svg id="breadcrumb-arrow" class="h-4 w-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <span id="breadcrumb-current" class="text-gray-900 font-medium hidden"></span>
+            </nav>
+
+            <!-- Main Finder-Style Layout -->
+            <div class="flex-1 flex overflow-hidden bg-white mx-4 mb-4 border border-gray-300 rounded-lg shadow-sm">
+                
+                <!-- Left Sidebar: Albums -->
+                <div id="albums-sidebar" class="w-80 border-r border-gray-300 bg-gray-50 flex flex-col">
+                    <!-- Sidebar Header -->
+                    <div class="p-4 border-b border-gray-300 bg-gray-100">
+                        <div class="flex items-center justify-between">
+                            <h2 class="font-semibold text-gray-900 flex items-center">
+                                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                </svg>
+                                Albums
+                            </h2>
+                            <span id="album-count" class="text-xs text-gray-600 bg-white px-2 py-1 rounded">0</span>
+                        </div>
+                        
+                        <!-- Sync All Button -->
+                        <button id="sync-all-albums" class="mt-3 w-full text-sm px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                            Sync All Albums
+                        </button>
                     </div>
-                    <input 
-                        id="search-input" 
-                        type="text" 
-                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary" 
-                        placeholder="Search your photos by content (e.g., 'archery medals', 'buckeye classic')..."
-                    >
+                    
+                    <!-- Albums List -->
+                    <div id="albums-list" class="flex-1 overflow-y-auto">
+                        <div id="loading-albums" class="p-4 text-center text-gray-500">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                            Loading albums...
+                        </div>
+                        <!-- Albums will be inserted here -->
+                    </div>
                 </div>
                 
-                <!-- Search Type Selector -->
-                <select id="search-type" class="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary">
-                    <option value="hybrid">Smart Search</option>
-                    <option value="text">Text Search</option>
-                    <option value="vector">Visual Search</option>
-                </select>
-                
-                <!-- Search Button -->
-                <button 
-                    id="search-button" 
-                    class="px-6 py-2 bg-primary text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
-                >
-                    Search
-                </button>
-            </div>
-            
-            <!-- Search Results Info -->
-            <div id="search-info" class="mt-4 hidden">
-                <div class="flex items-center justify-between">
-                    <p id="search-results-text" class="text-sm text-gray-600"></p>
-                    <button id="clear-search" class="text-sm text-primary hover:text-blue-600">Clear Search</button>
+                <!-- Right Panel: Photos -->
+                <div id="photos-panel" class="flex-1 flex flex-col">
+                    
+                    <!-- Photos Header -->
+                    <div id="photos-header" class="p-4 border-b border-gray-300 bg-gray-100">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center">
+                                <h2 id="current-album-title" class="font-semibold text-gray-900">Select an album</h2>
+                                <div id="album-stats" class="ml-4 text-sm text-gray-600 hidden">
+                                    <span id="photo-count">0 photos</span> • 
+                                    <span id="processing-stats">0 processed</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Album Actions -->
+                            <div id="album-actions" class="flex items-center space-x-2 hidden">
+                                <button id="sync-album" class="text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+                                    Sync Album
+                                </button>
+                                <button id="refresh-photos" class="text-sm px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Photo Controls -->
+                        <div id="photo-controls" class="flex items-center justify-between hidden">
+                            <div class="flex items-center space-x-3">
+                                <button id="select-all" class="text-sm px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
+                                    Select All
+                                </button>
+                                <button id="select-none" class="text-sm px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
+                                    Clear
+                                </button>
+                                <span id="selection-count" class="text-sm text-gray-600">0 selected</span>
+                                
+                                <!-- Status Filter -->
+                                <select id="status-filter" class="text-sm px-2 py-1 border border-gray-300 rounded bg-white">
+                                    <option value="">All Photos</option>
+                                    <option value="not_synced">Not Synced</option>
+                                    <option value="not_processed">Not Processed</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+                            
+                            <button id="process-selected" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50" disabled>
+                                Process Selected
+                            </button>
+                        </div>
+                        
+                        <!-- Batch Processing Progress -->
+                        <div id="batch-progress" class="hidden mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-medium text-blue-800">Processing Photos</span>
+                                <span id="batch-progress-text" class="text-sm text-blue-600">0/0</span>
+                            </div>
+                            <div class="w-full bg-blue-200 rounded-full h-2">
+                                <div id="batch-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Photos Grid -->
+                    <div id="photos-content" class="flex-1 overflow-y-auto p-4">
+                        <!-- Welcome State -->
+                        <div id="welcome-state" class="flex flex-col items-center justify-center h-full text-gray-500">
+                            <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
+                            </svg>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">Browse Your SmugMug Photos</h3>
+                            <p class="text-center max-w-md">Select an album from the sidebar to view and process photos with AI. Photos will show their processing status with colored indicators.</p>
+                        </div>
+                        
+                        <!-- Loading State -->
+                        <div id="loading-photos" class="hidden flex flex-col items-center justify-center h-full">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                            <p class="text-gray-600">Loading photos...</p>
+                        </div>
+                        
+                        <!-- Photo Grid -->
+                        <div id="photo-grid" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                            <!-- Photos will be inserted here -->
+                        </div>
+                        
+                        <!-- Empty State -->
+                        <div id="empty-photos" class="hidden flex flex-col items-center justify-center h-full text-gray-500">
+                            <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No Photos Found</h3>
+                            <p class="text-center">This album appears to be empty or the photos couldn't be loaded.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Loading State -->
-        <div id="loading" class="text-center py-12">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p class="mt-4 text-gray-600">Loading photos...</p>
+        <!-- Chat Page -->
+        <div id="page-chat" class="hidden flex-1 flex flex-col overflow-hidden">
+            <div class="flex-1 flex overflow-hidden bg-white mx-4 my-4 border border-gray-300 rounded-lg shadow-sm">
+                
+                <!-- Chat Container -->
+                <div class="flex-1 flex flex-col">
+                    <!-- Chat Header -->
+                    <div class="p-4 border-b border-gray-300 bg-gray-100">
+                        <div class="flex items-center justify-between">
+                            <h2 class="font-semibold text-gray-900 flex items-center">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                </svg>
+                                Chat with Your Photos
+                            </h2>
+                            <button id="clear-chat" class="text-sm px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
+                                Clear Chat
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-1">Ask questions about your photo collection using natural language</p>
+                    </div>
+                    
+                    <!-- Chat Messages -->
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <!-- Welcome Message -->
+                        <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                            <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                            </svg>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">Start a Conversation</h3>
+                            <p class="text-center max-w-md mb-4">Ask me anything about your SmugMug photos! I can help you find specific images, understand their content, or answer questions about your collection.</p>
+                            <div class="text-sm text-gray-500 space-y-1">
+                                <p><strong>Try asking:</strong></p>
+                                <p>"Show me photos with medals"</p>
+                                <p>"Find archery competition images"</p>
+                                <p>"What photos have been processed with AI?"</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Input -->
+                    <div class="p-4 border-t border-gray-300 bg-gray-50">
+                        <div class="flex space-x-3">
+                            <input 
+                                id="chat-input" 
+                                type="text" 
+                                placeholder="Ask me about your photos..."
+                                class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                            <button 
+                                id="chat-send" 
+                                class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                                disabled
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Error State -->
-        <div id="error" class="hidden text-center py-12">
-            <div class="text-red-500 text-6xl mb-4">⚠️</div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">Something went wrong</h3>
-            <p id="error-message" class="text-gray-600 mb-4"></p>
-            <button id="retry-button" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-600">
-                Retry
-            </button>
+        <!-- Search Page -->
+        <div id="page-search" class="hidden flex-1 flex flex-col overflow-hidden">
+            <div class="mx-4 my-4">
+                <!-- Search Header -->
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Search Your Photos</h2>
+                    <p class="text-gray-600">Find photos across your entire SmugMug collection using AI-powered search</p>
+                </div>
+                
+                <!-- Search Input Section -->
+                <div class="mb-6 p-6 bg-white border border-gray-300 rounded-lg shadow-sm">
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <!-- Search Input -->
+                        <div class="flex-1 relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                            <input 
+                                id="search-main-input" 
+                                type="text" 
+                                class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary text-lg" 
+                                placeholder="Search for medals, archery competitions, awards ceremonies..."
+                            >
+                        </div>
+                        
+                        <!-- Search Type Selector -->
+                        <select id="search-main-type" class="px-4 py-3 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary">
+                            <option value="hybrid">Smart Search</option>
+                            <option value="text">Text Search</option>
+                            <option value="vector">Visual Search</option>
+                        </select>
+                        
+                        <!-- Search Button -->
+                        <button 
+                            id="search-main-button" 
+                            class="px-8 py-3 bg-primary text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors font-medium"
+                        >
+                            Search
+                        </button>
+                    </div>
+                    
+                    <!-- Search Results Info -->
+                    <div id="search-main-info" class="mt-4 hidden">
+                        <div class="flex items-center justify-between">
+                            <p id="search-main-results-text" class="text-sm text-gray-600"></p>
+                            <button id="clear-main-search" class="text-sm text-primary hover:text-blue-600">Clear Search</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Search Results -->
+                <div id="search-results-container" class="bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden">
+                    <!-- Welcome State -->
+                    <div id="search-welcome" class="flex flex-col items-center justify-center p-12 text-gray-500">
+                        <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">Discover Your Photos</h3>
+                        <p class="text-center max-w-md">Use the search above to find specific photos in your collection. Our AI will search through photo content, metadata, and descriptions.</p>
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div id="search-loading" class="hidden flex flex-col items-center justify-center p-12">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                        <p class="text-gray-600">Searching your photos...</p>
+                    </div>
+                    
+                    <!-- Search Results Grid -->
+                    <div id="search-results-grid" class="hidden p-4">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                            <!-- Search results will be inserted here -->
+                        </div>
+                    </div>
+                    
+                    <!-- No Results State -->
+                    <div id="search-no-results" class="hidden flex flex-col items-center justify-center p-12 text-gray-500">
+                        <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">No Results Found</h3>
+                        <p class="text-center">Try different search terms or make sure your photos have been processed with AI first.</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Photo Gallery -->
-        <div id="photo-gallery" class="hidden">
-            <!-- Gallery Stats -->
-            <div id="gallery-stats" class="mb-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-2">Your Photos</h2>
-                <p id="gallery-count" class="text-sm text-gray-600"></p>
-            </div>
-            
-            <!-- Photo Grid -->
-            <div id="photo-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                <!-- Photos will be inserted here -->
-            </div>
-            
-            <!-- Load More Button -->
-            <div id="load-more-container" class="text-center mt-8 hidden">
-                <button id="load-more-button" class="px-6 py-3 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors">
-                    Load More Photos
-                </button>
-            </div>
-        </div>
-
-        <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center py-12">
-            <div class="text-gray-400 text-6xl mb-4">📷</div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">No Photos Found</h3>
-            <p class="text-gray-600">Your SmugMug photos will appear here once synced.</p>
-        </div>
     </main>
 
     <!-- Photo Detail Modal -->

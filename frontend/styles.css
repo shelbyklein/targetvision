@@ -327,3 +327,64 @@ img[loading="lazy"] {
     border-radius: 0.5rem;
     margin: 1rem 0;
 }
+
+/* Navigation tab styles */
+.nav-tab {
+    background-color: #f8fafc;
+    color: #64748b;
+    border: 1px solid transparent;
+}
+
+.nav-tab:hover {
+    background-color: #f1f5f9;
+    color: #475569;
+}
+
+.nav-tab-active {
+    background-color: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.nav-tab-active:hover {
+    background-color: #2563eb;
+    color: white;
+}
+
+/* Page transition effects */
+.page-transition {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+}
+
+.page-transition.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Chat message styles */
+.chat-message {
+    animation: slide-in 0.3s ease-out;
+}
+
+@keyframes slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Search result card styles */
+.search-result-card {
+    transition: all 0.3s ease;
+}
+
+.search-result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1);
+}
