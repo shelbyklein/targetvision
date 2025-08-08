@@ -1,33 +1,55 @@
 # MVP Development Guide
 
-## Objective
-Build a minimal viable product that can:
-1. Connect to SmugMug account via OAuth
-2. Sync photo metadata from SmugMug
-3. Process photos with Claude Vision API
-4. Enable basic search functionality
+## MVP Objective
+Build a minimal viable product in 2 weeks that demonstrates:
+1. ✅ SmugMug OAuth authentication works
+2. ✅ Can sync and display user's photos (limit 100 for MVP)
+3. ✅ AI generates meaningful descriptions via Claude Vision
+4. ✅ Vector search returns relevant results
+5. ✅ Basic web interface is functional
 
-## Phase 1: Foundation (Days 1-3)
+## Phase 1: Foundation (Days 1-2)
 
 ### 1.1 Project Setup
 ```bash
+# Create project structure
+mkdir -p targetvision/{backend,frontend,database,tests}
+cd targetvision
+
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install core dependencies
 pip install fastapi uvicorn python-dotenv httpx pillow
-pip install psycopg2-binary pgvector sqlalchemy
-pip install anthropic openai-clip-torch
+pip install psycopg2-binary pgvector sqlalchemy alembic
+pip install anthropic
+# Note: CLIP installation separate due to size
+pip install torch torchvision open-clip-torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ### 1.2 Environment Configuration
+
+#### Prerequisites - Get API Keys:
+1. **SmugMug API**: Register at https://api.smugmug.com/api/developer/apply
+2. **Anthropic Claude**: Get key from https://console.anthropic.com/
+
 Create `.env` file:
-```
-SMUGMUG_API_KEY=your_key
-SMUGMUG_API_SECRET=your_secret
-ANTHROPIC_API_KEY=your_claude_key
-DATABASE_URL=postgresql://user:pass@localhost/targetvision
+```bash
+# SmugMug OAuth (from SmugMug developer portal)
+SMUGMUG_API_KEY=your_api_key_here
+SMUGMUG_API_SECRET=your_api_secret_here
+SMUGMUG_CALLBACK_URL=http://localhost:8000/auth/callback
+
+# Claude Vision API
+ANTHROPIC_API_KEY=your_anthropic_key_here
+
+# Database (adjust for your PostgreSQL setup)
+DATABASE_URL=postgresql://postgres:password@localhost:5432/targetvision
+
+# Application
+SECRET_KEY=your-secret-key-generate-with-openssl-rand-hex-32
+DEBUG=true
 ```
 
 ### 1.3 Database Setup
@@ -55,7 +77,7 @@ CREATE TABLE ai_metadata (
 );
 ```
 
-## Phase 2: SmugMug Integration (Days 4-6)
+## Phase 2: SmugMug Integration (Days 3-4)
 
 ### 2.1 OAuth Implementation
 ```python
@@ -81,7 +103,7 @@ CREATE TABLE ai_metadata (
 - [ ] Photos appear in database
 - [ ] Pagination works for large albums
 
-## Phase 3: AI Processing (Days 7-9)
+## Phase 3: AI Processing (Days 5-6)
 
 ### 3.1 Image Processor
 ```python
@@ -108,7 +130,7 @@ CREATE TABLE ai_metadata (
 - [ ] Embeddings stored correctly
 - [ ] Batch processing completes
 
-## Phase 4: Search API (Days 10-11)
+## Phase 4: Search API (Days 7-8)
 
 ### 4.1 Search Endpoints
 ```python
@@ -129,7 +151,7 @@ GET  /search?q={query}
 - Return ranked results
 ```
 
-## Phase 5: Minimal Frontend (Days 12-14)
+## Phase 5: Minimal Frontend (Days 9-10)
 
 ### 5.1 Basic HTML Interface
 ```html
@@ -151,31 +173,54 @@ GET  /search?q={query}
 
 ## MVP Deliverables Checklist
 
-### Core Features
-- [ ] SmugMug OAuth connection
-- [ ] Photo metadata sync
-- [ ] AI description generation
-- [ ] Vector search functionality
-- [ ] Basic web interface
+### Week 1 Deliverables
+- [ ] FastAPI server running locally
+- [ ] PostgreSQL with pgvector configured
+- [ ] SmugMug OAuth flow working
+- [ ] Can fetch user's photos from SmugMug
+- [ ] Photos stored in database
 
-### Essential Endpoints
-- [ ] `/auth/smugmug` - OAuth flow
-- [ ] `/photos/sync` - Trigger sync
-- [ ] `/photos/process/batch` - Process photos
-- [ ] `/search` - Search photos
+### Week 2 Deliverables  
+- [ ] Claude Vision API integrated
+- [ ] AI descriptions generated for photos
+- [ ] Vector embeddings created and stored
+- [ ] Search endpoint returning results
+- [ ] Basic HTML/JS interface working
 
-### Minimal UI
-- [ ] Connect account button
-- [ ] Photo gallery view
-- [ ] Search bar
-- [ ] Results display
+### Essential API Endpoints
+```
+POST /auth/smugmug/request   - Start OAuth flow
+GET  /auth/smugmug/callback  - OAuth callback
+GET  /photos                  - List synced photos
+POST /photos/sync             - Sync from SmugMug
+POST /photos/{id}/process     - Process single photo
+GET  /search?q={query}        - Search photos
+```
 
-## Success Criteria
-1. User can authenticate with SmugMug
-2. System syncs at least 100 photos
-3. AI processes photos at 1 photo/second
-4. Search returns relevant results in <500ms
-5. UI is functional on desktop browsers
+### Minimal UI Pages
+- `index.html` - Landing page with "Connect SmugMug" button
+- `gallery.html` - Photo grid after authentication
+- `search.html` - Search interface and results
+
+## MVP Success Criteria
+
+### Technical Success
+✅ SmugMug OAuth completes without errors
+✅ Successfully sync 100 photos from user account
+✅ AI generates descriptions for 90%+ of photos
+✅ Vector search returns relevant results
+✅ Search response time < 1 second
+✅ No critical errors in 1-hour test session
+
+### User Experience Success
+✅ User can connect SmugMug in < 3 clicks
+✅ Photos display within 10 seconds of sync
+✅ Search finds relevant photos on first try
+✅ Interface works on Chrome/Firefox/Safari
+
+### Cost Success
+✅ Processing 100 photos costs < $1 in API fees
+✅ Can run on single $20/month server
 
 ## Next Steps After MVP
 - Add metadata editing interface

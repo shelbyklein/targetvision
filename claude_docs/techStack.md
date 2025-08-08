@@ -57,22 +57,32 @@ docker run -d \
 
 ### Python Dependencies
 ```txt
-# requirements.txt
+# requirements.txt - MVP essentials only
+# Core framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-dotenv==1.0.0
+
+# SmugMug OAuth
 httpx==0.25.0
-pillow==10.1.0
-anthropic==0.7.0
+oauthlib==3.2.2
+
+# Database
 psycopg2-binary==2.9.9
 pgvector==0.2.3
 sqlalchemy==2.0.23
 alembic==1.12.1
-python-jose[cryptography]==3.3.0
+
+# AI/ML
+anthropic==0.7.0
+pillow==10.1.0
+# Note: Install PyTorch separately based on your system:
+# CPU only: pip install torch torchvision open-clip-torch --index-url https://download.pytorch.org/whl/cpu
+# CUDA: pip install torch torchvision open-clip-torch
+
+# Utils
 python-multipart==0.0.6
-oauthlib==3.2.2
-torch==2.1.0
-open-clip-torch==2.23.0
+python-jose[cryptography]==3.3.0
 ```
 
 ### Database ORM
@@ -113,10 +123,24 @@ services:
 ### Hosting Options
 
 #### MVP/Development
-**Local Machine**
-- FastAPI: `uvicorn backend.main:app --reload`
-- PostgreSQL: Docker container
-- Frontend: Served by FastAPI
+**Local Machine Setup**
+```bash
+# Start PostgreSQL with pgvector
+docker run -d --name targetvision-db \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=targetvision \
+  -p 5432:5432 \
+  ankane/pgvector
+
+# Start FastAPI server
+cd targetvision
+source venv/bin/activate
+uvicorn backend.main:app --reload --port 8000
+
+# Access application
+# API docs: http://localhost:8000/docs
+# Frontend: http://localhost:8000/
+```
 
 #### Production Option 1: DigitalOcean
 **Droplet ($20/month)**
@@ -199,24 +223,26 @@ SECRET_KEY=<generated-secret>
 
 ## Cost Analysis
 
-### Monthly Estimates (1000 users)
+### Cost Estimates
 
-#### API Costs
-- Claude API: $300 (100k images @ $0.003)
-- SmugMug API: Free
-- Total: $300
+#### MVP Phase (100 photos)
+- Claude API: ~$0.30 (100 photos × $0.003)
+- Hosting: $0 (local development)
+- Total: **< $1**
 
-#### Infrastructure
-- Hosting: $20-50
-- Database: $15-30
-- CDN: $10-20
-- Monitoring: $0-20
-- Total: $45-120
+#### Pilot Phase (1000 photos, 10 users)
+- Claude API: $3 (1000 photos × $0.003)
+- Hosting: $20 (DigitalOcean droplet)
+- Database: $15 (managed PostgreSQL)
+- Total: **$38/month**
 
-#### Total Monthly Cost
-- MVP: $85
-- Production: $345-420
-- Per User: $0.35-0.42
+#### Production Phase (10k photos, 100 users)
+- Claude API: $30 (10k photos × $0.003)
+- Hosting: $50 (scaled droplets)
+- Database: $30 (larger instance)
+- Monitoring: $10
+- Total: **$120/month**
+- Per User: **$1.20/month**
 
 ## Migration Path
 

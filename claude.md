@@ -23,21 +23,19 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
 
 ## Architecture 
 
-### Backend Stack (Web API Server)
-- **Python with FastAPI**: For RESTful web API server
-- **PostgreSQL with pgvector**: For hybrid storage (metadata + vectors)
-- **LangChain or LlamaIndex**: For RAG pipeline orchestration
-- **Anthropic Claude**: For LLM capabilities
-- **CLIP or LLaVA**: For image understanding and embedding generation
-- **CORS middleware**: For secure cross-origin web requests
-- **WebSocket support**: For real-time chat communication
+### Backend Stack (Python API Server)
+- **Python 3.9+ with FastAPI**: Modern async web framework with automatic API documentation
+- **PostgreSQL 15+ with pgvector**: Hybrid storage for metadata and vector embeddings
+- **Anthropic Claude Vision API**: For generating photo descriptions and keywords
+- **CLIP (OpenAI)**: For generating searchable image embeddings
+- **SQLAlchemy 2.0**: ORM for database operations with async support
+- **CORS middleware**: For secure cross-origin requests from frontend
 
 ### Frontend Stack (Web Client)
-- **JAVASCRIPT** for frontend, no typescript
-- **Tailwind CSS**: For responsive web styling
-- **WebSocket client**: For real-time chat updates
-- **Fetch API**: For HTTP requests to backend
-- **React Query**: For efficient data fetching and caching
+- **Vanilla JavaScript (ES6+)**: No build step, maximum simplicity for MVP
+- **Tailwind CSS via CDN**: Rapid UI development without build process
+- **Fetch API**: Native browser API for backend communication
+- **No frameworks**: Direct DOM manipulation for MVP simplicity
 
 ### Core Components to Implement
 
@@ -65,16 +63,19 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
    - Filter by processing status and approval
    - Natural language query processing
 
-## Implementation Priority
+## MVP Implementation Priority (2 Weeks)
 
-1. Register SmugMug API application and get credentials
-2. Implement OAuth authentication flow
-3. Create SmugMug photo sync service
-4. Build metadata management database schema
-5. Implement LLM processing pipeline
-6. Create metadata management UI
-7. Add hybrid search functionality
-8. Enhance chat interface with RAG
+### Week 1: Core Backend
+1. **Day 1-2**: Setup FastAPI project, PostgreSQL with pgvector, environment configuration
+2. **Day 3-4**: Implement SmugMug OAuth 1.0a authentication flow
+3. **Day 5-6**: Create photo sync service (fetch and store metadata)
+4. **Day 7**: Test end-to-end SmugMug integration
+
+### Week 2: AI & Frontend
+5. **Day 8-9**: Implement Claude Vision API integration for descriptions
+6. **Day 10**: Add CLIP embeddings and vector search
+7. **Day 11-12**: Build minimal web interface (auth, gallery, search)
+8. **Day 13-14**: Testing, bug fixes, and deployment
 
 ## Technical Considerations
 
@@ -120,16 +121,17 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
 ## Development Guidelines
 
 ### File Structure Principles
-- **Minimal Dependencies**: Only essential npm packages (`dotenv`, `sharp`, `nodemon`)
-- **Clear Separation**: Frontend (`public/`), backend (`lib/`), utilities (`utilities/`)
-- **Test Files**: Prefix with `test-` (excluded from nodemon watching)
-- **Documentation**: Maintain `cline_docs/` for project documentation
+- **Minimal Dependencies**: Only essential Python packages (see requirements.txt)
+- **Clear Separation**: Backend (`backend/`), Frontend (`frontend/`), Database (`database/`)
+- **Test Files**: Located in `tests/` directory using pytest
+- **Documentation**: Maintain `claude_docs/` for project documentation
 
 ### Code Quality Standards
-- **Vanilla JavaScript**: No frameworks, use modern ES6+ features
-- **Error Handling**: Comprehensive try-catch blocks with logging
-- **Logging**: Use `log(message, type)` utility function throughout
-- **Security**: Environment variables for API keys, proper OAuth implementation
+- **Python**: Type hints, async/await patterns, PEP 8 compliance
+- **JavaScript**: Vanilla ES6+, no frameworks for MVP
+- **Error Handling**: Try-except in Python, try-catch in JavaScript
+- **Logging**: Python logging module for backend, console for frontend
+- **Security**: Environment variables for secrets, OAuth 1.0a for SmugMug
 
 ### Testing Strategy
 - **Integration Tests**: Test files for each major component

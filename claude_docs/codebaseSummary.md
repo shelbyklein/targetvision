@@ -1,50 +1,43 @@
-# Codebase Summary
+# Codebase Summary - TargetVision MVP
 
-## Project Structure
+## MVP Project Structure (To Be Built)
 ```
 targetvision/
 ├── backend/                 # Python FastAPI backend
-│   ├── main.py             # FastAPI app entry point & routes
-│   ├── models.py           # SQLAlchemy database models
-│   ├── database.py         # Database connection & setup
+│   ├── __init__.py         # Package init
+│   ├── main.py             # FastAPI app & routes
+│   ├── config.py           # Settings from environment
+│   ├── database.py         # PostgreSQL connection
+│   ├── models.py           # SQLAlchemy models
 │   ├── smugmug_auth.py     # OAuth 1.0a implementation
 │   ├── smugmug_service.py  # SmugMug API client
 │   ├── ai_processor.py     # Claude Vision integration
-│   ├── embeddings.py       # CLIP embedding generation
-│   ├── search.py           # Vector & hybrid search
-│   ├── queue_manager.py    # Batch processing queue
-│   └── utils.py            # Helper functions
+│   ├── embeddings.py       # CLIP vectors (MVP: simple)
+│   └── search.py           # Vector search with pgvector
 │
-├── frontend/               # Vanilla JavaScript web app
-│   ├── index.html         # Main HTML page
-│   ├── app.js             # Application logic
-│   ├── api.js             # Backend API client
-│   ├── auth.js            # OAuth handling
-│   ├── gallery.js         # Photo grid display
-│   ├── search.js          # Search interface
-│   └── styles.css         # Tailwind CSS styles
+├── frontend/               # Vanilla JavaScript (no build)
+│   ├── index.html         # Landing page with auth
+│   ├── gallery.html       # Photo grid view
+│   ├── app.js             # Main application logic
+│   └── styles.css         # Basic styles (Tailwind CDN)
 │
-├── database/              # Database scripts
-│   ├── schema.sql         # Table definitions
-│   ├── migrations/        # Schema migrations
-│   └── seed.sql          # Test data (dev only)
+├── database/              # Database setup
+│   └── schema.sql         # Initial table definitions
 │
-├── scripts/              # Utility scripts
-│   ├── setup.sh          # One-click setup
-│   ├── test_smugmug.py   # SmugMug API tester
-│   └── process_batch.py  # Manual batch processor
+├── tests/                # Integration tests
+│   └── test_smugmug.py   # Test OAuth and sync
 │
-├── tests/                # Test files
-│   ├── test_auth.py      # OAuth flow tests
-│   ├── test_search.py    # Search functionality tests
-│   └── test_ai.py        # AI processing tests
+├── claude_docs/          # Documentation
+│   ├── QUICK_START.md    # Getting started guide
+│   ├── MVP_DEVELOPMENT_GUIDE.md
+│   ├── currentTask.md
+│   ├── projectRoadmap.md
+│   └── techStack.md
 │
-├── claude_docs/          # Project documentation
-├── .env                  # Environment variables (not in git)
-├── .env.example          # Environment template
+├── .env                  # API keys (never commit)
+├── .env.example          # Template for .env
+├── .gitignore            # Exclude sensitive files
 ├── requirements.txt      # Python dependencies
-├── package.json          # Frontend dependencies (if any)
-├── docker-compose.yml    # PostgreSQL + pgvector setup
 └── README.md            # Project overview
 ```
 
@@ -53,16 +46,18 @@ targetvision/
 ### Backend Components
 
 #### main.py
-**Purpose:** FastAPI application and route definitions  
-**Key Routes:**
-- `POST /auth/smugmug` - Initiate OAuth flow
-- `GET /auth/callback` - OAuth callback handler
-- `GET /photos` - List synced photos
-- `POST /photos/sync` - Trigger SmugMug sync
-- `POST /photos/process/{id}` - Process single photo
-- `POST /photos/batch` - Process multiple photos
-- `GET /search` - Search photos
-- `WS /chat` - WebSocket for chat
+**Purpose:** FastAPI application entry point  
+**MVP Routes (Week 1):**
+- `GET /` - API status
+- `POST /auth/smugmug/request` - Start OAuth
+- `GET /auth/smugmug/callback` - Complete OAuth
+- `POST /photos/sync` - Sync from SmugMug
+- `GET /photos` - List photos
+
+**MVP Routes (Week 2):**
+- `POST /photos/{id}/process` - Generate AI description
+- `GET /search?q={query}` - Search photos
+- `GET /api/health` - Health check
 
 #### smugmug_auth.py
 **Purpose:** OAuth 1.0a implementation for SmugMug  
@@ -156,13 +151,17 @@ targetvision/
 
 ## Database Schema
 
-### Core Tables
-- **users** - User accounts and OAuth tokens
+### MVP Database Tables
+
+**Core Tables (Week 1):**
 - **photos** - SmugMug photo metadata
-- **ai_metadata** - AI-generated descriptions
-- **embeddings** - Vector embeddings for search
-- **processing_queue** - Batch processing jobs
-- **search_history** - User search queries
+  - id, smugmug_id, image_url, title, caption, keywords
+- **oauth_tokens** - Store access tokens (simplified for MVP)
+  - id, token, secret, created_at
+
+**AI Tables (Week 2):**
+- **ai_metadata** - AI-generated content
+  - id, photo_id, description, ai_keywords, embedding(vector), processed_at
 
 ### Key Relationships
 - photos → ai_metadata (1:1)
@@ -200,31 +199,34 @@ targetvision/
 
 ## Configuration
 
-### Environment Variables
+### Required Environment Variables
 ```bash
-# SmugMug OAuth
-SMUGMUG_API_KEY=
-SMUGMUG_API_SECRET=
-SMUGMUG_CALLBACK_URL=
+# SmugMug OAuth (get from https://api.smugmug.com/api/developer/apply)
+SMUGMUG_API_KEY=your_key_here
+SMUGMUG_API_SECRET=your_secret_here
+SMUGMUG_CALLBACK_URL=http://localhost:8000/auth/smugmug/callback
 
-# Claude API
-ANTHROPIC_API_KEY=
+# Claude Vision API (get from https://console.anthropic.com/)
+ANTHROPIC_API_KEY=your_claude_key_here
 
-# Database
-DATABASE_URL=postgresql://user:pass@localhost/targetvision
+# Database (PostgreSQL with pgvector)
+DATABASE_URL=postgresql://postgres:password@localhost:5432/targetvision
 
-# Application
-SECRET_KEY=
-DEBUG=false
+# Application Settings
+SECRET_KEY=generate-with-openssl-rand-hex-32
+DEBUG=true  # Set to false in production
 PORT=8000
+MAX_PHOTOS_MVP=100  # Limit for MVP testing
 ```
 
-### Key Settings
-- Max photos per sync: 100 (MVP)
-- AI processing batch size: 10
-- Search results limit: 50
-- Image resize max: 2200px
-- Vector dimensions: 512
+### MVP Configuration Limits
+- **Max photos per sync:** 100 (prevent overwhelming during testing)
+- **AI processing rate:** 1 photo/second (avoid rate limits)
+- **Search results limit:** 20 (simple pagination)
+- **Image resize:** 2200px max dimension (Claude API requirement)
+- **Vector dimensions:** 512 (CLIP ViT-B/32 standard)
+- **Request timeout:** 30 seconds
+- **Database connections:** 5 (pool size for development)
 
 ## Development Workflow
 

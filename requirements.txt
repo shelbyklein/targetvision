@@ -1,0 +1,29 @@
+# Core Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database - Updated for Python 3.13 compatibility
+sqlalchemy==2.0.23
+psycopg[binary]==3.2.3
+pgvector==0.3.6
+alembic==1.12.1
+
+# OAuth and HTTP
+httpx==0.25.0
+oauthlib==3.2.2
+
+# AI and ML
+anthropic==0.39.0
+# Note: Install PyTorch and CLIP separately based on your system:
+# pip install torch torchvision open-clip-torch --index-url https://download.pytorch.org/whl/cpu
+
+# Image Processing
+pillow==11.0.0
+
+# Configuration and Utilities
+python-dotenv==1.0.0
+python-multipart==0.0.6
+
+# Development
+pydantic==2.5.0
+typing-extensions==4.8.0

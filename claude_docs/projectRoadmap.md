@@ -5,13 +5,21 @@ Create an intelligent photo management system that enhances SmugMug collections 
 
 ## Development Phases
 
-### Phase 0: MVP (Weeks 1-2) ✅ CURRENT
-**Goal:** Prove core concept works
-- Basic SmugMug OAuth
-- Photo sync (100 photos max)
-- AI description generation
-- Simple vector search
-- Minimal web UI
+### Phase 0: MVP (Weeks 1-2) 🎯 CURRENT
+**Goal:** Prove core concept with working prototype
+
+**Week 1 Deliverables:**
+- SmugMug OAuth 1.0a implementation
+- Photo metadata sync from SmugMug
+- Database setup with pgvector
+- Basic API endpoints
+
+**Week 2 Deliverables:**
+- Claude Vision API integration
+- CLIP embeddings generation
+- Vector similarity search
+- Minimal web interface
+- End-to-end testing
 
 ### Phase 1: Production Ready (Weeks 3-4)
 **Goal:** Stable, deployable system
@@ -68,11 +76,12 @@ Create an intelligent photo management system that enhances SmugMug collections 
 
 ## Technical Milestones
 
-### Q1 2025
-- [x] Project setup
-- [ ] MVP deployment
-- [ ] First 10 beta users
-- [ ] 1000+ photos processed
+### January 2025 (MVP Month)
+- [x] Project documentation created
+- [ ] Week 1: Core backend complete
+- [ ] Week 2: AI + frontend complete
+- [ ] Week 3: Beta testing with 5 users
+- [ ] Week 4: Iterate based on feedback
 
 ### Q2 2025
 - [ ] Production deployment
@@ -112,10 +121,19 @@ Create an intelligent photo management system that enhances SmugMug collections 
 
 ## Success Metrics
 
-### MVP Success (Week 2)
-- Successfully process 100 photos
-- Search returns relevant results
-- 5 beta testers provide feedback
+### MVP Success Criteria (End of Week 2)
+
+**Technical Metrics:**
+- ✅ 100 photos synced from SmugMug
+- ✅ 90%+ photos have AI descriptions
+- ✅ Search returns relevant results in < 1 second
+- ✅ Zero critical bugs in testing
+
+**User Validation:**
+- ✅ SmugMug connection works first try
+- ✅ Photos display correctly
+- ✅ Search finds expected photos
+- ✅ 3+ beta testers confirm value
 
 ### Phase 1 Success (Month 1)
 - 95% processing success rate
@@ -161,11 +179,17 @@ Create an intelligent photo management system that enhances SmugMug collections 
 
 ## Budget Estimates
 
-### MVP Phase
-- Claude API: $50 (1000 photos)
+### MVP Phase (First 2 Weeks)
+- Claude API: < $1 (100 test photos)
+- Hosting: $0 (local development)
+- Domain: $0 (use localhost)
+- **Total: < $1**
+
+### Beta Phase (Weeks 3-4)
+- Claude API: ~$5 (1000+ photos)
 - Hosting: $20 (DigitalOcean droplet)
-- Domain: $15
-- **Total: $85**
+- Domain: $15 (optional)
+- **Total: $20-40**
 
 ### Production Phase (Monthly)
 - Claude API: $500 (10k photos/month)
