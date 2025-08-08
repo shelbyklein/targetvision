@@ -66,13 +66,16 @@
 - [x] Fix OAuth callback 500 error (removed state parameter)
 - [x] Test OAuth flow end-to-end
 
-### 2.2 Gallery Interface
+### 2.2 Gallery Interface ✅
 - [x] Implement finder-style gallery with nested folders
 - [x] Create folder tree component with expand/collapse
 - [x] Build album grid view with thumbnails
 - [x] Add photo viewer with lightbox
 - [x] Implement breadcrumb navigation
 - [x] Add search functionality across hierarchy
+- [x] Fix OAuth callback 500 error (OAuth 1.0a state parameter issue)
+- [x] Remove demo data from gallery API
+- [x] Handle authentication state properly
 
 ### 2.3 Photo Sync Service
 - [ ] Fetch user's albums from SmugMug

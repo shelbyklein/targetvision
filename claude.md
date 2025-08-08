@@ -147,3 +147,4 @@ npm run lint
 - NEVER create files unless they're absolutely necessary for achieving your goal
 - ALWAYS prefer editing an existing file to creating a new one
 - NEVER proactively create documentation files (*.md) or README files unless explicitly requested
+- allow me to start and stop servers, don't try to do it manually.

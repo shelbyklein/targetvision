@@ -68,6 +68,8 @@
 | T021 | OAuth popup window handling | 2025-01-07 | 0.5h | Added postMessage communication and auto-close |
 | T022 | Implement finder-style gallery | 2025-01-07 | 4h | Created macOS Finder-like gallery with nested folders |
 | T023 | Fix OAuth callback 500 error | 2025-01-07 | 1h | Fixed by removing state parameter from OAuth 1.0a |
+| T024 | Remove demo data from gallery | 2025-01-07 | 0.5h | Gallery now shows proper auth required message |
+| T025 | Update documentation | 2025-01-07 | 1h | Created gallery guide, updated OAuth docs |
 | T100 | Test SmugMug OAuth flow end-to-end | 2025-01-07 | 0.5h | OAuth flow verified working |
 
 ---

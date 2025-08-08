@@ -139,57 +139,72 @@ class SmugMugOAuth:
             }
 ```
 
-### 2.2 FastAPI OAuth Endpoints
+### 2.2 FastAPI OAuth Endpoints (CRITICAL FIX)
+
+**Important Discovery**: OAuth 1.0a does NOT support state parameters. We must use oauth_token as the storage key instead.
 
 Create `backend/api/auth.py`:
 
 ```python
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from services.smugmug_auth import SmugMugOAuth
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
+# CRITICAL: Use oauth_token as key, not state (OAuth 1.0a limitation)
+oauth_state_storage = {}
+
 @router.get("/smugmug/connect")
-async def smugmug_connect(db: Session = Depends(get_db)):
+async def smugmug_connect():
     """Initiate SmugMug OAuth flow"""
     oauth = SmugMugOAuth()
-    auth_url, state = oauth.get_authorization_url()
     
-    # Store state in session/database for verification
-    db_state = OAuthState(state=state, created_at=datetime.utcnow())
-    db.add(db_state)
-    db.commit()
+    # Get request token
+    request_token_data = await oauth.get_request_token()
+    oauth_token = request_token_data['oauth_token']
+    oauth_token_secret = request_token_data['oauth_token_secret']
     
-    return {"auth_url": auth_url, "state": state}
+    # CRITICAL: Store using oauth_token as key (not state!)
+    oauth_state_storage[oauth_token] = {
+        'oauth_token_secret': oauth_token_secret,
+        'created_at': datetime.utcnow().isoformat()
+    }
+    
+    # Build authorization URL
+    auth_url = oauth.get_authorization_url(oauth_token)
+    
+    return {"auth_url": auth_url}
 
-@router.get("/smugmug/callback")
-async def smugmug_callback(
-    oauth_token: str,
-    oauth_verifier: str,
-    state: str,
-    db: Session = Depends(get_db)
-):
+@router.post("/smugmug/callback")
+async def smugmug_callback(data: dict):
     """Handle SmugMug OAuth callback"""
-    # Verify state to prevent CSRF
-    db_state = db.query(OAuthState).filter_by(state=state).first()
-    if not db_state:
-        raise HTTPException(status_code=400, detail="Invalid state")
+    oauth_token = data.get('oauth_token')
+    oauth_verifier = data.get('oauth_verifier')
+    
+    # CRITICAL: Retrieve using oauth_token as key
+    stored_data = oauth_state_storage.get(oauth_token)
+    if not stored_data:
+        raise HTTPException(status_code=400, detail="Invalid oauth token")
+    
+    oauth_token_secret = stored_data['oauth_token_secret']
     
     # Exchange for access token
     oauth = SmugMugOAuth()
-    tokens = oauth.exchange_token(oauth_token, oauth_verifier)
+    tokens = await oauth.exchange_token(
+        oauth_token, 
+        oauth_verifier,
+        oauth_token_secret
+    )
     
-    # Store tokens securely
-    user = db.query(User).filter_by(id=current_user_id).first()
-    user.smugmug_access_token = encrypt(tokens['access_token'])
-    user.smugmug_refresh_token = encrypt(tokens['refresh_token'])
-    user.smugmug_connected = True
-    db.commit()
+    # Store tokens in memory (replace with DB in production)
+    smugmug_api_instance.oauth_token = tokens['oauth_token']
+    smugmug_api_instance.oauth_token_secret = tokens['oauth_token_secret']
     
-    # Redirect to frontend success page
-    return RedirectResponse(url="/dashboard?connected=true")
+    # Clean up temporary storage
+    del oauth_state_storage[oauth_token]
+    
+    return {"success": True, "user": {"name": "SmugMug User"}}
 
 @router.post("/smugmug/disconnect")
 async def smugmug_disconnect(db: Session = Depends(get_db)):
@@ -456,7 +471,19 @@ DATABASE_ENCRYPTION=true
 
 ### Common Issues (SOLVED)
 
-1. **"duplicated_oauth_protocol_parameter" error**
+1. **OAuth callback 500 error with state parameter** ⚠️ CRITICAL
+   - **Problem**: OAuth 1.0a doesn't support state parameters for CSRF protection
+   - **Root Cause**: SmugMug uses OAuth 1.0a (not 2.0) which has no state parameter
+   - **Solution**: Use oauth_token itself as the storage key instead of state
+   ```python
+   # WRONG - OAuth 1.0a doesn't have state
+   oauth_state_storage[state] = {'oauth_token_secret': secret}
+   
+   # CORRECT - Use oauth_token as key
+   oauth_state_storage[oauth_token] = {'oauth_token_secret': secret}
+   ```
+
+2. **"duplicated_oauth_protocol_parameter" error**
    - **Problem**: OAuth parameters sent in both query string and Authorization header
    - **Solution**: Use OAuth1Auth with parameters in constructor, not as query params
    ```python
@@ -468,7 +495,7 @@ DATABASE_ENCRYPTION=true
    response = await client.post(url, auth=oauth_auth)
    ```
 
-2. **OAuth popup not closing after authorization**
+3. **OAuth popup not closing after authorization**
    - **Problem**: Callback page doesn't communicate with opener window
    - **Solution**: Use postMessage to notify parent window and close popup
    ```javascript
@@ -478,15 +505,15 @@ DATABASE_ENCRYPTION=true
    }
    ```
 
-3. **404 on callback URL**
+4. **404 on callback URL**
    - **Problem**: Missing route handler for callback page
    - **Solution**: Create /app/auth/smugmug/callback/page.tsx in Next.js
 
-4. **Import errors with authlib**
+5. **Import errors with authlib**
    - **Problem**: OAuth1Session deprecated in newer authlib versions
    - **Solution**: Use OAuth1Auth instead of OAuth1Session
 
-5. **sentence-transformers compatibility**
+6. **sentence-transformers compatibility**
    - **Problem**: Version 2.2.2 incompatible with newer huggingface_hub
    - **Solution**: Update to sentence-transformers==3.0.1
 
