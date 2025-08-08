@@ -66,3 +66,7 @@ class Settings:
         return True
 
 settings = Settings()
+
+def get_settings() -> Settings:
+    """Get application settings instance"""
+    return settings

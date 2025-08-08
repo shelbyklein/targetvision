@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TargetVision - AI-Powered Photo Discovery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">🎯 TargetVision</h1>
+                    <span class="ml-3 text-sm text-gray-500">AI-Powered Photo Discovery</span>
+                </div>
+                
+                <!-- Authentication Status -->
+                <div id="auth-status" class="flex items-center space-x-4">
+                    <div id="auth-loading" class="text-sm text-gray-500">
+                        Loading...
+                    </div>
+                    <div id="auth-success" class="hidden flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span class="text-sm text-green-600">Connected to SmugMug</span>
+                        <span id="auth-username" class="text-sm text-gray-500"></span>
+                    </div>
+                    <div id="auth-error" class="hidden text-sm text-red-500">
+                        Not authenticated
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Search Section -->
+        <div class="mb-8">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <!-- Search Input -->
+                <div class="flex-1 relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <input 
+                        id="search-input" 
+                        type="text" 
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary" 
+                        placeholder="Search your photos by content (e.g., 'archery medals', 'buckeye classic')..."
+                    >
+                </div>
+                
+                <!-- Search Type Selector -->
+                <select id="search-type" class="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary">
+                    <option value="hybrid">Smart Search</option>
+                    <option value="text">Text Search</option>
+                    <option value="vector">Visual Search</option>
+                </select>
+                
+                <!-- Search Button -->
+                <button 
+                    id="search-button" 
+                    class="px-6 py-2 bg-primary text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
+                >
+                    Search
+                </button>
+            </div>
+            
+            <!-- Search Results Info -->
+            <div id="search-info" class="mt-4 hidden">
+                <div class="flex items-center justify-between">
+                    <p id="search-results-text" class="text-sm text-gray-600"></p>
+                    <button id="clear-search" class="text-sm text-primary hover:text-blue-600">Clear Search</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p class="mt-4 text-gray-600">Loading photos...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="hidden text-center py-12">
+            <div class="text-red-500 text-6xl mb-4">⚠️</div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">Something went wrong</h3>
+            <p id="error-message" class="text-gray-600 mb-4"></p>
+            <button id="retry-button" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-600">
+                Retry
+            </button>
+        </div>
+
+        <!-- Photo Gallery -->
+        <div id="photo-gallery" class="hidden">
+            <!-- Gallery Stats -->
+            <div id="gallery-stats" class="mb-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-2">Your Photos</h2>
+                <p id="gallery-count" class="text-sm text-gray-600"></p>
+            </div>
+            
+            <!-- Photo Grid -->
+            <div id="photo-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <!-- Photos will be inserted here -->
+            </div>
+            
+            <!-- Load More Button -->
+            <div id="load-more-container" class="text-center mt-8 hidden">
+                <button id="load-more-button" class="px-6 py-3 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors">
+                    Load More Photos
+                </button>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-12">
+            <div class="text-gray-400 text-6xl mb-4">📷</div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No Photos Found</h3>
+            <p class="text-gray-600">Your SmugMug photos will appear here once synced.</p>
+        </div>
+    </main>
+
+    <!-- Photo Detail Modal -->
+    <div id="photo-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-lg font-medium text-gray-900">Photo Details</h3>
+                <button id="modal-close" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Photo Display -->
+                    <div class="space-y-4">
+                        <img id="modal-image" src="" alt="" class="w-full h-auto rounded-lg shadow-sm">
+                        
+                        <!-- Photo Info -->
+                        <div class="text-sm text-gray-600">
+                            <p id="modal-dimensions"></p>
+                            <p id="modal-album"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Metadata -->
+                    <div class="space-y-6">
+                        <!-- Original Metadata -->
+                        <div>
+                            <h4 class="font-medium text-gray-900 mb-2">Original Metadata</h4>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div id="modal-original-title" class="mb-2"></div>
+                                <div id="modal-original-caption" class="mb-2"></div>
+                                <div id="modal-original-keywords"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- AI Metadata -->
+                        <div id="modal-ai-section" class="hidden">
+                            <h4 class="font-medium text-gray-900 mb-2 flex items-center">
+                                <span class="mr-2">🤖 AI Generated</span>
+                                <span id="modal-ai-confidence" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"></span>
+                            </h4>
+                            <div class="bg-blue-50 rounded-lg p-4 space-y-3">
+                                <div>
+                                    <label class="text-sm font-medium text-blue-900">Description</label>
+                                    <p id="modal-ai-description" class="text-blue-800 mt-1"></p>
+                                </div>
+                                
+                                <div>
+                                    <label class="text-sm font-medium text-blue-900">AI Keywords</label>
+                                    <div id="modal-ai-keywords" class="mt-1 flex flex-wrap gap-1"></div>
+                                </div>
+                                
+                                <div class="text-xs text-blue-600">
+                                    <span id="modal-ai-timestamp"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- No AI Metadata -->
+                        <div id="modal-no-ai" class="hidden">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <p class="text-yellow-800 text-sm">This photo hasn't been processed by AI yet.</p>
+                                <button id="modal-process-button" class="mt-2 text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-200">
+                                    Process with AI
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

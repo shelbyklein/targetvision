@@ -1,0 +1,315 @@
+import asyncio
+import base64
+import io
+import logging
+from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+import time
+
+import httpx
+from PIL import Image
+import anthropic
+
+from config import get_settings
+from models import Photo, AIMetadata, ProcessingQueue
+from database import get_db
+
+logger = logging.getLogger(__name__)
+
+class AIProcessor:
+    """Handles AI-powered photo analysis using Claude Vision API"""
+    
+    def __init__(self):
+        self.settings = get_settings()
+        self.client = anthropic.Anthropic(api_key=self.settings.ANTHROPIC_API_KEY)
+        self.max_image_size = 5 * 1024 * 1024  # 5MB limit for Claude API
+        self.max_dimension = 2200  # Claude API recommendation
+        
+    async def resize_image_for_api(self, image_data: bytes) -> bytes:
+        """Resize image to meet Claude API requirements"""
+        try:
+            # Open image with PIL
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Convert to RGB if needed
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            original_width, original_height = image.size
+            
+            # Calculate new dimensions maintaining aspect ratio
+            if original_width > original_height:
+                # Landscape: limit width
+                if original_width > self.max_dimension:
+                    new_width = self.max_dimension
+                    new_height = int((original_height * new_width) / original_width)
+                else:
+                    new_width, new_height = original_width, original_height
+            else:
+                # Portrait: limit height
+                if original_height > self.max_dimension:
+                    new_height = self.max_dimension
+                    new_width = int((original_width * new_height) / original_height)
+                else:
+                    new_width, new_height = original_width, original_height
+            
+            # Resize if necessary
+            if (new_width, new_height) != (original_width, original_height):
+                image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                logger.info(f"Resized image from {original_width}x{original_height} to {new_width}x{new_height}")
+            
+            # Save to bytes with progressive quality reduction if needed
+            quality = 95
+            while quality > 20:
+                output = io.BytesIO()
+                image.save(output, format='JPEG', quality=quality, optimize=True)
+                output_data = output.getvalue()
+                
+                if len(output_data) <= self.max_image_size:
+                    logger.info(f"Image compressed to {len(output_data)} bytes at quality {quality}")
+                    return output_data
+                
+                quality -= 10
+                
+            # If still too large, try more aggressive compression
+            output = io.BytesIO()
+            image.save(output, format='JPEG', quality=20, optimize=True)
+            return output.getvalue()
+            
+        except Exception as e:
+            logger.error(f"Error resizing image: {e}")
+            raise
+    
+    async def download_image(self, image_url: str) -> bytes:
+        """Download image from SmugMug URL"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(image_url)
+                response.raise_for_status()
+                return response.content
+        except Exception as e:
+            logger.error(f"Error downloading image from {image_url}: {e}")
+            raise
+    
+    def extract_keywords_from_description(self, description: str) -> List[str]:
+        """Extract potential keywords from AI description"""
+        # Simple keyword extraction - look for nouns and descriptive terms
+        common_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'this', 'that'}
+        
+        # Split description into words and filter
+        words = description.lower().replace(',', '').replace('.', '').split()
+        keywords = []
+        
+        for word in words:
+            if len(word) > 3 and word not in common_words:
+                keywords.append(word)
+        
+        # Return first 10 unique keywords
+        return list(dict.fromkeys(keywords))[:10]
+    
+    async def generate_description(self, image_data: bytes) -> Tuple[str, List[str], float]:
+        """Generate AI description using Claude Vision API"""
+        start_time = time.time()
+        
+        try:
+            # Prepare image for API
+            processed_image = await self.resize_image_for_api(image_data)
+            image_b64 = base64.b64encode(processed_image).decode('utf-8')
+            
+            # Construct prompt for photo analysis
+            prompt = """Analyze this photograph and provide a detailed, descriptive caption. Focus on:
+
+1. Main subjects (people, objects, animals)
+2. Setting and location details
+3. Actions or activities taking place
+4. Composition and visual elements
+5. Mood or atmosphere
+6. Technical aspects if notable (lighting, perspective, etc.)
+
+Write a natural, engaging description that would help someone search for and understand this image. Be specific and descriptive but concise (2-3 sentences maximum).
+
+Do not include speculation about metadata like camera settings, date, or photographer unless clearly visible in the image."""
+
+            # Call Claude Vision API
+            message = self.client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=300,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/jpeg",
+                                    "data": image_b64
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ]
+            )
+            
+            # Extract description from response
+            description = message.content[0].text.strip()
+            
+            # Generate keywords from description
+            keywords = self.extract_keywords_from_description(description)
+            
+            # Calculate processing time
+            processing_time = time.time() - start_time
+            
+            logger.info(f"Generated description in {processing_time:.2f}s: {description[:100]}...")
+            
+            return description, keywords, processing_time
+            
+        except Exception as e:
+            processing_time = time.time() - start_time
+            logger.error(f"Error generating description: {e}")
+            raise
+    
+    async def process_photo(self, photo_id: int) -> Optional[Dict]:
+        """Process a single photo with AI analysis"""
+        db = next(get_db())
+        
+        try:
+            # Get photo from database
+            photo = db.query(Photo).filter(Photo.id == photo_id).first()
+            if not photo:
+                logger.error(f"Photo {photo_id} not found")
+                return None
+            
+            # Check if already processed
+            existing = db.query(AIMetadata).filter(AIMetadata.photo_id == photo_id).first()
+            if existing:
+                logger.info(f"Photo {photo_id} already has AI metadata")
+                return existing.to_dict()
+            
+            # Download image
+            logger.info(f"Processing photo {photo_id}: {photo.title}")
+            image_data = await self.download_image(photo.image_url)
+            
+            # Generate AI description
+            description, keywords, processing_time = await self.generate_description(image_data)
+            
+            # Create AI metadata record
+            ai_metadata = AIMetadata(
+                photo_id=photo_id,
+                description=description,
+                ai_keywords=keywords,
+                confidence_score=0.85,  # Default confidence - could be enhanced
+                processing_time=processing_time,
+                model_version="claude-3-5-sonnet-20241022",
+                processed_at=datetime.now()
+            )
+            
+            db.add(ai_metadata)
+            db.commit()
+            db.refresh(ai_metadata)
+            
+            # Update processing queue status
+            queue_item = db.query(ProcessingQueue).filter(ProcessingQueue.photo_id == photo_id).first()
+            if queue_item:
+                queue_item.status = "completed"
+                queue_item.completed_at = datetime.now()
+                db.commit()
+            
+            logger.info(f"Successfully processed photo {photo_id}")
+            return ai_metadata.to_dict()
+            
+        except Exception as e:
+            logger.error(f"Error processing photo {photo_id}: {e}")
+            
+            # Update queue with error status
+            queue_item = db.query(ProcessingQueue).filter(ProcessingQueue.photo_id == photo_id).first()
+            if queue_item:
+                queue_item.status = "failed"
+                queue_item.last_error = str(e)
+                queue_item.attempts += 1
+                db.commit()
+            
+            raise
+        finally:
+            db.close()
+    
+    async def process_batch(self, photo_ids: List[int], max_concurrent: int = 3) -> List[Dict]:
+        """Process multiple photos concurrently with rate limiting"""
+        
+        async def process_single(photo_id: int):
+            try:
+                return await self.process_photo(photo_id)
+            except Exception as e:
+                logger.error(f"Failed to process photo {photo_id}: {e}")
+                return {"photo_id": photo_id, "error": str(e)}
+        
+        # Process in batches to respect rate limits
+        results = []
+        for i in range(0, len(photo_ids), max_concurrent):
+            batch = photo_ids[i:i + max_concurrent]
+            
+            # Process batch concurrently
+            batch_tasks = [process_single(photo_id) for photo_id in batch]
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            
+            results.extend(batch_results)
+            
+            # Rate limiting - wait between batches
+            if i + max_concurrent < len(photo_ids):
+                await asyncio.sleep(2)  # 2 second delay between batches
+        
+        return results
+    
+    async def add_to_processing_queue(self, photo_ids: List[int], priority: int = 0):
+        """Add photos to processing queue"""
+        db = next(get_db())
+        
+        try:
+            for photo_id in photo_ids:
+                # Check if already in queue
+                existing = db.query(ProcessingQueue).filter(ProcessingQueue.photo_id == photo_id).first()
+                if not existing:
+                    queue_item = ProcessingQueue(
+                        photo_id=photo_id,
+                        status="pending",
+                        priority=priority
+                    )
+                    db.add(queue_item)
+            
+            db.commit()
+            logger.info(f"Added {len(photo_ids)} photos to processing queue")
+            
+        except Exception as e:
+            logger.error(f"Error adding to queue: {e}")
+            db.rollback()
+            raise
+        finally:
+            db.close()
+    
+    async def get_queue_status(self) -> Dict:
+        """Get current processing queue status"""
+        db = next(get_db())
+        
+        try:
+            total = db.query(ProcessingQueue).count()
+            pending = db.query(ProcessingQueue).filter(ProcessingQueue.status == "pending").count()
+            processing = db.query(ProcessingQueue).filter(ProcessingQueue.status == "processing").count()
+            completed = db.query(ProcessingQueue).filter(ProcessingQueue.status == "completed").count()
+            failed = db.query(ProcessingQueue).filter(ProcessingQueue.status == "failed").count()
+            
+            return {
+                "total": total,
+                "pending": pending,
+                "processing": processing,
+                "completed": completed,
+                "failed": failed
+            }
+        finally:
+            db.close()
+
+# Global instance
+ai_processor = AIProcessor()

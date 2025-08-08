@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        .test-section { margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 0.5rem 1rem; margin: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>TargetVision Frontend API Tests</h1>
+    
+    <div class="test-section">
+        <h3>Authentication Status</h3>
+        <button onclick="testAuth()">Test Auth</button>
+        <div id="auth-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Load Photos</h3>
+        <button onclick="testPhotos()">Load Photos</button>
+        <div id="photos-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Search Photos</h3>
+        <input id="search-query" type="text" placeholder="Search query" value="medals">
+        <button onclick="testSearch()">Search</button>
+        <div id="search-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Photo Details</h3>
+        <input id="photo-id" type="number" placeholder="Photo ID" value="1">
+        <button onclick="testPhotoDetail()">Get Details</button>
+        <div id="detail-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        
+        async function testAuth() {
+            const result = document.getElementById('auth-result');
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`);
+                const data = await response.json();
+                result.innerHTML = `<span class="success">✅ Auth Status: ${JSON.stringify(data)}</span>`;
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function testPhotos() {
+            const result = document.getElementById('photos-result');
+            try {
+                const response = await fetch(`${API_BASE}/photos?limit=5`);
+                const data = await response.json();
+                result.innerHTML = `<span class="success">✅ Loaded ${data.length} photos</span><br>
+                    <pre>${JSON.stringify(data[0], null, 2)}</pre>`;
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function testSearch() {
+            const result = document.getElementById('search-result');
+            const query = document.getElementById('search-query').value;
+            try {
+                const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}&search_type=text`);
+                const data = await response.json();
+                result.innerHTML = `<span class="success">✅ Found ${data.results} photos for "${query}"</span><br>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function testPhotoDetail() {
+            const result = document.getElementById('detail-result');
+            const photoId = document.getElementById('photo-id').value;
+            try {
+                const response = await fetch(`${API_BASE}/photos/${photoId}`);
+                const data = await response.json();
+                result.innerHTML = `<span class="success">✅ Photo details loaded</span><br>
+                    <strong>Title:</strong> ${data.title || 'No title'}<br>
+                    <strong>AI Description:</strong> ${data.ai_metadata?.description || 'No AI description'}<br>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
