@@ -102,3 +102,44 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
 - NEVER proactively create documentation files (*.md) or README files unless explicitly requested
 - allow the user to start and stop servers, don't try to do it manually
 - avoid using typescript if possible, native javascript only
+
+### Claude AI Integration
+1. **Image Resizing**: Automatic dimension-based resizing for API compliance
+   - Landscape: 2200px wide, auto height
+   - Portrait: 2200px tall, auto width
+   - File size optimization with progressive quality reduction for 5MB limit
+2. **Analysis**: Structured JSON response with description and keywords
+3. **Error Handling**: Comprehensive retry logic and fallback mechanisms
+
+### SmugMug OAuth Flow
+1. **Request Token**: Generate with proper API signature
+2. **User Authorization**: Redirect to SmugMug authorization page
+3. **Access Token**: Exchange authorized request token for access token
+4. **API Access**: Use access token for all SmugMug API calls
+
+## Development Guidelines
+
+### File Structure Principles
+- **Minimal Dependencies**: Only essential npm packages (`dotenv`, `sharp`, `nodemon`)
+- **Clear Separation**: Frontend (`public/`), backend (`lib/`), utilities (`utilities/`)
+- **Test Files**: Prefix with `test-` (excluded from nodemon watching)
+- **Documentation**: Maintain `cline_docs/` for project documentation
+
+### Code Quality Standards
+- **Vanilla JavaScript**: No frameworks, use modern ES6+ features
+- **Error Handling**: Comprehensive try-catch blocks with logging
+- **Logging**: Use `log(message, type)` utility function throughout
+- **Security**: Environment variables for API keys, proper OAuth implementation
+
+### Testing Strategy
+- **Integration Tests**: Test files for each major component
+- **Manual Testing**: Test each feature incrementally during development
+- **API Testing**: Verify external API connections before feature implementation
+
+## Resources for Smugmug API Development
+- https://api.smugmug.com/api/v2/doc: home page
+- https://api.smugmug.com/api/v2/doc/tutorial/basics.html: your first API request
+- https://api.smugmug.com/api/v2/doc/tutorial/paging.html: pagination
+- https://api.smugmug.com/api/v2/doc/tutorial/authorization.html: authorization
+- https://api.smugmug.com/api/v2/doc/tutorial/oauth/web.html: example, web app
+- note that we will only read smugmug files.
