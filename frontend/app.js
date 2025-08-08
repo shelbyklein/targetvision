@@ -311,7 +311,9 @@ class TargetVisionApp {
 
     createPhotoCard(photo) {
         const div = document.createElement('div');
-        div.className = 'photo-card relative group cursor-pointer';
+        const cursorClass = photo.is_synced ? 'cursor-pointer' : 'cursor-not-allowed';
+        const opacityClass = photo.is_synced ? '' : 'opacity-60';
+        div.className = `photo-card relative group ${cursorClass} ${opacityClass}`;
         
         // Status indicator styling
         const statusConfig = {
@@ -362,6 +364,13 @@ class TargetVisionApp {
                 
                 <!-- Hover overlay for visual feedback -->
                 <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all z-10">
+                    ${!photo.is_synced ? `
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="bg-black bg-opacity-70 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                Sync album to enable selection
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
             </div>
             
@@ -384,6 +393,9 @@ class TargetVisionApp {
                     checkbox.checked = !checkbox.checked;
                     this.togglePhotoSelection(photo.smugmug_id, checkbox.checked);
                 }
+            } else {
+                // Show message for non-synced photos
+                this.showErrorMessage('Sync Required', 'This photo must be synced to the database before it can be selected for processing. Use the "Sync Album" button first.');
             }
         });
         
