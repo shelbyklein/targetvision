@@ -66,6 +66,9 @@
 | T019 | OAuth callback handler | 2025-01-07 | 1h | Created callback page and POST endpoint |
 | T020 | Fix OAuth parameter duplication | 2025-01-07 | 0.5h | Fixed OAuth1Auth parameter handling |
 | T021 | OAuth popup window handling | 2025-01-07 | 0.5h | Added postMessage communication and auto-close |
+| T022 | Implement finder-style gallery | 2025-01-07 | 4h | Created macOS Finder-like gallery with nested folders |
+| T023 | Fix OAuth callback 500 error | 2025-01-07 | 1h | Fixed by removing state parameter from OAuth 1.0a |
+| T100 | Test SmugMug OAuth flow end-to-end | 2025-01-07 | 0.5h | OAuth flow verified working |
 
 ---
 

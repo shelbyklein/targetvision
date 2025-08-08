@@ -5,7 +5,7 @@ import { Camera, MessageSquare, Search, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import ChatInterface from '@/components/ChatInterface'
 import SmugMugConnect from '@/components/SmugMugConnect'
-import PhotoGallery from '@/components/PhotoGallery'
+import FinderGallery from '@/components/FinderGallery'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
 export default function Home() {
@@ -78,7 +78,7 @@ export default function Home() {
           <div className="p-6">
             {activeTab === 'chat' && <ChatInterface />}
             {activeTab === 'smugmug' && <SmugMugConnect />}
-            {activeTab === 'gallery' && <PhotoGallery />}
+            {activeTab === 'gallery' && <FinderGallery />}
           </div>
         </div>
       </div>

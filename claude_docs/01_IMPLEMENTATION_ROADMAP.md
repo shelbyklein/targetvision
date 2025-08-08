@@ -61,10 +61,20 @@
 - [x] Create callback handler page for OAuth redirect
 - [x] Fix OAuth parameter duplication issues
 - [x] Implement popup window handling with postMessage
-- [ ] Implement account disconnection flow
+- [x] Implement account disconnection flow
 - [x] Fix development environment and dependencies
+- [x] Fix OAuth callback 500 error (removed state parameter)
+- [x] Test OAuth flow end-to-end
 
-### 2.2 Photo Sync Service
+### 2.2 Gallery Interface
+- [x] Implement finder-style gallery with nested folders
+- [x] Create folder tree component with expand/collapse
+- [x] Build album grid view with thumbnails
+- [x] Add photo viewer with lightbox
+- [x] Implement breadcrumb navigation
+- [x] Add search functionality across hierarchy
+
+### 2.3 Photo Sync Service
 - [ ] Fetch user's albums from SmugMug
 - [ ] Retrieve photo metadata and URLs
 - [ ] Implement incremental sync based on LastUpdated
@@ -73,7 +83,7 @@
 - [ ] Handle rate limiting and retries
 - [ ] Store SmugMug photo references locally
 
-### 2.3 Metadata Management System
+### 2.4 Metadata Management System
 - [ ] Design metadata storage schema
 - [ ] Create metadata CRUD operations
 - [ ] Implement metadata versioning/history
