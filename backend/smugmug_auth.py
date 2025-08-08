@@ -84,7 +84,7 @@ class SmugMugOAuth:
         auth_header = "OAuth " + ", ".join([f'{k}="{v}"' for k, v in oauth_params.items()])
         
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     url,
                     headers={"Authorization": auth_header}
@@ -134,7 +134,7 @@ class SmugMugOAuth:
         auth_header = "OAuth " + ", ".join([f'{k}="{v}"' for k, v in oauth_params.items()])
         
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     url,
                     headers={"Authorization": auth_header}
@@ -196,7 +196,7 @@ class SmugMugOAuth:
         headers["Authorization"] = auth_header
         
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 if method.upper() == "GET":
                     response = await client.get(url, params=params, headers=headers)
                 elif method.upper() == "POST":

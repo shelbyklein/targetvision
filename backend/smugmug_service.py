@@ -43,10 +43,11 @@ class SmugMugService:
             logger.error("No user albums URI found")
             return []
             
+        # Remove leading /api/v2 from user_uri if present since api_base already has it
+        if user_uri.startswith("/api/v2"):
+            user_uri = user_uri[7:]  # Remove "/api/v2"
         url = f"{self.api_base}{user_uri}"
         params = {
-            "_expand": "AlbumImages",
-            "_expandmethod": "inline",
             "count": "50"  # Get 50 albums at a time
         }
         
@@ -64,7 +65,11 @@ class SmugMugService:
                 # Check for pagination
                 pages = response_data.get("Pages", {})
                 if pages.get("NextPage"):
-                    url = f"{self.api_base}{pages['NextPage']}"
+                    next_page = pages['NextPage']
+                    # Remove leading /api/v2 if present
+                    if next_page.startswith("/api/v2"):
+                        next_page = next_page[7:]
+                    url = f"{self.api_base}{next_page}"
                     params = {}  # Clear params for next page
                 else:
                     url = None
@@ -76,10 +81,10 @@ class SmugMugService:
     
     async def get_album_images(self, album_uri: str, limit: int = 100) -> List[Dict]:
         """Get images from a specific album"""
-        url = f"{self.api_base}{album_uri}!images"
+        # Use full album URI (it already contains /api/v2)
+        url = f"https://api.smugmug.com{album_uri}!images"
         params = {
-            "_expand": "ImageSizes,ImageMetadata",
-            "_expandmethod": "inline",
+            "_expand": "ImageSizes",  # Only expand ImageSizes to avoid comma issues
             "count": str(min(limit, 100))  # Max 100 per request
         }
         
@@ -105,7 +110,9 @@ class SmugMugService:
                 if total_fetched < limit:
                     pages = response_data.get("Pages", {})
                     if pages.get("NextPage"):
-                        url = f"{self.api_base}{pages['NextPage']}"
+                        next_page = pages['NextPage']
+                        # Use full URL with SmugMug base
+                        url = f"https://api.smugmug.com{next_page}"
                         params = {}  # Clear params for next page
                     else:
                         url = None
@@ -119,7 +126,8 @@ class SmugMugService:
     
     async def get_image_sizes(self, image_uri: str) -> Dict:
         """Get available sizes for an image"""
-        url = f"{self.api_base}{image_uri}!sizes"
+        # Use full image URI (it already contains /api/v2)
+        url = f"https://api.smugmug.com{image_uri}!sizes"
         
         response = await self.oauth.make_authenticated_request(
             "GET", url, self.access_token, self.access_token_secret
