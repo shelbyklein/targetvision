@@ -24,24 +24,407 @@ class TargetVisionApp {
         this.nodeHistory = [];
         this.breadcrumbs = [];
         
+        // Flag to prevent state saving during initial load
+        this.isInitializing = true;
+        
+        // Initialize cache system
+        this.cache = {
+            albums: new Map(), // albumId -> { photos, timestamp, metadata }
+            folders: new Map(), // nodeUri -> { contents, timestamp }
+            expiry: {
+                photos: 60 * 60 * 1000, // 1 hour for photo data
+                folders: 24 * 60 * 60 * 1000, // 24 hours for folder structure
+                metadata: 30 * 60 * 1000 // 30 minutes for processing status
+            }
+        };
+        
+        // Load cache from localStorage
+        this.loadCache();
+        
         this.initializeApp();
     }
 
+    // Cache Management Methods
+    loadCache() {
+        try {
+            const albumsCache = localStorage.getItem('targetvision_albums_cache');
+            const foldersCache = localStorage.getItem('targetvision_folders_cache');
+            
+            if (albumsCache) {
+                const parsed = JSON.parse(albumsCache);
+                this.cache.albums = new Map(Object.entries(parsed));
+            }
+            
+            if (foldersCache) {
+                const parsed = JSON.parse(foldersCache);
+                this.cache.folders = new Map(Object.entries(parsed));
+            }
+            
+            console.log('Cache loaded:', {
+                albums: this.cache.albums.size,
+                folders: this.cache.folders.size
+            });
+        } catch (error) {
+            console.error('Error loading cache:', error);
+            this.cache.albums = new Map();
+            this.cache.folders = new Map();
+        }
+    }
+    
+    saveCache() {
+        try {
+            // Convert Maps to Objects for storage
+            const albumsObj = Object.fromEntries(this.cache.albums.entries());
+            const foldersObj = Object.fromEntries(this.cache.folders.entries());
+            
+            localStorage.setItem('targetvision_albums_cache', JSON.stringify(albumsObj));
+            localStorage.setItem('targetvision_folders_cache', JSON.stringify(foldersObj));
+        } catch (error) {
+            console.error('Error saving cache:', error);
+        }
+    }
+    
+    isCacheValid(timestamp, type = 'photos') {
+        const now = Date.now();
+        const expiry = this.cache.expiry[type] || this.cache.expiry.photos;
+        return (now - timestamp) < expiry;
+    }
+    
+    getCachedAlbumPhotos(albumId) {
+        const cached = this.cache.albums.get(albumId);
+        if (cached && this.isCacheValid(cached.timestamp, 'photos')) {
+            console.log('Using cached photos for album:', albumId);
+            return cached.photos;
+        }
+        return null;
+    }
+    
+    setCachedAlbumPhotos(albumId, photos, metadata = {}) {
+        this.cache.albums.set(albumId, {
+            photos: photos,
+            metadata: metadata,
+            timestamp: Date.now()
+        });
+        this.saveCache();
+        console.log('Cached photos for album:', albumId, `(${photos.length} photos)`);
+    }
+    
+    getCachedFolderContents(nodeUri) {
+        const key = nodeUri || 'root';
+        const cached = this.cache.folders.get(key);
+        if (cached && this.isCacheValid(cached.timestamp, 'folders')) {
+            console.log('Using cached folder contents for:', key);
+            return cached.contents;
+        }
+        return null;
+    }
+    
+    setCachedFolderContents(nodeUri, contents) {
+        const key = nodeUri || 'root';
+        this.cache.folders.set(key, {
+            contents: contents,
+            timestamp: Date.now()
+        });
+        this.saveCache();
+        console.log('Cached folder contents for:', key);
+    }
+    
+    clearCache() {
+        this.cache.albums.clear();
+        this.cache.folders.clear();
+        localStorage.removeItem('targetvision_albums_cache');
+        localStorage.removeItem('targetvision_folders_cache');
+        console.log('Cache cleared');
+    }
+    
+    clearCacheAndRefresh() {
+        // Clear cache
+        this.clearCache();
+        
+        // Update UI status
+        this.updateCacheStatus();
+        
+        // Show success message
+        const successMsg = document.getElementById('cache-cleared');
+        if (successMsg) {
+            successMsg.classList.remove('hidden');
+            setTimeout(() => {
+                successMsg.classList.add('hidden');
+            }, 3000);
+        }
+        
+        // Show toast notification
+        this.showToast('Cache Cleared', 'All cached data has been cleared successfully', 'success');
+    }
+    
+    updateCacheStatus() {
+        // Update cache count displays
+        const albumsCountElement = document.getElementById('cache-albums-count');
+        const foldersCountElement = document.getElementById('cache-folders-count');
+        
+        if (albumsCountElement) {
+            albumsCountElement.textContent = this.cache.albums.size;
+        }
+        if (foldersCountElement) {
+            foldersCountElement.textContent = this.cache.folders.size;
+        }
+        
+        console.log('Cache status updated:', {
+            albums: this.cache.albums.size,
+            folders: this.cache.folders.size
+        });
+    }
+
+    // State Persistence Methods
+    saveAppState() {
+        try {
+            // Don't save state during initial loading to prevent overriding URL params
+            if (this.isInitializing) {
+                console.log('Skipping saveAppState during initialization');
+                return;
+            }
+            
+            const state = {
+                currentPage: this.currentPage,
+                currentAlbum: this.currentAlbum,
+                currentNodeUri: this.currentNodeUri,
+                breadcrumbs: this.breadcrumbs,
+                nodeHistory: this.nodeHistory,
+                statusFilter: this.statusFilter,
+                showProcessedPhotos: this.showProcessedPhotos,
+                showUnprocessedPhotos: this.showUnprocessedPhotos,
+                timestamp: Date.now()
+            };
+            console.log('saveAppState called with:', {
+                currentPage: this.currentPage,
+                currentAlbum: this.currentAlbum?.title || this.currentAlbum?.smugmug_id,
+                currentNodeUri: this.currentNodeUri
+            });
+            localStorage.setItem('targetvision_state', JSON.stringify(state));
+            
+            // Also update URL for bookmarkable links
+            this.updateURL();
+        } catch (error) {
+            console.error('Error saving app state:', error);
+        }
+    }
+    
+    loadAppState() {
+        try {
+            const savedState = localStorage.getItem('targetvision_state');
+            if (!savedState) return null;
+            
+            const state = JSON.parse(savedState);
+            
+            // Check if state is not too old (24 hours)
+            if (Date.now() - state.timestamp > 24 * 60 * 60 * 1000) {
+                localStorage.removeItem('targetvision_state');
+                return null;
+            }
+            
+            return state;
+        } catch (error) {
+            console.error('Error loading app state:', error);
+            localStorage.removeItem('targetvision_state');
+            return null;
+        }
+    }
+    
+    updateURL() {
+        try {
+            const params = new URLSearchParams();
+            
+            console.log('updateURL called with state:', {
+                currentPage: this.currentPage,
+                currentAlbum: this.currentAlbum?.title || this.currentAlbum?.smugmug_id,
+                currentNodeUri: this.currentNodeUri
+            });
+            
+            if (this.currentPage !== 'albums') {
+                params.set('page', this.currentPage);
+            }
+            
+            if (this.currentAlbum) {
+                params.set('album', this.currentAlbum.smugmug_id || this.currentAlbum.album_key);
+            }
+            
+            if (this.currentNodeUri) {
+                params.set('node', encodeURIComponent(this.currentNodeUri));
+            }
+            
+            // Update URL without page reload
+            const newURL = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+            console.log('Setting URL to:', newURL);
+            window.history.replaceState(null, '', newURL);
+        } catch (error) {
+            console.error('Error updating URL:', error);
+        }
+    }
+    
+    loadStateFromURL() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const state = {
+                currentPage: params.get('page') || 'albums',
+                albumId: params.get('album'),
+                nodeUri: params.get('node') ? decodeURIComponent(params.get('node')) : null
+            };
+            console.log('loadStateFromURL found:', state, 'from URL:', window.location.search);
+            return state;
+        } catch (error) {
+            console.error('Error loading state from URL:', error);
+            return null;
+        }
+    }
+
     async initializeApp() {
+        console.log('Starting app initialization...');
         this.bindEventListeners();
+        console.log('Event listeners bound, checking connection...');
         await this.checkConnectionStatus();
         await this.checkAuthentication();
-        // Initialize breadcrumbs before loading albums
-        this.updateBreadcrumbs();
+        
+        // Load SmugMug albums first
         await this.loadSmugMugAlbums();
+        
+        // Try to restore state from URL first, then localStorage
+        let restoredState = false;
+        const urlState = this.loadStateFromURL();
+        const savedState = this.loadAppState();
+        
+        console.log('Restoration check:', { urlState, savedState });
+        
+        if (urlState && (urlState.albumId || urlState.nodeUri || urlState.currentPage !== 'albums')) {
+            console.log('Attempting to restore from URL state');
+            restoredState = await this.restoreStateFromData(urlState);
+        } else if (savedState) {
+            console.log('Attempting to restore from saved state');
+            restoredState = await this.restoreStateFromData(savedState);
+        }
+        
+        if (!restoredState) {
+            console.log('No state restored, using defaults');
+            // Default initialization
+            this.updateBreadcrumbs();
+        } else {
+            console.log('State restoration completed successfully');
+        }
+        
+        console.log('App initialization complete');
+        
+        // Mark initialization as complete to allow state saving
+        this.isInitializing = false;
+    }
+    
+    async restoreStateFromData(stateData) {
+        try {
+            let restored = false;
+            
+            // Restore page
+            if (stateData.currentPage && stateData.currentPage !== 'albums') {
+                console.log('Restoring page to:', stateData.currentPage);
+                this.showPage(stateData.currentPage);
+                restored = true;
+            }
+            
+            // Restore folder navigation FIRST (sets folder context)
+            if (stateData.nodeUri || stateData.currentNodeUri) {
+                const nodeUri = stateData.nodeUri || stateData.currentNodeUri;
+                if (nodeUri) {
+                    await this.loadFolderContents(nodeUri);
+                    restored = true;
+                }
+            }
+            
+            // Then restore album selection AFTER folder context is set
+            if (stateData.albumId || stateData.currentAlbum) {
+                const albumId = stateData.albumId || (stateData.currentAlbum ? 
+                    stateData.currentAlbum.smugmug_id || stateData.currentAlbum.album_key : null);
+                
+                if (albumId) {
+                    const album = this.smugmugAlbums.find(a => 
+                        (a.smugmug_id && a.smugmug_id === albumId) || 
+                        (a.album_key && a.album_key === albumId)
+                    );
+                    
+                    if (album) {
+                        await this.selectAlbum(album);
+                        restored = true;
+                    }
+                }
+            }
+            
+            // Restore other state properties
+            if (stateData.breadcrumbs) {
+                this.breadcrumbs = stateData.breadcrumbs;
+            }
+            if (stateData.nodeHistory) {
+                this.nodeHistory = stateData.nodeHistory;
+            }
+            if (stateData.statusFilter) {
+                this.statusFilter = stateData.statusFilter;
+            }
+            if (typeof stateData.showProcessedPhotos !== 'undefined') {
+                this.showProcessedPhotos = stateData.showProcessedPhotos;
+            }
+            if (typeof stateData.showUnprocessedPhotos !== 'undefined') {
+                this.showUnprocessedPhotos = stateData.showUnprocessedPhotos;
+            }
+            
+            // Update breadcrumbs display
+            this.updateBreadcrumbs();
+            
+            return restored;
+        } catch (error) {
+            console.error('Error restoring state:', error);
+            return false;
+        }
     }
 
     bindEventListeners() {
-        // Navigation
-        document.getElementById('nav-albums').addEventListener('click', () => this.showPage('albums'));
-        document.getElementById('nav-chat').addEventListener('click', () => this.showPage('chat'));
-        document.getElementById('nav-search').addEventListener('click', () => this.showPage('search'));
-        document.getElementById('nav-settings').addEventListener('click', () => this.showPage('settings'));
+        console.log('Binding event listeners...');
+        try {
+            // Navigation
+            const navAlbums = document.getElementById('nav-albums');
+            const navChat = document.getElementById('nav-chat');
+            const navSearch = document.getElementById('nav-search');
+            const navSettings = document.getElementById('nav-settings');
+            
+            if (navAlbums) {
+                navAlbums.addEventListener('click', () => this.showPage('albums'));
+                console.log('Albums event listener bound');
+            } else {
+                console.error('nav-albums element not found');
+            }
+            
+            if (navChat) {
+                navChat.addEventListener('click', () => this.showPage('chat'));
+                console.log('Chat event listener bound');
+            } else {
+                console.error('nav-chat element not found');
+            }
+            
+            if (navSearch) {
+                navSearch.addEventListener('click', () => this.showPage('search'));
+                console.log('Search event listener bound');
+            } else {
+                console.error('nav-search element not found');
+            }
+            
+            if (navSettings) {
+                navSettings.addEventListener('click', () => {
+                    console.log('Settings button clicked!');
+                    this.showPage('settings');
+                });
+                console.log('Settings event listener bound');
+            } else {
+                console.error('nav-settings element not found');
+            }
+            
+            console.log('Event listeners bound successfully');
+        } catch (error) {
+            console.error('Error binding event listeners:', error);
+        }
         
         // Album selection (breadcrumb-albums is now created dynamically, so we'll handle this in updateBreadcrumbs)
         
@@ -54,6 +437,9 @@ class TargetVisionApp {
         document.getElementById('select-all').addEventListener('click', () => this.selectAllPhotos());
         document.getElementById('select-none').addEventListener('click', () => this.clearSelection());
         document.getElementById('process-selected').addEventListener('click', () => this.processSelectedPhotos());
+        
+        // Global progress bar
+        document.getElementById('global-progress-close').addEventListener('click', () => this.hideGlobalProgress());
         
         // Filters
         document.getElementById('status-filter').addEventListener('change', (e) => this.filterPhotos(e.target.value));
@@ -104,6 +490,10 @@ class TargetVisionApp {
         document.getElementById('reset-prompt').addEventListener('click', () => this.resetPrompt());
         document.getElementById('test-prompt').addEventListener('click', () => this.testPrompt());
         document.getElementById('save-settings').addEventListener('click', () => this.saveApplicationSettings());
+        
+        // Cache management
+        document.getElementById('clear-cache').addEventListener('click', () => this.clearCacheAndRefresh());
+        document.getElementById('refresh-cache-status').addEventListener('click', () => this.updateCacheStatus());
         
         // API Key management
         document.getElementById('test-anthropic-key').addEventListener('click', () => this.testApiKey('anthropic'));
@@ -174,8 +564,41 @@ class TargetVisionApp {
     }
     
     async loadFolderContents(nodeUri = null) {
-        this.showAlbumsLoading();
+        // Check cache first for instant loading
+        const cachedContents = this.getCachedFolderContents(nodeUri);
+        if (cachedContents) {
+            console.log('Using cached folder contents');
+            this.smugmugAlbums = cachedContents.nodes || [];
+            this.currentNodeUri = nodeUri;
+            
+            // Save state after folder navigation
+            this.saveAppState();
+            
+            // Update breadcrumbs from cache
+            if (cachedContents.breadcrumbs) {
+                this.breadcrumbs = cachedContents.breadcrumbs;
+            } else {
+                this.breadcrumbs = [];
+            }
+            
+            this.displayFolderContents();
+            
+            // Also update the right panel to show folder contents
+            if (this.smugmugAlbums.length > 0) {
+                this.displayRootFolderContentsInRightPanel();
+            }
+            
+            // Refresh in background to ensure cache is up to date
+            this.refreshFolderContentsInBackground(nodeUri);
+            return;
+        }
         
+        // No cache, show loading and fetch fresh data
+        this.showAlbumsLoading();
+        await this.fetchFolderContents(nodeUri);
+    }
+    
+    async fetchFolderContents(nodeUri = null) {
         try {
             const url = nodeUri 
                 ? `${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(nodeUri)}`
@@ -185,8 +608,15 @@ class TargetVisionApp {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const data = await response.json();
+            
+            // Cache the fresh data
+            this.setCachedFolderContents(nodeUri, data);
+            
             this.smugmugAlbums = data.nodes || [];
             this.currentNodeUri = nodeUri;
+            
+            // Save state after folder navigation
+            this.saveAppState();
             
             // Update breadcrumbs
             if (data.breadcrumbs) {
@@ -208,6 +638,46 @@ class TargetVisionApp {
             console.error('Failed to load folder contents:', error);
             this.showErrorMessage('Failed to Load Folders', 'Could not fetch folders from SmugMug. Please check your connection and try again.', error.message);
             this.hideAlbumsLoading();
+        }
+    }
+    
+    async refreshFolderContentsInBackground(nodeUri = null) {
+        try {
+            console.log('Refreshing folder contents in background for:', nodeUri || 'root');
+            const url = nodeUri 
+                ? `${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(nodeUri)}`
+                : `${this.apiBase}/smugmug/nodes`;
+            
+            const response = await fetch(url);
+            if (!response.ok) return; // Silently fail for background refresh
+            
+            const freshData = await response.json();
+            
+            // Update cache with fresh data
+            this.setCachedFolderContents(nodeUri, freshData);
+            
+            // Only update UI if this is still the current folder
+            if (this.currentNodeUri === nodeUri) {
+                // Check if data actually changed to avoid unnecessary re-renders
+                if (JSON.stringify(this.smugmugAlbums) !== JSON.stringify(freshData.nodes || [])) {
+                    console.log('Folder data updated from background refresh');
+                    this.smugmugAlbums = freshData.nodes || [];
+                    
+                    // Update breadcrumbs if they changed
+                    if (freshData.breadcrumbs) {
+                        this.breadcrumbs = freshData.breadcrumbs;
+                    }
+                    
+                    this.displayFolderContents();
+                    
+                    // Also update the right panel if needed
+                    if (this.smugmugAlbums.length > 0) {
+                        this.displayRootFolderContentsInRightPanel();
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('Background folder refresh failed (ignoring):', error.message);
         }
     }
 
@@ -1349,7 +1819,18 @@ class TargetVisionApp {
     }
 
     async selectAlbum(album) {
+        console.log('selectAlbum called with album:', album);
+        console.log('Album keys:', Object.keys(album));
+        console.log('Album ID properties:', {
+            smugmug_id: album.smugmug_id,
+            album_key: album.album_key,
+            id: album.id
+        });
+        
         this.currentAlbum = album;
+        
+        // Save state after album selection
+        this.saveAppState();
         
         // Update UI
         this.updateAlbumSelection();
@@ -1451,14 +1932,36 @@ class TargetVisionApp {
 
     // Photos Management
     async loadAlbumPhotos(albumId) {
-        this.showPhotosLoading();
         this.clearSelection();
         
+        // Check cache first
+        const cachedPhotos = this.getCachedAlbumPhotos(albumId);
+        if (cachedPhotos) {
+            // Show cached data immediately for fast navigation
+            this.currentPhotos = cachedPhotos;
+            this.displayPhotos();
+            this.updatePhotoStats();
+            
+            // Still fetch fresh data in background to update cache and UI
+            this.refreshAlbumPhotosInBackground(albumId);
+            return;
+        }
+        
+        // No cache available, show loading and fetch fresh data
+        this.showPhotosLoading();
+        await this.fetchAlbumPhotos(albumId);
+    }
+    
+    async fetchAlbumPhotos(albumId) {
         try {
             const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             this.currentPhotos = await response.json();
+            
+            // Cache the fresh data
+            this.setCachedAlbumPhotos(albumId, this.currentPhotos);
+            
             this.displayPhotos();
             this.updatePhotoStats();
             this.hidePhotosLoading();
@@ -1467,6 +1970,32 @@ class TargetVisionApp {
             console.error('Failed to load photos:', error);
             this.showErrorMessage('Failed to Load Photos', 'Could not fetch photos from this album.', error.message);
             this.hidePhotosLoading();
+        }
+    }
+    
+    async refreshAlbumPhotosInBackground(albumId) {
+        try {
+            console.log('Refreshing album photos in background for:', albumId);
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos`);
+            if (!response.ok) return; // Silently fail for background refresh
+            
+            const freshPhotos = await response.json();
+            
+            // Update cache with fresh data
+            this.setCachedAlbumPhotos(albumId, freshPhotos);
+            
+            // Only update UI if this is still the current album
+            if (this.currentAlbum && (this.currentAlbum.smugmug_id === albumId || this.currentAlbum.album_key === albumId)) {
+                // Check if data actually changed to avoid unnecessary re-renders
+                if (JSON.stringify(this.currentPhotos) !== JSON.stringify(freshPhotos)) {
+                    console.log('Album data updated from background refresh');
+                    this.currentPhotos = freshPhotos;
+                    this.displayPhotos();
+                    this.updatePhotoStats();
+                }
+            }
+        } catch (error) {
+            console.log('Background refresh failed (ignoring):', error.message);
         }
     }
 
@@ -1533,6 +2062,9 @@ class TargetVisionApp {
         const cursorClass = photo.is_synced ? 'cursor-pointer' : 'cursor-not-allowed';
         const opacityClass = photo.is_synced ? '' : 'opacity-60';
         div.className = `photo-card relative group ${cursorClass} ${opacityClass}`;
+        
+        // Add data attribute for easy identification during status updates
+        div.setAttribute('data-photo-id', photo.local_photo_id || photo.smugmug_id);
         
         // Status indicator styling
         const statusConfig = {
@@ -1841,6 +2373,7 @@ class TargetVisionApp {
         }
         
         this.showBatchProgress(0, localPhotoIds.length, 0);
+        this.showGlobalProgress(0, localPhotoIds.length, 'Starting AI analysis of selected photos...', true);
         
         try {
             // Update status to processing
@@ -1865,36 +2398,25 @@ class TargetVisionApp {
                 headers['X-OpenAI-Key'] = apiSettings.openai_key;
             }
             
-            // Start batch processing
-            const response = await fetch(`${this.apiBase}/photos/process/batch?provider=${apiSettings.active_provider || 'anthropic'}`, {
+            // Start batch processing (don't await - let it run async)
+            fetch(`${this.apiBase}/photos/process/batch?provider=${apiSettings.active_provider || 'anthropic'}`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(localPhotoIds)
+            }).catch(error => {
+                console.error('Batch processing failed:', error);
+                this.hideBatchProgress();
+                this.hideGlobalProgress();
+                this.showErrorMessage('Processing Failed', 'Batch processing failed. Please try again.');
             });
             
-            const result = await response.json();
-            
-            // Show final progress
-            this.showBatchProgress(result.total, result.total, result.processed);
-            
-            // Reload photos and albums
-            const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
-            await this.loadAlbumPhotos(currentAlbumId);
-            await this.loadSmugMugAlbums();
-            
-            this.clearSelection();
-            
-            const message = `Batch processing completed! ${result.processed}/${result.total} photos processed successfully`;
-            if (result.processed !== result.total) {
-                const failed = result.total - result.processed;
-                this.showErrorMessage('Processing Completed with Errors', message + ` (${failed} failed)`);
-            } else {
-                this.showSuccessMessage('Processing Complete', message);
-            }
+            // Start polling for progress updates
+            this.pollBatchProgress(localPhotoIds);
             
         } catch (error) {
             console.error('Batch processing failed:', error);
             this.hideBatchProgress();
+            this.hideGlobalProgress();
             this.showErrorMessage('Processing Failed', 'Batch processing failed. Please try again.');
         }
     }
@@ -1959,7 +2481,12 @@ class TargetVisionApp {
 
     showPhotosLoading() {
         document.getElementById('loading-photos').classList.remove('hidden');
-        document.getElementById('photo-grid').classList.add('hidden');
+        
+        // Clear existing photos immediately to avoid showing old photos during loading
+        const photoGrid = document.getElementById('photo-grid');
+        photoGrid.innerHTML = '';
+        photoGrid.classList.add('hidden');
+        
         document.getElementById('empty-photos').classList.add('hidden');
         document.getElementById('welcome-state').classList.add('hidden');
     }
@@ -1988,6 +2515,211 @@ class TargetVisionApp {
 
     hideBatchProgress() {
         document.getElementById('batch-progress').classList.add('hidden');
+    }
+    
+    // Global Progress Bar Methods
+    showGlobalProgress(processed, total, details = 'Analyzing images and generating metadata...', enablePolling = false) {
+        const progressContainer = document.getElementById('global-progress-bar');
+        const progressText = document.getElementById('global-progress-text');
+        const progressFill = document.getElementById('global-progress-fill');
+        const progressDetails = document.getElementById('global-progress-details');
+        
+        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+        
+        progressText.textContent = `${processed}/${total}`;
+        progressFill.style.width = `${percentage}%`;
+        progressDetails.textContent = details;
+        progressContainer.classList.remove('hidden');
+        
+        // Store polling state
+        this.isPollingProgress = enablePolling;
+        
+        // Auto-hide after completion (only if not polling)
+        if (processed >= total && !enablePolling) {
+            setTimeout(() => {
+                this.hideGlobalProgress();
+            }, 4000);
+        }
+    }
+    
+    hideGlobalProgress() {
+        const progressContainer = document.getElementById('global-progress-bar');
+        progressContainer.classList.add('hidden');
+    }
+    
+    updateGlobalProgress(processed, total, details = null) {
+        const progressContainer = document.getElementById('global-progress-bar');
+        if (progressContainer.classList.contains('hidden')) return;
+        
+        const progressText = document.getElementById('global-progress-text');
+        const progressFill = document.getElementById('global-progress-fill');
+        const progressDetails = document.getElementById('global-progress-details');
+        
+        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+        
+        progressText.textContent = `${processed}/${total}`;
+        progressFill.style.width = `${percentage}%`;
+        
+        if (details) {
+            progressDetails.textContent = details;
+        }
+        
+        // Auto-hide after completion (only if not polling)
+        if (processed >= total && !this.isPollingProgress) {
+            setTimeout(() => {
+                this.hideGlobalProgress();
+            }, 4000);
+        }
+    }
+    
+    // Progress Polling for Real-time Updates
+    async pollBatchProgress(photoIds) {
+        const startTime = Date.now();
+        const maxPollingTime = 10 * 60 * 1000; // 10 minutes max
+        const pollInterval = 1000; // Poll every second
+        
+        let completed = 0;
+        let processing = 0;
+        let failed = 0;
+        const total = photoIds.length;
+        
+        const poll = async () => {
+            try {
+                // Check if photos are processed by fetching their current status
+                const statusPromises = photoIds.map(async (photoId) => {
+                    try {
+                        const response = await fetch(`${this.apiBase}/photos/${photoId}`);
+                        if (response.ok) {
+                            const photo = await response.json();
+                            return photo.processing_status || 'not_processed';
+                        }
+                        return 'not_processed';
+                    } catch {
+                        return 'not_processed';
+                    }
+                });
+                
+                const statuses = await Promise.all(statusPromises);
+                
+                // Update individual photo thumbnails with new status
+                photoIds.forEach((photoId, index) => {
+                    const newStatus = statuses[index];
+                    this.updatePhotoThumbnailStatus(photoId, newStatus);
+                });
+                
+                // Count statuses
+                completed = statuses.filter(status => status === 'completed').length;
+                processing = statuses.filter(status => status === 'processing').length;
+                failed = statuses.filter(status => status === 'failed').length;
+                
+                // Update progress bars
+                this.showBatchProgress(completed, total, completed);
+                
+                let detailMessage = 'Analyzing images and generating metadata...';
+                if (processing > 0) {
+                    detailMessage = `Processing ${processing} photos, ${completed} complete`;
+                } else if (completed > 0) {
+                    detailMessage = `${completed}/${total} photos analyzed successfully`;
+                }
+                
+                this.updateGlobalProgress(completed, total, detailMessage);
+                
+                // Check if all photos are done processing
+                const remaining = total - completed - failed;
+                if (remaining === 0) {
+                    // All photos processed, stop polling and clean up
+                    this.isPollingProgress = false;
+                    
+                    // Show completion message
+                    this.updateGlobalProgress(completed, total, 'Processing complete! Reloading photos...');
+                    
+                    // Reload photos and albums
+                    const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
+                    await this.loadAlbumPhotos(currentAlbumId);
+                    await this.loadSmugMugAlbums();
+                    
+                    this.clearSelection();
+                    
+                    // Auto-hide progress bar after completion
+                    setTimeout(() => {
+                        this.hideGlobalProgress();
+                    }, 4000);
+                    
+                    const message = `Batch processing completed! ${completed}/${total} photos processed successfully`;
+                    if (failed > 0) {
+                        this.showErrorMessage('Processing Completed with Errors', message + ` (${failed} failed)`);
+                    } else {
+                        this.showSuccessMessage('Processing Complete', message);
+                    }
+                    
+                    return; // Stop polling
+                }
+                
+                // Check timeout
+                if (Date.now() - startTime > maxPollingTime) {
+                    this.showErrorMessage('Processing Timeout', 'Processing is taking longer than expected. Please check the status later.');
+                    this.hideBatchProgress();
+                    this.hideGlobalProgress();
+                    return;
+                }
+                
+                // Schedule next poll
+                setTimeout(poll, pollInterval);
+                
+            } catch (error) {
+                console.error('Error polling batch progress:', error);
+                // Continue polling despite errors
+                setTimeout(poll, pollInterval);
+            }
+        };
+        
+        // Start polling
+        setTimeout(poll, 1000); // Start after 1 second
+    }
+    
+    // Update individual photo thumbnail status indicator
+    updatePhotoThumbnailStatus(photoId, newStatus) {
+        try {
+            // Find the photo in currentPhotos and update its status
+            const photoIndex = this.currentPhotos.findIndex(p => p.local_photo_id === photoId);
+            if (photoIndex !== -1) {
+                this.currentPhotos[photoIndex].processing_status = newStatus;
+            }
+            
+            // Find the photo card in the DOM using data attribute
+            const targetCard = document.querySelector(`[data-photo-id="${photoId}"]`);
+            if (!targetCard) return;
+            
+            // Update the status indicator
+            const statusConfig = {
+                'completed': { color: 'bg-green-500', icon: '✓', text: 'Processed' },
+                'processing': { color: 'bg-yellow-500', icon: '⏳', text: 'Processing' },
+                'failed': { color: 'bg-red-500', icon: '✗', text: 'Failed' },
+                'not_processed': { color: 'bg-orange-500', icon: '○', text: 'Not Processed' },
+                'not_synced': { color: 'bg-gray-400', icon: '○', text: 'Not Synced' }
+            };
+            
+            const statusInfo = statusConfig[newStatus] || statusConfig['not_processed'];
+            const statusIndicator = targetCard.querySelector('div[class*="absolute top-2 right-2"]');
+            
+            if (statusIndicator) {
+                // Update classes and content
+                statusIndicator.className = `absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center z-20`;
+                const iconSpan = statusIndicator.querySelector('span');
+                if (iconSpan) {
+                    iconSpan.textContent = statusInfo.icon;
+                }
+                
+                // Add a subtle animation to show the change
+                statusIndicator.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    statusIndicator.style.transform = 'scale(1)';
+                }, 300);
+            }
+            
+        } catch (error) {
+            console.error('Error updating photo thumbnail status:', error);
+        }
     }
 
     updatePhotoStats() {
@@ -2028,9 +2760,9 @@ class TargetVisionApp {
             processedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300';
         }
 
-        // Update unprocessed button style
+        // Update unprocessed button style - now uses same blue theme when active for consistency
         if (this.showUnprocessedPhotos) {
-            unprocessedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-100 text-gray-800 hover:bg-gray-200';
+            unprocessedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-blue-100 text-blue-800 hover:bg-blue-200';
         } else {
             unprocessedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300';
         }
@@ -2145,30 +2877,54 @@ class TargetVisionApp {
 
     // Page Navigation
     showPage(pageName) {
-        // Hide all pages
-        document.getElementById('page-albums').classList.add('hidden');
-        document.getElementById('page-chat').classList.add('hidden');
-        document.getElementById('page-search').classList.add('hidden');
-        document.getElementById('page-settings').classList.add('hidden');
-        
-        // Remove active state from all nav tabs
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.classList.remove('nav-tab-active');
-        });
-        
-        // Show selected page and activate tab
-        document.getElementById(`page-${pageName}`).classList.remove('hidden');
-        document.getElementById(`nav-${pageName}`).classList.add('nav-tab-active');
-        
-        this.currentPage = pageName;
-        
-        // Initialize page if needed
-        if (pageName === 'chat' && this.chatMessages.length === 0) {
-            this.initializeChatPage();
-        } else if (pageName === 'search') {
-            this.initializeSearchPage();
-        } else if (pageName === 'settings') {
-            this.initializeSettingsPage();
+        try {
+            console.log(`Switching to page: ${pageName}`);
+            
+            // Hide all pages
+            document.getElementById('page-albums').classList.add('hidden');
+            document.getElementById('page-chat').classList.add('hidden');
+            document.getElementById('page-search').classList.add('hidden');
+            document.getElementById('page-settings').classList.add('hidden');
+            
+            // Remove active state from all nav tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('nav-tab-active');
+            });
+            
+            // Show selected page and activate tab
+            const pageElement = document.getElementById(`page-${pageName}`);
+            const navElement = document.getElementById(`nav-${pageName}`);
+            
+            if (pageElement) {
+                pageElement.classList.remove('hidden');
+                console.log(`Page ${pageName} shown successfully`);
+            } else {
+                console.error(`Page element not found: page-${pageName}`);
+            }
+            
+            if (navElement) {
+                navElement.classList.add('nav-tab-active');
+            } else {
+                console.error(`Nav element not found: nav-${pageName}`);
+            }
+            
+            this.currentPage = pageName;
+            
+            // Save state after page change
+            this.saveAppState();
+            
+            // Initialize page if needed
+            if (pageName === 'chat' && this.chatMessages.length === 0) {
+                this.initializeChatPage();
+            } else if (pageName === 'search') {
+                this.initializeSearchPage();
+            } else if (pageName === 'settings') {
+                this.initializeSettingsPage().catch(error => {
+                    console.error('Error initializing settings page:', error);
+                });
+            }
+        } catch (error) {
+            console.error('Error in showPage:', error);
         }
     }
     
@@ -2871,6 +3627,9 @@ You can also ask for help with syncing albums or processing photos with AI. What
         processButton.textContent = 'Processing...';
         processButton.disabled = true;
         
+        // Show global progress for single photo
+        this.showGlobalProgress(0, 1, 'Analyzing photo with AI...');
+        
         try {
             // Get user's API settings
             const apiSettings = this.getApiSettings();
@@ -2908,10 +3667,14 @@ You can also ask for help with syncing albums or processing photos with AI. What
             // Refresh the photo grid to show updated status
             this.displayPhotos();
             
+            // Update global progress to complete
+            this.updateGlobalProgress(1, 1, 'Photo analysis complete!');
+            
             this.showSuccessMessage('AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
             
         } catch (error) {
             console.error('AI processing failed:', error);
+            this.hideGlobalProgress();
             this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
             
             processButton.textContent = originalText;
@@ -3127,6 +3890,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         this.loadApplicationSettings();
         this.loadApiKeySettings();
         this.updateSystemInfo();
+        this.updateCacheStatus();
     }
     
     async loadCurrentPrompt() {
@@ -3660,7 +4424,7 @@ Emphasize athletic performance, competition elements, and achievement recognitio
     async updateSystemInfo() {
         try {
             // Update photo counts
-            const response = await fetch(`${this.apiBase}/photos?limit=1`);
+            const response = await fetch(`${this.apiBase}/photos?stats_only=true`);
             if (response.ok) {
                 const data = await response.json();
                 document.getElementById('total-photos').textContent = data.total || '0';
@@ -3683,5 +4447,11 @@ Emphasize athletic performance, competition elements, and achievement recognitio
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new TargetVisionApp();
+    console.log('DOM loaded, initializing TargetVisionApp...');
+    try {
+        window.app = new TargetVisionApp();
+        console.log('TargetVisionApp initialized successfully');
+    } catch (error) {
+        console.error('Error initializing TargetVisionApp:', error);
+    }
 });

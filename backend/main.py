@@ -1138,16 +1138,28 @@ async def sync_photos(
         "total_photos": db.query(Photo).count()
     }
 
-@app.get("/photos", response_model=List[Dict])
+@app.get("/photos")
 async def list_photos(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, le=100),
+    stats_only: bool = Query(default=False, description="Return only statistics instead of photo list"),
     db: Session = Depends(get_db)
 ):
-    """List photos from database"""
-    photos = db.query(Photo).offset(skip).limit(limit).all()
+    """List photos from database or return statistics"""
     
-    return [photo.to_dict() for photo in photos]
+    if stats_only:
+        # Return aggregate statistics for system info
+        total_count = db.query(Photo).count()
+        processed_count = db.query(Photo).filter(Photo.processing_status == 'completed').count()
+        
+        return {
+            "total": total_count,
+            "processed": processed_count
+        }
+    else:
+        # Return paginated photo list
+        photos = db.query(Photo).offset(skip).limit(limit).all()
+        return [photo.to_dict() for photo in photos]
 
 @app.get("/photos/{photo_id}")
 async def get_photo(photo_id: int, db: Session = Depends(get_db)):

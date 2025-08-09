@@ -194,9 +194,9 @@
                                         </svg>
                                         Processed
                                     </button>
-                                    <button id="toggle-unprocessed" class="text-xs px-2 py-1 rounded transition-colors bg-gray-100 text-gray-800 hover:bg-gray-200">
+                                    <button id="toggle-unprocessed" class="text-xs px-2 py-1 rounded transition-colors bg-blue-100 text-blue-800 hover:bg-blue-200">
                                         <svg class="h-3 w-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-5a1 1 0 011-1h1a1 1 0 110 2H9a1 1 0 01-1-1zm1-9a1 1 0 011 1v6a1 1 0 11-2 0V5a1 1 0 011-1z" clip-rule="evenodd"/>
                                         </svg>
                                         Unprocessed
                                     </button>
@@ -706,6 +706,50 @@
                     </div>
                 </div>
                 
+                <!-- Cache Management -->
+                <div class="mb-6 p-6 bg-white border border-gray-300 rounded-lg shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Cache Management</h3>
+                    <p class="text-sm text-gray-600 mb-4">Manage locally stored data to improve navigation speed</p>
+                    
+                    <div class="space-y-4">
+                        <!-- Cache Status Display -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="font-medium text-gray-700">Cached Albums:</span>
+                                <span id="cache-albums-count">0</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-700">Cached Folders:</span>
+                                <span id="cache-folders-count">0</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Cache Info -->
+                        <div class="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                            <div class="flex items-start">
+                                <svg class="h-5 w-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                </svg>
+                                <div>
+                                    <p class="font-medium">Cache improves navigation speed</p>
+                                    <p class="mt-1">Album photos are cached for 1 hour, folder structure for 24 hours. Data refreshes automatically in the background.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Cache Actions -->
+                        <div class="pt-4 border-t border-gray-200">
+                            <button id="clear-cache" class="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition-colors mr-3">
+                                Clear All Cache
+                            </button>
+                            <button id="refresh-cache-status" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors">
+                                Refresh Status
+                            </button>
+                            <span id="cache-cleared" class="ml-3 text-sm text-green-600 hidden">✅ Cache cleared!</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- System Information -->
                 <div class="p-6 bg-white border border-gray-300 rounded-lg shadow-sm">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">System Information</h3>
@@ -867,6 +911,37 @@
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Global Processing Progress Bar (Fixed Bottom) -->
+    <div id="global-progress-bar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-3">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Processing Photos with AI</p>
+                        <p class="text-xs text-gray-500" id="global-progress-details">Analyzing images and generating metadata...</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span id="global-progress-text" class="text-sm font-medium text-blue-600">0/0</span>
+                    <button id="global-progress-close" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="global-progress-fill" class="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>
