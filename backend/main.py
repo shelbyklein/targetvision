@@ -28,11 +28,11 @@ oauth_temp_storage = {}
 
 # Cache for sidebar data (in-memory cache with TTL)
 sidebar_cache = {}
-SIDEBAR_CACHE_TTL = 300  # 5 minutes in seconds
+SIDEBAR_CACHE_TTL = int(float(os.getenv("SIDEBAR_CACHE_TTL_HOURS", 0.083)) * 3600)  # Default: 5 minutes (0.083 hours)
 
 # Cache for thumbnail URLs (longer TTL since they rarely change)
 thumbnail_cache = {}
-THUMBNAIL_CACHE_TTL = 3600  # 1 hour in seconds
+THUMBNAIL_CACHE_TTL = int(float(os.getenv("THUMBNAIL_CACHE_TTL_HOURS", 1)) * 3600)  # Default: 1 hour
 
 def get_cache_key(node_uri: Optional[str], user_id: str) -> str:
     """Generate cache key for sidebar data"""
