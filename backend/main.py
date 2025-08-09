@@ -243,6 +243,152 @@ async def list_smugmug_albums(db: Session = Depends(get_db)):
         logger.error(f"Error fetching SmugMug albums: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch albums from SmugMug: {str(e)}")
 
+@app.get("/smugmug/nodes")
+async def list_smugmug_nodes(
+    node_uri: Optional[str] = Query(default=None, description="Node URI to get children for (root if not provided)"),
+    db: Session = Depends(get_db)
+):
+    """Get child nodes (folders and albums) for a node using SmugMug Node API"""
+    
+    # Get stored access token
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    # Initialize SmugMug service
+    service = SmugMugService(token.access_token, token.access_token_secret)
+    
+    try:
+        # Fetch nodes from SmugMug API
+        nodes = await service.get_node_children(node_uri)
+        
+        if not nodes:
+            return []
+        
+        # Transform nodes to consistent format
+        result = []
+        
+        for node in nodes:
+            node_type = node.get("Type", "").lower()
+            
+            if node_type == "album":
+                # For albums, get detailed information including AlbumKey
+                node_data = await service.get_detailed_album_info(node)
+                
+                # Get local processing statistics for albums
+                if node_data.get("album_key"):
+                    album_key = node_data["album_key"]
+                    # Albums are stored with full URI, so construct it for lookup
+                    album_uri = f"/api/v2/album/{album_key}"
+                    local_album = db.query(Album).filter_by(smugmug_id=album_uri).first()
+                    if local_album:
+                        from sqlalchemy import func, case
+                        stats = db.query(
+                            func.count(Photo.id).label('synced_photo_count'),
+                            func.sum(case((Photo.processing_status == 'completed', 1), else_=0)).label('processed_count'),
+                            func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed_count')
+                        ).filter(Photo.album_id == local_album.id).first()
+                        
+                        node_data.update({
+                            'local_album_id': local_album.id,
+                            'synced_photo_count': int(stats.synced_photo_count or 0),
+                            'processed_count': int(stats.processed_count or 0),
+                            'ai_processed_count': int(stats.ai_processed_count or 0),
+                            'processing_progress': round((int(stats.ai_processed_count or 0) / max(int(stats.synced_photo_count or 1), 1)) * 100, 1),
+                            'is_synced': True
+                        })
+                    else:
+                        node_data.update({
+                            'local_album_id': None,
+                            'synced_photo_count': 0,
+                            'processed_count': 0,
+                            'ai_processed_count': 0,
+                            'processing_progress': 0.0,
+                            'is_synced': False
+                        })
+                else:
+                    # No album key available
+                    node_data.update({
+                        'local_album_id': None,
+                        'synced_photo_count': 0,
+                        'processed_count': 0,
+                        'ai_processed_count': 0,
+                        'processing_progress': 0.0,
+                        'is_synced': False
+                    })
+            else:
+                # For folders and other node types, use basic node data
+                node_data = {
+                    "node_id": node.get("NodeID", ""),
+                    "node_uri": node.get("Uri", ""),
+                    "name": node.get("Name", "Untitled"),
+                    "description": node.get("Description", ""),
+                    "type": node_type,
+                    "privacy": node.get("Privacy", ""),
+                    "security_type": node.get("SecurityType", ""),
+                    "date_added": node.get("DateAdded", ""),
+                    "date_modified": node.get("DateModified", ""),
+                    "has_children": node.get("HasChildren", False),
+                    "sort_method": node.get("SortMethod", ""),
+                    "sort_direction": node.get("SortDirection", "")
+                }
+            
+            result.append(node_data)
+        
+        # Get breadcrumbs for the current node if requested
+        breadcrumbs = []
+        if node_uri:
+            breadcrumbs = await service.get_folder_breadcrumbs(node_uri)
+        
+        return {
+            "nodes": result,
+            "breadcrumbs": breadcrumbs,
+            "current_node_uri": node_uri
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching SmugMug nodes: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch nodes from SmugMug: {str(e)}")
+
+
+@app.get("/smugmug/node/{node_id}")
+async def get_smugmug_node_details(
+    node_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get details for a specific SmugMug node"""
+    
+    # Get stored access token
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    # Initialize SmugMug service
+    service = SmugMugService(token.access_token, token.access_token_secret)
+    
+    try:
+        # Construct node URI
+        node_uri = f"/node/{node_id}"
+        
+        # Get node details
+        node = await service.get_node_details(node_uri)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+        
+        # Get breadcrumbs
+        breadcrumbs = await service.get_folder_breadcrumbs(node_uri)
+        
+        return {
+            "node": node,
+            "breadcrumbs": breadcrumbs
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting SmugMug node details: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get node details: {str(e)}")
+
 @app.get("/smugmug/albums/{smugmug_album_key}/photos", response_model=List[Dict])
 async def list_smugmug_album_photos(
     smugmug_album_key: str,
