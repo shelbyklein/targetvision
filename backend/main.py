@@ -737,11 +737,26 @@ async def list_smugmug_album_photos(
     service = SmugMugService(token.access_token, token.access_token_secret)
     
     try:
+        # First get album info to determine total image count
+        albums = await service.get_user_albums()
+        target_album = None
+        
+        for album in albums:
+            if album.get("AlbumKey") == smugmug_album_key:
+                target_album = album
+                break
+        
+        if not target_album:
+            raise HTTPException(status_code=404, detail="Album not found in SmugMug")
+        
+        # Get the total image count for the album
+        album_image_count = target_album.get("ImageCount", 100)  # Fallback to 100 if not available
+        
         # Construct album URI from key
         album_uri = f"/api/v2/album/{smugmug_album_key}"
         
-        # Fetch photos from SmugMug API
-        smugmug_photos = await service.get_album_images(album_uri)
+        # Fetch ALL photos from SmugMug API using the album's total image count
+        smugmug_photos = await service.get_album_images(album_uri, limit=album_image_count)
         
         if not smugmug_photos:
             return []
