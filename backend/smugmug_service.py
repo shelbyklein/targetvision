@@ -274,6 +274,31 @@ class SmugMugService:
             logger.error(f"Error syncing photos: {e}")
             return all_photos
     
+    async def get_album_by_key(self, album_key: str) -> Optional[Dict]:
+        """Get album information directly by album key via Album API"""
+        try:
+            url = f"{self.api_base}/album/{album_key}"
+            params = {
+                "_expand": "HighlightImage"  # Include highlight image data
+            }
+            
+            response = await self.oauth.make_authenticated_request(
+                "GET", url, self.access_token, self.access_token_secret, params
+            )
+            
+            if response and response.status_code == 200:
+                data = response.json()
+                album = data.get("Response", {}).get("Album", {})
+                logger.info(f"✅ Successfully fetched album {album_key} via Album API")
+                return album
+            else:
+                logger.error(f"❌ Failed to get album {album_key}: {response.status_code if response else 'No response'}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting album {album_key}: {e}")
+            return None
+
     async def get_detailed_album_info(self, node: Dict) -> Dict:
         """Get detailed album information from a Node API album node"""
         try:

@@ -713,7 +713,42 @@ async def get_album_thumbnail(
                         }
                     )
         
-        raise HTTPException(status_code=404, detail="No highlight image found for this album")
+        # If no highlight image, try to get the first image from the album as fallback
+        try:
+            album_data = await service.get_album_by_key(album_key)
+            if album_data:
+                # Try to get first image from album  
+                album_uri = f"/api/v2/album/{album_key}"
+                album_images = await service.get_album_images(album_uri, limit=1)
+                if album_images and len(album_images) > 0:
+                    first_image = album_images[0]
+                    thumbnail_url = first_image.get("ThumbnailUrl")
+                    if thumbnail_url:
+                        response_data = {
+                            "album_key": album_key,
+                            "thumbnail_url": thumbnail_url,
+                            "fallback": True  # Indicate this is a fallback
+                        }
+                        
+                        # Cache the fallback response
+                        thumbnail_cache[cache_key] = {
+                            'data': response_data,
+                            'timestamp': time.time()
+                        }
+                        logger.info(f"Cached fallback thumbnail data: {cache_key}")
+                        
+                        return JSONResponse(
+                            content=response_data,
+                            headers={
+                                "Cache-Control": "public, max-age=3600",
+                                "ETag": f'"{hash(thumbnail_url)}"',
+                                "X-Cache": "MISS-FALLBACK"
+                            }
+                        )
+        except Exception as fallback_error:
+            logger.warning(f"Fallback thumbnail fetch failed for {album_key}: {fallback_error}")
+        
+        raise HTTPException(status_code=404, detail="No highlight image or album images found for this album")
         
     except HTTPException:
         raise
@@ -737,14 +772,8 @@ async def list_smugmug_album_photos(
     service = SmugMugService(token.access_token, token.access_token_secret)
     
     try:
-        # First get album info to determine total image count
-        albums = await service.get_user_albums()
-        target_album = None
-        
-        for album in albums:
-            if album.get("AlbumKey") == smugmug_album_key:
-                target_album = album
-                break
+        # Get album info directly by album key
+        target_album = await service.get_album_by_key(smugmug_album_key)
         
         if not target_album:
             raise HTTPException(status_code=404, detail="Album not found in SmugMug")
@@ -836,14 +865,8 @@ async def sync_smugmug_album(
     service = SmugMugService(token.access_token, token.access_token_secret)
     
     try:
-        # Get album info from SmugMug
-        albums = await service.get_user_albums()
-        target_album = None
-        
-        for album in albums:
-            if album.get("AlbumKey") == smugmug_album_key:
-                target_album = album
-                break
+        # Get album info directly by album key
+        target_album = await service.get_album_by_key(smugmug_album_key)
         
         if not target_album:
             raise HTTPException(status_code=404, detail="Album not found in SmugMug")
