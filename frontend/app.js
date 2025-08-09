@@ -3362,6 +3362,15 @@ Emphasize athletic performance, competition elements, and achievement recognitio
     }
     
     // API Key Management Methods
+    getApiSettings() {
+        const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
+        return {
+            anthropic_key: settings.anthropic_key,
+            openai_key: settings.openai_key,
+            active_provider: settings.active_provider || 'anthropic'
+        };
+    }
+    
     loadApiKeySettings() {
         const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
         

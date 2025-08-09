@@ -13,5 +13,6 @@ Focus on:
 - Emotions or mood if apparent
 - be explicit if there are people smiling in the image
 - be explicit if there are no people in in the image and use keywords and descriptive text defining the image as having no people, lack of people, absent of people, landscape no people, etc.
+- be explicit about the person(s) age(s) and/or range. Use a generational term (gen z, gen alpha, millenial, baby boomer, etc)
 
 Do not include speculation about metadata like camera settings, date, or photographer information.
