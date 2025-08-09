@@ -414,20 +414,32 @@ async def get_album_thumbnail(
     if not token or not token.is_valid():
         raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
     
-    # Initialize SmugMug service
+    # Initialize SmugMug service for OAuth calls
     service = SmugMugService(token.access_token, token.access_token_secret)
     
     try:
-        # Use existing method to get album highlight image details
-        highlight_details = await service.get_album_highlight_image_details(album_key)
+        # Direct call to SmugMug API for album highlight image
+        url = f"https://api.smugmug.com/api/v2/album/{album_key}!highlightimage"
         
-        if highlight_details and highlight_details.get("thumbnail_url"):
-            return {
-                "album_key": album_key,
-                "thumbnail_url": highlight_details["thumbnail_url"]
-            }
-        else:
-            raise HTTPException(status_code=404, detail="No highlight image found for this album")
+        response = await service.oauth.make_authenticated_request(
+            "GET", url, token.access_token, token.access_token_secret
+        )
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            
+            # Extract thumbnail URL from Response.AlbumImage
+            if "Response" in data and "AlbumImage" in data["Response"]:
+                album_image = data["Response"]["AlbumImage"]
+                thumbnail_url = album_image.get("ThumbnailUrl")
+                
+                if thumbnail_url:
+                    return {
+                        "album_key": album_key,
+                        "thumbnail_url": thumbnail_url
+                    }
+        
+        raise HTTPException(status_code=404, detail="No highlight image found for this album")
         
     except HTTPException:
         raise
