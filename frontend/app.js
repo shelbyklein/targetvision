@@ -880,9 +880,17 @@ class TargetVisionApp {
         
         div.innerHTML = `
             <div class="flex flex-col items-center text-center">
-                <svg class="h-12 w-12 text-amber-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                </svg>
+                ${folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url) ? `
+                    <div class="w-12 h-12 mb-2 rounded overflow-hidden bg-gray-100 shadow-sm">
+                        <img src="${folder.highlight_image.thumbnail_url || folder.highlight_image.image_url}" 
+                             alt="${folderName}" 
+                             class="w-full h-full object-cover">
+                    </div>
+                ` : `
+                    <svg class="h-12 w-12 text-amber-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                `}
                 <h3 class="text-sm font-medium text-gray-900 truncate w-full">${folderName}</h3>
                 <p class="text-xs text-gray-500 mt-1">Folder</p>
             </div>
@@ -910,9 +918,17 @@ class TargetVisionApp {
         
         div.innerHTML = `
             <div class="flex flex-col items-center text-center">
-                <svg class="h-12 w-12 text-green-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-                </svg>
+                ${album.highlight_image && (album.highlight_image.thumbnail_url || album.highlight_image.image_url) ? `
+                    <div class="w-12 h-12 mb-2 rounded overflow-hidden bg-gray-100 shadow-sm">
+                        <img src="${album.highlight_image.thumbnail_url || album.highlight_image.image_url}" 
+                             alt="${albumName}" 
+                             class="w-full h-full object-cover">
+                    </div>
+                ` : `
+                    <svg class="h-12 w-12 text-green-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                `}
                 <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
                 <div class="flex items-center justify-center mt-1 space-x-2">
                     <p class="text-xs text-gray-500">${photoCount} photos</p>
