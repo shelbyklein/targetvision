@@ -53,6 +53,13 @@
                             </svg>
                             Search
                         </button>
+                        <button id="nav-settings" class="nav-tab px-4 py-2 text-sm font-medium rounded-md transition-colors">
+                            <svg class="h-4 w-4 mr-2 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            Settings
+                        </button>
                     </nav>
                 </div>
                 
@@ -86,12 +93,9 @@
         <div id="page-albums" class="flex-1 flex flex-col overflow-hidden">
             <!-- Navigation Breadcrumb -->
             <nav id="breadcrumb" class="flex items-center space-x-2 text-sm text-gray-500 mb-4 mx-4">
-                <button id="breadcrumb-albums" class="hover:text-primary flex items-center">
-                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
-                    </svg>
-                    SmugMug Albums
-                </button>
+                <div id="breadcrumb-path" class="flex items-center">
+                    <!-- Dynamic breadcrumb path will be inserted here -->
+                </div>
                 <svg id="breadcrumb-arrow" class="h-4 w-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
@@ -346,6 +350,70 @@
                     </div>
                 </div>
                 
+                <!-- Advanced Filters Section -->
+                <div class="mb-6 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-lg font-medium text-gray-900">Filters</h3>
+                        <button id="toggle-filters" class="text-sm text-primary hover:text-blue-600 flex items-center">
+                            <span id="filter-toggle-text">Show Filters</span>
+                            <svg id="filter-toggle-icon" class="h-4 w-4 ml-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div id="search-filters" class="hidden space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <!-- Album Filter -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Album</label>
+                                <select id="search-filter-album" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm">
+                                    <option value="">All Albums</option>
+                                    <!-- Albums will be populated dynamically -->
+                                </select>
+                            </div>
+                            
+                            <!-- Processing Status Filter -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Processing Status</label>
+                                <select id="search-filter-status" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm">
+                                    <option value="">All Photos</option>
+                                    <option value="completed">AI Processed</option>
+                                    <option value="not_processed">Not Processed</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Date Range Filter -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Date From</label>
+                                <input id="search-filter-date-from" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Date To</label>
+                                <input id="search-filter-date-to" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                        </div>
+                        
+                        <!-- Filter Actions -->
+                        <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+                            <div class="flex items-center space-x-3">
+                                <button id="apply-filters" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors text-sm font-medium">
+                                    Apply Filters
+                                </button>
+                                <button id="clear-filters" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors text-sm font-medium">
+                                    Clear Filters
+                                </button>
+                            </div>
+                            <div id="active-filters" class="text-sm text-gray-500">
+                                <!-- Active filter indicators will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Search Results -->
                 <div id="search-results-container" class="bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden">
                     <!-- Welcome State -->
@@ -377,6 +445,197 @@
                         </svg>
                         <h3 class="text-lg font-medium text-gray-900 mb-2">No Results Found</h3>
                         <p class="text-center">Try different search terms or make sure your photos have been processed with AI first.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="page-settings" class="hidden flex-1 flex flex-col overflow-hidden">
+            <div class="mx-4 my-4">
+                <!-- Settings Header -->
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Settings</h2>
+                    <p class="text-gray-600">Configure AI processing and application preferences</p>
+                </div>
+                
+                <!-- AI Processing Settings -->
+                <div class="mb-6 p-6 bg-white border border-gray-300 rounded-lg shadow-sm">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">AI Processing Configuration</h3>
+                        <p class="text-sm text-gray-600">Customize how Claude Vision analyzes your photos</p>
+                    </div>
+                    
+                    <!-- Current Prompt Display -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-md font-medium text-gray-800">AI Analysis Prompt</h4>
+                            <div class="flex items-center space-x-2">
+                                <span id="prompt-status" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Default</span>
+                                <button id="reset-prompt" class="text-sm bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 transition-colors">
+                                    Reset to Default
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- View Mode -->
+                        <div id="prompt-view" class="mb-4">
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <pre id="current-prompt" class="text-sm text-gray-800 whitespace-pre-wrap font-mono"></pre>
+                            </div>
+                            <button id="edit-prompt" class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                                Edit Prompt
+                            </button>
+                        </div>
+                        
+                        <!-- Edit Mode -->
+                        <div id="prompt-edit" class="hidden mb-4">
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="prompt-textarea" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Customize AI Analysis Instructions
+                                    </label>
+                                    <textarea 
+                                        id="prompt-textarea" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical font-mono"
+                                        rows="12"
+                                        placeholder="Enter your custom prompt..."
+                                    ></textarea>
+                                    <div class="flex justify-between items-center mt-2">
+                                        <p class="text-xs text-gray-500">
+                                            <strong>Tips:</strong> Be specific about what you want the AI to identify. Include instructions for formatting keywords and descriptions.
+                                        </p>
+                                        <span id="prompt-char-count" class="text-xs text-gray-500">0 characters</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center space-x-3">
+                                    <button id="save-prompt" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">
+                                        Save Prompt
+                                    </button>
+                                    <button id="cancel-prompt-edit" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button id="test-prompt" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 transition-colors">
+                                        Test Prompt
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Prompt Templates -->
+                        <div class="mt-6">
+                            <h4 class="text-md font-medium text-gray-800 mb-3">Prompt Templates</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer" data-template="detailed">
+                                    <h5 class="font-medium text-gray-900 mb-1">Detailed Analysis</h5>
+                                    <p class="text-sm text-gray-600 mb-2">Comprehensive descriptions with technical details, emotions, and context</p>
+                                    <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Photography Focus</span>
+                                </div>
+                                
+                                <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer" data-template="concise">
+                                    <h5 class="font-medium text-gray-900 mb-1">Concise Summary</h5>
+                                    <p class="text-sm text-gray-600 mb-2">Brief, focused descriptions highlighting main subjects and actions</p>
+                                    <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Quick Processing</span>
+                                </div>
+                                
+                                <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer" data-template="artistic">
+                                    <h5 class="font-medium text-gray-900 mb-1">Artistic Description</h5>
+                                    <p class="text-sm text-gray-600 mb-2">Focus on composition, lighting, mood, and artistic elements</p>
+                                    <span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Creative Focus</span>
+                                </div>
+                                
+                                <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer" data-template="sports">
+                                    <h5 class="font-medium text-gray-900 mb-1">Sports & Events</h5>
+                                    <p class="text-sm text-gray-600 mb-2">Specialized for sports photography, competitions, and events</p>
+                                    <span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Sports Focus</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Application Settings -->
+                <div class="mb-6 p-6 bg-white border border-gray-300 rounded-lg shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Application Preferences</h3>
+                    
+                    <div class="space-y-4">
+                        <!-- Processing Settings -->
+                        <div>
+                            <h4 class="text-md font-medium text-gray-800 mb-3">Processing Behavior</h4>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="auto-approve" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Auto-approve AI metadata for high-confidence results (>90%)</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="batch-processing" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Enable batch processing for multiple photos</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="retry-failed" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Automatically retry failed processing</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Interface Settings -->
+                        <div>
+                            <h4 class="text-md font-medium text-gray-800 mb-3">Interface Preferences</h4>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="show-confidence" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Show confidence scores in photo metadata</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="advanced-filters-default" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Show advanced filters by default in search</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="compact-view" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <span class="ml-2 text-sm text-gray-700">Use compact view for photo grids</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Save Settings Button -->
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <button id="save-settings" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                            Save Settings
+                        </button>
+                        <span id="settings-saved" class="ml-3 text-sm text-green-600 hidden">✅ Settings saved!</span>
+                    </div>
+                </div>
+                
+                <!-- System Information -->
+                <div class="p-6 bg-white border border-gray-300 rounded-lg shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">System Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="font-medium text-gray-700">Backend Status:</span>
+                            <span id="backend-status" class="text-green-600">Connected</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700">SmugMug Connection:</span>
+                            <span id="smugmug-status" class="text-green-600">Active</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700">Claude API:</span>
+                            <span id="claude-status" class="text-green-600">Available</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700">Total Photos:</span>
+                            <span id="total-photos">Loading...</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700">Processed Photos:</span>
+                            <span id="processed-photos">Loading...</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-700">Processing Queue:</span>
+                            <span id="queue-status">Loading...</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -423,11 +682,28 @@
                         
                         <!-- AI Metadata -->
                         <div id="modal-ai-section" class="hidden">
-                            <h4 class="font-medium text-gray-900 mb-2 flex items-center">
-                                <span class="mr-2">🤖 AI Generated</span>
-                                <span id="modal-ai-confidence" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"></span>
-                            </h4>
-                            <div class="bg-blue-50 rounded-lg p-4 space-y-3">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-medium text-gray-900 flex items-center">
+                                    <span class="mr-2">🤖 AI Generated</span>
+                                    <span id="modal-ai-confidence" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded"></span>
+                                </h4>
+                                <div class="flex items-center space-x-2">
+                                    <button id="modal-edit-toggle" class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200 transition-colors">
+                                        Edit
+                                    </button>
+                                    <div id="modal-edit-actions" class="hidden flex items-center space-x-2">
+                                        <button id="modal-save-metadata" class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors">
+                                            Save
+                                        </button>
+                                        <button id="modal-cancel-edit" class="text-sm bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- View Mode -->
+                            <div id="modal-ai-view" class="bg-blue-50 rounded-lg p-4 space-y-3">
                                 <div>
                                     <label class="text-sm font-medium text-blue-900">Description</label>
                                     <p id="modal-ai-description" class="text-blue-800 mt-1"></p>
@@ -440,6 +716,40 @@
                                 
                                 <div class="text-xs text-blue-600">
                                     <span id="modal-ai-timestamp"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Edit Mode -->
+                            <div id="modal-ai-edit" class="hidden bg-blue-50 rounded-lg p-4 space-y-4">
+                                <div>
+                                    <label for="modal-edit-description" class="block text-sm font-medium text-blue-900 mb-2">Description</label>
+                                    <textarea 
+                                        id="modal-edit-description" 
+                                        class="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+                                        rows="4"
+                                        placeholder="Enter photo description..."
+                                    ></textarea>
+                                </div>
+                                
+                                <div>
+                                    <label for="modal-edit-keywords" class="block text-sm font-medium text-blue-900 mb-2">Keywords</label>
+                                    <input 
+                                        type="text" 
+                                        id="modal-edit-keywords"
+                                        class="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Enter keywords separated by commas..."
+                                    >
+                                    <p class="text-xs text-blue-600 mt-1">Separate keywords with commas (e.g., archery, competition, medals)</p>
+                                </div>
+                                
+                                <div class="flex items-center space-x-4">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="modal-edit-approved" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="modal-edit-approved" class="ml-2 text-sm text-blue-800">Mark as approved</label>
+                                    </div>
+                                    <button id="modal-regenerate-ai" class="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors">
+                                        🔄 Regenerate AI
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -458,6 +768,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
 
     <script src="app.js"></script>
 </body>

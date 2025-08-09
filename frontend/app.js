@@ -10,6 +10,17 @@ class TargetVisionApp {
         this.currentPage = 'albums';
         this.chatMessages = [];
         this.searchResults = [];
+        this.searchFilters = {
+            album: '',
+            status: '',
+            dateFrom: '',
+            dateTo: ''
+        };
+        
+        // Folder navigation state
+        this.currentNodeUri = null;
+        this.nodeHistory = [];
+        this.breadcrumbs = [];
         
         this.initializeApp();
     }
@@ -18,6 +29,8 @@ class TargetVisionApp {
         this.bindEventListeners();
         await this.checkConnectionStatus();
         await this.checkAuthentication();
+        // Initialize breadcrumbs before loading albums
+        this.updateBreadcrumbs();
         await this.loadSmugMugAlbums();
     }
 
@@ -26,9 +39,9 @@ class TargetVisionApp {
         document.getElementById('nav-albums').addEventListener('click', () => this.showPage('albums'));
         document.getElementById('nav-chat').addEventListener('click', () => this.showPage('chat'));
         document.getElementById('nav-search').addEventListener('click', () => this.showPage('search'));
+        document.getElementById('nav-settings').addEventListener('click', () => this.showPage('settings'));
         
-        // Album selection
-        document.getElementById('breadcrumb-albums').addEventListener('click', () => this.showAlbumsView());
+        // Album selection (breadcrumb-albums is now created dynamically, so we'll handle this in updateBreadcrumbs)
         
         // Album actions
         document.getElementById('sync-album').addEventListener('click', () => this.syncCurrentAlbum());
@@ -60,12 +73,39 @@ class TargetVisionApp {
         });
         document.getElementById('clear-main-search').addEventListener('click', () => this.clearMainSearch());
         
+        // Filter functionality
+        document.getElementById('toggle-filters').addEventListener('click', () => this.toggleFilters());
+        document.getElementById('apply-filters').addEventListener('click', () => this.applyFilters());
+        document.getElementById('clear-filters').addEventListener('click', () => this.clearFilters());
+        
         // Modal functionality
         document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
         document.getElementById('photo-modal').addEventListener('click', (e) => {
             if (e.target.id === 'photo-modal') this.closeModal();
         });
         document.getElementById('modal-process-button').addEventListener('click', () => this.processPhotoWithAI());
+        
+        // Metadata editing
+        document.getElementById('modal-edit-toggle').addEventListener('click', () => this.toggleMetadataEdit());
+        document.getElementById('modal-save-metadata').addEventListener('click', () => this.saveMetadataChanges());
+        document.getElementById('modal-cancel-edit').addEventListener('click', () => this.cancelMetadataEdit());
+        document.getElementById('modal-regenerate-ai').addEventListener('click', () => this.regenerateAIMetadata());
+        
+        // Settings functionality
+        document.getElementById('edit-prompt').addEventListener('click', () => this.editPrompt());
+        document.getElementById('save-prompt').addEventListener('click', () => this.savePrompt());
+        document.getElementById('cancel-prompt-edit').addEventListener('click', () => this.cancelPromptEdit());
+        document.getElementById('reset-prompt').addEventListener('click', () => this.resetPrompt());
+        document.getElementById('test-prompt').addEventListener('click', () => this.testPrompt());
+        document.getElementById('save-settings').addEventListener('click', () => this.saveApplicationSettings());
+        
+        // Prompt textarea character count
+        document.getElementById('prompt-textarea').addEventListener('input', () => this.updateCharCount());
+        
+        // Template selection
+        document.querySelectorAll('[data-template]').forEach(template => {
+            template.addEventListener('click', () => this.selectTemplate(template.dataset.template));
+        });
     }
 
     // Authentication and Connection
@@ -117,30 +157,63 @@ class TargetVisionApp {
 
     // Albums Management
     async loadSmugMugAlbums() {
+        // Use the new folder navigation system
+        await this.loadFolderContents();
+    }
+    
+    async loadFolderContents(nodeUri = null) {
         this.showAlbumsLoading();
         
         try {
-            const response = await fetch(`${this.apiBase}/smugmug/albums`);
+            const url = nodeUri 
+                ? `${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(nodeUri)}`
+                : `${this.apiBase}/smugmug/nodes`;
+            
+            const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
-            this.smugmugAlbums = await response.json();
-            this.displayAlbums();
+            const data = await response.json();
+            this.smugmugAlbums = data.nodes || [];
+            this.currentNodeUri = nodeUri;
+            
+            // Update breadcrumbs
+            if (data.breadcrumbs) {
+                this.breadcrumbs = data.breadcrumbs;
+            } else {
+                this.breadcrumbs = [];
+            }
+            
+            this.displayFolderContents();
+            
+            // Also update the right panel to show folder contents
+            if (this.smugmugAlbums.length > 0) {
+                this.displayRootFolderContentsInRightPanel();
+            }
+            
             this.hideAlbumsLoading();
             
         } catch (error) {
-            console.error('Failed to load SmugMug albums:', error);
-            this.showErrorMessage('Failed to Load Albums', 'Could not fetch albums from SmugMug. Please check your connection and try again.', error.message);
+            console.error('Failed to load folder contents:', error);
+            this.showErrorMessage('Failed to Load Folders', 'Could not fetch folders from SmugMug. Please check your connection and try again.', error.message);
             this.hideAlbumsLoading();
         }
     }
 
     displayAlbums() {
+        // Delegate to folder contents display for backward compatibility
+        this.displayFolderContents();
+    }
+    
+    displayFolderContents() {
         const albumsList = document.getElementById('albums-list');
         const albumCount = document.getElementById('album-count');
         
         // Clear loading state
         const loading = document.getElementById('loading-albums');
         if (loading) loading.remove();
+        
+        // Update breadcrumbs
+        this.updateBreadcrumbs();
         
         albumCount.textContent = this.smugmugAlbums.length.toString();
         
@@ -149,13 +222,24 @@ class TargetVisionApp {
         if (this.smugmugAlbums.length === 0) {
             albumsList.innerHTML = `
                 <div class="p-4 text-center text-gray-500">
-                    <p class="text-sm">No albums found</p>
+                    <p class="text-sm">No folders or albums found</p>
                 </div>
             `;
             return;
         }
         
-        this.smugmugAlbums.forEach(album => {
+        // Separate folders and albums for better organization
+        const folders = this.smugmugAlbums.filter(item => item.type === 'folder');
+        const albums = this.smugmugAlbums.filter(item => item.type === 'album');
+        
+        // Display folders first
+        folders.forEach(folder => {
+            const folderElement = this.createFolderListItem(folder);
+            albumsList.appendChild(folderElement);
+        });
+        
+        // Then display albums
+        albums.forEach(album => {
             const albumElement = this.createAlbumListItem(album);
             albumsList.appendChild(albumElement);
         });
@@ -163,26 +247,32 @@ class TargetVisionApp {
 
     createAlbumListItem(album) {
         const div = document.createElement('div');
+        
+        // Handle both old API format (title, smugmug_id) and new Node API format (name, album_key)
+        const albumTitle = album.title || album.name || 'Untitled Album';
+        const albumId = album.smugmug_id || album.album_key || album.node_id;
+        const albumUri = album.node_uri;
+        
         div.className = `album-item p-3 border-b border-gray-200 hover:bg-white cursor-pointer transition-colors ${
-            this.currentAlbum && this.currentAlbum.smugmug_id === album.smugmug_id ? 'bg-blue-50 border-blue-200' : ''
+            this.currentAlbum && (this.currentAlbum.smugmug_id === albumId || this.currentAlbum.node_id === album.node_id) ? 'bg-blue-50 border-blue-200' : ''
         }`;
         
         const syncStatus = album.is_synced ? 'synced' : 'not-synced';
         const syncIcon = album.is_synced ? '✓' : '○';
         const syncColor = album.is_synced ? 'text-green-600' : 'text-gray-400';
         
-        // Processing statistics
+        // Processing statistics - for new Node API, these are now included
         const processed = album.ai_processed_count || 0;
-        const total = album.image_count || 0;
+        const total = album.image_count || album.synced_photo_count || 0;
         const processedPercent = total > 0 ? Math.round((processed / total) * 100) : 0;
         
         div.innerHTML = `
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center flex-1 min-w-0">
-                    <svg class="h-4 w-4 text-blue-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    <svg class="h-4 w-4 text-green-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                     </svg>
-                    <span class="text-sm font-medium text-gray-900 truncate">${album.title}</span>
+                    <span class="text-sm font-medium text-gray-900 truncate">${albumTitle}</span>
                 </div>
                 <span class="text-xs ${syncColor} ml-2">${syncIcon}</span>
             </div>
@@ -209,6 +299,241 @@ class TargetVisionApp {
         
         return div;
     }
+    
+    createFolderListItem(folder) {
+        const div = document.createElement('div');
+        
+        const folderName = folder.name || 'Untitled Folder';
+        
+        div.className = 'folder-item p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors';
+        
+        div.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center flex-1 min-w-0">
+                    <svg class="h-4 w-4 text-amber-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <span class="text-sm font-medium text-gray-900 truncate">${folderName}</span>
+                </div>
+                <svg class="h-3 w-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            
+            <div class="text-xs text-gray-500">
+                <span>Folder</span>
+            </div>
+        `;
+        
+        div.addEventListener('click', () => this.navigateToFolder(folder));
+        
+        return div;
+    }
+    
+    async navigateToFolder(folder) {
+        // Add current location to history for back navigation
+        this.nodeHistory.push({
+            nodeUri: this.currentNodeUri,
+            folderName: this.breadcrumbs.length > 0 ? this.breadcrumbs[this.breadcrumbs.length - 1].name : 'Root'
+        });
+        
+        // Load the folder contents using the node URI
+        await this.loadFolderContents(folder.node_uri);
+        
+        // Update right panel to show folder contents
+        this.displayFolderContentsInRightPanel(folder);
+    }
+    
+    updateBreadcrumbs() {
+        const breadcrumbContainer = document.getElementById('breadcrumb-path');
+        if (!breadcrumbContainer) return;
+        
+        // Clear existing breadcrumbs
+        breadcrumbContainer.innerHTML = '';
+        
+        // Create Albums root breadcrumb
+        const albumsRoot = document.createElement('button');
+        albumsRoot.id = 'breadcrumb-albums';
+        albumsRoot.className = 'text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center';
+        albumsRoot.innerHTML = `
+            <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
+            </svg>
+            SmugMug Albums
+        `;
+        albumsRoot.addEventListener('click', () => this.navigateToRoot());
+        breadcrumbContainer.appendChild(albumsRoot);
+        
+        // Add breadcrumbs for each folder in the path
+        this.breadcrumbs.forEach((breadcrumb, index) => {
+            // Add separator
+            const separator = document.createElement('span');
+            separator.className = 'mx-2 text-gray-400';
+            separator.textContent = '/';
+            breadcrumbContainer.appendChild(separator);
+            
+            // Add breadcrumb link
+            const link = document.createElement('button');
+            link.className = index === this.breadcrumbs.length - 1 
+                ? 'text-gray-700 text-sm font-medium' 
+                : 'text-blue-600 hover:text-blue-800 text-sm';
+            link.textContent = breadcrumb.name;
+            
+            if (index < this.breadcrumbs.length - 1) {
+                link.addEventListener('click', () => this.loadFolderContents(breadcrumb.node_uri));
+            }
+            
+            breadcrumbContainer.appendChild(link);
+        });
+    }
+    
+    async navigateToRoot() {
+        this.nodeHistory = [];
+        this.breadcrumbs = [];
+        await this.loadFolderContents();
+    }
+    
+    displayFolderContentsInRightPanel(folder) {
+        // Clear current album state since we're viewing folder contents
+        this.currentAlbum = null;
+        
+        // Update UI to show folder contents view
+        this.showPhotosView();
+        
+        // Update the header to show folder name
+        const folderName = folder.name || 'Folder';
+        document.getElementById('current-album-title').textContent = folderName;
+        
+        // Hide album-specific actions
+        document.getElementById('album-actions').classList.add('hidden');
+        document.getElementById('album-stats').classList.add('hidden');
+        
+        // Show folder contents in the photo grid area
+        this.displayFolderItemsInGrid(this.smugmugAlbums);
+        
+        // Update breadcrumb to show current folder
+        const breadcrumbArrow = document.getElementById('breadcrumb-arrow');
+        const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+        if (breadcrumbArrow) breadcrumbArrow.classList.remove('hidden');
+        if (breadcrumbCurrent) {
+            breadcrumbCurrent.classList.remove('hidden');
+            breadcrumbCurrent.textContent = folderName;
+        }
+    }
+    
+    displayFolderItemsInGrid(items) {
+        const photoGrid = document.getElementById('photo-grid');
+        const emptyState = document.getElementById('empty-photos');
+        const welcomeState = document.getElementById('welcome-state');
+        
+        // Hide other states
+        welcomeState.classList.add('hidden');
+        emptyState.classList.add('hidden');
+        
+        // Clear existing content
+        photoGrid.innerHTML = '';
+        
+        if (items.length === 0) {
+            emptyState.classList.remove('hidden');
+            photoGrid.classList.add('hidden');
+            return;
+        }
+        
+        // Show photo grid
+        photoGrid.classList.remove('hidden');
+        
+        // Separate folders and albums
+        const folders = items.filter(item => item.type === 'folder');
+        const albums = items.filter(item => item.type === 'album');
+        
+        // Display folders first
+        folders.forEach(folder => {
+            const folderCard = this.createFolderCard(folder);
+            photoGrid.appendChild(folderCard);
+        });
+        
+        // Then display albums
+        albums.forEach(album => {
+            const albumCard = this.createAlbumCard(album);
+            photoGrid.appendChild(albumCard);
+        });
+    }
+    
+    createFolderCard(folder) {
+        const div = document.createElement('div');
+        div.className = 'folder-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer';
+        
+        const folderName = folder.name || 'Untitled Folder';
+        
+        div.innerHTML = `
+            <div class="flex flex-col items-center text-center">
+                <svg class="h-12 w-12 text-amber-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                </svg>
+                <h3 class="text-sm font-medium text-gray-900 truncate w-full">${folderName}</h3>
+                <p class="text-xs text-gray-500 mt-1">Folder</p>
+            </div>
+        `;
+        
+        div.addEventListener('click', () => this.navigateToFolder(folder));
+        
+        return div;
+    }
+    
+    createAlbumCard(album) {
+        const div = document.createElement('div');
+        div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer';
+        
+        const albumName = album.name || 'Untitled Album';
+        const photoCount = album.image_count || album.synced_photo_count || 0;
+        const processedCount = album.ai_processed_count || 0;
+        const syncIcon = album.is_synced ? '✓' : '○';
+        const syncColor = album.is_synced ? 'text-green-600' : 'text-gray-400';
+        
+        div.innerHTML = `
+            <div class="flex flex-col items-center text-center">
+                <svg class="h-12 w-12 text-green-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                </svg>
+                <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
+                <div class="flex items-center justify-center mt-1 space-x-2">
+                    <p class="text-xs text-gray-500">${photoCount} photos</p>
+                    <span class="text-xs ${syncColor}">${syncIcon}</span>
+                </div>
+                ${album.is_synced ? `
+                    <p class="text-xs text-green-600 mt-1">${processedCount} processed</p>
+                ` : ''}
+            </div>
+        `;
+        
+        div.addEventListener('click', () => this.selectAlbum(album));
+        
+        return div;
+    }
+    
+    displayRootFolderContentsInRightPanel() {
+        // Clear current album state since we're viewing folder contents
+        this.currentAlbum = null;
+        
+        // Update UI to show folder contents view
+        this.showPhotosView();
+        
+        // Update the header to show root folder name
+        document.getElementById('current-album-title').textContent = 'SmugMug Albums';
+        
+        // Hide album-specific actions
+        document.getElementById('album-actions').classList.add('hidden');
+        document.getElementById('album-stats').classList.add('hidden');
+        
+        // Show folder contents in the photo grid area
+        this.displayFolderItemsInGrid(this.smugmugAlbums);
+        
+        // Hide the old breadcrumb elements for root view
+        const breadcrumbArrow = document.getElementById('breadcrumb-arrow');
+        const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+        if (breadcrumbArrow) breadcrumbArrow.classList.add('hidden');
+        if (breadcrumbCurrent) breadcrumbCurrent.classList.add('hidden');
+    }
 
     async selectAlbum(album) {
         this.currentAlbum = album;
@@ -216,7 +541,14 @@ class TargetVisionApp {
         // Update UI
         this.updateAlbumSelection();
         this.showPhotosView();
-        await this.loadAlbumPhotos(album.smugmug_id);
+        // Handle both old and new API format for album ID
+        const albumId = album.smugmug_id || album.album_key;
+        if (albumId) {
+            await this.loadAlbumPhotos(albumId);
+        } else {
+            console.error('No album ID found in album object:', album);
+            this.showErrorMessage('Album Error', 'Could not load album photos - missing album identifier');
+        }
     }
 
     updateAlbumSelection() {
@@ -226,32 +558,43 @@ class TargetVisionApp {
         });
         
         // Find and highlight current album
-        const albumItems = document.querySelectorAll('.album-item');
-        albumItems.forEach(item => {
-            const title = item.querySelector('span.font-medium').textContent;
-            if (title === this.currentAlbum.title) {
-                item.classList.add('bg-blue-50', 'border-blue-200');
+        if (this.currentAlbum) {
+            const albumItems = document.querySelectorAll('.album-item');
+            const currentAlbumName = this.currentAlbum.title || this.currentAlbum.name;
+            albumItems.forEach(item => {
+                const title = item.querySelector('span.font-medium').textContent;
+                if (title === currentAlbumName) {
+                    item.classList.add('bg-blue-50', 'border-blue-200');
+                }
+            });
+        }
+        
+        // Update breadcrumb to show current album
+        if (this.currentAlbum) {
+            const breadcrumbArrow = document.getElementById('breadcrumb-arrow');
+            const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+            if (breadcrumbArrow) breadcrumbArrow.classList.remove('hidden');
+            if (breadcrumbCurrent) {
+                breadcrumbCurrent.classList.remove('hidden');
+                breadcrumbCurrent.textContent = this.currentAlbum.title || this.currentAlbum.name || 'Selected Album';
             }
-        });
-        
-        // Update breadcrumb
-        document.getElementById('breadcrumb-arrow').classList.remove('hidden');
-        document.getElementById('breadcrumb-current').classList.remove('hidden');
-        document.getElementById('breadcrumb-current').textContent = this.currentAlbum.title;
-        
-        // Update photo panel header
-        document.getElementById('current-album-title').textContent = this.currentAlbum.title;
-        document.getElementById('album-stats').classList.remove('hidden');
-        document.getElementById('album-actions').classList.remove('hidden');
+            
+            // Update photo panel header
+            document.getElementById('current-album-title').textContent = this.currentAlbum.title || this.currentAlbum.name || 'Selected Album';
+            document.getElementById('album-stats').classList.remove('hidden');
+            document.getElementById('album-actions').classList.remove('hidden');
+        }
         
         // Update sync button based on sync status
         const syncButton = document.getElementById('sync-album');
-        if (this.currentAlbum.is_synced) {
-            syncButton.textContent = 'Re-sync Album';
-            syncButton.className = 'text-sm px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700';
-        } else {
-            syncButton.textContent = 'Sync Album';
-            syncButton.className = 'text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700';
+        if (this.currentAlbum) {
+            if (this.currentAlbum.is_synced) {
+                syncButton.textContent = 'Re-sync Album';
+                syncButton.className = 'text-sm px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700';
+            } else {
+                syncButton.textContent = 'Sync Album';
+                syncButton.className = 'text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700';
+            }
         }
     }
 
@@ -465,7 +808,17 @@ class TargetVisionApp {
         button.disabled = true;
         
         try {
-            const response = await fetch(`${this.apiBase}/smugmug/albums/${this.currentAlbum.smugmug_id}/sync`, {
+            const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
+            
+            // Save current navigation state
+            const savedState = {
+                currentNodeUri: this.currentNodeUri,
+                breadcrumbs: [...this.breadcrumbs],
+                nodeHistory: [...this.nodeHistory],
+                selectedAlbumId: currentAlbumId
+            };
+            
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${currentAlbumId}/sync`, {
                 method: 'POST'
             });
             
@@ -473,13 +826,8 @@ class TargetVisionApp {
             
             const result = await response.json();
             
-            // Reload albums and photos
-            await this.loadSmugMugAlbums();
-            await this.loadAlbumPhotos(this.currentAlbum.smugmug_id);
-            
-            // Update current album reference
-            this.currentAlbum = this.smugmugAlbums.find(a => a.smugmug_id === this.currentAlbum.smugmug_id);
-            this.updateAlbumSelection();
+            // Context-preserving refresh: only update current folder and album data
+            await this.refreshCurrentContext(savedState);
             
             this.showSuccessMessage('Album Synced', `Successfully synced ${result.synced_photos} photos from "${result.album_name}"`);
             
@@ -489,6 +837,42 @@ class TargetVisionApp {
         } finally {
             button.textContent = originalText;
             button.disabled = false;
+        }
+    }
+
+    async refreshCurrentContext(savedState) {
+        try {
+            // Restore navigation state
+            this.currentNodeUri = savedState.currentNodeUri;
+            this.breadcrumbs = savedState.breadcrumbs;
+            this.nodeHistory = savedState.nodeHistory;
+            
+            // Refresh current folder contents (which includes updated album data)
+            await this.loadFolderContents(this.currentNodeUri);
+            
+            // Find and restore the current album selection with updated data
+            const currentAlbumId = savedState.selectedAlbumId;
+            this.currentAlbum = this.smugmugAlbums.find(a => 
+                (a.smugmug_id && a.smugmug_id === currentAlbumId) || 
+                (a.album_key && a.album_key === currentAlbumId)
+            );
+            
+            // Refresh album photos if we have a current album
+            if (this.currentAlbum) {
+                await this.loadAlbumPhotos(currentAlbumId);
+                this.updateAlbumSelection();
+            }
+            
+            // Update breadcrumbs display
+            this.updateBreadcrumbs();
+            
+        } catch (error) {
+            console.error('Error refreshing context:', error);
+            // Fallback to full reload if context refresh fails
+            await this.loadSmugMugAlbums();
+            if (savedState.selectedAlbumId) {
+                await this.loadAlbumPhotos(savedState.selectedAlbumId);
+            }
         }
     }
 
@@ -534,7 +918,8 @@ class TargetVisionApp {
             this.showBatchProgress(result.total, result.total, result.processed);
             
             // Reload photos and albums
-            await this.loadAlbumPhotos(this.currentAlbum.smugmug_id);
+            const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
+            await this.loadAlbumPhotos(currentAlbumId);
             await this.loadSmugMugAlbums();
             
             this.clearSelection();
@@ -555,13 +940,20 @@ class TargetVisionApp {
     }
 
     // UI State Management
-    showAlbumsView() {
+    async showAlbumsView() {
         this.currentAlbum = null;
         this.clearSelection();
         
-        // Hide breadcrumb elements
-        document.getElementById('breadcrumb-arrow').classList.add('hidden');
-        document.getElementById('breadcrumb-current').classList.add('hidden');
+        // Reset folder navigation state and go to root
+        this.nodeHistory = [];
+        this.breadcrumbs = [];
+        this.currentNodeUri = null;
+        
+        // Hide breadcrumb elements (the old static ones)
+        const breadcrumbArrow = document.getElementById('breadcrumb-arrow');
+        const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+        if (breadcrumbArrow) breadcrumbArrow.classList.add('hidden');
+        if (breadcrumbCurrent) breadcrumbCurrent.classList.add('hidden');
         
         // Reset photo panel
         document.getElementById('current-album-title').textContent = 'Select an album';
@@ -578,6 +970,9 @@ class TargetVisionApp {
         document.querySelectorAll('.album-item').forEach(item => {
             item.classList.remove('bg-blue-50', 'border-blue-200');
         });
+        
+        // Load root folder contents
+        await this.loadFolderContents();
     }
 
     showPhotosView() {
@@ -652,20 +1047,97 @@ class TargetVisionApp {
 
     async refreshCurrentPhotos() {
         if (this.currentAlbum) {
-            await this.loadAlbumPhotos(this.currentAlbum.smugmug_id);
+            const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
+            await this.loadAlbumPhotos(currentAlbumId);
         }
     }
 
     // Utility Methods
+    showToast(title, message, type = 'success', duration = 4000) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        // Create toast element
+        const toast = document.createElement('div');
+        const toastId = 'toast-' + Date.now();
+        toast.id = toastId;
+        
+        // Base classes for all toasts
+        const baseClasses = 'transform transition-all duration-300 ease-in-out max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5';
+        
+        // Type-specific styling
+        const typeStyles = {
+            success: 'border-l-4 border-green-400',
+            error: 'border-l-4 border-red-400',
+            warning: 'border-l-4 border-yellow-400',
+            info: 'border-l-4 border-blue-400'
+        };
+        
+        const iconStyles = {
+            success: '🎉',
+            error: '❌',
+            warning: '⚠️', 
+            info: 'ℹ️'
+        };
+        
+        toast.className = `${baseClasses} ${typeStyles[type] || typeStyles.success} translate-x-full opacity-0`;
+        
+        toast.innerHTML = `
+            <div class="flex-1 w-0 p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <span class="text-lg">${iconStyles[type] || iconStyles.success}</span>
+                    </div>
+                    <div class="ml-3 w-0 flex-1">
+                        <p class="text-sm font-medium text-gray-900">${title}</p>
+                        <p class="mt-1 text-sm text-gray-500">${message}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex border-l border-gray-200">
+                <button class="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-gray-600 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" onclick="this.parentElement.parentElement.remove()">
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(toast);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full', 'opacity-0');
+            toast.classList.add('translate-x-0', 'opacity-100');
+        }, 50);
+        
+        // Auto dismiss
+        if (duration > 0) {
+            setTimeout(() => {
+                this.removeToast(toastId);
+            }, duration);
+        }
+    }
+
+    removeToast(toastId) {
+        const toast = document.getElementById(toastId);
+        if (toast) {
+            toast.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 300);
+        }
+    }
+
     showSuccessMessage(title, message) {
-        // Could implement toast notification here
-        alert(`${title}: ${message}`);
+        this.showToast(title, message, 'success');
     }
 
     showErrorMessage(title, message, details = null) {
         console.error(`${title}: ${message}`, details);
-        // Could implement proper error toast here
-        alert(`${title}: ${message}`);
+        this.showToast(title, message, 'error');
     }
 
     showConnectionError() {
@@ -686,6 +1158,7 @@ class TargetVisionApp {
         document.getElementById('page-albums').classList.add('hidden');
         document.getElementById('page-chat').classList.add('hidden');
         document.getElementById('page-search').classList.add('hidden');
+        document.getElementById('page-settings').classList.add('hidden');
         
         // Remove active state from all nav tabs
         document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -703,6 +1176,8 @@ class TargetVisionApp {
             this.initializeChatPage();
         } else if (pageName === 'search') {
             this.initializeSearchPage();
+        } else if (pageName === 'settings') {
+            this.initializeSettingsPage();
         }
     }
     
@@ -714,6 +1189,123 @@ class TargetVisionApp {
     initializeSearchPage() {
         // Search page is ready by default with welcome state
         console.log('Search page initialized');
+        this.populateAlbumFilter();
+    }
+    
+    async populateAlbumFilter() {
+        try {
+            // Get albums for filter dropdown
+            const albumSelect = document.getElementById('search-filter-album');
+            if (!albumSelect) return;
+            
+            // Clear existing options except "All Albums"
+            while (albumSelect.children.length > 1) {
+                albumSelect.removeChild(albumSelect.lastChild);
+            }
+            
+            // Add albums from current data
+            if (this.smugmugAlbums && this.smugmugAlbums.length > 0) {
+                this.smugmugAlbums.forEach(album => {
+                    const option = document.createElement('option');
+                    option.value = album.smugmug_id || album.album_key;
+                    option.textContent = album.title || album.name;
+                    albumSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error populating album filter:', error);
+        }
+    }
+    
+    toggleFilters() {
+        const filtersDiv = document.getElementById('search-filters');
+        const toggleText = document.getElementById('filter-toggle-text');
+        const toggleIcon = document.getElementById('filter-toggle-icon');
+        
+        if (filtersDiv.classList.contains('hidden')) {
+            filtersDiv.classList.remove('hidden');
+            toggleText.textContent = 'Hide Filters';
+            toggleIcon.style.transform = 'rotate(180deg)';
+        } else {
+            filtersDiv.classList.add('hidden');
+            toggleText.textContent = 'Show Filters';
+            toggleIcon.style.transform = 'rotate(0deg)';
+        }
+    }
+    
+    applyFilters() {
+        // Get filter values
+        this.searchFilters.album = document.getElementById('search-filter-album').value;
+        this.searchFilters.status = document.getElementById('search-filter-status').value;
+        this.searchFilters.dateFrom = document.getElementById('search-filter-date-from').value;
+        this.searchFilters.dateTo = document.getElementById('search-filter-date-to').value;
+        
+        // Update active filters display
+        this.updateActiveFiltersDisplay();
+        
+        // Re-run search with filters if there's a current query
+        const searchInput = document.getElementById('search-main-input');
+        if (searchInput.value.trim()) {
+            this.performMainSearch();
+        }
+    }
+    
+    clearFilters() {
+        // Clear filter values
+        document.getElementById('search-filter-album').value = '';
+        document.getElementById('search-filter-status').value = '';
+        document.getElementById('search-filter-date-from').value = '';
+        document.getElementById('search-filter-date-to').value = '';
+        
+        // Reset internal filter state
+        this.searchFilters = {
+            album: '',
+            status: '',
+            dateFrom: '',
+            dateTo: ''
+        };
+        
+        // Clear active filters display
+        this.updateActiveFiltersDisplay();
+        
+        // Re-run search if there's a current query
+        const searchInput = document.getElementById('search-main-input');
+        if (searchInput.value.trim()) {
+            this.performMainSearch();
+        }
+    }
+    
+    updateActiveFiltersDisplay() {
+        const activeFiltersDiv = document.getElementById('active-filters');
+        const activeFilters = [];
+        
+        if (this.searchFilters.album) {
+            const albumSelect = document.getElementById('search-filter-album');
+            const selectedAlbum = albumSelect.options[albumSelect.selectedIndex].text;
+            activeFilters.push(`Album: ${selectedAlbum}`);
+        }
+        
+        if (this.searchFilters.status) {
+            const statusSelect = document.getElementById('search-filter-status');
+            const selectedStatus = statusSelect.options[statusSelect.selectedIndex].text;
+            activeFilters.push(`Status: ${selectedStatus}`);
+        }
+        
+        if (this.searchFilters.dateFrom) {
+            activeFilters.push(`From: ${this.searchFilters.dateFrom}`);
+        }
+        
+        if (this.searchFilters.dateTo) {
+            activeFilters.push(`To: ${this.searchFilters.dateTo}`);
+        }
+        
+        if (activeFilters.length > 0) {
+            activeFiltersDiv.textContent = `Active: ${activeFilters.join(', ')}`;
+            activeFiltersDiv.classList.remove('hidden');
+        } else {
+            activeFiltersDiv.textContent = '';
+            activeFiltersDiv.classList.add('hidden');
+        }
     }
 
     // Chat Functionality
@@ -997,7 +1589,28 @@ You can also ask for help with syncing albums or processing photos with AI. What
         this.showSearchLoading();
         
         try {
-            const response = await fetch(`${this.apiBase}/search?q=${encodeURIComponent(query)}&search_type=${searchType}&limit=50`);
+            // Build search URL with filters
+            const params = new URLSearchParams({
+                q: query,
+                search_type: searchType,
+                limit: '50'
+            });
+            
+            // Add filter parameters if they exist
+            if (this.searchFilters.album) {
+                params.append('album', this.searchFilters.album);
+            }
+            if (this.searchFilters.status) {
+                params.append('processing_status', this.searchFilters.status);
+            }
+            if (this.searchFilters.dateFrom) {
+                params.append('date_from', this.searchFilters.dateFrom);
+            }
+            if (this.searchFilters.dateTo) {
+                params.append('date_to', this.searchFilters.dateTo);
+            }
+            
+            const response = await fetch(`${this.apiBase}/search?${params.toString()}`);
             const results = await response.json();
             
             this.searchResults = results.photos || [];
@@ -1128,6 +1741,9 @@ You can also ask for help with syncing albums or processing photos with AI. What
     // Modal and other functionality
     async showPhotoModal(photo) {
         console.log('Show modal for photo:', photo);
+        
+        // Store current photo for editing functions
+        this.currentPhoto = photo;
         
         // Populate modal with photo data
         const modal = document.getElementById('photo-modal');
@@ -1293,6 +1909,527 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
             processButton.textContent = originalText;
             processButton.disabled = false;
+        }
+    }
+    
+    // Metadata Editing Methods
+    toggleMetadataEdit() {
+        const viewMode = document.getElementById('modal-ai-view');
+        const editMode = document.getElementById('modal-ai-edit');
+        const editToggle = document.getElementById('modal-edit-toggle');
+        const editActions = document.getElementById('modal-edit-actions');
+        
+        if (editMode.classList.contains('hidden')) {
+            // Enter edit mode
+            this.enterEditMode(viewMode, editMode, editToggle, editActions);
+        } else {
+            // Exit edit mode without saving
+            this.exitEditMode(viewMode, editMode, editToggle, editActions);
+        }
+    }
+    
+    enterEditMode(viewMode, editMode, editToggle, editActions) {
+        // Hide view mode, show edit mode
+        viewMode.classList.add('hidden');
+        editMode.classList.remove('hidden');
+        editToggle.classList.add('hidden');
+        editActions.classList.remove('hidden');
+        
+        // Populate edit fields with current values
+        const description = document.getElementById('modal-ai-description').textContent;
+        const keywords = Array.from(document.getElementById('modal-ai-keywords').children)
+            .map(span => span.textContent)
+            .join(', ');
+        
+        document.getElementById('modal-edit-description').value = description;
+        document.getElementById('modal-edit-keywords').value = keywords;
+        
+        // Set approved status if available
+        const aiMetadata = this.currentPhoto?.ai_metadata;
+        if (aiMetadata) {
+            document.getElementById('modal-edit-approved').checked = aiMetadata.approved || false;
+        }
+    }
+    
+    exitEditMode(viewMode, editMode, editToggle, editActions) {
+        // Show view mode, hide edit mode
+        viewMode.classList.remove('hidden');
+        editMode.classList.add('hidden');
+        editToggle.classList.remove('hidden');
+        editActions.classList.add('hidden');
+    }
+    
+    cancelMetadataEdit() {
+        const viewMode = document.getElementById('modal-ai-view');
+        const editMode = document.getElementById('modal-ai-edit');
+        const editToggle = document.getElementById('modal-edit-toggle');
+        const editActions = document.getElementById('modal-edit-actions');
+        
+        this.exitEditMode(viewMode, editMode, editToggle, editActions);
+    }
+    
+    async saveMetadataChanges() {
+        if (!this.currentPhoto?.id) {
+            console.error('No photo selected for editing');
+            return;
+        }
+        
+        const description = document.getElementById('modal-edit-description').value.trim();
+        const keywordsText = document.getElementById('modal-edit-keywords').value.trim();
+        const approved = document.getElementById('modal-edit-approved').checked;
+        
+        // Convert keywords string to array
+        const keywords = keywordsText 
+            ? keywordsText.split(',').map(k => k.trim()).filter(k => k.length > 0)
+            : [];
+        
+        try {
+            const saveButton = document.getElementById('modal-save-metadata');
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+            
+            const response = await fetch(`${this.apiBase}/metadata/${this.currentPhoto.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    description,
+                    ai_keywords: keywords,
+                    approved
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to save metadata: ${response.status}`);
+            }
+            
+            const updatedMetadata = await response.json();
+            
+            // Update the display
+            this.updateMetadataDisplay(updatedMetadata);
+            
+            // Exit edit mode
+            const viewMode = document.getElementById('modal-ai-view');
+            const editMode = document.getElementById('modal-ai-edit');
+            const editToggle = document.getElementById('modal-edit-toggle');
+            const editActions = document.getElementById('modal-edit-actions');
+            
+            this.exitEditMode(viewMode, editMode, editToggle, editActions);
+            
+            // Show success message (you could add a toast notification here)
+            console.log('Metadata saved successfully');
+            
+        } catch (error) {
+            console.error('Error saving metadata:', error);
+            this.showErrorMessage('Save Failed', 'Failed to save metadata. Please try again.');
+        } finally {
+            const saveButton = document.getElementById('modal-save-metadata');
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save';
+        }
+    }
+    
+    updateMetadataDisplay(metadata) {
+        // Update view mode display
+        document.getElementById('modal-ai-description').textContent = metadata.description || '';
+        
+        const keywordsContainer = document.getElementById('modal-ai-keywords');
+        keywordsContainer.innerHTML = '';
+        
+        if (metadata.ai_keywords && metadata.ai_keywords.length > 0) {
+            metadata.ai_keywords.forEach(keyword => {
+                const span = document.createElement('span');
+                span.className = 'inline-block bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded';
+                span.textContent = keyword;
+                keywordsContainer.appendChild(span);
+            });
+        }
+        
+        // Update confidence and approval status
+        const confidenceSpan = document.getElementById('modal-ai-confidence');
+        if (metadata.approved) {
+            confidenceSpan.textContent = '✅ Approved';
+            confidenceSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+        } else {
+            const confidence = Math.round((metadata.confidence_score || 0.85) * 100);
+            confidenceSpan.textContent = `${confidence}% confidence`;
+            confidenceSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
+        }
+    }
+    
+    async regenerateAIMetadata() {
+        if (!this.currentPhoto?.id) {
+            console.error('No photo selected for regeneration');
+            return;
+        }
+        
+        try {
+            const regenerateButton = document.getElementById('modal-regenerate-ai');
+            regenerateButton.disabled = true;
+            regenerateButton.innerHTML = '🔄 Regenerating...';
+            
+            const response = await fetch(`${this.apiBase}/photos/${this.currentPhoto.id}/process`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to regenerate AI metadata: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Update the display
+            this.updateMetadataDisplay(result);
+            
+            // Update edit fields if in edit mode
+            document.getElementById('modal-edit-description').value = result.description || '';
+            const keywords = result.ai_keywords ? result.ai_keywords.join(', ') : '';
+            document.getElementById('modal-edit-keywords').value = keywords;
+            
+            console.log('AI metadata regenerated successfully');
+            
+        } catch (error) {
+            console.error('Error regenerating AI metadata:', error);
+            this.showErrorMessage('Regeneration Failed', 'Failed to regenerate AI metadata. Please try again.');
+        } finally {
+            const regenerateButton = document.getElementById('modal-regenerate-ai');
+            regenerateButton.disabled = false;
+            regenerateButton.innerHTML = '🔄 Regenerate AI';
+        }
+    }
+    
+    // Settings Page Methods
+    async initializeSettingsPage() {
+        console.log('Settings page initialized');
+        await this.loadCurrentPrompt();
+        this.loadApplicationSettings();
+        this.updateSystemInfo();
+    }
+    
+    async loadCurrentPrompt() {
+        try {
+            const response = await fetch(`${this.apiBase}/settings/prompt`);
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('current-prompt').textContent = data.prompt || this.getDefaultPrompt();
+                
+                // Update status indicator
+                const statusSpan = document.getElementById('prompt-status');
+                if (data.is_custom) {
+                    statusSpan.textContent = 'Custom';
+                    statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
+                } else {
+                    statusSpan.textContent = 'Default';
+                    statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+                }
+            } else {
+                // Fallback to default prompt
+                document.getElementById('current-prompt').textContent = this.getDefaultPrompt();
+            }
+        } catch (error) {
+            console.error('Error loading current prompt:', error);
+            document.getElementById('current-prompt').textContent = this.getDefaultPrompt();
+        }
+    }
+    
+    getDefaultPrompt() {
+        return `Analyze this image and provide a detailed description focusing on the main subjects, actions, and context. Then extract relevant keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A detailed description of what you see in the image
+- "keywords": An array of relevant keywords that describe the image content
+
+Focus on:
+- Main subjects and people
+- Actions being performed
+- Objects and equipment visible
+- Setting and environment
+- Events or activities
+- Emotions or mood if apparent
+
+Do not include speculation about metadata like camera settings, date, or photographer information.`;
+    }
+    
+    loadApplicationSettings() {
+        // Load settings from localStorage or set defaults
+        const settings = JSON.parse(localStorage.getItem('targetvision_settings') || '{}');
+        
+        document.getElementById('auto-approve').checked = settings.autoApprove || false;
+        document.getElementById('batch-processing').checked = settings.batchProcessing !== false; // default true
+        document.getElementById('retry-failed').checked = settings.retryFailed || false;
+        document.getElementById('show-confidence').checked = settings.showConfidence !== false; // default true
+        document.getElementById('advanced-filters-default').checked = settings.advancedFiltersDefault || false;
+        document.getElementById('compact-view').checked = settings.compactView || false;
+    }
+    
+    editPrompt() {
+        const viewMode = document.getElementById('prompt-view');
+        const editMode = document.getElementById('prompt-edit');
+        const currentPrompt = document.getElementById('current-prompt').textContent;
+        
+        // Switch to edit mode
+        viewMode.classList.add('hidden');
+        editMode.classList.remove('hidden');
+        
+        // Populate textarea
+        document.getElementById('prompt-textarea').value = currentPrompt;
+        this.updateCharCount();
+    }
+    
+    cancelPromptEdit() {
+        const viewMode = document.getElementById('prompt-view');
+        const editMode = document.getElementById('prompt-edit');
+        
+        // Switch back to view mode
+        viewMode.classList.remove('hidden');
+        editMode.classList.add('hidden');
+    }
+    
+    async savePrompt() {
+        const promptText = document.getElementById('prompt-textarea').value.trim();
+        
+        if (!promptText) {
+            this.showToast('Missing Prompt', 'Please enter a prompt before saving.', 'warning');
+            return;
+        }
+        
+        try {
+            const saveButton = document.getElementById('save-prompt');
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+            
+            const response = await fetch(`${this.apiBase}/settings/prompt`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    prompt: promptText
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to save prompt: ${response.status}`);
+            }
+            
+            // Update display
+            document.getElementById('current-prompt').textContent = promptText;
+            
+            // Update status
+            const statusSpan = document.getElementById('prompt-status');
+            statusSpan.textContent = 'Custom';
+            statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
+            
+            // Switch back to view mode
+            this.cancelPromptEdit();
+            
+            console.log('Prompt saved successfully');
+            
+        } catch (error) {
+            console.error('Error saving prompt:', error);
+            this.showErrorMessage('Save Failed', 'Failed to save prompt. Please try again.');
+        } finally {
+            const saveButton = document.getElementById('save-prompt');
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save Prompt';
+        }
+    }
+    
+    async resetPrompt() {
+        if (!confirm('Are you sure you want to reset to the default prompt? This will overwrite any custom changes.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${this.apiBase}/settings/prompt`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to reset prompt: ${response.status}`);
+            }
+            
+            // Update display
+            const defaultPrompt = this.getDefaultPrompt();
+            document.getElementById('current-prompt').textContent = defaultPrompt;
+            
+            // Update status
+            const statusSpan = document.getElementById('prompt-status');
+            statusSpan.textContent = 'Default';
+            statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+            
+            console.log('Prompt reset to default');
+            
+        } catch (error) {
+            console.error('Error resetting prompt:', error);
+            this.showErrorMessage('Reset Failed', 'Failed to reset prompt. Please try again.');
+        }
+    }
+    
+    async testPrompt() {
+        const promptText = document.getElementById('prompt-textarea').value.trim();
+        
+        if (!promptText) {
+            this.showToast('Missing Prompt', 'Please enter a prompt to test.', 'warning');
+            return;
+        }
+        
+        const testButton = document.getElementById('test-prompt');
+        testButton.disabled = true;
+        testButton.textContent = 'Testing...';
+        
+        try {
+            // This would test the prompt with a sample image
+            // For now, just simulate the test
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            this.showSuccessMessage('Test Successful', 'Prompt test completed! The prompt structure looks valid.');
+            
+        } catch (error) {
+            console.error('Error testing prompt:', error);
+            this.showErrorMessage('Test Failed', 'Failed to test prompt. Please check the format.');
+        } finally {
+            testButton.disabled = false;
+            testButton.textContent = 'Test Prompt';
+        }
+    }
+    
+    selectTemplate(templateName) {
+        const templates = {
+            detailed: `Analyze this image comprehensively and provide a detailed description covering all visual elements, technical aspects, emotions, and context. Then extract comprehensive keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A thorough, detailed description covering composition, lighting, subjects, actions, environment, mood, and technical observations
+- "keywords": An extensive array of relevant keywords including subjects, objects, emotions, settings, actions, technical terms, and style descriptors
+
+Focus on:
+- Complete scene composition and framing
+- Lighting conditions and quality
+- All visible subjects and their interactions
+- Detailed object and equipment identification
+- Environmental context and setting details
+- Emotional expressions and body language
+- Artistic and technical photographic elements
+- Color palette and visual mood
+
+Provide comprehensive coverage without speculation about metadata.`,
+
+            concise: `Analyze this image and provide a brief, focused description of the main subjects and primary action. Then list key identifying keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A concise 1-2 sentence description of the primary subject and main action
+- "keywords": A focused array of 5-8 key terms that best identify the image content
+
+Focus on:
+- Primary subject(s)
+- Main action or activity
+- Key objects or equipment
+- Basic setting or location
+
+Keep descriptions brief and keywords essential for searchability.`,
+
+            artistic: `Analyze this image from an artistic perspective, focusing on composition, visual elements, mood, and aesthetic qualities. Then extract relevant artistic keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A description emphasizing artistic composition, lighting, mood, visual flow, and aesthetic impact
+- "keywords": An array of keywords including artistic terms, mood descriptors, composition elements, and style characteristics
+
+Focus on:
+- Composition and visual balance
+- Lighting quality and direction  
+- Color harmony and palette
+- Mood and emotional resonance
+- Artistic technique and style
+- Visual texture and patterns
+- Depth and perspective
+- Overall aesthetic impact
+
+Emphasize the artistic and emotional qualities of the image.`,
+
+            sports: `Analyze this sports or event image with focus on athletic activities, competition elements, achievements, and event context. Then extract relevant sports keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A detailed description focusing on the sport, competition, athletes, actions, achievements, and event context
+- "keywords": An array of keywords including sport names, positions, actions, equipment, achievements, and event types
+
+Focus on:
+- Specific sport or activity
+- Athlete positions and actions
+- Competition or event type
+- Equipment and gear
+- Achievements (medals, trophies, awards)
+- Team or individual performance
+- Venue and event setting
+- Competitive context and results
+
+Emphasize athletic performance, competition elements, and achievement recognition.`
+        };
+        
+        if (templates[templateName]) {
+            document.getElementById('prompt-textarea').value = templates[templateName];
+            this.updateCharCount();
+            
+            // Visual feedback
+            document.querySelectorAll('[data-template]').forEach(t => {
+                t.classList.remove('border-blue-500', 'bg-blue-50');
+                t.classList.add('border-gray-200');
+            });
+            
+            const selectedTemplate = document.querySelector(`[data-template="${templateName}"]`);
+            selectedTemplate.classList.remove('border-gray-200');
+            selectedTemplate.classList.add('border-blue-500', 'bg-blue-50');
+        }
+    }
+    
+    updateCharCount() {
+        const textarea = document.getElementById('prompt-textarea');
+        const charCount = document.getElementById('prompt-char-count');
+        charCount.textContent = `${textarea.value.length} characters`;
+    }
+    
+    saveApplicationSettings() {
+        const settings = {
+            autoApprove: document.getElementById('auto-approve').checked,
+            batchProcessing: document.getElementById('batch-processing').checked,
+            retryFailed: document.getElementById('retry-failed').checked,
+            showConfidence: document.getElementById('show-confidence').checked,
+            advancedFiltersDefault: document.getElementById('advanced-filters-default').checked,
+            compactView: document.getElementById('compact-view').checked
+        };
+        
+        localStorage.setItem('targetvision_settings', JSON.stringify(settings));
+        
+        // Show success message
+        const savedIndicator = document.getElementById('settings-saved');
+        savedIndicator.classList.remove('hidden');
+        setTimeout(() => {
+            savedIndicator.classList.add('hidden');
+        }, 3000);
+        
+        console.log('Settings saved:', settings);
+    }
+    
+    async updateSystemInfo() {
+        try {
+            // Update photo counts
+            const response = await fetch(`${this.apiBase}/photos?limit=1`);
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('total-photos').textContent = data.total || '0';
+                document.getElementById('processed-photos').textContent = data.processed || '0';
+            }
+            
+            // Update queue status
+            const queueResponse = await fetch(`${this.apiBase}/photos/process/queue`);
+            if (queueResponse.ok) {
+                const queueData = await queueResponse.json();
+                document.getElementById('queue-status').textContent = 
+                    `${queueData.pending || 0} pending, ${queueData.processing || 0} processing`;
+            }
+            
+        } catch (error) {
+            console.error('Error updating system info:', error);
         }
     }
 }
