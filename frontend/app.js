@@ -874,27 +874,35 @@ class TargetVisionApp {
     
     createFolderCard(folder) {
         const div = document.createElement('div');
-        div.className = 'folder-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer';
-        
         const folderName = folder.name || 'Untitled Folder';
         
-        div.innerHTML = `
-            <div class="flex flex-col items-center text-center">
-                ${folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url) ? `
-                    <div class="w-12 h-12 mb-2 rounded overflow-hidden bg-gray-100 shadow-sm">
-                        <img src="${folder.highlight_image.thumbnail_url || folder.highlight_image.image_url}" 
-                             alt="${folderName}" 
-                             class="w-full h-full object-cover">
-                    </div>
-                ` : `
-                    <svg class="h-12 w-12 text-amber-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
+        if (folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url)) {
+            // Card with background image
+            const imageUrl = folder.highlight_image.thumbnail_url || folder.highlight_image.image_url;
+            div.className = 'folder-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
+            div.style.backgroundImage = `url('${imageUrl}')`;
+            
+            div.innerHTML = `
+                <div class="absolute top-2 left-2 flex items-center space-x-2 bg-black bg-opacity-50 px-2 py-1 rounded">
+                    <svg class="h-4 w-4 text-amber-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
                     </svg>
-                `}
-                <h3 class="text-sm font-medium text-gray-900 truncate w-full">${folderName}</h3>
-                <p class="text-xs text-gray-500 mt-1">Folder</p>
-            </div>
-        `;
+                    <h3 class="text-sm font-medium text-white truncate">${folderName}</h3>
+                </div>
+            `;
+        } else {
+            // Fallback card with icon
+            div.className = 'folder-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer aspect-square';
+            
+            div.innerHTML = `
+                <div class="flex flex-col items-center text-center h-full justify-center">
+                    <svg class="h-16 w-16 text-amber-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <h3 class="text-sm font-medium text-gray-900 truncate w-full">${folderName}</h3>
+                </div>
+            `;
+        }
         
         div.addEventListener('click', () => this.navigateToFolder(folder));
         
@@ -903,42 +911,65 @@ class TargetVisionApp {
     
     createAlbumCard(album) {
         const div = document.createElement('div');
-        div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer';
-        
         const albumName = album.name || 'Untitled Album';
         const photoCount = album.image_count || album.synced_photo_count || 0;
         const processedCount = album.ai_processed_count || 0;
         const syncIconSvg = album.is_synced 
-            ? `<svg class="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20" title="Synced - Album photos are available locally">
+            ? `<svg class="h-4 w-4 text-green-200" fill="currentColor" viewBox="0 0 20 20" title="Synced - Album photos are available locally">
                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                </svg>`
-            : `<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="Not synced - Click 'Sync Album' to download photos">
+            : `<svg class="h-4 w-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="Not synced - Click 'Sync Album' to download photos">
                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                </svg>`;
         
-        div.innerHTML = `
-            <div class="flex flex-col items-center text-center">
-                ${album.highlight_image && (album.highlight_image.thumbnail_url || album.highlight_image.image_url) ? `
-                    <div class="w-12 h-12 mb-2 rounded overflow-hidden bg-gray-100 shadow-sm">
-                        <img src="${album.highlight_image.thumbnail_url || album.highlight_image.image_url}" 
-                             alt="${albumName}" 
-                             class="w-full h-full object-cover">
-                    </div>
-                ` : `
-                    <svg class="h-12 w-12 text-green-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+        if (album.highlight_image && (album.highlight_image.thumbnail_url || album.highlight_image.image_url)) {
+            // Card with background image
+            const imageUrl = album.highlight_image.thumbnail_url || album.highlight_image.image_url;
+            div.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
+            div.style.backgroundImage = `url('${imageUrl}')`;
+            
+            div.innerHTML = `
+                <div class="absolute top-2 left-2">
+                    <svg class="h-5 w-5 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
                     </svg>
-                `}
-                <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
-                <div class="flex items-center justify-center mt-1 space-x-2">
-                    <p class="text-xs text-gray-500">${photoCount} photos</p>
-                    <span class="flex-shrink-0">${syncIconSvg}</span>
                 </div>
-                ${album.is_synced ? `
-                    <p class="text-xs text-green-600 mt-1">${processedCount} processed</p>
-                ` : ''}
-            </div>
-        `;
+                <div class="relative z-10 flex flex-col items-center text-center h-full justify-end">
+                    <h3 class="text-sm font-medium text-white truncate w-full bg-black bg-opacity-50 px-2 py-1 rounded">${albumName}</h3>
+                    <div class="flex items-center justify-center mt-1 space-x-2 bg-black bg-opacity-50 px-2 py-1 rounded">
+                        <p class="text-xs text-gray-200">${photoCount} photos</p>
+                        <span class="flex-shrink-0">${syncIconSvg}</span>
+                    </div>
+                    ${album.is_synced ? `
+                        <p class="text-xs text-green-300 mt-1 bg-black bg-opacity-50 px-2 py-1 rounded">${processedCount} processed</p>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            // Fallback card with icon
+            div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer aspect-square relative';
+            
+            div.innerHTML = `
+                <div class="absolute top-2 left-2">
+                    <svg class="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                    </svg>
+                </div>
+                <div class="flex flex-col items-center text-center h-full justify-center">
+                    <svg class="h-16 w-16 text-blue-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                    </svg>
+                    <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
+                    <div class="flex items-center justify-center mt-1 space-x-2">
+                        <p class="text-xs text-gray-500">${photoCount} photos</p>
+                        <span class="flex-shrink-0">${syncIconSvg}</span>
+                    </div>
+                    ${album.is_synced ? `
+                        <p class="text-xs text-green-600 mt-1">${processedCount} processed</p>
+                    ` : ''}
+                </div>
+            `;
+        }
         
         div.addEventListener('click', () => this.selectAlbum(album));
         
