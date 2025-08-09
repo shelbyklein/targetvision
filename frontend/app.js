@@ -729,12 +729,139 @@ class TargetVisionApp {
         document.getElementById('chat-send').disabled = true;
         
         try {
-            // Call chat API (placeholder for now)
-            this.addChatMessage('system', 'Chat functionality is not yet implemented. This will connect to your photo search and AI analysis system.');
+            // Check if this is a photo search query
+            if (this.isPhotoSearchQuery(message)) {
+                await this.handlePhotoSearchChat(message);
+            } else {
+                // Handle general conversation
+                await this.handleGeneralChat(message);
+            }
             
         } catch (error) {
             console.error('Chat error:', error);
-            this.addChatMessage('system', 'Sorry, there was an error processing your message.');
+            this.addChatMessage('system', 'Sorry, there was an error processing your message. Please try again.');
+        }
+    }
+    
+    isPhotoSearchQuery(message) {
+        const searchKeywords = ['find', 'show', 'search', 'look', 'photos', 'images', 'pictures', 'with', 'containing', 'have'];
+        const lowerMessage = message.toLowerCase();
+        return searchKeywords.some(keyword => lowerMessage.includes(keyword));
+    }
+    
+    async handlePhotoSearchChat(message) {
+        // Extract search terms from natural language
+        const searchQuery = this.extractSearchTerms(message);
+        
+        if (!searchQuery) {
+            this.addChatMessage('system', "I understand you're looking for photos, but I'm not sure what to search for. Try asking something like 'Find photos with medals' or 'Show me archery images'.");
+            return;
+        }
+        
+        // Show "thinking" message
+        this.addChatMessage('system', `🔍 Searching your photos for "${searchQuery}"...`);
+        
+        try {
+            // Perform actual photo search
+            const response = await fetch(`${this.apiBase}/search?q=${encodeURIComponent(searchQuery)}&search_type=hybrid&limit=10`);
+            
+            if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+            
+            const results = await response.json();
+            this.handleSearchResults(searchQuery, results);
+            
+        } catch (error) {
+            console.error('Photo search error:', error);
+            this.addChatMessage('system', "I encountered an error while searching your photos. Make sure you have photos synced and processed first.");
+        }
+    }
+    
+    extractSearchTerms(message) {
+        // Remove common chat words and extract the important terms
+        const stopWords = ['find', 'show', 'search', 'look', 'for', 'photos', 'images', 'pictures', 'me', 'with', 'containing', 'have', 'any', 'all', 'the', 'some'];
+        
+        // Simple extraction - remove stop words and get meaningful terms
+        let terms = message.toLowerCase()
+            .replace(/[^\w\s]/g, ' ') // Remove punctuation
+            .split(/\s+/)
+            .filter(word => word.length > 2 && !stopWords.includes(word));
+            
+        return terms.join(' ').trim();
+    }
+    
+    handleSearchResults(searchQuery, results) {
+        const photos = results.photos || [];
+        
+        if (photos.length === 0) {
+            this.addChatMessage('system', `I didn't find any photos matching "${searchQuery}". Try different terms or make sure your photos are synced and processed with AI first.`);
+            return;
+        }
+        
+        // Create response with photo results
+        const resultCount = photos.length;
+        const responseText = `Found ${resultCount} photo${resultCount > 1 ? 's' : ''} matching "${searchQuery}":`;
+        
+        this.addChatMessage('system', responseText);
+        
+        // Add photo results as a special message type
+        this.addPhotoResults(photos.slice(0, 6)); // Show up to 6 photos
+        
+        if (photos.length > 6) {
+            this.addChatMessage('system', `Showing first 6 results. Go to the Search page to see all ${photos.length} results.`);
+        }
+    }
+    
+    async handleGeneralChat(message) {
+        // Handle general conversation about the app, photos, etc.
+        const lowerMessage = message.toLowerCase();
+        
+        if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
+            this.addChatMessage('system', `I can help you find photos in your SmugMug collection! Here's what you can ask me:
+
+📸 **Photo Search:**
+• "Find photos with medals"
+• "Show me archery competition images"  
+• "Look for photos containing awards"
+
+🔧 **Getting Started:**
+• Go to the Albums page to sync your SmugMug photos
+• Use "Sync Album" to add photos to the database
+• Process photos with AI to enable smart search
+
+Try asking me to find something specific in your photos!`);
+        } else if (lowerMessage.includes('sync') || lowerMessage.includes('album')) {
+            this.addChatMessage('system', `To search photos, you'll need to sync them first:
+
+1. Go to the **Albums** page
+2. Select an album from your SmugMug account
+3. Click **"Sync Album"** to add photos to the database
+4. Select photos and click **"Process Selected"** to analyze them with AI
+
+Once photos are processed, you can search them by asking me things like "Find photos with trophies" or "Show me competition images".`);
+        } else if (lowerMessage.includes('process') || lowerMessage.includes('ai')) {
+            this.addChatMessage('system', `AI processing analyzes your photos to understand their content:
+
+🤖 **What AI Processing Does:**
+• Generates detailed descriptions of what's in each photo
+• Extracts keywords for better searchability
+• Enables content-based search (find photos by what's actually in them)
+
+💡 **How to Process Photos:**
+• Sync an album first
+• Select photos you want to analyze  
+• Click "Process Selected" to run AI analysis
+• Or use the lightbox button on individual photos
+
+Once processed, I can find your photos based on their actual content!`);
+        } else {
+            this.addChatMessage('system', `I'm here to help you find photos in your SmugMug collection! 
+
+Try asking me things like:
+• "Find photos with medals"
+• "Show me archery images"
+• "Look for competition photos"
+
+You can also ask for help with syncing albums or processing photos with AI. What would you like to find?`);
         }
     }
     
@@ -765,6 +892,78 @@ class TargetVisionApp {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
         this.chatMessages.push({ sender, message, timestamp: new Date() });
+    }
+    
+    addPhotoResults(photos) {
+        const messagesContainer = document.getElementById('chat-messages');
+        
+        // Remove welcome state if it exists
+        const welcomeState = messagesContainer.querySelector('.flex.flex-col.items-center.justify-center');
+        if (welcomeState) {
+            welcomeState.remove();
+        }
+        
+        const photoResultsDiv = document.createElement('div');
+        photoResultsDiv.className = 'flex justify-start mb-4';
+        
+        photoResultsDiv.innerHTML = `
+            <div class="max-w-4xl">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg">
+                    ${photos.map(photo => {
+                        const photoData = photo.photo || photo;
+                        const score = photo.score ? Math.round(photo.score * 100) : 0;
+                        return `
+                            <div class="chat-photo-result relative group cursor-pointer" 
+                                 data-photo='${JSON.stringify(photoData).replace(/'/g, '&apos;')}'>
+                                <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
+                                    <img 
+                                        src="${photoData.thumbnail_url}" 
+                                        alt="${photoData.title || 'Photo'}"
+                                        class="w-full h-full object-cover"
+                                        loading="lazy"
+                                    />
+                                    
+                                    <!-- Relevance score -->
+                                    ${score > 0 ? `
+                                        <div class="absolute top-1 right-1 bg-blue-600 text-white text-xs px-1 py-0.5 rounded">
+                                            ${score}%
+                                        </div>
+                                    ` : ''}
+                                    
+                                    <!-- Hover overlay -->
+                                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                                        <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Photo title -->
+                                <p class="text-xs text-gray-600 mt-1 truncate">${photoData.title || photoData.filename || 'Untitled'}</p>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <p class="text-xs text-gray-500 mt-2 px-2">Click any photo to view details</p>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(photoResultsDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Add click handlers for photo results
+        photoResultsDiv.querySelectorAll('.chat-photo-result').forEach(photoDiv => {
+            photoDiv.addEventListener('click', () => {
+                try {
+                    const photoData = JSON.parse(photoDiv.dataset.photo.replace(/&apos;/g, "'"));
+                    this.showPhotoModal(photoData);
+                } catch (error) {
+                    console.error('Error parsing photo data:', error);
+                }
+            });
+        });
     }
     
     clearChat() {
