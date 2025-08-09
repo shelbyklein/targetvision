@@ -677,7 +677,6 @@ async def get_album_thumbnail(
         
         # Direct call to SmugMug API for album highlight image
         url = f"https://api.smugmug.com/api/v2/album/{album_key}!highlightimage"
-        
         response = await service.oauth.make_authenticated_request(
             "GET", url, token.access_token, token.access_token_secret
         )
@@ -748,7 +747,27 @@ async def get_album_thumbnail(
         except Exception as fallback_error:
             logger.warning(f"Fallback thumbnail fetch failed for {album_key}: {fallback_error}")
         
-        raise HTTPException(status_code=404, detail="No highlight image or album images found for this album")
+        # Return default placeholder when no thumbnail is available
+        default_response_data = {
+            "album_key": album_key,
+            "thumbnail_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2Y0ZjRmNCIgc3Ryb2tlPSIjZGRkIiBzdHJva2Utd2lkdGg9IjIiLz48dGV4dCB4PSIxMjAiIHk9IjkwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuNGVtIj5ObyBJbWFnZSBBdmFpbGFibGU8L3RleHQ+PC9zdmc+",
+            "is_default": True
+        }
+        
+        # Cache the default response
+        thumbnail_cache[cache_key] = {
+            'data': default_response_data,
+            'timestamp': time.time()
+        }
+        
+        return JSONResponse(
+            content=default_response_data,
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "ETag": f'"{hash("default_thumbnail")}"',
+                "X-Cache": "MISS-DEFAULT"
+            }
+        )
         
     except HTTPException:
         raise
