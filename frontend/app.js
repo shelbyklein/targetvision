@@ -228,21 +228,216 @@ class TargetVisionApp {
             return;
         }
         
+        // Create hierarchical tree structure
+        this.createHierarchicalTree(this.smugmugAlbums, albumsList);
+    }
+    
+    createHierarchicalTree(items, container, level = 0) {
         // Separate folders and albums for better organization
-        const folders = this.smugmugAlbums.filter(item => item.type === 'folder');
-        const albums = this.smugmugAlbums.filter(item => item.type === 'album');
+        const folders = items.filter(item => item.type === 'folder');
+        const albums = items.filter(item => item.type === 'album');
         
-        // Display folders first
+        // Display folders first with dropdown capability
         folders.forEach(folder => {
-            const folderElement = this.createFolderListItem(folder);
-            albumsList.appendChild(folderElement);
+            const folderElement = this.createHierarchicalFolderItem(folder, level);
+            container.appendChild(folderElement);
         });
         
         // Then display albums
         albums.forEach(album => {
-            const albumElement = this.createAlbumListItem(album);
-            albumsList.appendChild(albumElement);
+            const albumElement = this.createHierarchicalAlbumItem(album, level);
+            container.appendChild(albumElement);
         });
+    }
+    
+    createHierarchicalFolderItem(folder, level) {
+        const div = document.createElement('div');
+        div.className = 'folder-tree-item';
+        
+        const paddingLeft = `${level * 16 + 8}px`;
+        
+        div.innerHTML = `
+            <div class="folder-item flex items-center justify-between p-2 hover:bg-gray-100 cursor-pointer group" 
+                 style="padding-left: ${paddingLeft}" data-node-uri="${folder.node_uri || ''}">
+                <div class="flex items-center flex-1">
+                    <button class="folder-toggle mr-2 w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-700" 
+                            ${!folder.has_children ? 'style="visibility: hidden"' : ''}>
+                        <svg class="w-3 h-3 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    
+                    <svg class="folder-icon h-4 w-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    
+                    <span class="folder-name text-sm text-gray-900 font-medium flex-1 truncate">${folder.name}</span>
+                    
+                </div>
+                
+                <div class="folder-info text-xs text-gray-500 ml-2">
+                    ${folder.has_children ? '›' : ''}
+                </div>
+            </div>
+            
+            <div class="folder-children hidden pl-4"></div>
+        `;
+        
+        // Add click handlers
+        const folderItem = div.querySelector('.folder-item');
+        const folderToggle = div.querySelector('.folder-toggle');
+        const folderChildren = div.querySelector('.folder-children');
+        
+        // Double-click to navigate into folder
+        folderItem.addEventListener('dblclick', () => {
+            if (folder.has_children) {
+                this.navigateToFolder(folder);
+            }
+        });
+        
+        // Single click to show folder info in right panel
+        folderItem.addEventListener('click', (e) => {
+            if (e.target.closest('.folder-toggle')) return; // Don't handle if toggle was clicked
+            this.selectFolderItem(folder, div);
+        });
+        
+        // Toggle dropdown for folders with children
+        if (folder.has_children) {
+            folderToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleFolderExpansion(folder, div, folderChildren);
+            });
+        }
+        
+        return div;
+    }
+    
+    createHierarchicalAlbumItem(album, level) {
+        const div = document.createElement('div');
+        div.className = 'album-tree-item';
+        
+        const paddingLeft = `${level * 16 + 24}px`; // Extra padding for albums
+        
+        const progressBar = album.processing_progress > 0 ? 
+            `<div class="w-16 bg-gray-200 rounded-full h-1 ml-2">
+                <div class="bg-green-600 h-1 rounded-full transition-all duration-300" 
+                     style="width: ${album.processing_progress}%"></div>
+             </div>` : '';
+        
+        div.innerHTML = `
+            <div class="album-item flex items-center justify-between p-2 hover:bg-blue-50 cursor-pointer group rounded-sm" 
+                 style="padding-left: ${paddingLeft}" data-album-key="${album.album_key || ''}" data-album-uri="${album.album_uri || ''}">
+                <div class="flex items-center flex-1">
+                    <div class="w-4 h-4 mr-2"></div> <!-- Spacer for alignment -->
+                    
+                    <svg class="album-icon h-4 w-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4zM2 7v8a2 2 0 002 2h8.172a2 2 0 001.414-.586l2.828-2.828A2 2 0 0017 12.184V4a2 2 0 00-2-2H9.828a2 2 0 00-1.414.586L5.586 5.414A2 2 0 004 6.828V7z"/>
+                    </svg>
+                    
+                    <span class="album-name text-sm text-gray-900 flex-1 truncate">${album.name}</span>
+                    
+                </div>
+                
+                <div class="album-info flex items-center text-xs text-gray-500 ml-2">
+                    <span class="mr-2">${album.image_count || 0}</span>
+                    ${progressBar}
+                </div>
+            </div>
+        `;
+        
+        // Add click handler
+        const albumItem = div.querySelector('.album-item');
+        albumItem.addEventListener('click', () => {
+            this.selectAlbumFromTree(album, div);
+        });
+        
+        return div;
+    }
+    
+    async toggleFolderExpansion(folder, folderElement, childrenContainer) {
+        const toggle = folderElement.querySelector('.folder-toggle svg');
+        const isExpanded = !childrenContainer.classList.contains('hidden');
+        
+        if (isExpanded) {
+            // Collapse
+            childrenContainer.classList.add('hidden');
+            toggle.style.transform = 'rotate(0deg)';
+            childrenContainer.innerHTML = '';
+        } else {
+            // Expand - load children
+            toggle.style.transform = 'rotate(90deg)';
+            childrenContainer.classList.remove('hidden');
+            
+            // Show loading state
+            childrenContainer.innerHTML = `
+                <div class="flex items-center py-2 px-4 text-xs text-gray-500">
+                    <div class="animate-spin rounded-full h-3 w-3 border-b border-gray-400 mr-2"></div>
+                    Loading...
+                </div>
+            `;
+            
+            try {
+                // Fetch folder children
+                const response = await fetch(`${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(folder.node_uri)}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                const children = data.nodes || [];
+                
+                // Clear loading and display children
+                childrenContainer.innerHTML = '';
+                if (children.length > 0) {
+                    this.createHierarchicalTree(children, childrenContainer, 1);
+                } else {
+                    childrenContainer.innerHTML = `
+                        <div class="py-2 px-4 text-xs text-gray-500 italic">
+                            No items found
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Failed to load folder children:', error);
+                childrenContainer.innerHTML = `
+                    <div class="py-2 px-4 text-xs text-red-500">
+                        Failed to load folder contents
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    selectFolderItem(folder, element) {
+        // Remove selection from other items
+        document.querySelectorAll('.folder-item, .album-item').forEach(item => {
+            item.classList.remove('bg-blue-100', 'border-l-4', 'border-blue-500');
+        });
+        
+        // Add selection to current item
+        const folderItem = element.querySelector('.folder-item');
+        folderItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
+        
+        // Show folder info in right panel
+        this.displayFolderInfoInRightPanel(folder);
+    }
+    
+    selectAlbumFromTree(album, element) {
+        // Remove selection from other items
+        document.querySelectorAll('.folder-item, .album-item').forEach(item => {
+            item.classList.remove('bg-blue-100', 'border-l-4', 'border-blue-500');
+        });
+        
+        // Add selection to current item
+        const albumItem = element.querySelector('.album-item');
+        albumItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
+        
+        // Load album photos in right panel
+        this.selectAlbum(album);
+    }
+    
+    navigateToFolder(folder) {
+        // Navigate into the folder (replaces current level)
+        this.loadFolderContents(folder.node_uri);
     }
 
     createAlbumListItem(album) {
@@ -405,20 +600,17 @@ class TargetVisionApp {
         // Clear existing breadcrumbs
         breadcrumbContainer.innerHTML = '';
         
-        // Create Albums root breadcrumb
-        const albumsRoot = document.createElement('button');
-        albumsRoot.id = 'breadcrumb-albums';
-        albumsRoot.className = 'text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center';
-        albumsRoot.innerHTML = `
-            <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        // Create Albums root breadcrumb with dropdown
+        const rootDropdown = this.createBreadcrumbDropdown('root', {
+            name: 'SmugMug Albums',
+            node_uri: null,
+            icon: `<svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
-            </svg>
-            SmugMug Albums
-        `;
-        albumsRoot.addEventListener('click', () => this.navigateToRoot());
-        breadcrumbContainer.appendChild(albumsRoot);
+            </svg>`
+        }, true);
+        breadcrumbContainer.appendChild(rootDropdown);
         
-        // Add breadcrumbs for each folder in the path
+        // Add breadcrumbs for each folder in the path with dropdowns
         this.breadcrumbs.forEach((breadcrumb, index) => {
             // Add separator
             const separator = document.createElement('span');
@@ -426,19 +618,170 @@ class TargetVisionApp {
             separator.textContent = '/';
             breadcrumbContainer.appendChild(separator);
             
-            // Add breadcrumb link
-            const link = document.createElement('button');
-            link.className = index === this.breadcrumbs.length - 1 
-                ? 'text-gray-700 text-sm font-medium' 
-                : 'text-blue-600 hover:text-blue-800 text-sm';
-            link.textContent = breadcrumb.name;
-            
-            if (index < this.breadcrumbs.length - 1) {
-                link.addEventListener('click', () => this.loadFolderContents(breadcrumb.node_uri));
-            }
-            
-            breadcrumbContainer.appendChild(link);
+            // Create dropdown for each breadcrumb level
+            const isLast = index === this.breadcrumbs.length - 1;
+            const dropdown = this.createBreadcrumbDropdown(
+                `level-${index}`,
+                breadcrumb,
+                false,
+                isLast
+            );
+            breadcrumbContainer.appendChild(dropdown);
         });
+    }
+    
+    createBreadcrumbDropdown(id, item, isRoot = false, isLast = false) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative inline-block';
+        wrapper.setAttribute('data-dropdown-id', id);
+        
+        // Create main button
+        const button = document.createElement('button');
+        button.className = isLast 
+            ? 'text-gray-700 text-sm font-medium flex items-center' 
+            : 'text-blue-600 hover:text-blue-800 text-sm flex items-center hover:bg-blue-50 rounded px-1 py-1';
+        
+        button.innerHTML = `
+            ${item.icon || ''}
+            <span>${item.name}</span>
+            ${!isLast ? `
+                <svg class="w-3 h-3 ml-1 transform transition-transform duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            ` : ''}
+        `;
+        
+        // Create dropdown menu
+        const dropdown = document.createElement('div');
+        dropdown.className = 'absolute left-0 mt-1 w-64 bg-white rounded-md shadow-lg border border-gray-200 z-50 hidden';
+        dropdown.innerHTML = `
+            <div class="py-1">
+                <div class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
+                    Quick Navigation
+                </div>
+                <div class="dropdown-loading px-3 py-2 text-center">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b border-gray-400 mx-auto"></div>
+                </div>
+            </div>
+        `;
+        
+        // Event listeners for dropdown
+        if (!isLast) {
+            let timeoutId = null;
+            
+            // Show dropdown on hover (with delay)
+            button.addEventListener('mouseenter', () => {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    this.showBreadcrumbDropdown(id, item, dropdown);
+                }, 300);
+            });
+            
+            // Hide dropdown when leaving both button and dropdown
+            wrapper.addEventListener('mouseleave', () => {
+                clearTimeout(timeoutId);
+                setTimeout(() => {
+                    if (!wrapper.matches(':hover')) {
+                        dropdown.classList.add('hidden');
+                        const arrow = button.querySelector('svg:last-child');
+                        if (arrow) arrow.style.transform = 'rotate(0deg)';
+                    }
+                }, 100);
+            });
+            
+            // Navigate on click
+            button.addEventListener('click', () => {
+                const nodeUri = isRoot ? null : item.node_uri;
+                this.loadFolderContents(nodeUri);
+            });
+        }
+        
+        wrapper.appendChild(button);
+        wrapper.appendChild(dropdown);
+        
+        return wrapper;
+    }
+    
+    async showBreadcrumbDropdown(id, item, dropdownElement) {
+        const dropdown = dropdownElement;
+        dropdown.classList.remove('hidden');
+        
+        // Rotate arrow
+        const wrapper = dropdown.parentElement;
+        const arrow = wrapper.querySelector('button svg:last-child');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+        
+        // Load folder contents for dropdown
+        try {
+            const nodeUri = item.node_uri;
+            const response = await fetch(`${this.apiBase}/smugmug/nodes${nodeUri ? `?node_uri=${encodeURIComponent(nodeUri)}` : ''}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            const contents = data.nodes || [];
+            
+            // Create dropdown content
+            const folders = contents.filter(node => node.type === 'folder');
+            const albums = contents.filter(node => node.type === 'album');
+            
+            const dropdownContent = dropdown.querySelector('.py-1');
+            dropdownContent.innerHTML = `
+                <div class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
+                    Quick Navigation
+                </div>
+                
+                ${folders.length > 0 ? `
+                    <div class="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-50">
+                        Folders (${folders.length})
+                    </div>
+                    ${folders.slice(0, 8).map(folder => `
+                        <button onclick="app.loadFolderContents('${folder.node_uri}')" 
+                                class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                            </svg>
+                            <span class="truncate">${folder.name}</span>
+                        </button>
+                    `).join('')}
+                    ${folders.length > 8 ? `<div class="px-3 py-1 text-xs text-gray-500">...and ${folders.length - 8} more</div>` : ''}
+                ` : ''}
+                
+                ${albums.length > 0 ? `
+                    <div class="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-50 ${folders.length > 0 ? 'border-t' : ''}">
+                        Albums (${albums.length})
+                    </div>
+                    ${albums.slice(0, 8).map(album => `
+                        <button onclick="app.selectAlbum(${JSON.stringify(album).replace(/"/g, '&quot;')})" 
+                                class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
+                            </svg>
+                            <span class="truncate flex-1">${album.name}</span>
+                            <span class="text-xs text-gray-500">${album.image_count || 0}</span>
+                        </button>
+                    `).join('')}
+                    ${albums.length > 8 ? `<div class="px-3 py-1 text-xs text-gray-500">...and ${albums.length - 8} more</div>` : ''}
+                ` : ''}
+                
+                ${contents.length === 0 ? `
+                    <div class="px-3 py-4 text-sm text-gray-500 text-center">
+                        No items found
+                    </div>
+                ` : ''}
+            `;
+            
+        } catch (error) {
+            console.error('Failed to load breadcrumb dropdown:', error);
+            const dropdownContent = dropdown.querySelector('.py-1');
+            dropdownContent.innerHTML = `
+                <div class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
+                    Quick Navigation
+                </div>
+                <div class="px-3 py-4 text-sm text-red-500 text-center">
+                    Failed to load contents
+                </div>
+            `;
+        }
     }
     
     async navigateToRoot() {
@@ -593,6 +936,238 @@ class TargetVisionApp {
         if (breadcrumbArrow) breadcrumbArrow.classList.add('hidden');
         if (breadcrumbCurrent) breadcrumbCurrent.classList.add('hidden');
     }
+    
+    displayFolderInfoInRightPanel(folder) {
+        // Clear current album state since we're viewing folder info
+        this.currentAlbum = null;
+        
+        // Update UI to show folder info view
+        this.showPhotosView();
+        
+        // Update the header to show folder name
+        document.getElementById('current-album-title').textContent = folder.name || 'Folder';
+        
+        // Hide album-specific actions
+        document.getElementById('album-actions').classList.add('hidden');
+        document.getElementById('album-stats').classList.add('hidden');
+        
+        // Hide photo controls since we're showing folder info
+        document.getElementById('photo-controls').classList.add('hidden');
+        
+        // Create folder info display
+        const photoGrid = document.getElementById('photo-grid');
+        const emptyState = document.getElementById('empty-photos');
+        const welcomeState = document.getElementById('welcome-state');
+        
+        // Hide other states
+        if (emptyState) emptyState.classList.add('hidden');
+        if (welcomeState) welcomeState.classList.add('hidden');
+        
+        photoGrid.classList.remove('hidden');
+        photoGrid.className = 'flex-1 p-6'; // Remove grid classes for info view
+        
+        // Create folder info content
+        photoGrid.innerHTML = `
+            <div class="max-w-4xl mx-auto">
+                <!-- Folder Header -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex items-start space-x-6">
+                        <!-- Folder Icon or Highlight Image -->
+                        <div class="flex-shrink-0">
+                            ${folder.highlight_image && (folder.highlight_image.image_url || folder.highlight_image.thumbnail_url) ? `
+                                <div class="w-32 h-32 rounded-lg overflow-hidden bg-gray-100 shadow-sm">
+                                    <img src="${folder.highlight_image.image_url || folder.highlight_image.thumbnail_url}" 
+                                         alt="${folder.name}" 
+                                         class="w-full h-full object-cover">
+                                </div>
+                            ` : `
+                                <div class="w-32 h-32 rounded-lg bg-yellow-100 flex items-center justify-center">
+                                    <svg class="w-16 h-16 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                    </svg>
+                                </div>
+                            `}
+                        </div>
+                        
+                        <!-- Folder Details -->
+                        <div class="flex-1">
+                            <h1 class="text-2xl font-bold text-gray-900 mb-2">${folder.name || 'Untitled Folder'}</h1>
+                            
+                            ${folder.description ? `
+                                <p class="text-gray-600 mb-4">${folder.description}</p>
+                            ` : ''}
+                            
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="font-medium text-gray-500">Type:</span>
+                                    <span class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-sm text-xs font-medium">
+                                        ${folder.type.charAt(0).toUpperCase() + folder.type.slice(1)}
+                                    </span>
+                                </div>
+                                
+                                <div>
+                                    <span class="font-medium text-gray-500">Privacy:</span>
+                                    <span class="ml-2">${folder.privacy || 'Unknown'}</span>
+                                </div>
+                                
+                                ${folder.date_added ? `
+                                    <div>
+                                        <span class="font-medium text-gray-500">Created:</span>
+                                        <span class="ml-2">${new Date(folder.date_added).toLocaleDateString()}</span>
+                                    </div>
+                                ` : ''}
+                                
+                                ${folder.date_modified ? `
+                                    <div>
+                                        <span class="font-medium text-gray-500">Modified:</span>
+                                        <span class="ml-2">${new Date(folder.date_modified).toLocaleDateString()}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            
+                            <!-- Folder Actions -->
+                            <div class="flex items-center space-x-3 mt-4">
+                                ${folder.has_children ? `
+                                    <button onclick="app.navigateToFolder({node_uri: '${folder.node_uri}', name: '${folder.name}', has_children: true})" 
+                                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
+                                        <svg class="w-4 h-4 mr-2 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                        Browse Folder
+                                    </button>
+                                ` : ''}
+                                
+                                <button onclick="app.refreshFolderInfo('${folder.node_uri}')" 
+                                        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium">
+                                    <svg class="w-4 h-4 mr-2 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Folder Contents Preview -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Folder Contents</h2>
+                    
+                    <div id="folder-contents-preview" class="text-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p class="text-gray-600">Loading folder contents...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Load folder contents preview
+        this.loadFolderContentsPreview(folder.node_uri);
+        
+        // Update breadcrumb to show current folder
+        const breadcrumbArrow = document.getElementById('breadcrumb-arrow');
+        const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+        if (breadcrumbArrow) breadcrumbArrow.classList.remove('hidden');
+        if (breadcrumbCurrent) {
+            breadcrumbCurrent.classList.remove('hidden');
+            breadcrumbCurrent.textContent = folder.name;
+        }
+    }
+    
+    async loadFolderContentsPreview(nodeUri) {
+        const previewContainer = document.getElementById('folder-contents-preview');
+        if (!previewContainer) return;
+        
+        try {
+            const response = await fetch(`${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(nodeUri)}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            const contents = data.nodes || [];
+            
+            if (contents.length === 0) {
+                previewContainer.innerHTML = `
+                    <div class="text-gray-500">
+                        <svg class="w-12 h-12 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
+                        </svg>
+                        <p>This folder is empty</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const folders = contents.filter(item => item.type === 'folder');
+            const albums = contents.filter(item => item.type === 'album');
+            
+            previewContainer.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    ${folders.length > 0 ? `
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-3 flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                </svg>
+                                Folders (${folders.length})
+                            </h3>
+                            <div class="space-y-2">
+                                ${folders.slice(0, 5).map(folder => `
+                                    <div class="flex items-center py-2 px-3 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer" 
+                                         onclick="app.navigateToFolder({node_uri: '${folder.node_uri}', name: '${folder.name}', has_children: true})">
+                                        <svg class="w-4 h-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                        </svg>
+                                        <span class="text-sm truncate">${folder.name}</span>
+                                    </div>
+                                `).join('')}
+                                ${folders.length > 5 ? `<p class="text-xs text-gray-500 pl-6">...and ${folders.length - 5} more</p>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${albums.length > 0 ? `
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-3 flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
+                                </svg>
+                                Albums (${albums.length})
+                            </h3>
+                            <div class="space-y-2">
+                                ${albums.slice(0, 5).map(album => `
+                                    <div class="flex items-center py-2 px-3 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer" 
+                                         onclick="app.selectAlbum(${JSON.stringify(album).replace(/"/g, '&quot;')})">
+                                        <svg class="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
+                                        </svg>
+                                        <span class="text-sm truncate flex-1">${album.name}</span>
+                                        <span class="text-xs text-gray-500">${album.image_count || 0}</span>
+                                    </div>
+                                `).join('')}
+                                ${albums.length > 5 ? `<p class="text-xs text-gray-500 pl-6">...and ${albums.length - 5} more</p>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Failed to load folder contents preview:', error);
+            previewContainer.innerHTML = `
+                <div class="text-red-500">
+                    <svg class="w-12 h-12 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <p>Failed to load folder contents</p>
+                </div>
+            `;
+        }
+    }
+    
+    async refreshFolderInfo(nodeUri) {
+        // Refresh the folder info by reloading
+        this.loadFolderContentsPreview(nodeUri);
+    }
 
     async selectAlbum(album) {
         this.currentAlbum = album;
@@ -621,9 +1196,12 @@ class TargetVisionApp {
             const albumItems = document.querySelectorAll('.album-item');
             const currentAlbumName = this.currentAlbum.title || this.currentAlbum.name;
             albumItems.forEach(item => {
-                const title = item.querySelector('span.font-medium').textContent;
-                if (title === currentAlbumName) {
-                    item.classList.add('bg-blue-50', 'border-blue-200');
+                const titleElement = item.querySelector('span.album-name') || item.querySelector('span.font-medium');
+                if (titleElement) {
+                    const title = titleElement.textContent;
+                    if (title === currentAlbumName) {
+                        item.classList.add('bg-blue-50', 'border-blue-200');
+                    }
                 }
             });
         }
@@ -638,8 +1216,8 @@ class TargetVisionApp {
                 breadcrumbCurrent.textContent = this.currentAlbum.title || this.currentAlbum.name || 'Selected Album';
             }
             
-            // Update photo panel header
-            document.getElementById('current-album-title').textContent = this.currentAlbum.title || this.currentAlbum.name || 'Selected Album';
+            // Update photo panel header with highlight image
+            this.updateAlbumHeader();
             document.getElementById('album-stats').classList.remove('hidden');
             document.getElementById('album-actions').classList.remove('hidden');
         }
@@ -654,6 +1232,41 @@ class TargetVisionApp {
                 syncButton.textContent = 'Sync Album';
                 syncButton.className = 'text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700';
             }
+        }
+    }
+    
+    updateAlbumHeader() {
+        const titleElement = document.getElementById('current-album-title');
+        if (!titleElement || !this.currentAlbum) return;
+        
+        const albumName = this.currentAlbum.title || this.currentAlbum.name || 'Selected Album';
+        
+        // Check if album has a highlight image
+        if (this.currentAlbum.highlight_image && (this.currentAlbum.highlight_image.thumbnail_url || this.currentAlbum.highlight_image.image_url)) {
+            // Create enhanced header with highlight image
+            const headerContainer = titleElement.parentElement;
+            headerContainer.innerHTML = `
+                <div class="flex items-center space-x-4">
+                    <div class="album-highlight-image flex-shrink-0">
+                        <img src="${this.currentAlbum.highlight_image.thumbnail_url || this.currentAlbum.highlight_image.image_url}" 
+                             alt="${albumName}" 
+                             class="w-12 h-12 rounded-lg object-cover shadow-sm border border-gray-200">
+                    </div>
+                    <div class="flex-1">
+                        <h2 id="current-album-title" class="font-semibold text-gray-900">${albumName}</h2>
+                        ${this.currentAlbum.description ? `
+                            <p class="text-sm text-gray-600 mt-1 truncate">${this.currentAlbum.description}</p>
+                        ` : ''}
+                    </div>
+                </div>
+                <div id="album-stats" class="ml-4 text-sm text-gray-600 hidden">
+                    <span id="photo-count">0 photos</span> • 
+                    <span id="processing-stats">0 processed</span>
+                </div>
+            `;
+        } else {
+            // Standard header without highlight image
+            titleElement.textContent = albumName;
         }
     }
 
@@ -2565,5 +3178,5 @@ Emphasize athletic performance, competition elements, and achievement recognitio
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new TargetVisionApp();
+    window.app = new TargetVisionApp();
 });
