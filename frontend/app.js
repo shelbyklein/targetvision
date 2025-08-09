@@ -99,6 +99,12 @@ class TargetVisionApp {
         document.getElementById('test-prompt').addEventListener('click', () => this.testPrompt());
         document.getElementById('save-settings').addEventListener('click', () => this.saveApplicationSettings());
         
+        // API Key management
+        document.getElementById('test-anthropic-key').addEventListener('click', () => this.testApiKey('anthropic'));
+        document.getElementById('test-openai-key').addEventListener('click', () => this.testApiKey('openai'));
+        document.getElementById('test-image-upload').addEventListener('change', (e) => this.handleTestImageUpload(e));
+        document.getElementById('analyze-test-image').addEventListener('click', () => this.analyzeTestImage());
+        
         // Prompt textarea character count
         document.getElementById('prompt-textarea').addEventListener('input', () => this.updateCharCount());
         
@@ -1739,10 +1745,25 @@ class TargetVisionApp {
                 body: JSON.stringify(localPhotoIds)
             });
             
+            // Get user's API settings
+            const apiSettings = this.getApiSettings();
+            
+            // Prepare headers with API keys
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (apiSettings.anthropic_key) {
+                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
+            }
+            if (apiSettings.openai_key) {
+                headers['X-OpenAI-Key'] = apiSettings.openai_key;
+            }
+            
             // Start batch processing
-            const response = await fetch(`${this.apiBase}/photos/process/batch`, {
+            const response = await fetch(`${this.apiBase}/photos/process/batch?provider=${apiSettings.active_provider || 'anthropic'}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: headers,
                 body: JSON.stringify(localPhotoIds)
             });
             
@@ -2713,8 +2734,22 @@ You can also ask for help with syncing albums or processing photos with AI. What
         processButton.disabled = true;
         
         try {
-            const response = await fetch(`${this.apiBase}/photos/${currentPhoto.local_photo_id}/process`, {
-                method: 'POST'
+            // Get user's API settings
+            const apiSettings = this.getApiSettings();
+            
+            // Prepare headers with API keys
+            const headers = {};
+            
+            if (apiSettings.anthropic_key) {
+                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
+            }
+            if (apiSettings.openai_key) {
+                headers['X-OpenAI-Key'] = apiSettings.openai_key;
+            }
+            
+            const response = await fetch(`${this.apiBase}/photos/${currentPhoto.local_photo_id}/process?provider=${apiSettings.active_provider || 'anthropic'}`, {
+                method: 'POST',
+                headers: headers
             });
             
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -2903,8 +2938,22 @@ You can also ask for help with syncing albums or processing photos with AI. What
             regenerateButton.disabled = true;
             regenerateButton.innerHTML = '🔄 Regenerating...';
             
-            const response = await fetch(`${this.apiBase}/photos/${this.currentPhoto.id}/process`, {
-                method: 'POST'
+            // Get user's API settings
+            const apiSettings = this.getApiSettings();
+            
+            // Prepare headers with API keys
+            const headers = {};
+            
+            if (apiSettings.anthropic_key) {
+                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
+            }
+            if (apiSettings.openai_key) {
+                headers['X-OpenAI-Key'] = apiSettings.openai_key;
+            }
+            
+            const response = await fetch(`${this.apiBase}/photos/${this.currentPhoto.id}/process?provider=${apiSettings.active_provider || 'anthropic'}`, {
+                method: 'POST',
+                headers: headers
             });
             
             if (!response.ok) {
@@ -2938,6 +2987,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         console.log('Settings page initialized');
         await this.loadCurrentPrompt();
         this.loadApplicationSettings();
+        this.loadApiKeySettings();
         this.updateSystemInfo();
     }
     
@@ -3242,6 +3292,222 @@ Emphasize athletic performance, competition elements, and achievement recognitio
         }, 3000);
         
         console.log('Settings saved:', settings);
+    }
+    
+    // API Key Management Methods
+    loadApiKeySettings() {
+        const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
+        
+        // Load API keys (masked for security)
+        if (settings.anthropic_key) {
+            document.getElementById('anthropic-api-key').value = '••••••••••••••••';
+        }
+        if (settings.openai_key) {
+            document.getElementById('openai-api-key').value = '••••••••••••••••';
+        }
+        
+        // Load active provider
+        const activeProvider = settings.active_provider || 'anthropic';
+        document.getElementById(`provider-${activeProvider}`).checked = true;
+    }
+    
+    saveApiKeySettings() {
+        const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
+        
+        // Get API keys (only if they're not masked)
+        const anthropicKey = document.getElementById('anthropic-api-key').value;
+        const openaiKey = document.getElementById('openai-api-key').value;
+        
+        if (anthropicKey && !anthropicKey.startsWith('••••')) {
+            settings.anthropic_key = anthropicKey;
+        }
+        if (openaiKey && !openaiKey.startsWith('••••')) {
+            settings.openai_key = openaiKey;
+        }
+        
+        // Get active provider
+        const activeProvider = document.querySelector('input[name="ai-provider"]:checked').value;
+        settings.active_provider = activeProvider;
+        
+        localStorage.setItem('targetvision_api_settings', JSON.stringify(settings));
+        return settings;
+    }
+    
+    async testApiKey(provider) {
+        const button = document.getElementById(`test-${provider}-key`);
+        const statusDiv = document.getElementById(`${provider}-key-status`);
+        const keyInput = document.getElementById(`${provider}-api-key`);
+        
+        const apiKey = keyInput.value;
+        if (!apiKey || apiKey.startsWith('••••')) {
+            this.showKeyStatus(statusDiv, 'error', 'Please enter a valid API key');
+            return;
+        }
+        
+        // Update button state
+        button.disabled = true;
+        button.textContent = 'Testing...';
+        statusDiv.classList.remove('hidden');
+        this.showKeyStatus(statusDiv, 'info', 'Testing API key...');
+        
+        try {
+            const response = await fetch(`${this.apiBase}/settings/test-api-key`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    provider: provider,
+                    api_key: apiKey
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showKeyStatus(statusDiv, 'success', 'API key is valid!');
+                // Save the key since it's valid
+                this.saveApiKeySettings();
+            } else {
+                this.showKeyStatus(statusDiv, 'error', result.error || 'Invalid API key');
+            }
+        } catch (error) {
+            this.showKeyStatus(statusDiv, 'error', 'Failed to test API key');
+            console.error('API key test error:', error);
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Test';
+        }
+    }
+    
+    showKeyStatus(statusDiv, type, message) {
+        statusDiv.className = `mt-1 text-xs ${type === 'success' ? 'text-green-600' : type === 'error' ? 'text-red-600' : 'text-blue-600'}`;
+        statusDiv.textContent = message;
+        statusDiv.classList.remove('hidden');
+    }
+    
+    handleTestImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            return;
+        }
+        
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const previewImg = document.getElementById('test-preview-img');
+            const previewDiv = document.getElementById('test-image-preview');
+            const analyzeButton = document.getElementById('analyze-test-image');
+            
+            previewImg.src = e.target.result;
+            previewDiv.classList.remove('hidden');
+            analyzeButton.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    async analyzeTestImage() {
+        const fileInput = document.getElementById('test-image-upload');
+        const analyzeButton = document.getElementById('analyze-test-image');
+        const resultDiv = document.getElementById('test-analysis-result');
+        const resultContent = document.getElementById('test-result-content');
+        
+        if (!fileInput.files[0]) {
+            alert('Please select an image first');
+            return;
+        }
+        
+        // Save current settings to ensure we use the right provider
+        const apiSettings = this.saveApiKeySettings();
+        
+        // Check if we have API key for the selected provider
+        const activeProvider = apiSettings.active_provider;
+        const hasKey = activeProvider === 'anthropic' ? apiSettings.anthropic_key : apiSettings.openai_key;
+        
+        if (!hasKey) {
+            alert(`Please configure your ${activeProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key first`);
+            return;
+        }
+        
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('image', fileInput.files[0]);
+        formData.append('provider', activeProvider);
+        
+        analyzeButton.disabled = true;
+        analyzeButton.textContent = 'Analyzing...';
+        resultDiv.classList.add('hidden');
+        
+        try {
+            // Prepare headers with API keys
+            const headers = {};
+            
+            if (apiSettings.anthropic_key) {
+                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
+            }
+            if (apiSettings.openai_key) {
+                headers['X-OpenAI-Key'] = apiSettings.openai_key;
+            }
+            
+            const response = await fetch(`${this.apiBase}/settings/test-image-analysis`, {
+                method: 'POST',
+                headers: headers,
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                // Display results
+                resultContent.innerHTML = `
+                    <div class="space-y-3">
+                        <div>
+                            <strong class="text-gray-700">Provider:</strong> 
+                            <span class="px-2 py-1 bg-${activeProvider === 'anthropic' ? 'purple' : 'blue'}-100 text-${activeProvider === 'anthropic' ? 'purple' : 'blue'}-800 text-xs rounded">
+                                ${activeProvider === 'anthropic' ? 'Anthropic Claude' : 'OpenAI GPT-4V'}
+                            </span>
+                        </div>
+                        <div>
+                            <strong class="text-gray-700">Description:</strong>
+                            <p class="mt-1 text-sm text-gray-800">${result.analysis.description}</p>
+                        </div>
+                        <div>
+                            <strong class="text-gray-700">Keywords:</strong>
+                            <div class="mt-1 flex flex-wrap gap-1">
+                                ${result.analysis.keywords.map(keyword => 
+                                    `<span class="bg-gray-100 text-gray-700 px-2 py-1 text-xs rounded">${keyword}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        ${result.prompt_used ? `
+                        <div>
+                            <strong class="text-gray-700">Analysis Prompt Used:</strong>
+                            <details class="mt-1">
+                                <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-800">Show/Hide Prompt</summary>
+                                <div class="mt-2 p-3 bg-gray-50 rounded-md border text-xs text-gray-700 font-mono whitespace-pre-wrap">${result.prompt_used}</div>
+                            </details>
+                        </div>
+                        ` : ''}
+                        <div class="text-xs text-gray-500">
+                            Analysis completed in ${result.processing_time || 'N/A'} seconds
+                        </div>
+                    </div>
+                `;
+                resultDiv.classList.remove('hidden');
+            } else {
+                alert(`Analysis failed: ${result.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Image analysis error:', error);
+            alert('Failed to analyze image. Please check your network connection and API key.');
+        } finally {
+            analyzeButton.disabled = false;
+            analyzeButton.textContent = 'Analyze Image';
+        }
     }
     
     async updateSystemInfo() {

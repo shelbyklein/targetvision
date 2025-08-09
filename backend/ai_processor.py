@@ -20,9 +20,18 @@ logger = logging.getLogger(__name__)
 class AIProcessor:
     """Handles AI-powered photo analysis using Claude Vision API"""
     
-    def __init__(self):
+    def __init__(self, anthropic_api_key: Optional[str] = None, openai_api_key: Optional[str] = None):
         self.settings = get_settings()
-        self.client = anthropic.Anthropic(api_key=self.settings.ANTHROPIC_API_KEY)
+        # Use provided API key or fallback to environment variable
+        self.anthropic_api_key = anthropic_api_key or self.settings.ANTHROPIC_API_KEY
+        self.openai_api_key = openai_api_key or getattr(self.settings, 'OPENAI_API_KEY', None)
+        
+        # Initialize Anthropic client if we have a key
+        if self.anthropic_api_key:
+            self.client = anthropic.Anthropic(api_key=self.anthropic_api_key)
+        else:
+            self.client = None
+            
         self.max_image_size = 5 * 1024 * 1024  # 5MB limit for Claude API
         self.max_dimension = 2200  # Claude API recommendation
         
@@ -135,8 +144,8 @@ Focus on:
 
 Do not include speculation about metadata like camera settings, date, or photographer information."""
 
-    async def generate_description(self, image_data: bytes) -> Tuple[str, List[str], float]:
-        """Generate AI description using Claude Vision API"""
+    async def generate_description(self, image_data: bytes, provider: str = "anthropic") -> Tuple[str, List[str], float, str]:
+        """Generate AI description using specified provider (anthropic or openai)"""
         start_time = time.time()
         
         try:
@@ -147,69 +156,175 @@ Do not include speculation about metadata like camera settings, date, or photogr
             # Get the current analysis prompt (custom or default)
             prompt = self.get_analysis_prompt()
 
-            # Call Claude Vision API
-            message = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=300,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": image_b64
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": prompt
-                            }
-                        ]
-                    }
-                ]
-            )
-            
-            # Extract content from response
-            response_text = message.content[0].text.strip()
-            
-            # Try to parse as JSON first (for new format prompts)
-            try:
-                import json
-                response_data = json.loads(response_text)
-                description = response_data.get("description", "")
-                keywords = response_data.get("keywords", [])
+            if provider.lower() == "anthropic":
+                description, keywords, processing_time = await self._generate_with_anthropic(image_b64, prompt, start_time)
+                return description, keywords, processing_time, prompt
+            elif provider.lower() == "openai":
+                description, keywords, processing_time = await self._generate_with_openai(image_b64, prompt, start_time)
+                return description, keywords, processing_time, prompt
+            else:
+                raise ValueError(f"Unsupported provider: {provider}")
                 
-                # Ensure keywords is a list of strings
-                if isinstance(keywords, str):
-                    keywords = [kw.strip() for kw in keywords.split(',')]
-                elif not isinstance(keywords, list):
-                    keywords = []
-                
-                # Clean keywords
-                keywords = [kw.strip() for kw in keywords if isinstance(kw, str) and kw.strip()]
-                
-            except (json.JSONDecodeError, AttributeError):
-                # Fallback to old format - treat entire response as description
-                description = response_text
-                keywords = self.extract_keywords_from_description(description)
-            
-            # Calculate processing time
-            processing_time = time.time() - start_time
-            
-            logger.info(f"Generated description in {processing_time:.2f}s: {description[:100]}...")
-            logger.info(f"Extracted keywords: {keywords}")
-            
-            return description, keywords, processing_time
-            
         except Exception as e:
             processing_time = time.time() - start_time
-            logger.error(f"Error generating description: {e}")
+            logger.error(f"Error generating description with {provider}: {e}")
             raise
     
-    async def process_photo(self, photo_id: int) -> Optional[Dict]:
+    async def _generate_with_anthropic(self, image_b64: str, prompt: str, start_time: float) -> Tuple[str, List[str], float]:
+        """Generate description using Anthropic Claude Vision API"""
+        if not self.client:
+            raise ValueError("Anthropic API key not configured")
+            
+        # Call Claude Vision API
+        message = self.client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=300,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": image_b64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        )
+        
+        # Extract content from response
+        response_text = message.content[0].text.strip()
+        return self._parse_ai_response(response_text, start_time)
+    
+    async def _generate_with_openai(self, image_b64: str, prompt: str, start_time: float) -> Tuple[str, List[str], float]:
+        """Generate description using OpenAI GPT-4 Vision API"""
+        if not self.openai_api_key:
+            raise ValueError("OpenAI API key not configured")
+        
+        headers = {
+            "Authorization": f"Bearer {self.openai_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "gpt-4o",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_b64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 300
+        }
+        
+        # Retry logic for rate limiting
+        max_retries = 3
+        base_delay = 1.0
+        
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json=payload
+                    )
+                    response.raise_for_status()
+                    
+                    result = response.json()
+                    response_text = result["choices"][0]["message"]["content"].strip()
+                    return self._parse_ai_response(response_text, start_time)
+                    
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429 and attempt < max_retries - 1:
+                    # Rate limit hit, wait with exponential backoff
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"OpenAI rate limit hit, waiting {delay}s before retry {attempt + 1}/{max_retries}")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    # Re-raise if not a rate limit error or max retries exceeded
+                    raise
+    
+    def _parse_ai_response(self, response_text: str, start_time: float) -> Tuple[str, List[str], float]:
+        """Parse AI response and extract description and keywords"""
+        # Clean response text - remove markdown code blocks if present
+        cleaned_text = response_text.strip()
+        
+        # Handle markdown code blocks (```json ... ```)
+        if cleaned_text.startswith('```json') and cleaned_text.endswith('```'):
+            # Extract JSON from markdown code block
+            lines = cleaned_text.split('\n')
+            json_lines = []
+            in_json = False
+            
+            for line in lines:
+                if line.strip() == '```json':
+                    in_json = True
+                    continue
+                elif line.strip() == '```':
+                    break
+                elif in_json:
+                    json_lines.append(line)
+            
+            cleaned_text = '\n'.join(json_lines).strip()
+        elif cleaned_text.startswith('```') and cleaned_text.endswith('```'):
+            # Handle generic code blocks
+            cleaned_text = cleaned_text[3:-3].strip()
+            # If it starts with a language identifier, remove the first line
+            if '\n' in cleaned_text and not cleaned_text[0] in '{["':
+                cleaned_text = '\n'.join(cleaned_text.split('\n')[1:])
+        
+        # Try to parse as JSON first (for new format prompts)
+        try:
+            import json
+            response_data = json.loads(cleaned_text)
+            description = response_data.get("description", "")
+            keywords = response_data.get("keywords", [])
+            
+            # Ensure keywords is a list of strings
+            if isinstance(keywords, str):
+                keywords = [kw.strip() for kw in keywords.split(',')]
+            elif not isinstance(keywords, list):
+                keywords = []
+            
+            # Clean keywords
+            keywords = [kw.strip() for kw in keywords if isinstance(kw, str) and kw.strip()]
+            
+        except (json.JSONDecodeError, AttributeError):
+            # Fallback to old format - treat entire response as description
+            description = response_text
+            keywords = self.extract_keywords_from_description(description)
+        
+        # Calculate processing time
+        processing_time = time.time() - start_time
+        
+        logger.info(f"Generated description in {processing_time:.2f}s: {description[:100]}...")
+        logger.info(f"Extracted keywords: {keywords}")
+        
+        return description, keywords, processing_time
+            
+    
+    async def process_photo(self, photo_id: int, provider: str = "anthropic") -> Optional[Dict]:
         """Process a single photo with AI analysis"""
         db = next(get_db())
         
@@ -231,7 +346,7 @@ Do not include speculation about metadata like camera settings, date, or photogr
             image_data = await self.download_image(photo.image_url)
             
             # Generate AI description
-            description, keywords, processing_time = await self.generate_description(image_data)
+            description, keywords, processing_time, prompt = await self.generate_description(image_data, provider)
             
             # Create AI metadata record
             ai_metadata = AIMetadata(
@@ -240,7 +355,7 @@ Do not include speculation about metadata like camera settings, date, or photogr
                 ai_keywords=keywords,
                 confidence_score=0.85,  # Default confidence - could be enhanced
                 processing_time=processing_time,
-                model_version="claude-3-5-sonnet-20241022",
+                model_version=f"{provider}-{datetime.now().strftime('%Y-%m-%d')}",
                 processed_at=datetime.now()
             )
             
@@ -360,5 +475,5 @@ Do not include speculation about metadata like camera settings, date, or photogr
         finally:
             db.close()
 
-# Global instance
+# Global instance (with default settings)
 ai_processor = AIProcessor()

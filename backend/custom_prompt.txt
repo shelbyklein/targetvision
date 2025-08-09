@@ -1,0 +1,17 @@
+Analyze this image and provide a detailed description focusing on the main subjects, actions, and context. Then extract relevant keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A detailed description of what you see in the image
+- "keywords": An array of relevant keywords that describe the image content
+
+Focus on:
+- Main subjects and people
+- Actions being performed
+- Objects and equipment visible
+- Setting and environment
+- Events or activities
+- Emotions or mood if apparent
+- be explicit of the people in the photos are smiling
+- be explicit if there are no people in the photo, and noter what type of image it might be (it's a landscape image, sporting event, etc)
+
+Do not include speculation about metadata like camera settings, date, or photographer information.

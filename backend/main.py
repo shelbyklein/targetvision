@@ -1,12 +1,16 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, File, UploadFile, Header, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from typing import Dict, List, Optional
 import os
+import time
+import base64
 from datetime import datetime
 from dotenv import load_dotenv
 import logging
+from pydantic import BaseModel
+import httpx
 
 load_dotenv()
 
@@ -15,12 +19,17 @@ from database import get_db, init_db, test_connection
 from models import Album, Photo, AIMetadata, OAuthToken, ProcessingQueue
 from smugmug_auth import SmugMugOAuth
 from smugmug_service import SmugMugService
-from ai_processor import ai_processor
+from ai_processor import ai_processor, AIProcessor
 from embeddings import hybrid_search, vector_search
 from config import settings
 
 # Store temporary OAuth tokens in memory (use Redis in production)
 oauth_temp_storage = {}
+
+# Pydantic models for API key management
+class APIKeyTestRequest(BaseModel):
+    provider: str
+    api_key: str
 
 logging.basicConfig(
     level=logging.INFO,
@@ -795,8 +804,14 @@ async def delete_photo(photo_id: int, db: Session = Depends(get_db)):
 
 # AI Processing Endpoints
 @app.post("/photos/{photo_id}/process")
-async def process_photo(photo_id: int, db: Session = Depends(get_db)):
-    """Process a single photo with AI analysis"""
+async def process_photo(
+    photo_id: int, 
+    provider: str = Query(default="anthropic", regex="^(anthropic|openai)$"),
+    anthropic_key: Optional[str] = Header(default=None, alias="X-Anthropic-Key"),
+    openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),
+    db: Session = Depends(get_db)
+):
+    """Process a single photo with AI analysis using specified provider and API keys"""
     
     # Check if photo exists
     photo = db.query(Photo).filter_by(id=photo_id).first()
@@ -812,8 +827,14 @@ async def process_photo(photo_id: int, db: Session = Depends(get_db)):
         }
     
     try:
+        # Create AI processor with user's API keys
+        processor = AIProcessor(
+            anthropic_api_key=anthropic_key,
+            openai_api_key=openai_key
+        )
+        
         # Process the photo
-        result = await ai_processor.process_photo(photo_id)
+        result = await processor.process_photo(photo_id, provider)
         
         if result:
             return {
@@ -831,9 +852,12 @@ async def process_photo(photo_id: int, db: Session = Depends(get_db)):
 async def process_photos_batch(
     photo_ids: List[int],
     max_concurrent: int = Query(default=3, le=5),
+    provider: str = Query(default="anthropic", regex="^(anthropic|openai)$"),
+    anthropic_key: Optional[str] = Header(default=None, alias="X-Anthropic-Key"),
+    openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),
     db: Session = Depends(get_db)
 ):
-    """Process multiple photos in batch"""
+    """Process multiple photos in batch using specified provider and API keys"""
     
     # Validate photo IDs exist
     existing_photos = db.query(Photo.id).filter(Photo.id.in_(photo_ids)).all()
@@ -843,11 +867,38 @@ async def process_photos_batch(
         raise HTTPException(status_code=404, detail="No valid photos found")
     
     try:
-        # Add to processing queue
+        # Create AI processor with user's API keys
+        processor = AIProcessor(
+            anthropic_api_key=anthropic_key,
+            openai_api_key=openai_key
+        )
+        
+        # Add to processing queue (using default processor for queue management)
         await ai_processor.add_to_processing_queue(existing_ids)
         
-        # Process batch
-        results = await ai_processor.process_batch(existing_ids, max_concurrent)
+        # Process batch with user's configured processor
+        async def process_single_with_provider(photo_id: int):
+            try:
+                return await processor.process_photo(photo_id, provider)
+            except Exception as e:
+                logger.error(f"Failed to process photo {photo_id}: {e}")
+                return {"photo_id": photo_id, "error": str(e)}
+        
+        # Process in batches to respect rate limits
+        results = []
+        for i in range(0, len(existing_ids), max_concurrent):
+            batch = existing_ids[i:i + max_concurrent]
+            
+            # Process batch concurrently
+            import asyncio
+            batch_tasks = [process_single_with_provider(photo_id) for photo_id in batch]
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            
+            results.extend(batch_results)
+            
+            # Rate limiting - wait between batches
+            if i + max_concurrent < len(existing_ids):
+                await asyncio.sleep(2)  # 2 second delay between batches
         
         successful = len([r for r in results if r and "error" not in r])
         
@@ -1219,6 +1270,265 @@ async def reset_ai_prompt():
         
     except Exception as e:
         logger.error(f"Error resetting AI prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/settings/test-api-key")
+async def test_api_key(request: APIKeyTestRequest):
+    """Test if an API key is valid for the specified provider"""
+    try:
+        provider = request.provider.lower()
+        api_key = request.api_key
+        
+        if provider == "anthropic":
+            return await test_anthropic_key(api_key)
+        elif provider == "openai":
+            return await test_openai_key(api_key)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
+            
+    except Exception as e:
+        logger.error(f"Error testing API key for {request.provider}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def test_anthropic_key(api_key: str):
+    """Test Anthropic API key by making a simple request"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "content-type": "application/json",
+                    "anthropic-version": "2023-06-01"
+                },
+                json={
+                    "model": "claude-3-haiku-20240307",
+                    "max_tokens": 10,
+                    "messages": [{"role": "user", "content": "Hello"}]
+                },
+                timeout=10.0
+            )
+            
+        if response.status_code == 200:
+            return {"success": True, "message": "Anthropic API key is valid"}
+        else:
+            error_detail = response.json().get("error", {}).get("message", "Invalid API key")
+            return {"success": False, "error": error_detail}
+            
+    except httpx.TimeoutException:
+        return {"success": False, "error": "Request timed out"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+async def test_openai_key(api_key: str):
+    """Test OpenAI API key by making a simple request"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": "Hello"}],
+                    "max_tokens": 10
+                },
+                timeout=10.0
+            )
+            
+        if response.status_code == 200:
+            return {"success": True, "message": "OpenAI API key is valid"}
+        else:
+            error_detail = response.json().get("error", {}).get("message", "Invalid API key")
+            return {"success": False, "error": error_detail}
+            
+    except httpx.TimeoutException:
+        return {"success": False, "error": "Request timed out"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/settings/test-image-analysis")
+async def test_image_analysis(
+    image: UploadFile = File(...),
+    provider: str = Form(...),
+    anthropic_key: Optional[str] = Header(default=None, alias="X-Anthropic-Key"),
+    openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key")
+):
+    """Test image analysis with the specified provider"""
+    try:
+        # Validate image file
+        if not image.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read image data
+        image_data = await image.read()
+        
+        start_time = time.time()
+        
+        # Create AI processor with user's API keys
+        processor = AIProcessor(
+            anthropic_api_key=anthropic_key,
+            openai_api_key=openai_key
+        )
+        
+        # Generate description using the processor
+        description, keywords, processing_time, prompt = await processor.generate_description(
+            image_data, provider.lower()
+        )
+        
+        return {
+            "success": True,
+            "provider": provider,
+            "prompt_used": prompt,
+            "analysis": {
+                "description": description,
+                "keywords": keywords
+            },
+            "processing_time": round(processing_time, 2)
+        }
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"Error in test image analysis with {provider}: {e}")
+        logger.error(f"Full traceback: {error_details}")
+        
+        # Provide user-friendly error messages
+        error_message = str(e)
+        if "429 Too Many Requests" in error_message:
+            error_message = "Rate limit exceeded. Please wait a moment before trying again, or check your API usage limits."
+        elif "401" in error_message or "unauthorized" in error_message.lower():
+            error_message = "Invalid API key. Please check your API key configuration."
+        elif "insufficient_quota" in error_message.lower():
+            error_message = "Insufficient API credits. Please check your account balance."
+        elif "api key not configured" in error_message.lower():
+            error_message = f"Please configure your {provider.title()} API key in the settings."
+        
+        raise HTTPException(status_code=500, detail=error_message)
+
+async def analyze_with_anthropic(image_base64: str, content_type: str, api_key: str = None):
+    """Analyze image using Anthropic Claude Vision"""
+    # In a real implementation, you'd get the API key from secure storage or headers
+    # For this demo, we'll use environment variables as fallback
+    api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "content-type": "application/json",
+                    "anthropic-version": "2023-06-01"
+                },
+                json={
+                    "model": "claude-3-sonnet-20240229",
+                    "max_tokens": 500,
+                    "messages": [{
+                        "role": "user",
+                        "content": [{
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": content_type,
+                                "data": image_base64
+                            }
+                        }, {
+                            "type": "text",
+                            "text": "Analyze this image and provide a detailed description and relevant keywords. Return your response as a JSON object with 'description' and 'keywords' fields, where keywords is an array of strings."
+                        }]
+                    }]
+                },
+                timeout=30.0
+            )
+            
+        if response.status_code != 200:
+            error_detail = response.json().get("error", {}).get("message", "API request failed")
+            raise HTTPException(status_code=400, detail=error_detail)
+        
+        result = response.json()
+        content = result["content"][0]["text"]
+        
+        # Try to parse as JSON, fallback to structured response
+        try:
+            import json
+            parsed = json.loads(content)
+            return parsed
+        except:
+            return {
+                "description": content,
+                "keywords": ["image", "analysis", "test"]
+            }
+            
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=408, detail="Request timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def analyze_with_openai(image_base64: str, content_type: str, api_key: str = None):
+    """Analyze image using OpenAI GPT-4 Vision"""
+    # In a real implementation, you'd get the API key from secure storage or headers
+    api_key = api_key or os.getenv("OPENAI_API_KEY")
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="OpenAI API key not configured")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "gpt-4o",
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Analyze this image and provide a detailed description and relevant keywords. Return your response as a JSON object with 'description' and 'keywords' fields, where keywords is an array of strings."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{content_type};base64,{image_base64}"
+                                }
+                            }
+                        ]
+                    }],
+                    "max_tokens": 500
+                },
+                timeout=30.0
+            )
+            
+        if response.status_code != 200:
+            error_detail = response.json().get("error", {}).get("message", "API request failed")
+            raise HTTPException(status_code=400, detail=error_detail)
+        
+        result = response.json()
+        content = result["choices"][0]["message"]["content"]
+        
+        # Try to parse as JSON, fallback to structured response
+        try:
+            import json
+            parsed = json.loads(content)
+            return parsed
+        except:
+            return {
+                "description": content,
+                "keywords": ["image", "analysis", "test"]
+            }
+            
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=408, detail="Request timed out")
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
