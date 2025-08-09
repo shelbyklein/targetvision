@@ -529,8 +529,16 @@ async def sync_smugmug_album(
         else:
             album_id = existing_album.id
         
-        # Get photos from SmugMug and sync them
-        photos = await service.get_album_images(album_uri)
+        # Get photos from SmugMug and sync them - sync entire album
+        album_image_count = target_album.get("ImageCount", 0)
+        logger.info(f"Syncing album '{album_name}' with {album_image_count} total photos")
+        
+        # Progress callback for large albums
+        async def sync_progress(current: int, total: int):
+            percent = round((current / total) * 100, 1) if total > 0 else 0
+            logger.info(f"Album sync progress: {current}/{total} photos fetched ({percent}%)")
+        
+        photos = await service.get_album_images(album_uri, limit=album_image_count, progress_callback=sync_progress)
         synced_count = 0
         
         for photo in photos:
@@ -572,6 +580,8 @@ async def sync_smugmug_album(
                 synced_count += 1
         
         db.commit()
+        
+        logger.info(f"Album sync completed: {synced_count} photos synced to database from {len(photos)} photos fetched")
         
         return {
             "message": f"Successfully synced album '{album_name}'",

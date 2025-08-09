@@ -29,7 +29,7 @@ class Settings:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "development-secret-key-change-in-production")
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
     PORT: int = int(os.getenv("PORT", 8000))
-    MAX_PHOTOS_MVP: int = int(os.getenv("MAX_PHOTOS_MVP", 100))
+    MAX_PHOTOS_MVP: int = int(os.getenv("MAX_PHOTOS_MVP", 10000))
     
     # Image Processing Settings
     MAX_IMAGE_WIDTH: int = 2200

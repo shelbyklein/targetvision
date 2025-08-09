@@ -258,13 +258,25 @@ class TargetVisionApp {
         }`;
         
         const syncStatus = album.is_synced ? 'synced' : 'not-synced';
-        const syncIcon = album.is_synced ? '✓' : '○';
-        const syncColor = album.is_synced ? 'text-green-600' : 'text-gray-400';
+        const syncIconSvg = album.is_synced 
+            ? `<svg class="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20" title="Synced - Album photos are available locally">
+                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+               </svg>`
+            : `<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="Not synced - Click 'Sync Album' to download photos">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+               </svg>`;
         
         // Processing statistics - for new Node API, these are now included
-        const processed = album.ai_processed_count || 0;
-        const total = album.image_count || album.synced_photo_count || 0;
-        const processedPercent = total > 0 ? Math.round((processed / total) * 100) : 0;
+        const totalPhotos = album.image_count || 0; // Total photos in SmugMug
+        const syncedPhotos = album.synced_photo_count || 0; // Photos downloaded locally
+        const processedPhotos = album.ai_processed_count || 0; // Photos analyzed by AI
+        
+        // Calculate different states
+        const notSynced = Math.max(0, totalPhotos - syncedPhotos); // Not downloaded yet
+        const syncedNotProcessed = Math.max(0, syncedPhotos - processedPhotos); // Downloaded but not processed
+        const processed = processedPhotos; // Fully processed
+        
+        const processedPercent = syncedPhotos > 0 ? Math.round((processed / syncedPhotos) * 100) : 0;
         
         div.innerHTML = `
             <div class="flex items-center justify-between mb-2">
@@ -274,23 +286,65 @@ class TargetVisionApp {
                     </svg>
                     <span class="text-sm font-medium text-gray-900 truncate">${albumTitle}</span>
                 </div>
-                <span class="text-xs ${syncColor} ml-2">${syncIcon}</span>
+                <span class="ml-2 flex-shrink-0">${syncIconSvg}</span>
             </div>
             
-            <div class="flex items-center justify-between text-xs text-gray-500">
-                <span>${total} photos</span>
-                <span class="text-green-600">${processed} processed</span>
-            </div>
-            
-            ${album.is_synced ? `
-                <div class="mt-2">
-                    <div class="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>AI Processing</span>
-                        <span>${processedPercent}%</span>
+            ${totalPhotos > 0 ? `
+                <div class="mt-2 space-y-1">
+                    <!-- Photo counts breakdown -->
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-600">${totalPhotos} total photos</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-1">
-                        <div class="bg-green-500 h-1 rounded-full transition-all" style="width: ${processedPercent}%"></div>
-                    </div>
+                    
+                    ${album.is_synced ? `
+                        <!-- Detailed breakdown for synced albums -->
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between text-xs">
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                                    <span class="text-gray-700">Processed</span>
+                                </div>
+                                <span class="text-green-600 font-medium">${processed}</span>
+                            </div>
+                            ${syncedNotProcessed > 0 ? `
+                                <div class="flex items-center justify-between text-xs">
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 rounded-full bg-yellow-500 mr-1"></div>
+                                        <span class="text-gray-700">Synced, not processed</span>
+                                    </div>
+                                    <span class="text-yellow-600 font-medium">${syncedNotProcessed}</span>
+                                </div>
+                            ` : ''}
+                            ${notSynced > 0 ? `
+                                <div class="flex items-center justify-between text-xs">
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 rounded-full bg-gray-400 mr-1"></div>
+                                        <span class="text-gray-700">Not synced</span>
+                                    </div>
+                                    <span class="text-gray-500 font-medium">${notSynced}</span>
+                                </div>
+                            ` : ''}
+                            <!-- Progress bar -->
+                            <div class="mt-2">
+                                <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                    <span>AI Progress</span>
+                                    <span>${processedPercent}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                    <div class="bg-green-500 h-1.5 rounded-full transition-all" style="width: ${processedPercent}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : `
+                        <!-- Simple display for unsynced albums -->
+                        <div class="flex items-center justify-between text-xs">
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full bg-gray-400 mr-1"></div>
+                                <span class="text-gray-700">Not synced</span>
+                            </div>
+                            <span class="text-gray-500 font-medium">${totalPhotos}</span>
+                        </div>
+                    `}
                 </div>
             ` : ''}
         `;
@@ -487,8 +541,13 @@ class TargetVisionApp {
         const albumName = album.name || 'Untitled Album';
         const photoCount = album.image_count || album.synced_photo_count || 0;
         const processedCount = album.ai_processed_count || 0;
-        const syncIcon = album.is_synced ? '✓' : '○';
-        const syncColor = album.is_synced ? 'text-green-600' : 'text-gray-400';
+        const syncIconSvg = album.is_synced 
+            ? `<svg class="h-4 w-4 text-green-600" fill="currentColor" viewBox="0 0 20 20" title="Synced - Album photos are available locally">
+                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+               </svg>`
+            : `<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" title="Not synced - Click 'Sync Album' to download photos">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+               </svg>`;
         
         div.innerHTML = `
             <div class="flex flex-col items-center text-center">
@@ -498,7 +557,7 @@ class TargetVisionApp {
                 <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
                 <div class="flex items-center justify-center mt-1 space-x-2">
                     <p class="text-xs text-gray-500">${photoCount} photos</p>
-                    <span class="text-xs ${syncColor}">${syncIcon}</span>
+                    <span class="flex-shrink-0">${syncIconSvg}</span>
                 </div>
                 ${album.is_synced ? `
                     <p class="text-xs text-green-600 mt-1">${processedCount} processed</p>
@@ -670,14 +729,29 @@ class TargetVisionApp {
         const status = photo.processing_status || 'not_synced';
         const statusInfo = statusConfig[status];
         
+        // Check if photo is selected
+        const isSelected = this.selectedPhotos.has(photo.smugmug_id);
+        const selectionBorder = isSelected ? 'ring-4 ring-blue-500' : '';
+        
         div.innerHTML = `
-            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
+            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative ${selectionBorder}">
                 <img 
                     src="${photo.thumbnail_url}" 
                     alt="${photo.title || 'Photo'}"
                     class="w-full h-full object-cover"
                     loading="lazy"
                 />
+                
+                <!-- Selection overlay -->
+                ${isSelected ? `
+                    <div class="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center z-15">
+                        <div class="bg-blue-500 text-white rounded-full p-2 shadow-lg">
+                            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                ` : ''}
                 
                 <!-- Status indicator -->
                 <div class="absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center z-20">
@@ -697,10 +771,11 @@ class TargetVisionApp {
                 
                 <!-- Selection checkbox (only for synced photos) -->
                 ${photo.is_synced ? `
-                    <div class="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <div class="absolute bottom-2 left-2 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity z-20">
                         <input type="checkbox" 
                                class="photo-checkbox w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500" 
                                data-photo-id="${photo.smugmug_id}"
+                               ${isSelected ? 'checked' : ''}
                                onclick="event.stopPropagation()">
                     </div>
                 ` : ''}
@@ -795,6 +870,60 @@ class TargetVisionApp {
         const count = this.selectedPhotos.size;
         document.getElementById('selection-count').textContent = `${count} selected`;
         document.getElementById('process-selected').disabled = count === 0;
+        
+        // Update visual indicators for all photos
+        this.updatePhotoSelectionVisuals();
+    }
+    
+    updatePhotoSelectionVisuals() {
+        // Update visual indicators for each photo
+        document.querySelectorAll('.photo-card').forEach(photoCard => {
+            const checkbox = photoCard.querySelector('.photo-checkbox');
+            if (!checkbox) return;
+            
+            const photoId = checkbox.dataset.photoId;
+            const isSelected = this.selectedPhotos.has(photoId);
+            const imageContainer = photoCard.querySelector('.aspect-square');
+            
+            // Update selection border
+            if (isSelected) {
+                imageContainer.classList.add('ring-4', 'ring-blue-500');
+            } else {
+                imageContainer.classList.remove('ring-4', 'ring-blue-500');
+            }
+            
+            // Update selection overlay
+            let selectionOverlay = photoCard.querySelector('.selection-overlay');
+            if (isSelected && !selectionOverlay) {
+                // Create selection overlay
+                selectionOverlay = document.createElement('div');
+                selectionOverlay.className = 'selection-overlay absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center z-15';
+                selectionOverlay.innerHTML = `
+                    <div class="bg-blue-500 text-white rounded-full p-2 shadow-lg">
+                        <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                `;
+                imageContainer.appendChild(selectionOverlay);
+            } else if (!isSelected && selectionOverlay) {
+                // Remove selection overlay
+                selectionOverlay.remove();
+            }
+            
+            // Update checkbox container visibility
+            const checkboxContainer = photoCard.querySelector('.photo-checkbox').parentElement;
+            if (isSelected) {
+                checkboxContainer.classList.remove('opacity-0', 'group-hover:opacity-100');
+                checkboxContainer.classList.add('opacity-100');
+            } else {
+                checkboxContainer.classList.remove('opacity-100');
+                checkboxContainer.classList.add('opacity-0', 'group-hover:opacity-100');
+            }
+            
+            // Ensure checkbox state matches
+            checkbox.checked = isSelected;
+        });
     }
 
     // Processing
@@ -1063,7 +1192,7 @@ class TargetVisionApp {
         toast.id = toastId;
         
         // Base classes for all toasts
-        const baseClasses = 'transform transition-all duration-300 ease-in-out max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5';
+        const baseClasses = 'transform transition-all duration-300 ease-in-out min-w-[400px] bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5';
         
         // Type-specific styling
         const typeStyles = {
@@ -1137,7 +1266,7 @@ class TargetVisionApp {
 
     showErrorMessage(title, message, details = null) {
         console.error(`${title}: ${message}`, details);
-        this.showToast(title, message, 'error');
+        this.showToast(title, message, 'error', 0); // 0 duration means no auto-dismiss
     }
 
     showConnectionError() {

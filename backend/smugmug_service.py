@@ -79,19 +79,21 @@ class SmugMugService:
                 
         return albums
     
-    async def get_album_images(self, album_uri: str, limit: int = 100) -> List[Dict]:
+    async def get_album_images(self, album_uri: str, limit: int = 100, progress_callback=None) -> List[Dict]:
         """Get images from a specific album"""
+        logger.info(f"Starting get_album_images with limit={limit} for album: {album_uri}")
         # Use full album URI (it already contains /api/v2)
         url = f"https://api.smugmug.com{album_uri}!images"
         params = {
             "_expand": "ImageSizes",  # Only expand ImageSizes to avoid comma issues
-            "count": str(min(limit, 100))  # Max 100 per request
+            "count": str(limit)  # Request full album in one go if possible
         }
         
         images = []
         total_fetched = 0
         
         while url and total_fetched < limit:
+            logger.info(f"Fetching batch from SmugMug: {total_fetched}/{limit} photos fetched so far")
             response = await self.oauth.make_authenticated_request(
                 "GET", url, self.access_token, self.access_token_secret, params
             )
@@ -100,23 +102,42 @@ class SmugMugService:
                 data = response.json()
                 response_data = data.get("Response", {})
                 batch_images = response_data.get("AlbumImage", [])
+                logger.info(f"Received {len(batch_images)} images in this batch")
+                logger.info(f"Response data keys: {list(response_data.keys())}")
+                if "Pages" in response_data:
+                    logger.info(f"Pages info: {response_data['Pages']}")
                 
                 # Add images up to limit
                 remaining = limit - total_fetched
                 images.extend(batch_images[:remaining])
                 total_fetched += len(batch_images[:remaining])
                 
+                logger.info(f"Added {len(batch_images[:remaining])} images, total now: {total_fetched}")
+                
+                # Call progress callback if provided
+                if progress_callback:
+                    await progress_callback(total_fetched, limit)
+                
                 # Check for pagination
                 if total_fetched < limit:
                     pages = response_data.get("Pages", {})
+                    logger.info(f"Pages object: {pages}")
                     if pages.get("NextPage"):
                         next_page = pages['NextPage']
+                        logger.info(f"NextPage found: {next_page}")
                         # Use full URL with SmugMug base
                         url = f"https://api.smugmug.com{next_page}"
-                        params = {}  # Clear params for next page
+                        # SmugMug NextPage URLs already contain necessary parameters
+                        # Don't override them, just add _expand if not already there
+                        if "_expand" not in next_page:
+                            params = {"_expand": "ImageSizes"}
+                        else:
+                            params = {}
                     else:
+                        logger.info("No NextPage found - pagination complete")
                         url = None
                 else:
+                    logger.info("Reached requested limit - stopping pagination")
                     url = None
             else:
                 logger.error(f"Failed to get album images: {response.status_code if response else 'No response'}")

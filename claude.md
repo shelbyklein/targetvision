@@ -144,4 +144,10 @@ A **SmugMug-integrated** RAG (Retrieval Augmented Generation) application that c
 - https://api.smugmug.com/api/v2/doc/tutorial/paging.html: pagination
 - https://api.smugmug.com/api/v2/doc/tutorial/authorization.html: authorization
 - https://api.smugmug.com/api/v2/doc/tutorial/oauth/web.html: example, web app
+- https://api.smugmug.com/api/v2/doc/reference/folder.html: folder
+- https://api.smugmug.com/api/v2/doc/reference/album.html: album
 - note that we will only read smugmug files.
+
+## Important Links
+
+Frontend: http://localhost:3000/
