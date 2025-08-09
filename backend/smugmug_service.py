@@ -411,7 +411,32 @@ class SmugMugService:
                     # Extract highlight image information if available
                     highlight_image = self.extract_highlight_image_info(node)
                     if highlight_image:
-                        enhanced_node["highlight_image"] = highlight_image
+                        # Check if we need to fetch folder highlight image details
+                        if highlight_image.get("needs_folder_fetch"):
+                            folder_highlight_uri = highlight_image.get("folder_highlight_uri")
+                            if folder_highlight_uri:
+                                folder_image_details = await self.get_folder_highlight_image_details(folder_highlight_uri)
+                                if folder_image_details:
+                                    enhanced_node["highlight_image"] = folder_image_details
+                                else:
+                                    # Fallback to basic info if fetch fails
+                                    enhanced_node["highlight_image"] = highlight_image
+                            else:
+                                enhanced_node["highlight_image"] = highlight_image
+                        elif highlight_image.get("needs_fetch"):
+                            # Handle regular highlight image fetch if needed
+                            highlight_uri = highlight_image.get("highlight_uri")
+                            if highlight_uri:
+                                image_details = await self.get_highlight_image_details(highlight_uri)
+                                if image_details:
+                                    enhanced_node["highlight_image"] = image_details
+                                else:
+                                    # Fallback to basic info if fetch fails
+                                    enhanced_node["highlight_image"] = highlight_image
+                            else:
+                                enhanced_node["highlight_image"] = highlight_image
+                        else:
+                            enhanced_node["highlight_image"] = highlight_image
                     
                     enhanced_nodes.append(enhanced_node)
                 
@@ -495,23 +520,30 @@ class SmugMugService:
                     "uri": highlight_image.get("Uri", "")
                 }
                 
+                # Check for ThumbnailUrl first (used by folder highlight images)
+                if "ThumbnailUrl" in highlight_image:
+                    image_info["thumbnail_url"] = highlight_image["ThumbnailUrl"]
+                    image_info["image_url"] = highlight_image["ThumbnailUrl"]  # Use ThumbnailUrl as primary for folders
+                
                 # Extract image sizes if available
                 if "ImageSizes" in highlight_image:
                     sizes = highlight_image["ImageSizes"]
                     
-                    # Get various sizes
-                    for size_key in ["X5Large", "X4Large", "X3Large", "X2Large", "XLarge", "Large", "Medium"]:
-                        if size_key in sizes:
-                            image_info["image_url"] = sizes[size_key]["Url"]
-                            image_info["width"] = sizes[size_key].get("Width", 0)
-                            image_info["height"] = sizes[size_key].get("Height", 0)
-                            break
+                    # Get various sizes (only if we don't already have ThumbnailUrl)
+                    if "image_url" not in image_info:
+                        for size_key in ["X5Large", "X4Large", "X3Large", "X2Large", "XLarge", "Large", "Medium"]:
+                            if size_key in sizes:
+                                image_info["image_url"] = sizes[size_key]["Url"]
+                                image_info["width"] = sizes[size_key].get("Width", 0)
+                                image_info["height"] = sizes[size_key].get("Height", 0)
+                                break
                     
-                    # Get thumbnail URL
-                    for thumb_key in ["Small", "Thumb"]:
-                        if thumb_key in sizes:
-                            image_info["thumbnail_url"] = sizes[thumb_key]["Url"]
-                            break
+                    # Get thumbnail URL (if not already set from ThumbnailUrl)
+                    if "thumbnail_url" not in image_info:
+                        for thumb_key in ["Small", "Thumb"]:
+                            if thumb_key in sizes:
+                                image_info["thumbnail_url"] = sizes[thumb_key]["Url"]
+                                break
                 
                 # Get highlight image URI for fetching sizes if not expanded
                 elif "Uris" in highlight_image and "ImageSizes" in highlight_image["Uris"]:
@@ -519,9 +551,18 @@ class SmugMugService:
                 
                 return image_info
             
-            # Check if there's a HighlightImage URI in the node's Uris
+            # Check if there's a HighlightImage URI in the node's Uris (for folders)
             elif "Uris" in node and "HighlightImage" in node["Uris"]:
                 highlight_uri = node["Uris"]["HighlightImage"]["Uri"]
+                
+                # For folders, try to use the FolderHighlightImage endpoint to get ThumbnailUrl
+                if node.get("Type") == "folder" and "FolderHighlightImage" in node["Uris"]:
+                    folder_highlight_uri = node["Uris"]["FolderHighlightImage"]["Uri"]
+                    return {
+                        "folder_highlight_uri": folder_highlight_uri,
+                        "needs_folder_fetch": True  # Use special folder highlight endpoint
+                    }
+                
                 return {
                     "highlight_uri": highlight_uri,
                     "needs_fetch": True  # Indicates we need to fetch the highlight image data separately
@@ -560,4 +601,46 @@ class SmugMugService:
                 
         except Exception as e:
             logger.error(f"Error getting highlight image details: {e}")
+            return None
+    
+    async def get_folder_highlight_image_details(self, folder_highlight_uri: str) -> Optional[Dict]:
+        """Fetch folder highlight image information using the FolderHighlightImage endpoint"""
+        try:
+            # Use the full SmugMug API URL
+            url = f"https://api.smugmug.com{folder_highlight_uri}"
+            
+            response = await self.oauth.make_authenticated_request(
+                "GET", url, self.access_token, self.access_token_secret
+            )
+            
+            if response and response.status_code == 200:
+                data = response.json()
+                image_data = data.get("Response", {}).get("Image", {})
+                
+                # Extract folder highlight image info with ThumbnailUrl
+                image_info = {
+                    "image_key": image_data.get("ImageKey", ""),
+                    "title": image_data.get("Title", ""),
+                    "caption": image_data.get("Caption", ""),
+                    "uri": image_data.get("Uri", "")
+                }
+                
+                # Use ThumbnailUrl as the primary image URL for folders
+                if "ThumbnailUrl" in image_data:
+                    image_info["thumbnail_url"] = image_data["ThumbnailUrl"]
+                    image_info["image_url"] = image_data["ThumbnailUrl"]
+                
+                # Add additional metadata
+                if "OriginalWidth" in image_data:
+                    image_info["width"] = image_data["OriginalWidth"]
+                if "OriginalHeight" in image_data:
+                    image_info["height"] = image_data["OriginalHeight"]
+                
+                return image_info
+            else:
+                logger.error(f"Failed to get folder highlight image details: {response.status_code if response else 'No response'}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting folder highlight image details: {e}")
             return None

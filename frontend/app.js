@@ -737,9 +737,17 @@ class TargetVisionApp {
                     ${folders.slice(0, 8).map(folder => `
                         <button onclick="app.loadFolderContents('${folder.node_uri}')" 
                                 class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center">
-                            <svg class="w-4 h-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                            </svg>
+                            ${folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url) ? `
+                                <div class="w-6 h-6 mr-2 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                                    <img src="${folder.highlight_image.thumbnail_url || folder.highlight_image.image_url}" 
+                                         alt="${folder.name}" 
+                                         class="w-full h-full object-cover">
+                                </div>
+                            ` : `
+                                <svg class="w-4 h-4 mr-2 text-yellow-600 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                </svg>
+                            `}
                             <span class="truncate">${folder.name}</span>
                         </button>
                     `).join('')}
@@ -753,9 +761,17 @@ class TargetVisionApp {
                     ${albums.slice(0, 8).map(album => `
                         <button onclick="app.selectAlbum(${JSON.stringify(album).replace(/"/g, '&quot;')})" 
                                 class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center">
-                            <svg class="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
-                            </svg>
+                            ${album.highlight_image && (album.highlight_image.thumbnail_url || album.highlight_image.image_url) ? `
+                                <div class="w-6 h-6 mr-2 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                                    <img src="${album.highlight_image.thumbnail_url || album.highlight_image.image_url}" 
+                                         alt="${album.name}" 
+                                         class="w-full h-full object-cover">
+                                </div>
+                            ` : `
+                                <svg class="w-4 h-4 mr-2 text-blue-600 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
+                                </svg>
+                            `}
                             <span class="truncate flex-1">${album.name}</span>
                             <span class="text-xs text-gray-500">${album.image_count || 0}</span>
                         </button>
@@ -1114,9 +1130,17 @@ class TargetVisionApp {
                                 ${folders.slice(0, 5).map(folder => `
                                     <div class="flex items-center py-2 px-3 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer" 
                                          onclick="app.navigateToFolder({node_uri: '${folder.node_uri}', name: '${folder.name}', has_children: true})">
-                                        <svg class="w-4 h-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                                        </svg>
+                                        ${folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url) ? `
+                                            <div class="w-8 h-8 mr-2 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                                                <img src="${folder.highlight_image.thumbnail_url || folder.highlight_image.image_url}" 
+                                                     alt="${folder.name}" 
+                                                     class="w-full h-full object-cover">
+                                            </div>
+                                        ` : `
+                                            <svg class="w-4 h-4 mr-2 text-yellow-600 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                            </svg>
+                                        `}
                                         <span class="text-sm truncate">${folder.name}</span>
                                     </div>
                                 `).join('')}
@@ -1137,9 +1161,17 @@ class TargetVisionApp {
                                 ${albums.slice(0, 5).map(album => `
                                     <div class="flex items-center py-2 px-3 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer" 
                                          onclick="app.selectAlbum(${JSON.stringify(album).replace(/"/g, '&quot;')})">
-                                        <svg class="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
-                                        </svg>
+                                        ${album.highlight_image && (album.highlight_image.thumbnail_url || album.highlight_image.image_url) ? `
+                                            <div class="w-8 h-8 mr-2 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                                                <img src="${album.highlight_image.thumbnail_url || album.highlight_image.image_url}" 
+                                                     alt="${album.name}" 
+                                                     class="w-full h-full object-cover">
+                                            </div>
+                                        ` : `
+                                            <svg class="w-4 h-4 mr-2 text-blue-600 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
+                                            </svg>
+                                        `}
                                         <span class="text-sm truncate flex-1">${album.name}</span>
                                         <span class="text-xs text-gray-500">${album.image_count || 0}</span>
                                     </div>
