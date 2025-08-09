@@ -982,6 +982,85 @@ async def approve_ai_metadata(photo_id: int, db: Session = Depends(get_db)):
         "photo_id": photo_id
     }
 
+# Settings Endpoints
+@app.get("/settings/prompt")
+async def get_ai_prompt():
+    """Get the current AI processing prompt"""
+    try:
+        # For now, store in a simple file or return default
+        # In production, this could be stored in the database
+        prompt_file = "custom_prompt.txt"
+        
+        if os.path.exists(prompt_file):
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                custom_prompt = f.read().strip()
+            return {
+                "prompt": custom_prompt,
+                "is_custom": True
+            }
+        else:
+            # Return the default prompt from ai_processor
+            default_prompt = """Analyze this image and provide a detailed description focusing on the main subjects, actions, and context. Then extract relevant keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A detailed description of what you see in the image
+- "keywords": An array of relevant keywords that describe the image content
+
+Focus on:
+- Main subjects and people
+- Actions being performed
+- Objects and equipment visible
+- Setting and environment
+- Events or activities
+- Emotions or mood if apparent
+
+Do not include speculation about metadata like camera settings, date, or photographer information."""
+            
+            return {
+                "prompt": default_prompt,
+                "is_custom": False
+            }
+    except Exception as e:
+        logger.error(f"Error getting AI prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/settings/prompt")
+async def save_ai_prompt(prompt_data: Dict):
+    """Save a custom AI processing prompt"""
+    try:
+        prompt = prompt_data.get("prompt", "").strip()
+        
+        if not prompt:
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+        
+        # Save to file
+        prompt_file = "custom_prompt.txt"
+        with open(prompt_file, 'w', encoding='utf-8') as f:
+            f.write(prompt)
+        
+        logger.info("Custom AI prompt saved successfully")
+        return {"message": "Prompt saved successfully", "is_custom": True}
+        
+    except Exception as e:
+        logger.error(f"Error saving AI prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/settings/prompt")
+async def reset_ai_prompt():
+    """Reset to default AI processing prompt"""
+    try:
+        prompt_file = "custom_prompt.txt"
+        
+        if os.path.exists(prompt_file):
+            os.remove(prompt_file)
+        
+        logger.info("AI prompt reset to default")
+        return {"message": "Prompt reset to default", "is_custom": False}
+        
+    except Exception as e:
+        logger.error(f"Error resetting AI prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))

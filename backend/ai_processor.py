@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 import logging
+import os
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import time
@@ -107,6 +108,33 @@ class AIProcessor:
         # Return first 10 unique keywords
         return list(dict.fromkeys(keywords))[:10]
     
+    def get_analysis_prompt(self) -> str:
+        """Get the current analysis prompt (custom or default)"""
+        try:
+            prompt_file = "custom_prompt.txt"
+            if os.path.exists(prompt_file):
+                with open(prompt_file, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+        except Exception as e:
+            logger.warning(f"Error reading custom prompt, using default: {e}")
+        
+        # Default prompt
+        return """Analyze this image and provide a detailed description focusing on the main subjects, actions, and context. Then extract relevant keywords.
+
+Return your response as a JSON object with these fields:
+- "description": A detailed description of what you see in the image
+- "keywords": An array of relevant keywords that describe the image content
+
+Focus on:
+- Main subjects and people
+- Actions being performed
+- Objects and equipment visible
+- Setting and environment
+- Events or activities
+- Emotions or mood if apparent
+
+Do not include speculation about metadata like camera settings, date, or photographer information."""
+
     async def generate_description(self, image_data: bytes) -> Tuple[str, List[str], float]:
         """Generate AI description using Claude Vision API"""
         start_time = time.time()
@@ -116,19 +144,8 @@ class AIProcessor:
             processed_image = await self.resize_image_for_api(image_data)
             image_b64 = base64.b64encode(processed_image).decode('utf-8')
             
-            # Construct prompt for photo analysis
-            prompt = """Analyze this photograph and provide a detailed, descriptive caption. Focus on:
-
-1. Main subjects (people, objects, animals)
-2. Setting and location details
-3. Actions or activities taking place
-4. Composition and visual elements
-5. Mood or atmosphere
-6. Technical aspects if notable (lighting, perspective, etc.)
-
-Write a natural, engaging description that would help someone search for and understand this image. Be specific and descriptive but concise (2-3 sentences maximum).
-
-Do not include speculation about metadata like camera settings, date, or photographer unless clearly visible in the image."""
+            # Get the current analysis prompt (custom or default)
+            prompt = self.get_analysis_prompt()
 
             # Call Claude Vision API
             message = self.client.messages.create(
@@ -155,16 +172,35 @@ Do not include speculation about metadata like camera settings, date, or photogr
                 ]
             )
             
-            # Extract description from response
-            description = message.content[0].text.strip()
+            # Extract content from response
+            response_text = message.content[0].text.strip()
             
-            # Generate keywords from description
-            keywords = self.extract_keywords_from_description(description)
+            # Try to parse as JSON first (for new format prompts)
+            try:
+                import json
+                response_data = json.loads(response_text)
+                description = response_data.get("description", "")
+                keywords = response_data.get("keywords", [])
+                
+                # Ensure keywords is a list of strings
+                if isinstance(keywords, str):
+                    keywords = [kw.strip() for kw in keywords.split(',')]
+                elif not isinstance(keywords, list):
+                    keywords = []
+                
+                # Clean keywords
+                keywords = [kw.strip() for kw in keywords if isinstance(kw, str) and kw.strip()]
+                
+            except (json.JSONDecodeError, AttributeError):
+                # Fallback to old format - treat entire response as description
+                description = response_text
+                keywords = self.extract_keywords_from_description(description)
             
             # Calculate processing time
             processing_time = time.time() - start_time
             
             logger.info(f"Generated description in {processing_time:.2f}s: {description[:100]}...")
+            logger.info(f"Extracted keywords: {keywords}")
             
             return description, keywords, processing_time
             
