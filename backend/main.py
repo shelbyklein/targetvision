@@ -26,6 +26,46 @@ from config import settings
 # Store temporary OAuth tokens in memory (use Redis in production)
 oauth_temp_storage = {}
 
+# Cache for sidebar data (in-memory cache with TTL)
+sidebar_cache = {}
+SIDEBAR_CACHE_TTL = 300  # 5 minutes in seconds
+
+# Cache for thumbnail URLs (longer TTL since they rarely change)
+thumbnail_cache = {}
+THUMBNAIL_CACHE_TTL = 3600  # 1 hour in seconds
+
+def get_cache_key(node_uri: Optional[str], user_id: str) -> str:
+    """Generate cache key for sidebar data"""
+    return f"sidebar_{user_id}_{node_uri or 'root'}"
+
+def get_thumbnail_cache_key(album_key: str, user_id: str) -> str:
+    """Generate cache key for thumbnail data"""
+    return f"thumbnail_{user_id}_{album_key}"
+
+def is_cache_valid(cache_entry: Dict, ttl: int = SIDEBAR_CACHE_TTL) -> bool:
+    """Check if cache entry is still valid"""
+    return time.time() - cache_entry.get('timestamp', 0) < ttl
+
+def invalidate_sidebar_cache(user_id: str = None):
+    """Invalidate sidebar cache for a specific user or all users"""
+    keys_to_remove = []
+    for key in sidebar_cache.keys():
+        if user_id is None or key.startswith(f"sidebar_{user_id}_"):
+            keys_to_remove.append(key)
+    
+    for key in keys_to_remove:
+        del sidebar_cache[key]
+
+def invalidate_thumbnail_cache(user_id: str = None):
+    """Invalidate thumbnail cache for a specific user or all users"""
+    keys_to_remove = []
+    for key in thumbnail_cache.keys():
+        if user_id is None or key.startswith(f"thumbnail_{user_id}_"):
+            keys_to_remove.append(key)
+    
+    for key in keys_to_remove:
+        del thumbnail_cache[key]
+
 # Pydantic models for API key management
 class APIKeyTestRequest(BaseModel):
     provider: str
@@ -264,10 +304,54 @@ async def list_smugmug_nodes(
     if not token or not token.is_valid():
         raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
     
+    # Generate cache key using user ID from token
+    cache_key = get_cache_key(node_uri, token.user_id or "unknown")
+    
+    # Check cache first
+    if cache_key in sidebar_cache and is_cache_valid(sidebar_cache[cache_key]):
+        logger.info(f"Cache hit for sidebar data: {cache_key}")
+        cached_data = sidebar_cache[cache_key]['data']
+        
+        # Update local database stats for albums (always fresh)
+        for node_data in cached_data['nodes']:
+            if node_data.get('type') == 'album' and node_data.get('album_key'):
+                album_key = node_data['album_key']
+                album_uri = f"/api/v2/album/{album_key}"
+                local_album = db.query(Album).filter_by(smugmug_id=album_uri).first()
+                if local_album:
+                    from sqlalchemy import func, case
+                    stats = db.query(
+                        func.count(Photo.id).label('synced_photo_count'),
+                        func.sum(case((Photo.processing_status == 'completed', 1), else_=0)).label('processed_count'),
+                        func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed_count')
+                    ).filter(Photo.album_id == local_album.id).first()
+                    
+                    node_data.update({
+                        'local_album_id': local_album.id,
+                        'synced_photo_count': int(stats.synced_photo_count or 0),
+                        'processed_count': int(stats.processed_count or 0),
+                        'ai_processed_count': int(stats.ai_processed_count or 0),
+                        'processing_progress': round((int(stats.ai_processed_count or 0) / max(int(stats.synced_photo_count or 1), 1)) * 100, 1),
+                        'is_synced': True
+                    })
+                else:
+                    node_data.update({
+                        'local_album_id': None,
+                        'synced_photo_count': 0,
+                        'processed_count': 0,
+                        'ai_processed_count': 0,
+                        'processing_progress': 0.0,
+                        'is_synced': False
+                    })
+        
+        return cached_data
+    
     # Initialize SmugMug service
     service = SmugMugService(token.access_token, token.access_token_secret)
     
     try:
+        logger.info(f"Cache miss for sidebar data: {cache_key} - fetching from SmugMug API")
+        
         # Fetch nodes from SmugMug API
         nodes = await service.get_node_children(node_uri)
         
@@ -353,15 +437,153 @@ async def list_smugmug_nodes(
         if node_uri:
             breadcrumbs = await service.get_folder_breadcrumbs(node_uri)
         
-        return {
+        response_data = {
             "nodes": result,
             "breadcrumbs": breadcrumbs,
             "current_node_uri": node_uri
         }
         
+        # Cache the response data (without local database stats for albums)
+        cache_data = {
+            "nodes": [],
+            "breadcrumbs": breadcrumbs,
+            "current_node_uri": node_uri
+        }
+        
+        # Store nodes in cache but remove local database-specific fields for albums
+        for node_data in result:
+            cached_node = node_data.copy()
+            if cached_node.get('type') == 'album':
+                # Remove local database stats from cache
+                for key in ['local_album_id', 'synced_photo_count', 'processed_count', 'ai_processed_count', 'processing_progress', 'is_synced']:
+                    cached_node.pop(key, None)
+            cache_data["nodes"].append(cached_node)
+        
+        sidebar_cache[cache_key] = {
+            'data': cache_data,
+            'timestamp': time.time()
+        }
+        logger.info(f"Cached sidebar data: {cache_key}")
+        
+        return response_data
+        
     except Exception as e:
         logger.error(f"Error fetching SmugMug nodes: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch nodes from SmugMug: {str(e)}")
+
+@app.post("/cache/clear")
+async def clear_all_cache(
+    db: Session = Depends(get_db)
+):
+    """Clear all cache (sidebar and thumbnail) for the current user"""
+    
+    # Get stored access token to identify user
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    user_id = token.user_id or "unknown"
+    
+    sidebar_count = len([k for k in sidebar_cache.keys() if k.startswith(f"sidebar_{user_id}_")])
+    thumbnail_count = len([k for k in thumbnail_cache.keys() if k.startswith(f"thumbnail_{user_id}_")])
+    
+    invalidate_sidebar_cache(user_id)
+    invalidate_thumbnail_cache(user_id)
+    
+    return {
+        "message": f"All cache cleared for user {user_id}",
+        "cleared_sidebar_entries": sidebar_count,
+        "cleared_thumbnail_entries": thumbnail_count,
+        "total_cleared": sidebar_count + thumbnail_count
+    }
+
+@app.post("/cache/sidebar/clear")
+async def clear_sidebar_cache(
+    db: Session = Depends(get_db)
+):
+    """Clear the sidebar cache for the current user"""
+    
+    # Get stored access token to identify user
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    user_id = token.user_id or "unknown"
+    cleared_count = len([k for k in sidebar_cache.keys() if k.startswith(f"sidebar_{user_id}_")])
+    invalidate_sidebar_cache(user_id)
+    
+    return {"message": f"Sidebar cache cleared for user {user_id}", "cleared_entries": cleared_count}
+
+@app.post("/cache/thumbnails/clear")
+async def clear_thumbnail_cache(
+    db: Session = Depends(get_db)
+):
+    """Clear the thumbnail cache for the current user"""
+    
+    # Get stored access token to identify user
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    user_id = token.user_id or "unknown"
+    cleared_count = len([k for k in thumbnail_cache.keys() if k.startswith(f"thumbnail_{user_id}_")])
+    invalidate_thumbnail_cache(user_id)
+    
+    return {"message": f"Thumbnail cache cleared for user {user_id}", "cleared_entries": cleared_count}
+
+@app.get("/cache/status")
+async def get_cache_status(
+    db: Session = Depends(get_db)
+):
+    """Get cache status for the current user"""
+    
+    # Get stored access token to identify user
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    user_id = token.user_id or "unknown"
+    
+    # Sidebar cache info
+    sidebar_keys = [k for k in sidebar_cache.keys() if k.startswith(f"sidebar_{user_id}_")]
+    sidebar_info = []
+    for key in sidebar_keys:
+        entry = sidebar_cache[key]
+        sidebar_info.append({
+            "key": key,
+            "timestamp": entry["timestamp"],
+            "age_seconds": int(time.time() - entry["timestamp"]),
+            "is_valid": is_cache_valid(entry, SIDEBAR_CACHE_TTL),
+            "nodes_count": len(entry["data"]["nodes"])
+        })
+    
+    # Thumbnail cache info
+    thumbnail_keys = [k for k in thumbnail_cache.keys() if k.startswith(f"thumbnail_{user_id}_")]
+    thumbnail_info = []
+    for key in thumbnail_keys:
+        entry = thumbnail_cache[key]
+        thumbnail_info.append({
+            "key": key,
+            "timestamp": entry["timestamp"],
+            "age_seconds": int(time.time() - entry["timestamp"]),
+            "is_valid": is_cache_valid(entry, THUMBNAIL_CACHE_TTL),
+            "album_key": entry["data"]["album_key"]
+        })
+    
+    return {
+        "user_id": user_id,
+        "sidebar_cache": {
+            "ttl_seconds": SIDEBAR_CACHE_TTL,
+            "total_entries": len(sidebar_keys),
+            "entries": sidebar_info
+        },
+        "thumbnail_cache": {
+            "ttl_seconds": THUMBNAIL_CACHE_TTL,
+            "total_entries": len(thumbnail_keys),
+            "entries": thumbnail_info
+        },
+        "total_cache_entries": len(sidebar_keys) + len(thumbnail_keys)
+    }
 
 
 @app.get("/smugmug/node/{node_id}")
@@ -405,19 +627,54 @@ async def get_smugmug_node_details(
 @app.get("/smugmug/album/{album_key}/thumbnail")
 async def get_album_thumbnail(
     album_key: str,
+    if_none_match: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
-    """Get thumbnail URL for a specific album"""
+    """Get thumbnail URL for a specific album with caching"""
     
     # Get stored access token
     token = db.query(OAuthToken).filter_by(service="smugmug").first()
     if not token or not token.is_valid():
         raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
     
+    user_id = token.user_id or "unknown"
+    cache_key = get_thumbnail_cache_key(album_key, user_id)
+    
+    # Check cache first
+    if cache_key in thumbnail_cache and is_cache_valid(thumbnail_cache[cache_key], THUMBNAIL_CACHE_TTL):
+        logger.info(f"Cache hit for thumbnail: {cache_key}")
+        cached_data = thumbnail_cache[cache_key]['data']
+        etag = f'"{hash(cached_data["thumbnail_url"])}"'
+        
+        # Check ETag for 304 Not Modified
+        if if_none_match and if_none_match == etag:
+            return JSONResponse(
+                content={},
+                status_code=304,
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                    "ETag": etag,
+                    "X-Cache": "HIT-304"
+                }
+            )
+        
+        # Return cached response with cache headers
+        response = JSONResponse(
+            content=cached_data,
+            headers={
+                "Cache-Control": "public, max-age=3600",  # 1 hour browser cache
+                "ETag": etag,
+                "X-Cache": "HIT"
+            }
+        )
+        return response
+    
     # Initialize SmugMug service for OAuth calls
     service = SmugMugService(token.access_token, token.access_token_secret)
     
     try:
+        logger.info(f"Cache miss for thumbnail: {cache_key} - fetching from SmugMug API")
+        
         # Direct call to SmugMug API for album highlight image
         url = f"https://api.smugmug.com/api/v2/album/{album_key}!highlightimage"
         
@@ -434,10 +691,27 @@ async def get_album_thumbnail(
                 thumbnail_url = album_image.get("ThumbnailUrl")
                 
                 if thumbnail_url:
-                    return {
+                    response_data = {
                         "album_key": album_key,
                         "thumbnail_url": thumbnail_url
                     }
+                    
+                    # Cache the response
+                    thumbnail_cache[cache_key] = {
+                        'data': response_data,
+                        'timestamp': time.time()
+                    }
+                    logger.info(f"Cached thumbnail data: {cache_key}")
+                    
+                    # Return response with cache headers
+                    return JSONResponse(
+                        content=response_data,
+                        headers={
+                            "Cache-Control": "public, max-age=3600",  # 1 hour browser cache
+                            "ETag": f'"{hash(thumbnail_url)}"',
+                            "X-Cache": "MISS"
+                        }
+                    )
         
         raise HTTPException(status_code=404, detail="No highlight image found for this album")
         
