@@ -7,6 +7,8 @@ class TargetVisionApp {
         this.currentPhotos = [];
         this.selectedPhotos = new Set();
         this.statusFilter = '';
+        this.showProcessedPhotos = true;
+        this.showUnprocessedPhotos = true;
         this.currentPage = 'albums';
         this.chatMessages = [];
         this.searchResults = [];
@@ -55,6 +57,10 @@ class TargetVisionApp {
         
         // Filters
         document.getElementById('status-filter').addEventListener('change', (e) => this.filterPhotos(e.target.value));
+        
+        // Visibility toggles
+        document.getElementById('toggle-processed').addEventListener('click', () => this.toggleProcessedVisibility());
+        document.getElementById('toggle-unprocessed').addEventListener('click', () => this.toggleUnprocessedVisibility());
         
         // Chat functionality
         document.getElementById('chat-send').addEventListener('click', () => this.sendChatMessage());
@@ -1476,9 +1482,31 @@ class TargetVisionApp {
         
         // Filter photos if needed
         let photosToShow = this.currentPhotos;
+        
+        // Apply status filter first
         if (this.statusFilter) {
-            photosToShow = this.currentPhotos.filter(photo => photo.processing_status === this.statusFilter);
+            if (this.statusFilter === 'processed') {
+                // Show photos that have AI metadata
+                photosToShow = photosToShow.filter(photo => photo.ai_metadata && photo.ai_metadata.length > 0);
+            } else if (this.statusFilter === 'unprocessed') {
+                // Show photos that don't have AI metadata
+                photosToShow = photosToShow.filter(photo => !photo.ai_metadata || photo.ai_metadata.length === 0);
+            } else {
+                // Standard status filtering
+                photosToShow = photosToShow.filter(photo => photo.processing_status === this.statusFilter);
+            }
         }
+        
+        // Apply visibility toggles
+        photosToShow = photosToShow.filter(photo => {
+            const isProcessed = photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
+            const isUnprocessed = !isProcessed;
+            
+            if (isProcessed && !this.showProcessedPhotos) return false;
+            if (isUnprocessed && !this.showUnprocessedPhotos) return false;
+            
+            return true;
+        });
         
         photoGrid.classList.remove('hidden');
         photoGrid.innerHTML = '';
@@ -1487,6 +1515,9 @@ class TargetVisionApp {
             const photoElement = this.createPhotoCard(photo);
             photoGrid.appendChild(photoElement);
         });
+        
+        // Update toggle button styles to reflect current state
+        this.updateToggleButtonStyles();
     }
 
     createPhotoCard(photo) {
@@ -1965,6 +1996,37 @@ class TargetVisionApp {
     filterPhotos(status) {
         this.statusFilter = status;
         this.displayPhotos();
+    }
+
+    toggleProcessedVisibility() {
+        this.showProcessedPhotos = !this.showProcessedPhotos;
+        this.updateToggleButtonStyles();
+        this.displayPhotos();
+    }
+
+    toggleUnprocessedVisibility() {
+        this.showUnprocessedPhotos = !this.showUnprocessedPhotos;
+        this.updateToggleButtonStyles();
+        this.displayPhotos();
+    }
+
+    updateToggleButtonStyles() {
+        const processedBtn = document.getElementById('toggle-processed');
+        const unprocessedBtn = document.getElementById('toggle-unprocessed');
+
+        // Update processed button style
+        if (this.showProcessedPhotos) {
+            processedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-blue-100 text-blue-800 hover:bg-blue-200';
+        } else {
+            processedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300';
+        }
+
+        // Update unprocessed button style
+        if (this.showUnprocessedPhotos) {
+            unprocessedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-100 text-gray-800 hover:bg-gray-200';
+        } else {
+            unprocessedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300';
+        }
     }
 
     async refreshCurrentPhotos() {
