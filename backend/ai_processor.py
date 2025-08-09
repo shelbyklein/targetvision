@@ -209,15 +209,21 @@ Do not include speculation about metadata like camera settings, date, or photogr
             )
             
             db.add(ai_metadata)
-            db.commit()
-            db.refresh(ai_metadata)
+            
+            # Update photo processing status to completed
+            photo = db.query(Photo).filter(Photo.id == photo_id).first()
+            if photo:
+                photo.processing_status = "completed"
+                photo.updated_at = datetime.now()
             
             # Update processing queue status
             queue_item = db.query(ProcessingQueue).filter(ProcessingQueue.photo_id == photo_id).first()
             if queue_item:
                 queue_item.status = "completed"
                 queue_item.completed_at = datetime.now()
-                db.commit()
+            
+            db.commit()
+            db.refresh(ai_metadata)
             
             logger.info(f"Successfully processed photo {photo_id}")
             return ai_metadata.to_dict()
@@ -225,13 +231,20 @@ Do not include speculation about metadata like camera settings, date, or photogr
         except Exception as e:
             logger.error(f"Error processing photo {photo_id}: {e}")
             
+            # Update photo processing status to failed
+            photo = db.query(Photo).filter(Photo.id == photo_id).first()
+            if photo:
+                photo.processing_status = "failed"
+                photo.updated_at = datetime.now()
+            
             # Update queue with error status
             queue_item = db.query(ProcessingQueue).filter(ProcessingQueue.photo_id == photo_id).first()
             if queue_item:
                 queue_item.status = "failed"
                 queue_item.last_error = str(e)
                 queue_item.attempts += 1
-                db.commit()
+            
+            db.commit()
             
             raise
         finally:

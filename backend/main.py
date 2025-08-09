@@ -774,22 +774,68 @@ async def add_to_queue(
 async def search_photos(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(default=20, le=50),
-    search_type: str = Query(default="hybrid", regex="^(text|vector|hybrid)$")
+    search_type: str = Query(default="hybrid", regex="^(text|vector|hybrid)$"),
+    album: Optional[str] = Query(default=None, description="Filter by album name or ID"),
+    processing_status: Optional[str] = Query(default=None, description="Filter by processing status"),
+    date_from: Optional[str] = Query(default=None, description="Filter photos from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(default=None, description="Filter photos to date (YYYY-MM-DD)")
 ):
-    """Search photos using text or vector similarity"""
+    """Search photos using text or vector similarity with optional filters"""
+    
+    def apply_search_filters(photos_query, album_filter=None, status_filter=None, date_from_filter=None, date_to_filter=None):
+        """Apply filters to a Photo query"""
+        if album_filter:
+            # Try to find album by name first, then by ID
+            album_obj = photos_query.session.query(Album).filter(
+                (Album.title.ilike(f"%{album_filter}%")) | 
+                (Album.id == album_filter if album_filter.isdigit() else False)
+            ).first()
+            if album_obj:
+                photos_query = photos_query.filter(Photo.album_id == album_obj.id)
+        
+        if status_filter:
+            photos_query = photos_query.filter(Photo.processing_status == status_filter)
+        
+        if date_from_filter:
+            try:
+                date_from = datetime.strptime(date_from_filter, "%Y-%m-%d")
+                photos_query = photos_query.filter(Photo.created_at >= date_from)
+            except ValueError:
+                pass  # Invalid date format, skip filter
+        
+        if date_to_filter:
+            try:
+                date_to = datetime.strptime(date_to_filter, "%Y-%m-%d")
+                photos_query = photos_query.filter(Photo.created_at <= date_to)
+            except ValueError:
+                pass  # Invalid date format, skip filter
+        
+        return photos_query
     
     try:
         if search_type == "vector":
+            # For vector search, we'll need to implement filtering separately
             results = await vector_search.search_by_text(q, limit)
+            # TODO: Apply filters to vector search results
         elif search_type == "text":
-            # Simple text search implementation
+            # Enhanced text search implementation with filters
             db = next(get_db())
             try:
                 query_lower = q.lower()
                 
+                # Start with a base query that includes filters
+                base_query = db.query(Photo).join(AIMetadata, Photo.id == AIMetadata.photo_id)
+                filtered_query = apply_search_filters(
+                    base_query, album, processing_status, date_from, date_to
+                )
+                
+                # Get metadata records that match filters
+                metadata_records = db.query(AIMetadata).join(Photo).filter(
+                    Photo.id.in_([photo.id for photo in filtered_query])
+                ).all()
+                
                 # Search in AI metadata and photo metadata
                 photos = []
-                metadata_records = db.query(AIMetadata).all()
                 
                 for metadata in metadata_records:
                     score = 0.0
@@ -803,6 +849,13 @@ async def search_photos(
                         for keyword in metadata.ai_keywords:
                             if query_lower in keyword.lower():
                                 score += 0.5
+                    
+                    # Search in photo title and filename
+                    if metadata.photo:
+                        if metadata.photo.title and query_lower in metadata.photo.title.lower():
+                            score += 0.8
+                        if metadata.photo.filename and query_lower in metadata.photo.filename.lower():
+                            score += 0.6
                     
                     if score > 0 and metadata.photo:
                         photos.append({
@@ -821,13 +874,21 @@ async def search_photos(
                 db.close()
                 
         else:  # hybrid
+            # For hybrid search, we'll also need to implement filtering
             results = await hybrid_search.search(q, limit)
+            # TODO: Apply filters to hybrid search results
         
         return {
             "query": q,
             "search_type": search_type,
             "results": len(results),
-            "photos": results
+            "photos": results,
+            "filters": {
+                "album": album,
+                "processing_status": processing_status,
+                "date_from": date_from,
+                "date_to": date_to
+            }
         }
         
     except Exception as e:
