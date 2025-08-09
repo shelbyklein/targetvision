@@ -423,6 +423,18 @@ class SmugMugService:
                                     enhanced_node["highlight_image"] = highlight_image
                             else:
                                 enhanced_node["highlight_image"] = highlight_image
+                        # Check if we need to fetch album highlight image details
+                        elif highlight_image.get("needs_album_fetch"):
+                            album_highlight_uri = highlight_image.get("album_highlight_uri")
+                            if album_highlight_uri:
+                                album_image_details = await self.get_album_highlight_image_details(album_highlight_uri)
+                                if album_image_details:
+                                    enhanced_node["highlight_image"] = album_image_details
+                                else:
+                                    # Fallback to basic info if fetch fails
+                                    enhanced_node["highlight_image"] = highlight_image
+                            else:
+                                enhanced_node["highlight_image"] = highlight_image
                         elif highlight_image.get("needs_fetch"):
                             # Handle regular highlight image fetch if needed
                             highlight_uri = highlight_image.get("highlight_uri")
@@ -562,6 +574,14 @@ class SmugMugService:
                         "folder_highlight_uri": folder_highlight_uri,
                         "needs_folder_fetch": True  # Use special folder highlight endpoint
                     }
+                # For albums, try to use the AlbumHighlightImage endpoint to get ThumbnailUrl
+                elif node.get("Type") == "album" and "Uris" in node and node["Uris"].get("Album"):
+                    album_uri = node["Uris"]["Album"]["Uri"]
+                    album_highlight_uri = f"{album_uri}!highlightimage"
+                    return {
+                        "album_highlight_uri": album_highlight_uri,
+                        "needs_album_fetch": True  # Use special album highlight endpoint
+                    }
                 
                 return {
                     "highlight_uri": highlight_uri,
@@ -643,4 +663,46 @@ class SmugMugService:
                 
         except Exception as e:
             logger.error(f"Error getting folder highlight image details: {e}")
+            return None
+    
+    async def get_album_highlight_image_details(self, album_highlight_uri: str) -> Optional[Dict]:
+        """Fetch album highlight image information using the AlbumHighlightImage endpoint"""
+        try:
+            # Use the full SmugMug API URL
+            url = f"https://api.smugmug.com{album_highlight_uri}"
+            
+            response = await self.oauth.make_authenticated_request(
+                "GET", url, self.access_token, self.access_token_secret
+            )
+            
+            if response and response.status_code == 200:
+                data = response.json()
+                image_data = data.get("Response", {}).get("Image", {})
+                
+                # Extract album highlight image info with ThumbnailUrl
+                image_info = {
+                    "image_key": image_data.get("ImageKey", ""),
+                    "title": image_data.get("Title", ""),
+                    "caption": image_data.get("Caption", ""),
+                    "uri": image_data.get("Uri", "")
+                }
+                
+                # Use ThumbnailUrl as the primary image URL for albums
+                if "ThumbnailUrl" in image_data:
+                    image_info["thumbnail_url"] = image_data["ThumbnailUrl"]
+                    image_info["image_url"] = image_data["ThumbnailUrl"]
+                
+                # Add additional metadata
+                if "OriginalWidth" in image_data:
+                    image_info["width"] = image_data["OriginalWidth"]
+                if "OriginalHeight" in image_data:
+                    image_info["height"] = image_data["OriginalHeight"]
+                
+                return image_info
+            else:
+                logger.error(f"Failed to get album highlight image details: {response.status_code if response else 'No response'}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting album highlight image details: {e}")
             return None
