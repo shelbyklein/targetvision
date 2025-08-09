@@ -403,13 +403,42 @@ class SmugMugService:
                 data = response.json()
                 nodes = data.get("Response", {}).get("Node", [])
                 
+                
                 # Enhance nodes with highlight image information
                 enhanced_nodes = []
                 for node in nodes:
                     enhanced_node = node.copy()
                     
-                    # Extract highlight image information if available
+                    # Extract highlight image information if available OR check if it's an album that needs processing
                     highlight_image = self.extract_highlight_image_info(node)
+                    
+                    # Add privacy/security information for albums
+                    if node.get("Type", "").lower() == "album":
+                        privacy = node.get("Privacy", "")
+                        effective_privacy = node.get("EffectivePrivacy", "")
+                        security_type = node.get("SecurityType", "")
+                        effective_security = node.get("EffectiveSecurityType", "")
+                        
+                        enhanced_node["privacy_info"] = {
+                            "privacy": privacy,
+                            "effective_privacy": effective_privacy,
+                            "security_type": security_type,
+                            "effective_security": effective_security,
+                            "is_unlisted": privacy.lower() == "unlisted" or effective_privacy.lower() == "unlisted",
+                            "is_private": privacy.lower() == "private" or effective_privacy.lower() == "private"
+                        }
+                        
+                    
+                    
+                    # If no highlight image found but this is an album, try to create one using album_key
+                    if not highlight_image and node.get("Type", "").lower() == "album" and node.get("AlbumKey"):
+                        album_key = node["AlbumKey"]
+                        album_highlight_uri = f"/api/v2/album/{album_key}!highlightimage"
+                        highlight_image = {
+                            "album_highlight_uri": album_highlight_uri,
+                            "needs_album_fetch": True
+                        }
+                    
                     if highlight_image:
                         # Check if we need to fetch folder highlight image details
                         if highlight_image.get("needs_folder_fetch"):
@@ -431,8 +460,19 @@ class SmugMugService:
                                 if album_image_details:
                                     enhanced_node["highlight_image"] = album_image_details
                                 else:
-                                    # Fallback to basic info if fetch fails
-                                    enhanced_node["highlight_image"] = highlight_image
+                                    # Try to get first image thumbnail as fallback for private/unlisted albums
+                                    album_uri = None
+                                    if "Uris" in node and "Album" in node["Uris"]:
+                                        album_uri = node["Uris"]["Album"]["Uri"]
+                                    
+                                    if album_uri:
+                                        first_image_thumbnail = await self.get_first_album_image_thumbnail(album_uri)
+                                        if first_image_thumbnail:
+                                            enhanced_node["highlight_image"] = first_image_thumbnail
+                                        else:
+                                            enhanced_node["highlight_image"] = highlight_image
+                                    else:
+                                        enhanced_node["highlight_image"] = highlight_image
                             else:
                                 enhanced_node["highlight_image"] = highlight_image
                         elif highlight_image.get("needs_fetch"):
@@ -575,13 +615,43 @@ class SmugMugService:
                         "needs_folder_fetch": True  # Use special folder highlight endpoint
                     }
                 # For albums, try to use the AlbumHighlightImage endpoint to get ThumbnailUrl
-                elif node.get("Type") == "album" and "Uris" in node and node["Uris"].get("Album"):
-                    album_uri = node["Uris"]["Album"]["Uri"]
-                    album_highlight_uri = f"{album_uri}!highlightimage"
-                    return {
-                        "album_highlight_uri": album_highlight_uri,
-                        "needs_album_fetch": True  # Use special album highlight endpoint
-                    }
+                elif node.get("Type", "").lower() == "album":
+                    logger.info(f"Processing album node: {node.get('Name', 'Unknown')} - NodeID: {node.get('NodeID', 'Unknown')}")
+                    logger.info(f"Album node Uris structure: {list(node.get('Uris', {}).keys()) if node.get('Uris') else 'No Uris'}")
+                    
+                    album_highlight_uri = None
+                    
+                    # Method 1: Use Uris.Album if available
+                    if "Uris" in node and node["Uris"].get("Album"):
+                        album_uri = node["Uris"]["Album"]["Uri"]
+                        album_highlight_uri = f"{album_uri}!highlightimage"
+                        logger.info(f"Album method 1: Using Uris.Album - {album_highlight_uri}")
+                    
+                    # Method 2: Try to extract album key from node properties
+                    elif node.get("AlbumKey"):
+                        album_key = node["AlbumKey"]
+                        album_highlight_uri = f"/api/v2/album/{album_key}!highlightimage"
+                        logger.info(f"Album method 2: Using AlbumKey - {album_highlight_uri}")
+                    
+                    # Method 3: Check for album URI patterns in existing URIs
+                    elif "Uris" in node:
+                        for uri_key, uri_obj in node["Uris"].items():
+                            if isinstance(uri_obj, dict) and "Uri" in uri_obj:
+                                uri = uri_obj["Uri"]
+                                # Look for album URI pattern
+                                if "/album/" in uri and "!highlightimage" not in uri:
+                                    album_highlight_uri = f"{uri}!highlightimage"
+                                    logger.info(f"Album method 3: Found album URI pattern - {album_highlight_uri}")
+                                    break
+                    
+                    if album_highlight_uri:
+                        logger.info(f"Album {node.get('Name', 'Unknown')}: Using album highlight URI: {album_highlight_uri}")
+                        return {
+                            "album_highlight_uri": album_highlight_uri,
+                            "needs_album_fetch": True  # Use special album highlight endpoint
+                        }
+                    else:
+                        logger.warning(f"Album node {node.get('Name', 'Unknown')} could not be processed for album highlight image")
                 
                 return {
                     "highlight_uri": highlight_uri,
@@ -705,4 +775,47 @@ class SmugMugService:
                 
         except Exception as e:
             logger.error(f"Error getting album highlight image details: {e}")
+            return None
+
+    async def get_first_album_image_thumbnail(self, album_uri: str) -> Optional[Dict]:
+        """Get thumbnail of the first image in an album as fallback for highlight image"""
+        try:
+            # Use the album URI to get images (limit to 1 for efficiency)
+            url = f"https://api.smugmug.com{album_uri}!images"
+            params = {
+                "_expand": "ImageSizes",
+                "count": "1"  # Only get the first image
+            }
+            
+            response = await self.oauth.make_authenticated_request(
+                "GET", url, self.access_token, self.access_token_secret, params=params
+            )
+            
+            if response and response.status_code == 200:
+                data = response.json()
+                images = data.get("Response", {}).get("AlbumImage", [])
+                
+                if images:
+                    first_image = images[0]
+                    
+                    # Extract thumbnail info using existing metadata extraction logic
+                    metadata = self.extract_photo_metadata(first_image)
+                    
+                    # Return thumbnail info in the same format as highlight images
+                    if metadata.get("thumbnail_url"):
+                        return {
+                            "image_key": metadata.get("smugmug_id", ""),
+                            "title": metadata.get("title", ""),
+                            "caption": metadata.get("caption", ""),
+                            "thumbnail_url": metadata["thumbnail_url"],
+                            "image_url": metadata.get("image_url", metadata["thumbnail_url"]),
+                            "width": metadata.get("width", 0),
+                            "height": metadata.get("height", 0),
+                            "is_fallback_thumbnail": True  # Flag to indicate this is a fallback
+                        }
+                        
+            return None
+                
+        except Exception as e:
+            logger.error(f"Error getting first album image thumbnail: {e}")
             return None

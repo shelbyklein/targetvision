@@ -773,6 +773,11 @@ class TargetVisionApp {
                                 </svg>
                             `}
                             <span class="truncate flex-1">${album.name}</span>
+                            ${album.privacy_info && album.privacy_info.is_private ? 
+                                '<span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded mr-1">Private</span>' :
+                                album.privacy_info && album.privacy_info.is_unlisted ? 
+                                '<span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded mr-1">Unlisted</span>' : ''
+                            }
                             <span class="text-xs text-gray-500">${album.image_count || 0}</span>
                         </button>
                     `).join('')}
@@ -928,12 +933,16 @@ class TargetVisionApp {
             div.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
             div.style.backgroundImage = `url('${imageUrl}')`;
             
+            // Privacy status badge
+            const privacyBadge = album.privacy_info ? 
+                (album.privacy_info.is_private ? 
+                    '<span class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center"><svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>Private</span>' 
+                : album.privacy_info.is_unlisted ? 
+                    '<span class="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center"><svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>Unlisted</span>' 
+                : '') : '';
+
             div.innerHTML = `
-                <div class="absolute top-2 left-2">
-                    <svg class="h-5 w-5 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
-                    </svg>
-                </div>
+                ${privacyBadge}
                 <div class="relative z-10 flex flex-col items-center text-center h-full justify-end">
                     <h3 class="text-sm font-medium text-white truncate w-full bg-black bg-opacity-50 px-2 py-1 rounded">${albumName}</h3>
                     <div class="flex items-center justify-center mt-1 space-x-2 bg-black bg-opacity-50 px-2 py-1 rounded">
@@ -949,12 +958,16 @@ class TargetVisionApp {
             // Fallback card with icon
             div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer aspect-square relative';
             
+            // Privacy status badge
+            const privacyBadge = album.privacy_info ? 
+                (album.privacy_info.is_private ? 
+                    '<span class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center"><svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>Private</span>' 
+                : album.privacy_info.is_unlisted ? 
+                    '<span class="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center"><svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>Unlisted</span>' 
+                : '') : '';
+
             div.innerHTML = `
-                <div class="absolute top-2 left-2">
-                    <svg class="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
-                    </svg>
-                </div>
+                ${privacyBadge}
                 <div class="flex flex-col items-center text-center h-full justify-center">
                     <svg class="h-16 w-16 text-blue-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
