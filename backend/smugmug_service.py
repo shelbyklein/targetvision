@@ -391,7 +391,8 @@ class SmugMugService:
             
             url = f"{self.api_base}{child_nodes_uri}"
             params = {
-                "count": 100  # Get up to 100 children
+                "count": 100,  # Get up to 100 children
+                "_expand": "HighlightImage"  # Request HighlightImage data
             }
             
             response = await self.oauth.make_authenticated_request(
@@ -402,8 +403,20 @@ class SmugMugService:
                 data = response.json()
                 nodes = data.get("Response", {}).get("Node", [])
                 
-                logger.info(f"Found {len(nodes)} child nodes")
-                return nodes
+                # Enhance nodes with highlight image information
+                enhanced_nodes = []
+                for node in nodes:
+                    enhanced_node = node.copy()
+                    
+                    # Extract highlight image information if available
+                    highlight_image = self.extract_highlight_image_info(node)
+                    if highlight_image:
+                        enhanced_node["highlight_image"] = highlight_image
+                    
+                    enhanced_nodes.append(enhanced_node)
+                
+                logger.info(f"Found {len(enhanced_nodes)} child nodes with highlight image data")
+                return enhanced_nodes
             else:
                 logger.error(f"Failed to get child nodes: {response.status_code if response else 'No response'}")
                 return []
@@ -466,3 +479,85 @@ class SmugMugService:
         except Exception as e:
             logger.error(f"Error getting breadcrumbs: {e}")
             return []
+    
+    def extract_highlight_image_info(self, node: Dict) -> Optional[Dict]:
+        """Extract highlight image information from a node"""
+        try:
+            # Check if HighlightImage is available in the node data
+            if "HighlightImage" in node:
+                highlight_image = node["HighlightImage"]
+                
+                # Extract basic image info
+                image_info = {
+                    "image_key": highlight_image.get("ImageKey", ""),
+                    "title": highlight_image.get("Title", ""),
+                    "caption": highlight_image.get("Caption", ""),
+                    "uri": highlight_image.get("Uri", "")
+                }
+                
+                # Extract image sizes if available
+                if "ImageSizes" in highlight_image:
+                    sizes = highlight_image["ImageSizes"]
+                    
+                    # Get various sizes
+                    for size_key in ["X5Large", "X4Large", "X3Large", "X2Large", "XLarge", "Large", "Medium"]:
+                        if size_key in sizes:
+                            image_info["image_url"] = sizes[size_key]["Url"]
+                            image_info["width"] = sizes[size_key].get("Width", 0)
+                            image_info["height"] = sizes[size_key].get("Height", 0)
+                            break
+                    
+                    # Get thumbnail URL
+                    for thumb_key in ["Small", "Thumb"]:
+                        if thumb_key in sizes:
+                            image_info["thumbnail_url"] = sizes[thumb_key]["Url"]
+                            break
+                
+                # Get highlight image URI for fetching sizes if not expanded
+                elif "Uris" in highlight_image and "ImageSizes" in highlight_image["Uris"]:
+                    image_info["sizes_uri"] = highlight_image["Uris"]["ImageSizes"]["Uri"]
+                
+                return image_info
+            
+            # Check if there's a HighlightImage URI in the node's Uris
+            elif "Uris" in node and "HighlightImage" in node["Uris"]:
+                highlight_uri = node["Uris"]["HighlightImage"]["Uri"]
+                return {
+                    "highlight_uri": highlight_uri,
+                    "needs_fetch": True  # Indicates we need to fetch the highlight image data separately
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting highlight image info: {e}")
+            return None
+    
+    async def get_highlight_image_details(self, highlight_uri: str) -> Optional[Dict]:
+        """Fetch detailed highlight image information from URI"""
+        try:
+            # Remove leading /api/v2 if present
+            if highlight_uri.startswith("/api/v2"):
+                highlight_uri = highlight_uri[7:]
+            
+            url = f"{self.api_base}{highlight_uri}"
+            params = {
+                "_expand": "ImageSizes"
+            }
+            
+            response = await self.oauth.make_authenticated_request(
+                "GET", url, self.access_token, self.access_token_secret, params=params
+            )
+            
+            if response and response.status_code == 200:
+                data = response.json()
+                image_data = data.get("Response", {}).get("Image", {})
+                
+                return self.extract_highlight_image_info({"HighlightImage": image_data})
+            else:
+                logger.error(f"Failed to get highlight image details: {response.status_code if response else 'No response'}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting highlight image details: {e}")
+            return None

@@ -332,6 +332,10 @@ async def list_smugmug_nodes(
                     "sort_method": node.get("SortMethod", ""),
                     "sort_direction": node.get("SortDirection", "")
                 }
+                
+                # Add highlight image data if available
+                if "highlight_image" in node:
+                    node_data["highlight_image"] = node["highlight_image"]
             
             result.append(node_data)
         
