@@ -84,34 +84,31 @@ img[loading="lazy"] {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-/* Photo grid masonry-style layout for larger screens */
-@media (min-width: 768px) {
+/* Photo grid flexbox layout */
+#photo-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+/* Ensure consistent card sizes with flexbox */
+#photo-grid > * {
+    flex: 0 0 150px; /* Fixed width to match card size */
+}
+
+/* Responsive adjustments for flexbox layout */
+@media (max-width: 767px) {
     #photo-grid {
-        column-count: 3;
-        column-gap: 1rem;
+        justify-content: center;
+        gap: 0.75rem;
     }
     
     #photo-grid > * {
-        break-inside: avoid;
-        margin-bottom: 1rem;
+        flex: 0 0 calc(50% - 0.375rem); /* 2 columns on mobile */
+        max-width: 150px;
     }
-}
-
-@media (min-width: 1024px) {
-    #photo-grid {
-        column-count: 4;
-    }
-}
-
-@media (min-width: 1280px) {
-    #photo-grid {
-        column-count: 5;
-    }
-}
-
-/* Alternative: Keep grid layout for better control */
-.grid-layout #photo-grid {
-    column-count: unset;
 }
 
 /* Search result highlighting */
@@ -203,9 +200,7 @@ img[loading="lazy"] {
         gap: 0.75rem;
     }
     
-    #photo-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    /* Mobile flexbox layout is handled above */
 }
 
 /* Dark mode support (future enhancement) */

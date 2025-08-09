@@ -1445,16 +1445,13 @@ async def search_photos(
                             score += 0.6
                     
                     if score > 0 and metadata.photo:
-                        photos.append({
-                            "photo_id": metadata.photo_id,
-                            "score": score,
-                            "description": metadata.description,
-                            "ai_keywords": metadata.ai_keywords,
-                            "photo": metadata.photo.to_dict()
-                        })
+                        # Use the enhanced photo.to_dict() which includes AI metadata
+                        photo_dict = metadata.photo.to_dict(include_ai_metadata=True)
+                        photo_dict["search_score"] = score
+                        photos.append(photo_dict)
                 
                 # Sort by score
-                photos.sort(key=lambda x: x["score"], reverse=True)
+                photos.sort(key=lambda x: x["search_score"], reverse=True)
                 results = photos[:limit]
                 
             finally:

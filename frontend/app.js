@@ -896,8 +896,10 @@ class TargetVisionApp {
         if (folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url)) {
             // Card with background image
             const imageUrl = folder.highlight_image.thumbnail_url || folder.highlight_image.image_url;
-            div.className = 'folder-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
+            div.className = 'folder-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center';
             div.style.backgroundImage = `url('${imageUrl}')`;
+            div.style.width = '150px';
+            div.style.height = '150px';
             
             div.innerHTML = `
                 <div class="absolute top-2 left-2 flex items-center space-x-2 bg-black bg-opacity-50 px-2 py-1 rounded">
@@ -909,7 +911,9 @@ class TargetVisionApp {
             `;
         } else {
             // Fallback card with icon
-            div.className = 'folder-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer aspect-square';
+            div.className = 'folder-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer';
+            div.style.width = '150px';
+            div.style.height = '150px';
             
             div.innerHTML = `
                 <div class="flex flex-col items-center text-center h-full justify-center">
@@ -970,8 +974,10 @@ class TargetVisionApp {
         if (false) { // Remove old logic
             // Card with background image
             const imageUrl = album.highlight_image.thumbnail_url || album.highlight_image.image_url;
-            div.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
+            div.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center';
             div.style.backgroundImage = `url('${imageUrl}')`;
+            div.style.width = '150px';
+            div.style.height = '150px';
             
             // Privacy status badge
             const privacyBadge = album.privacy_info ? 
@@ -996,7 +1002,9 @@ class TargetVisionApp {
             `;
         } else {
             // Fallback card with icon
-            div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer aspect-square relative';
+            div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative';
+            div.style.width = '150px';
+            div.style.height = '150px';
             
             // Privacy status badge
             const privacyBadge = album.privacy_info ? 
@@ -1564,8 +1572,7 @@ class TargetVisionApp {
                 
                 <!-- Status indicator -->
                 <div class="absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center z-20">
-                    <span class="mr-1">${statusInfo.icon}</span>
-                    <span class="hidden sm:inline">${statusInfo.text}</span>
+                    <span>${statusInfo.icon}</span>
                 </div>
                 
                 <!-- Lightbox button -->
@@ -2647,7 +2654,11 @@ You can also ask for help with syncing albums or processing photos with AI. What
         div.className = 'search-result-card relative group cursor-pointer';
         
         const photo = result.photo || result;
-        const score = result.score || 0;
+        const searchScore = result.search_score || 0;
+        
+        // Get AI confidence score from AI metadata
+        const aiConfidence = photo.ai_metadata?.confidence_score || 
+                           (photo.confidence_score ? photo.confidence_score : 0);
         
         div.innerHTML = `
             <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
@@ -2658,19 +2669,22 @@ You can also ask for help with syncing albums or processing photos with AI. What
                     loading="lazy"
                 />
                 
-                <!-- Relevance score -->
+                <!-- AI Confidence score -->
                 <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full z-20">
-                    ${Math.round(score * 100)}%
+                    ${Math.round(aiConfidence * 100)}%
                 </div>
                 
-                <!-- Lightbox button -->
+                <!-- Download button -->
                 <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <button class="lightbox-btn w-8 h-8 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full flex items-center justify-center text-white transition-all" 
-                            onclick="event.stopPropagation()">
+                    <a href="${photo.image_url || photo.thumbnail_url}" 
+                       download="${photo.title || 'photo'}"
+                       class="download-btn inline-block w-8 h-8 bg-green-600 bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center text-white transition-all mr-1" 
+                       onclick="event.stopPropagation()"
+                       title="Download">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                    </button>
+                    </a>
                 </div>
                 
                 <!-- Hover overlay for visual feedback -->
@@ -2685,14 +2699,10 @@ You can also ask for help with syncing albums or processing photos with AI. What
             </div>
         `;
         
-        // Add lightbox button handler for search results
-        const lightboxBtn = div.querySelector('.lightbox-btn');
-        if (lightboxBtn) {
-            lightboxBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showPhotoModal(photo);
-            });
-        }
+        // Make entire card clickable to open lightbox
+        div.addEventListener('click', () => {
+            this.showPhotoModal(photo);
+        });
         
         return div;
     }
@@ -2732,11 +2742,9 @@ You can also ask for help with syncing albums or processing photos with AI. What
         // Populate modal with photo data
         const modal = document.getElementById('photo-modal');
         const modalImage = document.getElementById('modal-image');
+        const modalDownload = document.getElementById('modal-download');
         const modalDimensions = document.getElementById('modal-dimensions');
         const modalAlbum = document.getElementById('modal-album');
-        const modalOriginalTitle = document.getElementById('modal-original-title');
-        const modalOriginalCaption = document.getElementById('modal-original-caption');
-        const modalOriginalKeywords = document.getElementById('modal-original-keywords');
         const modalAiSection = document.getElementById('modal-ai-section');
         const modalNoAi = document.getElementById('modal-no-ai');
         const modalAiDescription = document.getElementById('modal-ai-description');
@@ -2749,34 +2757,35 @@ You can also ask for help with syncing albums or processing photos with AI. What
         modalImage.src = imageUrl;
         modalImage.alt = photo.title || 'Photo';
         
+        // Set download link
+        modalDownload.href = imageUrl;
+        modalDownload.download = photo.title || 'photo';
+        
         // Set photo info
         modalDimensions.textContent = `${photo.width || 0} × ${photo.height || 0} pixels`;
         modalAlbum.textContent = `Album: ${photo.album_name || 'Unknown Album'}`;
         
-        // Set original metadata
-        modalOriginalTitle.innerHTML = photo.title ? 
-            `<strong>Title:</strong> ${photo.title}` : 
-            '<span class="text-gray-400">No title</span>';
-            
-        modalOriginalCaption.innerHTML = photo.caption ? 
-            `<strong>Caption:</strong> ${photo.caption}` : 
-            '<span class="text-gray-400">No caption</span>';
-            
-        if (photo.keywords && photo.keywords.length > 0) {
-            const keywordTags = photo.keywords.map(keyword => 
-                `<span class="inline-block bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs mr-1 mb-1">${keyword}</span>`
-            ).join('');
-            modalOriginalKeywords.innerHTML = `<strong>Keywords:</strong><br>${keywordTags}`;
-        } else {
-            modalOriginalKeywords.innerHTML = '<span class="text-gray-400">No keywords</span>';
+        
+        // Handle AI metadata - support multiple data structures for backward compatibility
+        let aiData = null;
+        
+        // Try to get AI data from different possible locations
+        if (photo.ai_metadata) {
+            // New structure: nested ai_metadata object
+            aiData = photo.ai_metadata;
+        } else if (photo.description || photo.ai_keywords) {
+            // Old structure: AI data at top level (legacy search results)
+            aiData = {
+                description: photo.description,
+                ai_keywords: photo.ai_keywords,
+                confidence_score: photo.confidence_score,
+                processed_at: photo.processed_at
+            };
         }
         
-        // Handle AI metadata
-        if (photo.ai_metadata || photo.has_ai_metadata) {
+        if (aiData && (aiData.description || (aiData.ai_keywords && aiData.ai_keywords.length > 0))) {
             modalAiSection.classList.remove('hidden');
             modalNoAi.classList.add('hidden');
-            
-            const aiData = photo.ai_metadata || {};
             
             if (aiData.description) {
                 modalAiDescription.textContent = aiData.description;

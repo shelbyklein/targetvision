@@ -746,11 +746,18 @@
         <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 class="text-lg font-medium text-gray-900">Photo Details</h3>
-                <button id="modal-close" class="text-gray-400 hover:text-gray-600">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+                <div class="flex items-center space-x-2">
+                    <a id="modal-download" href="" download="" class="text-green-600 hover:text-green-700 p-2" title="Download">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </a>
+                    <button id="modal-close" class="text-gray-400 hover:text-gray-600">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
             
             <div class="p-6">
@@ -768,15 +775,6 @@
                     
                     <!-- Metadata -->
                     <div class="space-y-6">
-                        <!-- Original Metadata -->
-                        <div>
-                            <h4 class="font-medium text-gray-900 mb-2">Original Metadata</h4>
-                            <div class="bg-gray-50 rounded-lg p-4">
-                                <div id="modal-original-title" class="mb-2"></div>
-                                <div id="modal-original-caption" class="mb-2"></div>
-                                <div id="modal-original-keywords"></div>
-                            </div>
-                        </div>
                         
                         <!-- AI Metadata -->
                         <div id="modal-ai-section" class="hidden">

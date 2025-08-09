@@ -73,8 +73,8 @@ class Photo(Base):
     album = relationship("Album", back_populates="photos")
     ai_metadata = relationship("AIMetadata", back_populates="photo", uselist=False, cascade="all, delete-orphan")
     
-    def to_dict(self):
-        return {
+    def to_dict(self, include_ai_metadata=True):
+        result = {
             "id": self.id,
             "smugmug_id": self.smugmug_id,
             "title": self.title,
@@ -90,6 +90,12 @@ class Photo(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "has_ai_metadata": self.ai_metadata is not None
         }
+        
+        # Include AI metadata if requested and available
+        if include_ai_metadata and self.ai_metadata:
+            result["ai_metadata"] = self.ai_metadata.to_dict()
+        
+        return result
 
 class AIMetadata(Base):
     """AI-generated metadata for photos"""
