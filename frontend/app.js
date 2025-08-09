@@ -2063,8 +2063,9 @@ class TargetVisionApp {
         const opacityClass = photo.is_synced ? '' : 'opacity-60';
         div.className = `photo-card relative group ${cursorClass} ${opacityClass}`;
         
-        // Add data attribute for easy identification during status updates
-        div.setAttribute('data-photo-id', photo.local_photo_id || photo.smugmug_id);
+        // Use consistent photo ID - prefer smugmug_id, fallback to image_key, then local_photo_id
+        const photoId = photo.smugmug_id || photo.image_key || photo.local_photo_id;
+        div.setAttribute('data-photo-id', photoId);
         
         // Status indicator styling
         const statusConfig = {
@@ -2117,16 +2118,6 @@ class TargetVisionApp {
                     </button>
                 </div>
                 
-                <!-- Selection checkbox (only for synced photos) -->
-                ${photo.is_synced ? `
-                    <div class="absolute bottom-2 left-2 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity z-20">
-                        <input type="checkbox" 
-                               class="photo-checkbox w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500" 
-                               data-photo-id="${photo.smugmug_id}"
-                               ${isSelected ? 'checked' : ''}
-                               onclick="event.stopPropagation()">
-                    </div>
-                ` : ''}
                 
                 <!-- Hover overlay for visual feedback -->
                 <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all z-10">
@@ -2154,11 +2145,8 @@ class TargetVisionApp {
             
             // If photo is synced, toggle selection
             if (photo.is_synced) {
-                const checkbox = div.querySelector('.photo-checkbox');
-                if (checkbox) {
-                    checkbox.checked = !checkbox.checked;
-                    this.togglePhotoSelection(photo.smugmug_id, checkbox.checked);
-                }
+                const isCurrentlySelected = this.selectedPhotos.has(photo.smugmug_id);
+                this.togglePhotoSelection(photo.smugmug_id, !isCurrentlySelected);
             } else {
                 // Show message for non-synced photos
                 this.showErrorMessage('Sync Required', 'This photo must be synced to the database before it can be selected for processing. Use the "Sync Album" button first.');
@@ -2174,25 +2162,18 @@ class TargetVisionApp {
             });
         }
         
-        // Add checkbox handler for direct checkbox clicks
-        const checkbox = div.querySelector('.photo-checkbox');
-        if (checkbox) {
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                this.togglePhotoSelection(photo.smugmug_id, e.target.checked);
-            });
-        }
-        
         return div;
     }
 
     // Selection Management
     togglePhotoSelection(photoId, isSelected) {
+        console.log('togglePhotoSelection called:', { photoId, isSelected, selectedCount: this.selectedPhotos.size });
         if (isSelected) {
             this.selectedPhotos.add(photoId);
         } else {
             this.selectedPhotos.delete(photoId);
         }
+        console.log('After toggle, selectedPhotos:', Array.from(this.selectedPhotos));
         this.updateSelectionUI();
     }
 
@@ -2200,17 +2181,12 @@ class TargetVisionApp {
         const syncedPhotos = this.currentPhotos.filter(p => p.is_synced);
         syncedPhotos.forEach(photo => {
             this.selectedPhotos.add(photo.smugmug_id);
-            const checkbox = document.querySelector(`[data-photo-id="${photo.smugmug_id}"]`);
-            if (checkbox) checkbox.checked = true;
         });
         this.updateSelectionUI();
     }
 
     clearSelection() {
         this.selectedPhotos.clear();
-        document.querySelectorAll('.photo-checkbox').forEach(checkbox => {
-            checkbox.checked = false;
-        });
         this.updateSelectionUI();
     }
 
@@ -2224,14 +2200,15 @@ class TargetVisionApp {
     }
     
     updatePhotoSelectionVisuals() {
+        console.log('updatePhotoSelectionVisuals called, selectedPhotos:', Array.from(this.selectedPhotos));
         // Update visual indicators for each photo
         document.querySelectorAll('.photo-card').forEach(photoCard => {
-            const checkbox = photoCard.querySelector('.photo-checkbox');
-            if (!checkbox) return;
+            const photoId = photoCard.getAttribute('data-photo-id');
+            if (!photoId) return;
             
-            const photoId = checkbox.dataset.photoId;
             const isSelected = this.selectedPhotos.has(photoId);
             const imageContainer = photoCard.querySelector('.aspect-square');
+            console.log(`Photo ${photoId}: isSelected=${isSelected}, imageContainer exists=${!!imageContainer}`);
             
             // Update selection border
             if (isSelected) {
@@ -2258,19 +2235,6 @@ class TargetVisionApp {
                 // Remove selection overlay
                 selectionOverlay.remove();
             }
-            
-            // Update checkbox container visibility
-            const checkboxContainer = photoCard.querySelector('.photo-checkbox').parentElement;
-            if (isSelected) {
-                checkboxContainer.classList.remove('opacity-0', 'group-hover:opacity-100');
-                checkboxContainer.classList.add('opacity-100');
-            } else {
-                checkboxContainer.classList.remove('opacity-100');
-                checkboxContainer.classList.add('opacity-0', 'group-hover:opacity-100');
-            }
-            
-            // Ensure checkbox state matches
-            checkbox.checked = isSelected;
         });
     }
 
