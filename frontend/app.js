@@ -933,7 +933,35 @@ class TargetVisionApp {
                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                </svg>`;
         
-        if (album.highlight_image && (album.highlight_image.thumbnail_url || album.highlight_image.image_url)) {
+        // Always start with fallback appearance and load thumbnail on-demand
+        div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer aspect-square relative';
+        
+        // Privacy status badge - defined here so it can be used in lazy-load call
+        const privacyBadge = album.privacy_info ? 
+            (album.privacy_info.is_private ? 
+                '<span class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center"><svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 616 0z" clip-rule="evenodd"/></svg>Private</span>' 
+            : album.privacy_info.is_unlisted ? 
+                '<span class="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center"><svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 818 0z" clip-rule="evenodd"/></svg>Unlisted</span>' 
+            : '') : '';
+
+        div.innerHTML = `
+            ${privacyBadge}
+            <div class="flex flex-col items-center text-center h-full justify-center">
+                <svg class="h-16 w-16 text-blue-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                </svg>
+                <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
+                <div class="flex items-center justify-center mt-1 space-x-2">
+                    <p class="text-xs text-gray-500">${photoCount} photos</p>
+                    <span class="flex-shrink-0">${syncIconSvg}</span>
+                </div>
+                ${album.is_synced ? `
+                    <p class="text-xs text-green-600 mt-1">${processedCount} processed</p>
+                ` : ''}
+            </div>
+        `;
+
+        if (false) { // Remove old logic
             // Card with background image
             const imageUrl = album.highlight_image.thumbnail_url || album.highlight_image.image_url;
             div.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
@@ -990,9 +1018,48 @@ class TargetVisionApp {
             `;
         }
         
+        // For albums with album_key, lazy-load thumbnail
+        if (album.type === 'album' && album.album_key) {
+            this.loadAlbumThumbnail(div, album.album_key, albumName, photoCount, processedCount, syncIconSvg, privacyBadge, album.is_synced);
+        }
+        
         div.addEventListener('click', () => this.selectAlbum(album));
         
         return div;
+    }
+    
+    async loadAlbumThumbnail(cardElement, albumKey, albumName, photoCount, processedCount, syncIconSvg, privacyBadge, isSynced) {
+        try {
+            const response = await fetch(`${this.apiBase}/smugmug/album/${albumKey}/thumbnail`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.thumbnail_url) {
+                    // Update card with thumbnail background
+                    cardElement.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
+                    cardElement.style.backgroundImage = `url('${data.thumbnail_url}')`;
+                    
+                    // Update content with overlay styling
+                    cardElement.innerHTML = `
+                        ${privacyBadge}
+                        <div class="relative z-10 flex flex-col items-center text-center h-full justify-end">
+                            <h3 class="text-sm font-medium text-white truncate w-full bg-black bg-opacity-50 px-2 py-1 rounded">${albumName}</h3>
+                            <div class="flex items-center justify-center mt-1 space-x-2 bg-black bg-opacity-50 px-2 py-1 rounded">
+                                <p class="text-xs text-gray-200">${photoCount} photos</p>
+                                <span class="flex-shrink-0">${syncIconSvg}</span>
+                            </div>
+                            ${isSynced ? `
+                                <p class="text-xs text-green-300 mt-1 bg-black bg-opacity-50 px-2 py-1 rounded">${processedCount} processed</p>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+            }
+        } catch (error) {
+            console.log(`No thumbnail available for album ${albumName}: ${error.message}`);
+            // Keep fallback appearance
+        }
     }
     
     displayRootFolderContentsInRightPanel() {

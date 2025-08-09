@@ -48,7 +48,8 @@ class SmugMugService:
             user_uri = user_uri[7:]  # Remove "/api/v2"
         url = f"{self.api_base}{user_uri}"
         params = {
-            "count": "50"  # Get 50 albums at a time
+            "count": "50",  # Get 50 albums at a time
+            "_expand": "HighlightImage"  # Include highlight image data with ThumbnailUrl
         }
         
         albums = []
@@ -60,7 +61,26 @@ class SmugMugService:
             if response and response.status_code == 200:
                 data = response.json()
                 response_data = data.get("Response", {})
-                albums.extend(response_data.get("Album", []))
+                album_batch = response_data.get("Album", [])
+                # Process each album to extract highlight image data if present
+                processed_albums = []
+                for album in album_batch:
+                    processed_album = album.copy()
+                    # Extract highlight image info if available
+                    if "HighlightImage" in album and album["HighlightImage"]:
+                        highlight_image = album["HighlightImage"]
+                        if "ThumbnailUrl" in highlight_image:
+                            processed_album["highlight_image"] = {
+                                "image_key": highlight_image.get("ImageKey", ""),
+                                "title": highlight_image.get("Title", ""),
+                                "caption": highlight_image.get("Caption", ""),
+                                "uri": highlight_image.get("Uri", ""),
+                                "thumbnail_url": highlight_image["ThumbnailUrl"],
+                                "image_url": highlight_image["ThumbnailUrl"]
+                            }
+                    processed_albums.append(processed_album)
+                
+                albums.extend(processed_albums)
                 
                 # Check for pagination
                 pages = response_data.get("Pages", {})
@@ -434,6 +454,7 @@ class SmugMugService:
                     if not highlight_image and node.get("Type", "").lower() == "album" and node.get("AlbumKey"):
                         album_key = node["AlbumKey"]
                         album_highlight_uri = f"/api/v2/album/{album_key}!highlightimage"
+                        logger.info(f"🎯 Creating album highlight URI for '{node.get('Name', 'Unknown')}': {album_highlight_uri}")
                         highlight_image = {
                             "album_highlight_uri": album_highlight_uri,
                             "needs_album_fetch": True
@@ -455,11 +476,19 @@ class SmugMugService:
                         # Check if we need to fetch album highlight image details
                         elif highlight_image.get("needs_album_fetch"):
                             album_highlight_uri = highlight_image.get("album_highlight_uri")
+                            logger.info(f"📸 [ALBUM DEBUG] Starting album highlight image fetch for '{node.get('Name', 'Unknown')}' from: {album_highlight_uri}")
                             if album_highlight_uri:
                                 album_image_details = await self.get_album_highlight_image_details(album_highlight_uri)
                                 if album_image_details:
+                                    logger.info(f"✅ [ALBUM DEBUG] Successfully got album highlight image for '{node.get('Name', 'Unknown')}': thumbnail_url={album_image_details.get('thumbnail_url', 'None')}")
                                     enhanced_node["highlight_image"] = album_image_details
+                                    try:
+                                        with open("/Users/shelbyklein/apps/targetvision/album_debug.log", "a") as f:
+                                            f.write(f"ALBUM DEBUG: SETTING enhanced_node highlight_image for '{node.get('Name', 'Unknown')}'\n")
+                                    except:
+                                        pass
                                 else:
+                                    logger.warning(f"❌ [ALBUM DEBUG] Failed to get album highlight image details for '{node.get('Name', 'Unknown')}')")
                                     # Try to get first image thumbnail as fallback for private/unlisted albums
                                     album_uri = None
                                     if "Uris" in node and "Album" in node["Uris"]:
@@ -560,6 +589,10 @@ class SmugMugService:
     def extract_highlight_image_info(self, node: Dict) -> Optional[Dict]:
         """Extract highlight image information from a node"""
         try:
+            # Debug logging
+            if node.get("Type", "").lower() == "album":
+                logger.info(f"🔍 Extracting highlight image for album '{node.get('Name', 'Unknown')}': HighlightImage={bool('HighlightImage' in node)}, Uris={bool('Uris' in node and node['Uris'])}, AlbumKey={node.get('AlbumKey', 'None')}")
+            
             # Check if HighlightImage is available in the node data
             if "HighlightImage" in node:
                 highlight_image = node["HighlightImage"]
@@ -740,14 +773,78 @@ class SmugMugService:
         try:
             # Use the full SmugMug API URL
             url = f"https://api.smugmug.com{album_highlight_uri}"
+            logger.info(f"🔍 [ALBUM DEBUG] Making API call to: {url}")
+            
+            # Also write to a debug file to ensure we can see this is being called
+            try:
+                with open("/Users/shelbyklein/apps/targetvision/album_debug.log", "a") as f:
+                    f.write(f"ALBUM DEBUG: API call to {url}\n")
+            except:
+                pass
             
             response = await self.oauth.make_authenticated_request(
                 "GET", url, self.access_token, self.access_token_secret
             )
             
+            # Log response status to file
+            try:
+                with open("/Users/shelbyklein/apps/targetvision/album_debug.log", "a") as f:
+                    f.write(f"ALBUM DEBUG: Response status: {response.status_code if response else 'No response'}\n")
+                    if response and response.status_code != 200:
+                        f.write(f"ALBUM DEBUG: Error response: {response.text[:500] if response else 'No text'}\n")
+            except:
+                pass
+            
+            logger.info(f"🔍 [ALBUM DEBUG] Response status: {response.status_code if response else 'No response'}")
+            
             if response and response.status_code == 200:
                 data = response.json()
-                image_data = data.get("Response", {}).get("Image", {})
+                logger.info(f"🔍 [ALBUM DEBUG] Full response data: {json.dumps(data, indent=2)}")
+                
+                # Also log successful responses to file for inspection
+                try:
+                    with open("/Users/shelbyklein/apps/targetvision/album_debug.log", "a") as f:
+                        f.write(f"ALBUM DEBUG: SUCCESS - Response data processing starting\n")
+                        f.write(f"ALBUM DEBUG: SUCCESS - Response keys: {list(data.get('Response', {}).keys())}\n")
+                        f.write("=" * 20 + "\n")
+                except:
+                    pass
+                
+                # Try different response structure patterns
+                image_data = None
+                
+                # Pattern 1: Response.AlbumImage (correct pattern for album highlight images)
+                if "Response" in data and "AlbumImage" in data["Response"]:
+                    image_data = data["Response"]["AlbumImage"]
+                    logger.info(f"🔍 [ALBUM DEBUG] Found image data via Response.AlbumImage pattern")
+                    try:
+                        with open("/Users/shelbyklein/apps/targetvision/album_debug.log", "a") as f:
+                            f.write(f"ALBUM DEBUG: SUCCESS - Found AlbumImage, ThumbnailUrl present: {'ThumbnailUrl' in image_data}\n")
+                    except:
+                        pass
+                    
+                # Pattern 2: Response.Image (fallback for regular images)
+                elif "Response" in data and "Image" in data["Response"]:
+                    image_data = data["Response"]["Image"]
+                    logger.info(f"🔍 [ALBUM DEBUG] Found image data via Response.Image pattern")
+                    
+                # Pattern 3: Check if Response contains HighlightImage directly
+                elif "Response" in data and "HighlightImage" in data["Response"]:
+                    image_data = data["Response"]["HighlightImage"]
+                    logger.info(f"🔍 [ALBUM DEBUG] Found image data via Response.HighlightImage pattern")
+                    
+                # Pattern 4: Check if Response contains album data with HighlightImage
+                elif "Response" in data and "Album" in data["Response"]:
+                    album_data = data["Response"]["Album"]
+                    if "HighlightImage" in album_data:
+                        image_data = album_data["HighlightImage"]
+                        logger.info(f"🔍 [ALBUM DEBUG] Found image data via Response.Album.HighlightImage pattern")
+                
+                if not image_data:
+                    logger.warning(f"🔍 [ALBUM DEBUG] No image data found in any expected patterns. Response keys: {list(data.get('Response', {}).keys())}")
+                    return None
+                    
+                logger.info(f"🔍 [ALBUM DEBUG] Image data structure: {json.dumps(image_data, indent=2)}")
                 
                 # Extract album highlight image info with ThumbnailUrl
                 image_info = {
@@ -761,6 +858,9 @@ class SmugMugService:
                 if "ThumbnailUrl" in image_data:
                     image_info["thumbnail_url"] = image_data["ThumbnailUrl"]
                     image_info["image_url"] = image_data["ThumbnailUrl"]
+                    logger.info(f"🔍 [ALBUM DEBUG] Found ThumbnailUrl: {image_data['ThumbnailUrl']}")
+                else:
+                    logger.warning(f"🔍 [ALBUM DEBUG] No ThumbnailUrl found in image data. Available keys: {list(image_data.keys())}")
                 
                 # Add additional metadata
                 if "OriginalWidth" in image_data:
@@ -768,13 +868,30 @@ class SmugMugService:
                 if "OriginalHeight" in image_data:
                     image_info["height"] = image_data["OriginalHeight"]
                 
+                logger.info(f"🔍 [ALBUM DEBUG] Final image_info: {json.dumps(image_info, indent=2)}")
+                try:
+                    with open("/Users/shelbyklein/apps/targetvision/album_debug.log", "a") as f:
+                        f.write(f"ALBUM DEBUG: RETURNING - thumbnail_url: {image_info.get('thumbnail_url', 'None')}\n")
+                        f.write("=" * 50 + "\n")
+                except:
+                    pass
                 return image_info
             else:
-                logger.error(f"Failed to get album highlight image details: {response.status_code if response else 'No response'}")
+                error_msg = f"HTTP {response.status_code}" if response else "No response"
+                if response and response.status_code != 200:
+                    try:
+                        error_data = response.json()
+                        logger.error(f"🔍 [ALBUM DEBUG] API error details: {json.dumps(error_data, indent=2)}")
+                    except:
+                        logger.error(f"🔍 [ALBUM DEBUG] API error (no JSON): {response.text if response else 'No response text'}")
+                        
+                logger.error(f"Failed to get album highlight image details: {error_msg}")
                 return None
                 
         except Exception as e:
             logger.error(f"Error getting album highlight image details: {e}")
+            import traceback
+            logger.error(f"🔍 [ALBUM DEBUG] Exception traceback: {traceback.format_exc()}")
             return None
 
     async def get_first_album_image_thumbnail(self, album_uri: str) -> Optional[Dict]:

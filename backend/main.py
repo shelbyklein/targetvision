@@ -402,6 +402,39 @@ async def get_smugmug_node_details(
         logger.error(f"Error getting SmugMug node details: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get node details: {str(e)}")
 
+@app.get("/smugmug/album/{album_key}/thumbnail")
+async def get_album_thumbnail(
+    album_key: str,
+    db: Session = Depends(get_db)
+):
+    """Get thumbnail URL for a specific album"""
+    
+    # Get stored access token
+    token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not token or not token.is_valid():
+        raise HTTPException(status_code=401, detail="Not authenticated with SmugMug")
+    
+    # Initialize SmugMug service
+    service = SmugMugService(token.access_token, token.access_token_secret)
+    
+    try:
+        # Use existing method to get album highlight image details
+        highlight_details = await service.get_album_highlight_image_details(album_key)
+        
+        if highlight_details and highlight_details.get("thumbnail_url"):
+            return {
+                "album_key": album_key,
+                "thumbnail_url": highlight_details["thumbnail_url"]
+            }
+        else:
+            raise HTTPException(status_code=404, detail="No highlight image found for this album")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting album thumbnail for {album_key}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get album thumbnail: {str(e)}")
+
 @app.get("/smugmug/albums/{smugmug_album_key}/photos", response_model=List[Dict])
 async def list_smugmug_album_photos(
     smugmug_album_key: str,
