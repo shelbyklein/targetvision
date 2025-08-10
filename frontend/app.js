@@ -2354,8 +2354,22 @@ class TargetVisionApp {
                 e.stopPropagation();
                 this.processSinglePhoto(photo);
             });
-            // Add cursor pointer to indicate it's clickable
+            
+            // Add cursor pointer and hover state for unprocessed photos
             statusIndicator.style.cursor = 'pointer';
+            
+            // Add hover effect only for unprocessed photos
+            if (status === 'not_processed') {
+                statusIndicator.classList.add('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
+                statusIndicator.title = 'Click to process with AI';
+            } else if (status === 'completed') {
+                statusIndicator.title = 'Processed - click to reprocess';
+            } else if (status === 'failed') {
+                statusIndicator.title = 'Processing failed - click to retry';
+            } else if (status === 'processing') {
+                statusIndicator.title = 'Processing in progress...';
+                statusIndicator.style.cursor = 'default';
+            }
         }
         
         return div;
@@ -2978,6 +2992,22 @@ class TargetVisionApp {
                 const iconSpan = statusIndicator.querySelector('span');
                 if (iconSpan) {
                     iconSpan.textContent = statusInfo.icon;
+                }
+                
+                // Update hover state and tooltip based on new status
+                statusIndicator.classList.remove('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
+                statusIndicator.style.cursor = 'pointer';
+                
+                if (newStatus === 'not_processed') {
+                    statusIndicator.classList.add('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
+                    statusIndicator.title = 'Click to process with AI';
+                } else if (newStatus === 'completed') {
+                    statusIndicator.title = 'Processed - click to reprocess';
+                } else if (newStatus === 'failed') {
+                    statusIndicator.title = 'Processing failed - click to retry';
+                } else if (newStatus === 'processing') {
+                    statusIndicator.title = 'Processing in progress...';
+                    statusIndicator.style.cursor = 'default';
                 }
                 
                 // Add a subtle animation to show the change
