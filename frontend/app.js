@@ -4256,7 +4256,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
     }
     
     async saveMetadataChanges() {
-        if (!this.currentPhoto?.id) {
+        if (!this.currentPhoto?.local_photo_id) {
             console.error('No photo selected for editing');
             return;
         }
@@ -4275,7 +4275,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             saveButton.disabled = true;
             saveButton.textContent = 'Saving...';
             
-            const response = await fetch(`${this.apiBase}/metadata/${this.currentPhoto.id}`, {
+            const response = await fetch(`${this.apiBase}/metadata/${this.currentPhoto.local_photo_id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -4954,16 +4954,17 @@ Emphasize athletic performance, competition elements, and achievement recognitio
             return;
         }
         
-        // Save current settings to ensure we use the right provider
-        const apiSettings = this.saveApiKeySettings();
-        
-        // Check if we have API key for the selected provider
+        // Get API settings respecting the key source toggle
+        const apiSettings = this.getApiSettings();
         const activeProvider = apiSettings.active_provider;
-        const hasKey = activeProvider === 'anthropic' ? apiSettings.anthropic_key : apiSettings.openai_key;
         
-        if (!hasKey) {
-            alert(`Please configure your ${activeProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key first`);
-            return;
+        // Check if we're using custom keys and they're available
+        if (apiSettings.key_source === 'custom') {
+            const hasKey = activeProvider === 'anthropic' ? apiSettings.anthropic_key : apiSettings.openai_key;
+            if (!hasKey) {
+                alert(`Please configure your ${activeProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key first, or switch to using server keys`);
+                return;
+            }
         }
         
         // Prepare form data
@@ -4976,15 +4977,23 @@ Emphasize athletic performance, competition elements, and achievement recognitio
         resultDiv.classList.add('hidden');
         
         try {
-            // Prepare headers with API keys
-            const headers = {};
+            // Prepare headers with API keys only if using custom keys
+            const headers = {
+                'Content-Type': 'application/json'
+            };
             
-            if (apiSettings.anthropic_key) {
-                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
+            // Only send custom API keys if key_source is 'custom'
+            if (apiSettings.key_source === 'custom') {
+                if (apiSettings.anthropic_key) {
+                    headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
+                }
+                if (apiSettings.openai_key) {
+                    headers['X-OpenAI-Key'] = apiSettings.openai_key;
+                }
             }
-            if (apiSettings.openai_key) {
-                headers['X-OpenAI-Key'] = apiSettings.openai_key;
-            }
+            
+            // Remove Content-Type header since we're using FormData
+            delete headers['Content-Type'];
             
             const response = await fetch(`${this.apiBase}/settings/test-image-analysis`, {
                 method: 'POST',
