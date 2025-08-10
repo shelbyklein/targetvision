@@ -1436,7 +1436,7 @@ async def get_batch_processing_status(db: Session = Depends(get_db)):
 async def process_photos_batch(
     photo_ids: List[int],
     background_tasks: BackgroundTasks,
-    max_concurrent: int = Query(default=3, le=5),
+    max_concurrent: int = Query(default=1, le=5),
     provider: str = Query(default="anthropic", regex="^(anthropic|openai)$"),
     anthropic_key: Optional[str] = Header(default=None, alias="X-Anthropic-Key"),
     openai_key: Optional[str] = Header(default=None, alias="X-OpenAI-Key"),

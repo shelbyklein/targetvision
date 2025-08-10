@@ -2561,8 +2561,8 @@ class TargetVisionApp {
             await this.loadSmugMugAlbums();
             if (savedState.selectedAlbumId) {
                 await this.loadAlbumPhotos(savedState.selectedAlbumId);
-                // Navigate to photos view after fallback sync
-                this.showPage('photos');
+                // Stay on albums page - photos are displayed in right panel
+                this.currentPage = 'albums';
             }
         }
     }

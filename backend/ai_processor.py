@@ -532,7 +532,7 @@ Do not include speculation about metadata like camera settings, date, or photogr
         finally:
             db.close()
     
-    async def process_batch(self, photo_ids: List[int], max_concurrent: int = 3) -> List[Dict]:
+    async def process_batch(self, photo_ids: List[int], max_concurrent: int = 1) -> List[Dict]:
         """Process multiple photos concurrently with rate limiting"""
         
         async def process_single(photo_id: int):
