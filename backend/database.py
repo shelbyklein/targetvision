@@ -42,7 +42,7 @@ def init_db():
     """Initialize database tables"""
     try:
         # Import all models to register them with Base
-        from models import Photo, AIMetadata, OAuthToken
+        from models import Photo, AIMetadata, OAuthToken, Album, ProcessingQueue, Collection, CollectionItem
         
         # Create all tables
         Base.metadata.create_all(bind=engine)

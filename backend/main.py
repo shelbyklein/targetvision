@@ -16,7 +16,7 @@ load_dotenv()
 
 # Import our modules
 from database import get_db, init_db, test_connection
-from models import Album, Photo, AIMetadata, OAuthToken, ProcessingQueue
+from models import Album, Photo, AIMetadata, OAuthToken, ProcessingQueue, Collection, CollectionItem
 from smugmug_auth import SmugMugOAuth
 from smugmug_service import SmugMugService
 from ai_processor import ai_processor, AIProcessor
@@ -1143,6 +1143,7 @@ async def list_photos(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=20, le=100),
     stats_only: bool = Query(default=False, description="Return only statistics instead of photo list"),
+    smugmug_id: Optional[str] = Query(default=None, description="Filter by SmugMug ID"),
     db: Session = Depends(get_db)
 ):
     """List photos from database or return statistics"""
@@ -1157,8 +1158,15 @@ async def list_photos(
             "processed": processed_count
         }
     else:
-        # Return paginated photo list
-        photos = db.query(Photo).offset(skip).limit(limit).all()
+        # Build query with optional filtering
+        query = db.query(Photo)
+        
+        # Filter by SmugMug ID if provided
+        if smugmug_id:
+            query = query.filter(Photo.smugmug_id == smugmug_id)
+        
+        # Apply pagination
+        photos = query.offset(skip).limit(limit).all()
         return [photo.to_dict() for photo in photos]
 
 @app.get("/photos/{photo_id}")
@@ -1915,6 +1923,242 @@ async def analyze_with_openai(image_base64: str, content_type: str, api_key: str
         raise HTTPException(status_code=408, detail="Request timed out")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Collections API Endpoints
+@app.get("/collections", response_model=List[Dict])
+async def list_collections(db: Session = Depends(get_db)):
+    """List all collections"""
+    
+    collections = db.query(Collection).order_by(Collection.created_at.desc()).all()
+    
+    return [collection.to_dict() for collection in collections]
+
+@app.post("/collections", response_model=Dict)
+async def create_collection(
+    name: str = Query(..., min_length=1, max_length=255),
+    description: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db)
+):
+    """Create a new collection"""
+    
+    # Check if collection with same name already exists
+    existing = db.query(Collection).filter(Collection.name == name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Collection with this name already exists")
+    
+    # Create new collection
+    collection = Collection(
+        name=name,
+        description=description
+    )
+    
+    db.add(collection)
+    db.commit()
+    db.refresh(collection)
+    
+    return {
+        "message": "Collection created successfully",
+        "collection": collection.to_dict()
+    }
+
+@app.get("/collections/{collection_id}", response_model=Dict)
+async def get_collection(
+    collection_id: int, 
+    include_photos: bool = Query(default=True),
+    db: Session = Depends(get_db)
+):
+    """Get collection details with photos"""
+    
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    return collection.to_dict(include_photos=include_photos)
+
+@app.put("/collections/{collection_id}", response_model=Dict)
+async def update_collection(
+    collection_id: int,
+    name: Optional[str] = Query(default=None, min_length=1, max_length=255),
+    description: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db)
+):
+    """Update collection name or description"""
+    
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    # Check if new name conflicts with existing collection (if name is being changed)
+    if name and name != collection.name:
+        existing = db.query(Collection).filter(Collection.name == name).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Collection with this name already exists")
+        collection.name = name
+    
+    if description is not None:
+        collection.description = description
+    
+    db.commit()
+    db.refresh(collection)
+    
+    return {
+        "message": "Collection updated successfully",
+        "collection": collection.to_dict()
+    }
+
+@app.delete("/collections/{collection_id}")
+async def delete_collection(collection_id: int, db: Session = Depends(get_db)):
+    """Delete a collection"""
+    
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    collection_name = collection.name
+    db.delete(collection)
+    db.commit()
+    
+    return {
+        "message": f"Collection '{collection_name}' deleted successfully"
+    }
+
+@app.post("/collections/{collection_id}/photos", response_model=Dict)
+async def add_photos_to_collection(
+    collection_id: int,
+    request_data: Dict,
+    db: Session = Depends(get_db)
+):
+    """Add photos to a collection"""
+    
+    # Extract photo_ids from request data
+    photo_ids = request_data.get("photo_ids", [])
+    if not photo_ids:
+        raise HTTPException(status_code=400, detail="photo_ids required")
+    
+    # Verify collection exists
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    # Verify photos exist
+    existing_photos = db.query(Photo.id).filter(Photo.id.in_(photo_ids)).all()
+    existing_photo_ids = [p.id for p in existing_photos]
+    
+    if not existing_photo_ids:
+        raise HTTPException(status_code=404, detail="No valid photos found")
+    
+    # Add photos to collection (ignore duplicates)
+    added_count = 0
+    skipped_count = 0
+    
+    for photo_id in existing_photo_ids:
+        # Check if photo is already in collection
+        existing_item = db.query(CollectionItem).filter(
+            CollectionItem.collection_id == collection_id,
+            CollectionItem.photo_id == photo_id
+        ).first()
+        
+        if not existing_item:
+            collection_item = CollectionItem(
+                collection_id=collection_id,
+                photo_id=photo_id
+            )
+            db.add(collection_item)
+            added_count += 1
+        else:
+            skipped_count += 1
+    
+    db.commit()
+    
+    return {
+        "message": f"Added {added_count} photos to collection '{collection.name}'",
+        "added": added_count,
+        "skipped": skipped_count,
+        "total_requested": len(photo_ids)
+    }
+
+@app.delete("/collections/{collection_id}/photos/{photo_id}")
+async def remove_photo_from_collection(
+    collection_id: int, 
+    photo_id: int, 
+    db: Session = Depends(get_db)
+):
+    """Remove a photo from a collection"""
+    
+    # Find the collection item
+    collection_item = db.query(CollectionItem).filter(
+        CollectionItem.collection_id == collection_id,
+        CollectionItem.photo_id == photo_id
+    ).first()
+    
+    if not collection_item:
+        raise HTTPException(status_code=404, detail="Photo not found in this collection")
+    
+    # Get collection name for response
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    collection_name = collection.name if collection else "Collection"
+    
+    db.delete(collection_item)
+    db.commit()
+    
+    return {
+        "message": f"Photo removed from collection '{collection_name}'"
+    }
+
+@app.put("/collections/{collection_id}/cover")
+async def set_collection_cover(
+    collection_id: int,
+    photo_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Set the cover photo for a collection"""
+    
+    # Verify collection exists
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    # Verify photo exists and is in the collection
+    collection_item = db.query(CollectionItem).filter(
+        CollectionItem.collection_id == collection_id,
+        CollectionItem.photo_id == photo_id
+    ).first()
+    
+    if not collection_item:
+        raise HTTPException(status_code=400, detail="Photo must be in the collection to be set as cover")
+    
+    # Update collection cover
+    collection.cover_photo_id = photo_id
+    db.commit()
+    db.refresh(collection)
+    
+    return {
+        "message": f"Cover photo set for collection '{collection.name}'",
+        "collection": collection.to_dict()
+    }
+
+@app.get("/photos/{photo_id}/collections", response_model=List[Dict])
+async def get_photo_collections(photo_id: int, db: Session = Depends(get_db)):
+    """Get all collections that contain a specific photo"""
+    
+    # Verify photo exists
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # Get collection items for this photo
+    collection_items = db.query(CollectionItem).filter(
+        CollectionItem.photo_id == photo_id
+    ).all()
+    
+    collections = []
+    for item in collection_items:
+        if item.collection:
+            collection_data = item.collection.to_dict()
+            collection_data["added_at"] = item.added_at.isoformat() if item.added_at else None
+            collections.append(collection_data)
+    
+    return collections
 
 if __name__ == "__main__":
     import uvicorn

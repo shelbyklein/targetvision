@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, ARRAY
+from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, ARRAY, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 # from pgvector.sqlalchemy import Vector  # Commented out for testing without pgvector
@@ -72,8 +72,9 @@ class Photo(Base):
     # Relationships
     album = relationship("Album", back_populates="photos")
     ai_metadata = relationship("AIMetadata", back_populates="photo", uselist=False, cascade="all, delete-orphan")
+    collection_items = relationship("CollectionItem", back_populates="photo", cascade="all, delete-orphan")
     
-    def to_dict(self, include_ai_metadata=True):
+    def to_dict(self, include_ai_metadata=True, include_collections=True):
         result = {
             "id": self.id,
             "smugmug_id": self.smugmug_id,
@@ -95,7 +96,22 @@ class Photo(Base):
         if include_ai_metadata and self.ai_metadata:
             result["ai_metadata"] = self.ai_metadata.to_dict()
         
+        # Include collections if requested and available
+        if include_collections and self.collection_items:
+            result["collections"] = [
+                {
+                    "id": item.collection.id,
+                    "name": item.collection.name,
+                    "added_at": item.added_at.isoformat() if item.added_at else None
+                }
+                for item in self.collection_items if item.collection
+            ]
+        
         return result
+    
+    def get_collections(self):
+        """Get list of collections this photo belongs to"""
+        return [item.collection for item in self.collection_items if item.collection]
 
 class AIMetadata(Base):
     """AI-generated metadata for photos"""
@@ -160,3 +176,69 @@ class ProcessingQueue(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
+
+class Collection(Base):
+    """User-created collections of photos"""
+    __tablename__ = "collections"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    cover_photo_id = Column(Integer, ForeignKey("photos.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    cover_photo = relationship("Photo", foreign_keys=[cover_photo_id])
+    items = relationship("CollectionItem", back_populates="collection", cascade="all, delete-orphan")
+    
+    def to_dict(self, include_photos=False):
+        result = {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "cover_photo_id": self.cover_photo_id,
+            "photo_count": len(self.items) if self.items else 0,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+        
+        # Include cover photo details if available
+        if self.cover_photo:
+            result["cover_photo"] = {
+                "id": self.cover_photo.id,
+                "thumbnail_url": self.cover_photo.thumbnail_url,
+                "title": self.cover_photo.title
+            }
+        
+        # Include photos if requested
+        if include_photos and self.items:
+            result["photos"] = [item.photo.to_dict() for item in self.items if item.photo]
+        
+        return result
+
+class CollectionItem(Base):
+    """Many-to-many relationship between collections and photos"""
+    __tablename__ = "collection_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    collection_id = Column(Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=False, index=True)
+    photo_id = Column(Integer, ForeignKey("photos.id", ondelete="CASCADE"), nullable=False, index=True)
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Ensure each photo can only be added once per collection
+    __table_args__ = (
+        UniqueConstraint('collection_id', 'photo_id', name='unique_collection_photo'),
+    )
+    
+    # Relationships
+    collection = relationship("Collection", back_populates="items")
+    photo = relationship("Photo")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "collection_id": self.collection_id,
+            "photo_id": self.photo_id,
+            "added_at": self.added_at.isoformat() if self.added_at else None
+        }

@@ -4,11 +4,6 @@
         "command": "uvx",
         "args": ["duckduckgo-mcp-server"]
         },
-    "puppeteer": {
-        "command": "npx",
-        "args": ["-y", "puppeteer-mcp-server"],
-        "env": {}
-        },
     "sequential-thinking": {
       "command": "npx",
       "args": [
