@@ -1243,6 +1243,45 @@ async def process_photo(
         logger.error(f"Error processing photo {photo_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
+@app.delete("/photos/{photo_id}/ai-metadata")
+async def delete_ai_metadata(photo_id: int, db: Session = Depends(get_db)):
+    """Delete AI metadata for a photo and reset processing status"""
+    
+    # Verify photo exists
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    try:
+        # Find and delete AI metadata
+        ai_metadata = db.query(AIMetadata).filter(AIMetadata.photo_id == photo_id).first()
+        
+        if ai_metadata:
+            db.delete(ai_metadata)
+            logger.info(f"Deleted AI metadata for photo {photo_id}")
+            metadata_deleted = True
+        else:
+            logger.info(f"No AI metadata found for photo {photo_id}")
+            metadata_deleted = False
+        
+        # Reset processing status to not_processed
+        photo.processing_status = "not_processed"
+        photo.updated_at = datetime.now()
+        
+        db.commit()
+        
+        return {
+            "message": "AI metadata deleted successfully" if metadata_deleted else "No AI metadata found to delete",
+            "photo_id": photo_id,
+            "metadata_deleted": metadata_deleted,
+            "processing_status": "not_processed"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting AI metadata for photo {photo_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete AI metadata: {str(e)}")
+
 @app.post("/photos/process/batch")
 async def process_photos_batch(
     photo_ids: List[int],
