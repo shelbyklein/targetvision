@@ -800,14 +800,7 @@ class TargetVisionApp {
         const folderToggle = div.querySelector('.folder-toggle');
         const folderChildren = div.querySelector('.folder-children');
         
-        // Double-click to navigate into folder
-        folderItem.addEventListener('dblclick', () => {
-            if (folder.has_children) {
-                this.navigateToFolder(folder);
-            }
-        });
-        
-        // Single click to show folder info in right panel
+        // Single click to navigate to folder contents
         folderItem.addEventListener('click', (e) => {
             if (e.target.closest('.folder-toggle')) return; // Don't handle if toggle was clicked
             this.selectFolderItem(folder, div);
@@ -929,8 +922,8 @@ class TargetVisionApp {
         const folderItem = element.querySelector('.folder-item');
         folderItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
         
-        // Show folder info in right panel
-        this.displayFolderInfoInRightPanel(folder);
+        // Navigate to folder contents instead of showing folder info
+        this.navigateToFolder(folder);
     }
     
     selectAlbumFromTree(album, element) {
