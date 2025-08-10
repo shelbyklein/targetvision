@@ -2898,7 +2898,7 @@ class TargetVisionApp {
     // Progress Polling for Real-time Updates
     async pollBatchProgress(photoIds) {
         const startTime = Date.now();
-        const maxPollingTime = 10 * 60 * 1000; // 10 minutes max
+        const maxPollingTime = 30 * 60 * 1000; // 30 minutes max (increased for 1-image-at-a-time processing)
         const pollInterval = 1000; // Poll every second
         
         let completed = 0;
