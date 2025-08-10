@@ -2103,18 +2103,18 @@ class TargetVisionApp {
         const selectionBorder = isSelected ? 'ring-4 ring-blue-500' : '';
         
         div.innerHTML = `
-            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative ${selectionBorder}">
+            <div class="photo-container aspect-square bg-gray-100 rounded-lg overflow-hidden relative ${selectionBorder}">
                 <img 
                     src="${photo.thumbnail_url}" 
                     alt="${photo.title || 'Photo'}"
-                    class="w-full h-full object-cover"
+                    class="photo-thumbnail w-full h-full object-cover"
                     loading="lazy"
                 />
                 
                 <!-- Selection overlay -->
                 ${isSelected ? `
-                    <div class="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center z-15">
-                        <div class="bg-blue-500 text-white rounded-full p-2 shadow-lg">
+                    <div class="selection-overlay absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center z-15">
+                        <div class="selection-checkmark bg-blue-500 text-white rounded-full p-2 shadow-lg">
                             <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                             </svg>
@@ -2122,16 +2122,27 @@ class TargetVisionApp {
                     </div>
                 ` : ''}
                 
-                <!-- Status indicator -->
-                <div class="absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center z-20">
-                    <span>${statusInfo.icon}</span>
+                <!-- Collection indicator -->
+                ${photo.collections && photo.collections.length > 0 ? `
+                    <div class="collection-indicator absolute top-2 left-2 z-20">
+                        <div class="w-7 h-7 bg-black bg-opacity-60 rounded-full flex items-center justify-center text-yellow-400">
+                            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Status indicator (top-right) -->
+                <div class="status-indicator absolute top-2 right-2 w-7 h-7 ${statusInfo.color} text-white text-xs rounded-full flex items-center justify-center z-20">
+                    <span class="status-icon">${statusInfo.icon}</span>
                 </div>
                 
-                <!-- Lightbox button -->
-                <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <button class="lightbox-btn w-8 h-8 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full flex items-center justify-center text-white transition-all" 
+                <!-- Lightbox button (moved to bottom-right) -->
+                <div class="lightbox-button-container absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button class="lightbox-btn w-7 h-7 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full flex items-center justify-center text-white transition-all" 
                             onclick="event.stopPropagation()">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg class="lightbox-icon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                     </button>
@@ -2139,21 +2150,15 @@ class TargetVisionApp {
                 
                 
                 <!-- Hover overlay for visual feedback -->
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all z-10">
+                <div class="hover-overlay absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all z-10">
                     ${!photo.is_synced ? `
-                        <div class="absolute inset-0 flex items-center justify-center">
-                            <div class="bg-black bg-opacity-70 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div class="sync-tooltip-container absolute inset-0 flex items-center justify-center">
+                            <div class="sync-tooltip bg-black bg-opacity-70 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                                 Sync album to enable selection
                             </div>
                         </div>
                     ` : ''}
                 </div>
-            </div>
-            
-            <!-- Photo info -->
-            <div class="mt-2">
-                <p class="text-xs text-gray-600 truncate">${photo.filename || photo.title || 'Untitled'}</p>
-                <p class="text-xs text-gray-400">${photo.width}×${photo.height}</p>
             </div>
         `;
         

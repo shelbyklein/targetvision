@@ -835,29 +835,30 @@ async def list_smugmug_album_photos(
             }
             
             if local_photo:
+                # Use the Photo model's to_dict method to include all data including collections
+                local_data = local_photo.to_dict(include_ai_metadata=True, include_collections=True)
+                
+                # Merge local database data with SmugMug data, prioritizing local data
                 photo_data.update({
-                    'local_photo_id': local_photo.id,
-                    'processing_status': local_photo.processing_status,
-                    'has_ai_metadata': local_photo.ai_metadata is not None,
+                    'local_photo_id': local_data['id'],
+                    'processing_status': local_data['processing_status'],
+                    'has_ai_metadata': local_data['has_ai_metadata'],
                     'is_synced': True,
-                    'synced_at': local_photo.created_at.isoformat() if local_photo.created_at else None
+                    'synced_at': local_data['created_at'],
+                    'collections': local_data.get('collections', [])  # Include collections data
                 })
                 
                 # Include AI metadata if available
-                if local_photo.ai_metadata:
-                    photo_data['ai_metadata'] = {
-                        'description': local_photo.ai_metadata.description,
-                        'ai_keywords': local_photo.ai_metadata.ai_keywords,
-                        'confidence_score': local_photo.ai_metadata.confidence_score,
-                        'processed_at': local_photo.ai_metadata.processed_at.isoformat() if local_photo.ai_metadata.processed_at else None
-                    }
+                if local_data.get('ai_metadata'):
+                    photo_data['ai_metadata'] = local_data['ai_metadata']
             else:
                 photo_data.update({
                     'local_photo_id': None,
                     'processing_status': 'not_synced',
                     'has_ai_metadata': False,
                     'is_synced': False,
-                    'synced_at': None
+                    'synced_at': None,
+                    'collections': []  # Empty collections array for non-synced photos
                 })
             
             result.append(photo_data)
