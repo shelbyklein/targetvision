@@ -2271,6 +2271,17 @@ class TargetVisionApp {
             });
         }
         
+        // Add status indicator click handler for processing
+        const statusIndicator = div.querySelector('.status-indicator');
+        if (statusIndicator) {
+            statusIndicator.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.processSinglePhoto(photo);
+            });
+            // Add cursor pointer to indicate it's clickable
+            statusIndicator.style.cursor = 'pointer';
+        }
+        
         return div;
     }
 
@@ -2507,6 +2518,88 @@ class TargetVisionApp {
             this.hideBatchProgress();
             this.hideGlobalProgress();
             this.showErrorMessage('Processing Failed', 'Batch processing failed. Please try again.');
+        }
+    }
+
+    async processSinglePhoto(photo) {
+        // Check if photo is synced and has required data
+        if (!photo.is_synced || !photo.local_photo_id) {
+            this.showErrorMessage('Processing Error', 'This photo must be synced to the database before it can be processed with AI.');
+            return;
+        }
+        
+        // Check if already processing
+        if (this.processingPhotos.has(photo.local_photo_id)) {
+            this.showErrorMessage('Processing in Progress', 'This photo is already being processed.');
+            return;
+        }
+        
+        // Check if already processed
+        if (photo.has_ai_metadata || photo.processing_status === 'completed') {
+            this.showErrorMessage('Already Processed', 'This photo has already been processed with AI.');
+            return;
+        }
+        
+        // Add to UI processing state
+        this.processingPhotos.add(photo.local_photo_id);
+        
+        // Refresh UI to show processing indicator
+        this.displayPhotos();
+        
+        // Show global progress for single photo
+        this.showGlobalProgress(0, 1, 'Analyzing photo with AI...');
+        
+        try {
+            // Get user's API settings
+            const apiSettings = this.getApiSettings();
+            
+            // Prepare headers with API keys
+            const headers = {};
+            
+            if (apiSettings.anthropic_key) {
+                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
+            }
+            if (apiSettings.openai_key) {
+                headers['X-OpenAI-Key'] = apiSettings.openai_key;
+            }
+            
+            const response = await fetch(`${this.apiBase}/photos/${photo.local_photo_id}/process?provider=${apiSettings.active_provider || 'anthropic'}`, {
+                method: 'POST',
+                headers: headers
+            });
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const result = await response.json();
+            
+            // Update the photo data with AI metadata
+            const photoIndex = this.currentPhotos.findIndex(p => p.local_photo_id === photo.local_photo_id);
+            if (photoIndex !== -1) {
+                this.currentPhotos[photoIndex].ai_metadata = result.ai_metadata;
+                this.currentPhotos[photoIndex].has_ai_metadata = true;
+            }
+            
+            // Remove from processing state
+            this.processingPhotos.delete(photo.local_photo_id);
+            
+            // Refresh the photo grid to show updated status
+            this.displayPhotos();
+            
+            // Update global progress to complete
+            this.updateGlobalProgress(1, 1, 'Photo analysis complete!');
+            
+            this.showSuccessMessage('AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
+            
+        } catch (error) {
+            console.error('AI processing failed:', error);
+            this.hideGlobalProgress();
+            this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
+            
+            // Remove from processing state on error
+            this.processingPhotos.delete(photo.local_photo_id);
+            
+            // Refresh UI to remove processing indicator
+            this.displayPhotos();
         }
     }
 
