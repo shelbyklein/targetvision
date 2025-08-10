@@ -6,6 +6,7 @@ class TargetVisionApp {
         this.currentAlbum = null;
         this.currentPhotos = [];
         this.selectedPhotos = new Set();
+        this.processingPhotos = new Set(); // UI-only state for photos currently being processed
         this.statusFilter = '';
         this.showProcessedPhotos = true;
         this.showUnprocessedPhotos = true;
@@ -139,7 +140,17 @@ class TargetVisionApp {
         this.cache.folders.clear();
         localStorage.removeItem('targetvision_albums_cache');
         localStorage.removeItem('targetvision_folders_cache');
-        console.log('Cache cleared');
+        console.log('🔍 DEBUG: Cache cleared');
+    }
+    
+    // Debug function to clear cache and reload current album
+    debugClearCacheAndReload() {
+        console.log('🔍 DEBUG: Clearing cache and reloading current album...');
+        this.clearCache();
+        if (this.currentAlbum) {
+            const albumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
+            this.loadAlbumPhotos(albumId);
+        }
     }
     
     clearCacheAndRefresh() {
@@ -1957,6 +1968,7 @@ class TargetVisionApp {
         const cachedPhotos = this.getCachedAlbumPhotos(albumId);
         if (cachedPhotos) {
             // Show cached data immediately for fast navigation
+            console.log(`🔍 DEBUG: Using cached photos for album ${albumId} (${cachedPhotos.length} photos)`);
             this.currentPhotos = cachedPhotos;
             this.displayPhotos();
             this.updatePhotoStats();
@@ -1977,6 +1989,30 @@ class TargetVisionApp {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             this.currentPhotos = await response.json();
+            
+            // DEBUG: Log photo data to understand status issues
+            console.log(`🔍 DEBUG: Fetched ${this.currentPhotos.length} photos for album ${albumId}`);
+            console.log('🔍 DEBUG: To clear cache and reload, run: window.app.debugClearCacheAndReload()');
+            
+            const statusCounts = {};
+            this.currentPhotos.forEach((photo, index) => {
+                const status = photo.processing_status || 'undefined';
+                const hasAiMetadata = !!(photo.ai_metadata && photo.ai_metadata.length > 0);
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+                
+                // Log first few photos for detailed analysis
+                if (index < 5) {
+                    console.log(`🔍 Photo ${index + 1}:`, {
+                        title: photo.title || photo.filename || 'Untitled',
+                        processing_status: photo.processing_status,
+                        hasAiMetadata: hasAiMetadata,
+                        ai_metadata_length: photo.ai_metadata ? photo.ai_metadata.length : 0,
+                        smugmug_id: photo.smugmug_id,
+                        local_photo_id: photo.local_photo_id
+                    });
+                }
+            });
+            console.log('🔍 Status breakdown:', statusCounts);
             
             // Cache the fresh data
             this.setCachedAlbumPhotos(albumId, this.currentPhotos);
@@ -2076,6 +2112,39 @@ class TargetVisionApp {
         this.updateToggleButtonStyles();
     }
 
+    // Helper function to determine consistent photo processing status
+    getPhotoProcessingStatus(photo) {
+        // Check if photo is currently being processed (UI-only state)
+        const photoId = photo.smugmug_id || photo.image_key || photo.local_photo_id;
+        if (this.processingPhotos.has(photoId)) {
+            return 'processing'; // Temporary UI state
+        }
+        
+        let status = photo.processing_status || 'not_synced';
+        const originalStatus = status;
+        
+        // If photo has AI metadata, it should show as completed regardless of processing_status
+        // Exception: respect 'failed' status even if AI metadata exists (edge case)
+        if (photo.ai_metadata && photo.ai_metadata.length > 0) {
+            if (photo.processing_status !== 'failed') {
+                status = 'completed';
+            }
+        }
+        
+        // DEBUG: Log status changes for debugging
+        if (status !== originalStatus || (photo.processing_status === 'completed' && photo.title)) {
+            console.log('🔍 Status determination:', {
+                title: photo.title || photo.filename || 'Untitled',
+                originalStatus: photo.processing_status,
+                finalStatus: status,
+                hasAiMetadata: !!(photo.ai_metadata && photo.ai_metadata.length > 0),
+                aiMetadataCount: photo.ai_metadata ? photo.ai_metadata.length : 0
+            });
+        }
+        
+        return status;
+    }
+
     createPhotoCard(photo) {
         const div = document.createElement('div');
         const cursorClass = photo.is_synced ? 'cursor-pointer' : 'cursor-not-allowed';
@@ -2095,7 +2164,8 @@ class TargetVisionApp {
             'not_synced': { color: 'bg-gray-400', icon: '○', text: 'Not Synced' }
         };
         
-        const status = photo.processing_status || 'not_synced';
+        // Determine status consistently with filtering logic
+        const status = this.getPhotoProcessingStatus(photo);
         const statusInfo = statusConfig[status];
         
         // Check if photo is selected
@@ -2392,16 +2462,19 @@ class TargetVisionApp {
             return;
         }
         
+        // Add photos to UI processing state
+        Array.from(this.selectedPhotos).forEach(photoId => {
+            this.processingPhotos.add(photoId);
+        });
+        
+        // Update UI to show processing indicators
+        this.displayPhotos();
+        
         this.showBatchProgress(0, localPhotoIds.length, 0);
         this.showGlobalProgress(0, localPhotoIds.length, 'Starting AI analysis of selected photos...', true);
         
         try {
-            // Update status to processing
-            await fetch(`${this.apiBase}/photos/update-status?status=processing`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(localPhotoIds)
-            });
+            // Note: No longer updating backend status to "processing" - this is now UI-only state
             
             // Get user's API settings
             const apiSettings = this.getApiSettings();
@@ -2435,6 +2508,9 @@ class TargetVisionApp {
             
         } catch (error) {
             console.error('Batch processing failed:', error);
+            // Clear processing state on error
+            this.processingPhotos.clear();
+            this.displayPhotos(); // Refresh UI to remove processing indicators
             this.hideBatchProgress();
             this.hideGlobalProgress();
             this.showErrorMessage('Processing Failed', 'Batch processing failed. Please try again.');
@@ -2520,6 +2596,11 @@ class TargetVisionApp {
         const progressText = document.getElementById('batch-progress-text');
         const progressBar = document.getElementById('batch-progress-bar');
         
+        // Check if elements exist before trying to use them
+        if (!progressContainer || !progressText || !progressBar) {
+            return; // Elements were removed, skip batch progress display
+        }
+        
         const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
         
         progressText.textContent = `${processed}/${total}`;
@@ -2534,7 +2615,10 @@ class TargetVisionApp {
     }
 
     hideBatchProgress() {
-        document.getElementById('batch-progress').classList.add('hidden');
+        const progressContainer = document.getElementById('batch-progress');
+        if (progressContainer) {
+            progressContainer.classList.add('hidden');
+        }
     }
     
     // Global Progress Bar Methods
@@ -2621,23 +2705,32 @@ class TargetVisionApp {
                 
                 const statuses = await Promise.all(statusPromises);
                 
-                // Update individual photo thumbnails with new status
+                // Update individual photo thumbnails with new status and clean up processing state
                 photoIds.forEach((photoId, index) => {
                     const newStatus = statuses[index];
                     this.updatePhotoThumbnailStatus(photoId, newStatus);
+                    
+                    // Remove from processing state if completed or failed
+                    const currentPhoto = this.currentPhotos.find(p => p.local_photo_id === photoId);
+                    const photoId_ui = currentPhoto ? (currentPhoto.smugmug_id || currentPhoto.image_key || currentPhoto.local_photo_id) : photoId;
+                    if (newStatus === 'completed' || newStatus === 'failed') {
+                        this.processingPhotos.delete(photoId_ui);
+                    }
                 });
                 
-                // Count statuses
+                // Count statuses (no longer checking for "processing" since it's UI-only)
                 completed = statuses.filter(status => status === 'completed').length;
-                processing = statuses.filter(status => status === 'processing').length;
                 failed = statuses.filter(status => status === 'failed').length;
+                
+                // Calculate remaining as photos still being processed (not yet completed or failed)
+                const remaining = total - completed - failed;
                 
                 // Update progress bars
                 this.showBatchProgress(completed, total, completed);
                 
                 let detailMessage = 'Analyzing images and generating metadata...';
-                if (processing > 0) {
-                    detailMessage = `Processing ${processing} photos, ${completed} complete`;
+                if (remaining > 0) {
+                    detailMessage = `Processing ${remaining} photos, ${completed} complete`;
                 } else if (completed > 0) {
                     detailMessage = `${completed}/${total} photos analyzed successfully`;
                 }
@@ -2645,10 +2738,12 @@ class TargetVisionApp {
                 this.updateGlobalProgress(completed, total, detailMessage);
                 
                 // Check if all photos are done processing
-                const remaining = total - completed - failed;
                 if (remaining === 0) {
                     // All photos processed, stop polling and clean up
                     this.isPollingProgress = false;
+                    
+                    // Clear all processing state
+                    this.processingPhotos.clear();
                     
                     // Show completion message
                     this.updateGlobalProgress(completed, total, 'Processing complete! Reloading photos...');
@@ -2697,15 +2792,9 @@ class TargetVisionApp {
         setTimeout(poll, 1000); // Start after 1 second
     }
     
-    // Update individual photo thumbnail status indicator
+    // Update individual photo thumbnail status indicator (UI only)
     updatePhotoThumbnailStatus(photoId, newStatus) {
         try {
-            // Find the photo in currentPhotos and update its status
-            const photoIndex = this.currentPhotos.findIndex(p => p.local_photo_id === photoId);
-            if (photoIndex !== -1) {
-                this.currentPhotos[photoIndex].processing_status = newStatus;
-            }
-            
             // Find the photo card in the DOM using data attribute
             const targetCard = document.querySelector(`[data-photo-id="${photoId}"]`);
             if (!targetCard) return;
@@ -3888,6 +3977,9 @@ You can also ask for help with syncing albums or processing photos with AI. What
         processButton.textContent = 'Processing...';
         processButton.disabled = true;
         
+        // Add to UI processing state (no backend persistence)
+        this.processingPhotos.add(currentPhoto.local_photo_id);
+        
         // Show global progress for single photo
         this.showGlobalProgress(0, 1, 'Analyzing photo with AI...');
         
@@ -3914,13 +4006,16 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
             const result = await response.json();
             
-            // Update the current photo data
+            // Update the current photo data with AI metadata only (no processing_status change)
             const photoIndex = this.currentPhotos.findIndex(p => p.local_photo_id === currentPhoto.local_photo_id);
             if (photoIndex !== -1) {
                 this.currentPhotos[photoIndex].ai_metadata = result.ai_metadata;
                 this.currentPhotos[photoIndex].has_ai_metadata = true;
-                this.currentPhotos[photoIndex].processing_status = 'completed';
+                // Don't set processing_status - it will be derived from has_ai_metadata
             }
+            
+            // Remove from processing state
+            this.processingPhotos.delete(currentPhoto.local_photo_id);
             
             // Refresh the modal with updated data
             await this.showPhotoModal(this.currentPhotos[photoIndex]);
@@ -3937,6 +4032,9 @@ You can also ask for help with syncing albums or processing photos with AI. What
             console.error('AI processing failed:', error);
             this.hideGlobalProgress();
             this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
+            
+            // Remove from processing state on error
+            this.processingPhotos.delete(currentPhoto.local_photo_id);
             
             processButton.textContent = originalText;
             processButton.disabled = false;

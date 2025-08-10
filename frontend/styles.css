@@ -94,6 +94,7 @@ img[loading="lazy"] {
     display: grid;
     gap: 1rem;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    width: 100%;
 }
 
 /* Large screens - 8 columns */
@@ -123,6 +124,31 @@ img[loading="lazy"] {
         grid-template-columns: repeat(2, 1fr);
         gap: 0.75rem;
     }
+}
+
+/* Ensure photos content fills available space and scrolls properly */
+#photos-content {
+    height: 0;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+/* Collection photos content should behave the same */
+#collection-photos-content {
+    height: 0;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+/* Ensure proper height flow through the layout */
+#page-albums, #photos-panel {
+    height: 100%;
+}
+
+/* Settings page should be scrollable */
+#page-settings {
+    height: 100%;
+    overflow-y: auto;
 }
 
 /* Search result highlighting */

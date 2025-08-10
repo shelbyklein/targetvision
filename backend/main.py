@@ -1024,7 +1024,7 @@ async def get_album_photos(
     album_id: int,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, le=200),
-    processing_status: Optional[str] = Query(default=None, regex="^(not_processed|processing|completed|failed)$"),
+    processing_status: Optional[str] = Query(default=None, regex="^(not_processed|completed|failed)$"),
     db: Session = Depends(get_db)
 ):
     """Get photos from a specific album with optional filtering by processing status"""
@@ -1059,7 +1059,6 @@ async def get_album(album_id: int, db: Session = Depends(get_db)):
     stats = db.query(
         func.count(Photo.id).label('total_photos'),
         func.sum(case((Photo.processing_status == 'completed', 1), else_=0)).label('processed'),
-        func.sum(case((Photo.processing_status == 'processing', 1), else_=0)).label('processing'),
         func.sum(case((Photo.processing_status == 'failed', 1), else_=0)).label('failed'),
         func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed')
     ).filter(Photo.album_id == album_id).first()
@@ -1068,7 +1067,6 @@ async def get_album(album_id: int, db: Session = Depends(get_db)):
     album_dict.update({
         'total_photos': int(stats.total_photos or 0),
         'processed_photos': int(stats.processed or 0),
-        'processing_photos': int(stats.processing or 0),
         'failed_photos': int(stats.failed or 0),
         'ai_processed_photos': int(stats.ai_processed or 0)
     })
@@ -1324,7 +1322,7 @@ async def get_processing_queue_status():
 @app.post("/photos/update-status")
 async def update_photos_processing_status(
     photo_ids: List[int],
-    status: str = Query(..., regex="^(not_processed|processing|completed|failed)$"),
+    status: str = Query(..., regex="^(not_processed|completed|failed)$"),
     db: Session = Depends(get_db)
 ):
     """Update processing status for multiple photos"""

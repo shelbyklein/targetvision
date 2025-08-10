@@ -21,7 +21,7 @@
         }
     </script>
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
+<body class="bg-gray-50 h-screen flex flex-col">
     <!-- Header -->
     <header class="bg-white shadow-sm border-b w-full">
         <div class="w-full px-4 sm:px-6 lg:px-8">
@@ -95,7 +95,7 @@
         <div id="error-toast" class="hidden mb-4 mx-4"></div>
 
         <!-- Albums Page -->
-        <div id="page-albums" class="flex-1 flex flex-col overflow-hidden">
+        <div id="page-albums" class="flex-1 flex flex-col overflow-hidden h-full">
             <!-- Navigation Breadcrumb -->
             <nav id="breadcrumb" class="flex items-center space-x-2 text-sm text-gray-500 mb-4 mx-4 pt-4">
                 <div id="breadcrumb-path" class="flex items-center">
@@ -108,7 +108,7 @@
             </nav>
 
             <!-- Main Finder-Style Layout -->
-            <div class="flex-1 flex overflow-hidden bg-white mx-4 mb-4 border border-gray-300 rounded-lg shadow-sm">
+            <div class="flex-1 flex overflow-hidden bg-white mx-4 mb-4 border border-gray-300 rounded-lg shadow-sm min-h-0">
                 
                 <!-- Left Sidebar: Albums -->
                 <div id="albums-sidebar" class="w-80 border-r border-gray-300 bg-gray-50 flex flex-col">
@@ -141,7 +141,7 @@
                 </div>
                 
                 <!-- Right Panel: Photos -->
-                <div id="photos-panel" class="flex-1 flex flex-col">
+                <div id="photos-panel" class="flex-1 flex flex-col min-h-0">
                     
                     <!-- Photos Header -->
                     <div id="photos-header" class="p-4 border-b border-gray-300 bg-gray-100">
@@ -212,21 +212,10 @@
                                 Process Selected
                             </button>
                         </div>
-                        
-                        <!-- Batch Processing Progress -->
-                        <div id="batch-progress" class="hidden mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-sm font-medium text-blue-800">Processing Photos</span>
-                                <span id="batch-progress-text" class="text-sm text-blue-600">0/0</span>
-                            </div>
-                            <div class="w-full bg-blue-200 rounded-full h-2">
-                                <div id="batch-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                            </div>
-                        </div>
                     </div>
                     
                     <!-- Photos Grid -->
-                    <div id="photos-content" class="flex-1 overflow-y-auto p-4">
+                    <div id="photos-content" class="flex-1 overflow-y-auto p-4 min-h-0">
                         <!-- Welcome State -->
                         <div id="welcome-state" class="flex flex-col items-center justify-center h-full text-gray-500">
                             <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -328,7 +317,7 @@
                     </div>
                     
                     <!-- Collection Photos Grid -->
-                    <div id="collection-photos-content" class="flex-1 overflow-y-auto p-4">
+                    <div id="collection-photos-content" class="flex-1 overflow-y-auto p-4 min-h-0">
                         <div id="collection-photos-placeholder" class="text-center text-gray-500 py-12">
                             <svg class="h-16 w-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
@@ -560,7 +549,7 @@
         </div>
 
         <!-- Settings Page -->
-        <div id="page-settings" class="hidden flex-1 flex flex-col overflow-hidden">
+        <div id="page-settings" class="hidden flex-1 flex flex-col overflow-y-auto">
             <div class="mx-4 my-4">
                 <!-- Settings Header -->
                 <div class="mb-6">
