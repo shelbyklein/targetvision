@@ -573,6 +573,7 @@ class TargetVisionApp {
         document.getElementById('modal-save-metadata').addEventListener('click', () => this.saveMetadataChanges());
         document.getElementById('modal-cancel-edit').addEventListener('click', () => this.cancelMetadataEdit());
         document.getElementById('modal-regenerate-ai').addEventListener('click', () => this.regenerateAIMetadata());
+        document.getElementById('modal-delete-ai').addEventListener('click', () => this.deleteAIMetadata());
         
         // Collection management
         document.getElementById('modal-add-to-collection').addEventListener('click', () => this.showCollectionInterface());
@@ -4344,7 +4345,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
     }
     
     async regenerateAIMetadata() {
-        if (!this.currentPhoto?.id) {
+        if (!this.currentPhoto?.local_photo_id) {
             console.error('No photo selected for regeneration');
             return;
         }
@@ -4367,7 +4368,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
                 headers['X-OpenAI-Key'] = apiSettings.openai_key;
             }
             
-            const response = await fetch(`${this.apiBase}/photos/${this.currentPhoto.id}/process?provider=${apiSettings.active_provider || 'anthropic'}`, {
+            const response = await fetch(`${this.apiBase}/photos/${this.currentPhoto.local_photo_id}/process?provider=${apiSettings.active_provider || 'anthropic'}`, {
                 method: 'POST',
                 headers: headers
             });
@@ -4395,6 +4396,63 @@ You can also ask for help with syncing albums or processing photos with AI. What
             const regenerateButton = document.getElementById('modal-regenerate-ai');
             regenerateButton.disabled = false;
             regenerateButton.innerHTML = '🔄 Regenerate AI';
+        }
+    }
+    
+    async deleteAIMetadata() {
+        if (!this.currentPhoto?.local_photo_id) {
+            console.error('No photo selected for AI metadata deletion');
+            return;
+        }
+        
+        // Show confirmation dialog
+        const confirmed = confirm('Are you sure you want to delete the AI-generated metadata for this photo? This action cannot be undone.');
+        if (!confirmed) {
+            return;
+        }
+        
+        try {
+            const deleteButton = document.getElementById('modal-delete-ai');
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '🗑️ Deleting...';
+            
+            const response = await fetch(`${this.apiBase}/photos/${this.currentPhoto.local_photo_id}/ai-metadata`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to delete AI metadata: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Update the current photo data
+            const photoIndex = this.currentPhotos.findIndex(p => p.local_photo_id === this.currentPhoto.local_photo_id);
+            if (photoIndex !== -1) {
+                this.currentPhotos[photoIndex].ai_metadata = null;
+                this.currentPhotos[photoIndex].has_ai_metadata = false;
+                this.currentPhotos[photoIndex].processing_status = 'not_processed';
+                
+                // Update current photo reference
+                this.currentPhoto = this.currentPhotos[photoIndex];
+            }
+            
+            // Update the modal display to show no AI metadata
+            this.showPhotoModal(this.currentPhoto);
+            
+            // Refresh the photo grid to show updated status
+            this.displayPhotos();
+            
+            this.showSuccessMessage('AI Data Deleted', 'AI-generated metadata has been successfully removed from this photo.');
+            console.log('AI metadata deleted successfully');
+            
+        } catch (error) {
+            console.error('Error deleting AI metadata:', error);
+            this.showErrorMessage('Deletion Failed', 'Failed to delete AI metadata. Please try again.');
+        } finally {
+            const deleteButton = document.getElementById('modal-delete-ai');
+            deleteButton.disabled = false;
+            deleteButton.innerHTML = '🗑️ Delete AI Data';
         }
     }
     
