@@ -1466,8 +1466,8 @@ class TargetVisionApp {
             div.style.backgroundImage = `url('${imageUrl}')`;
             
             div.innerHTML = `
-                <div class="absolute top-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded">
-                    <h3 class="text-sm font-medium text-white break-words flex items-center">
+                <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 p-2 rounded-b-lg">
+                    <h3 class="text-sm font-medium text-white break-words flex items-center justify-center text-center">
                         <svg class="h-4 w-4 text-amber-300 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
                         </svg>
@@ -1618,17 +1618,22 @@ class TargetVisionApp {
                     cardElement.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center aspect-square';
                     cardElement.style.backgroundImage = `url('${data.thumbnail_url}')`;
                     
-                    // Update content with overlay styling
+                    // Update content with bottom overlay styling
                     cardElement.innerHTML = `
                         ${privacyBadge}
-                        <div class="relative z-10 flex flex-col items-center text-center h-full justify-end">
-                            <h3 class="text-sm font-medium text-white truncate w-full bg-black bg-opacity-50 px-2 py-1 rounded">${albumName}</h3>
-                            <div class="flex items-center justify-center mt-1 space-x-2 bg-black bg-opacity-50 px-2 py-1 rounded">
+                        <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 p-2 rounded-b-lg">
+                            <h3 class="text-sm font-medium text-white break-words flex items-center justify-center text-center mb-1">
+                                <svg class="h-4 w-4 text-blue-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                                </svg>
+                                ${albumName}
+                            </h3>
+                            <div class="flex items-center justify-center space-x-2">
                                 <p class="text-xs text-gray-200">${photoCount} photos</p>
                                 <span class="flex-shrink-0">${syncIconSvg}</span>
                             </div>
                             ${isSynced ? `
-                                <p class="text-xs text-green-300 mt-1 bg-black bg-opacity-50 px-2 py-1 rounded">${processedCount} processed</p>
+                                <p class="text-xs text-green-300 mt-1 text-center">${processedCount} processed</p>
                             ` : ''}
                         </div>
                     `;
