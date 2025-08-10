@@ -4877,7 +4877,7 @@ Emphasize athletic performance, competition elements, and achievement recognitio
 
         const photosHtml = this.currentCollectionPhotos.map(photo => `
             <div class="photo-thumbnail group relative bg-gray-100 aspect-square rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                 onclick="window.app.openPhotoModal('${photo.smugmug_id}')">
+                 onclick="window.app.showPhotoModal(${JSON.stringify(photo).replace(/"/g, '&quot;')})">
                 <img src="${photo.thumbnail_url}" 
                      alt="${photo.title || 'Photo'}" 
                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
