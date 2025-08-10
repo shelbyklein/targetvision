@@ -173,6 +173,73 @@ class TargetVisionApp {
         this.showToast('Cache Cleared', 'All cached data has been cleared successfully', 'success');
     }
     
+    async confirmProcessingStatus() {
+        const button = document.getElementById('confirm-processing-status');
+        const resultDiv = document.getElementById('confirm-status-result');
+        
+        // Disable button and show loading state
+        const originalText = button.textContent;
+        button.textContent = 'Confirming...';
+        button.disabled = true;
+        
+        try {
+            const response = await fetch(`${this.apiBase}/photos/confirm-processing-status`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Show success result
+            resultDiv.innerHTML = `
+                <div class="text-green-700 bg-green-50 border border-green-200 rounded p-3">
+                    <div class="font-medium">✅ Processing Status Confirmed</div>
+                    <div class="text-sm mt-1">
+                        <div>Total photos: ${result.total_photos}</div>
+                        <div>Photos updated: ${result.photos_updated}</div>
+                        ${result.newly_completed > 0 ? `<div>Newly marked as completed: ${result.newly_completed}</div>` : ''}
+                        ${result.newly_not_processed > 0 ? `<div>Newly marked as unprocessed: ${result.newly_not_processed}</div>` : ''}
+                    </div>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+            
+            // Show toast notification
+            this.showToast('Status Confirmed', `${result.photos_updated} photos updated`, 'success');
+            
+            // Refresh photo grid if we're on the albums page
+            if (this.currentPage === 'albums' && this.currentPhotos.length > 0) {
+                this.displayPhotos();
+            }
+            
+        } catch (error) {
+            console.error('Error confirming processing status:', error);
+            
+            // Show error result
+            resultDiv.innerHTML = `
+                <div class="text-red-700 bg-red-50 border border-red-200 rounded p-3">
+                    <div class="font-medium">❌ Failed to confirm processing status</div>
+                    <div class="text-sm mt-1">${error.message}</div>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+            
+            this.showToast('Error', 'Failed to confirm processing status', 'error');
+        } finally {
+            // Restore button
+            button.textContent = originalText;
+            button.disabled = false;
+            
+            // Hide result after 10 seconds
+            setTimeout(() => {
+                resultDiv.classList.add('hidden');
+            }, 10000);
+        }
+    }
+    
     updateCacheStatus() {
         // Update cache count displays
         const albumsCountElement = document.getElementById('cache-albums-count');
@@ -524,6 +591,9 @@ class TargetVisionApp {
         // Cache management
         document.getElementById('clear-cache').addEventListener('click', () => this.clearCacheAndRefresh());
         document.getElementById('refresh-cache-status').addEventListener('click', () => this.updateCacheStatus());
+        
+        // Data management
+        document.getElementById('confirm-processing-status').addEventListener('click', () => this.confirmProcessingStatus());
         
         // API Key management
         document.getElementById('test-anthropic-key').addEventListener('click', () => this.testApiKey('anthropic'));
