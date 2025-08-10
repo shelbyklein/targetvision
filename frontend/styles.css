@@ -398,12 +398,14 @@ img[loading="lazy"] {
     box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1);
 }
 
-/* Status indicator forced 1:1 aspect ratio */
-.status-indicator {
-    width: 2rem; /* 32px */
-    height: 2rem; /* 32px */
-    min-width: 2rem;
-    min-height: 2rem;
+/* Photo card icons - consistent sizing */
+.status-indicator,
+.collection-indicator > div,
+.lightbox-btn {
+    width: 1.75rem !important; /* 28px - w-7 */
+    height: 1.75rem !important; /* 28px - h-7 */
+    min-width: 1.75rem;
+    min-height: 1.75rem;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;

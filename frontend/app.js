@@ -2111,7 +2111,16 @@ class TargetVisionApp {
                     loading="lazy"
                 />
                 
-                <!-- Selection overlay -->
+                <!-- Selection hover checkmark (shows on hover when not selected) -->
+                <div class="selection-hover-checkmark absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity z-19 ${isSelected ? 'hidden' : ''} flex items-center justify-center">
+                    <div class="w-8 h-8 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center text-gray-700 shadow-lg transition-all cursor-pointer">
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Selection overlay (shows when selected) -->
                 ${isSelected ? `
                     <div class="selection-overlay absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center z-15">
                         <div class="selection-checkmark bg-blue-500 text-white rounded-full p-2 shadow-lg">
@@ -2183,6 +2192,19 @@ class TargetVisionApp {
             lightboxBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.showPhotoModal(photo);
+            });
+        }
+        
+        // Add selection hover checkmark handler
+        const hoverCheckmark = div.querySelector('.selection-hover-checkmark');
+        if (hoverCheckmark) {
+            hoverCheckmark.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (photo.is_synced) {
+                    this.togglePhotoSelection(photo.smugmug_id, true);
+                } else {
+                    this.showErrorMessage('Sync Required', 'This photo must be synced to the database before it can be selected for processing. Use the "Sync Album" button first.');
+                }
             });
         }
         
@@ -2258,6 +2280,16 @@ class TargetVisionApp {
             } else if (!isSelected && selectionOverlay) {
                 // Remove selection overlay
                 selectionOverlay.remove();
+            }
+            
+            // Update hover checkmark visibility
+            const hoverCheckmark = photoCard.querySelector('.selection-hover-checkmark');
+            if (hoverCheckmark) {
+                if (isSelected) {
+                    hoverCheckmark.classList.add('hidden');
+                } else {
+                    hoverCheckmark.classList.remove('hidden');
+                }
             }
         });
     }
