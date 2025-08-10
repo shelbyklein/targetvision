@@ -646,6 +646,29 @@
                     
                     <!-- API Keys Section -->
                     <div class="mb-6 space-y-4">
+                        <!-- Key Source Toggle -->
+                        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <label class="block text-sm font-medium text-gray-700 mb-3">API Key Source</label>
+                            <div class="flex space-x-6">
+                                <div class="flex items-center">
+                                    <input id="use-default-keys" name="key-source" type="radio" value="default" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" checked>
+                                    <label for="use-default-keys" class="ml-2 block text-sm text-gray-700">
+                                        Use Server Keys (.env)
+                                        <div class="text-xs text-gray-500">Recommended - Uses keys configured on the server</div>
+                                    </label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input id="use-custom-keys" name="key-source" type="radio" value="custom" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                    <label for="use-custom-keys" class="ml-2 block text-sm text-gray-700">
+                                        Use My Own Keys
+                                        <div class="text-xs text-gray-500">Provide your own API keys below</div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Custom Keys Container (initially hidden) -->
+                        <div id="custom-keys-container" class="hidden space-y-4">
                         <!-- Anthropic API Key -->
                         <div id="anthropic-key-section">
                             <label for="anthropic-api-key" class="block text-sm font-medium text-gray-700 mb-2">
@@ -675,6 +698,7 @@
                             </div>
                             <div id="openai-key-status" class="mt-1 text-xs hidden"></div>
                         </div>
+                        </div> <!-- End custom-keys-container -->
                     </div>
                     
                     <!-- Image Test Section -->

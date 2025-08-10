@@ -2624,7 +2624,9 @@ class TargetVisionApp {
             const apiSettings = this.getApiSettings();
             
             // Prepare headers with API keys
-            const headers = {};
+            const headers = {
+                'Content-Type': 'application/json'
+            };
             
             if (apiSettings.anthropic_key) {
                 headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
@@ -4463,6 +4465,27 @@ You can also ask for help with syncing albums or processing photos with AI. What
         this.loadApiKeySettings();
         this.updateSystemInfo();
         this.updateCacheStatus();
+        
+        // Add event listeners for key source toggle
+        document.querySelectorAll('input[name="key-source"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                this.handleKeySourceChange();
+            });
+        });
+    }
+    
+    handleKeySourceChange() {
+        const keySource = document.querySelector('input[name="key-source"]:checked').value;
+        const customKeysContainer = document.getElementById('custom-keys-container');
+        
+        if (keySource === 'custom') {
+            customKeysContainer.classList.remove('hidden');
+        } else {
+            customKeysContainer.classList.add('hidden');
+        }
+        
+        // Auto-save the setting
+        this.saveApiKeySettings();
     }
     
     async loadCurrentPrompt() {
@@ -4771,22 +4794,38 @@ Emphasize athletic performance, competition elements, and achievement recognitio
     // API Key Management Methods
     getApiSettings() {
         const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
+        const keySource = settings.key_source || 'default';
+        
         return {
-            anthropic_key: settings.anthropic_key,
-            openai_key: settings.openai_key,
-            active_provider: settings.active_provider || 'anthropic'
+            // Only return API keys if using custom key source
+            anthropic_key: keySource === 'custom' ? settings.anthropic_key : undefined,
+            openai_key: keySource === 'custom' ? settings.openai_key : undefined,
+            active_provider: settings.active_provider || 'anthropic',
+            key_source: keySource
         };
     }
     
     loadApiKeySettings() {
         const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
         
-        // Load API keys (masked for security)
-        if (settings.anthropic_key) {
-            document.getElementById('anthropic-api-key').value = '••••••••••••••••';
-        }
-        if (settings.openai_key) {
-            document.getElementById('openai-api-key').value = '••••••••••••••••';
+        // Load key source setting (default to 'default' for server keys)
+        const keySource = settings.key_source || 'default';
+        document.getElementById(`use-${keySource}-keys`).checked = true;
+        
+        // Show/hide custom keys container based on setting
+        const customKeysContainer = document.getElementById('custom-keys-container');
+        if (keySource === 'custom') {
+            customKeysContainer.classList.remove('hidden');
+            
+            // Load API keys (masked for security)
+            if (settings.anthropic_key) {
+                document.getElementById('anthropic-api-key').value = '••••••••••••••••';
+            }
+            if (settings.openai_key) {
+                document.getElementById('openai-api-key').value = '••••••••••••••••';
+            }
+        } else {
+            customKeysContainer.classList.add('hidden');
         }
         
         // Load active provider
@@ -4797,15 +4836,26 @@ Emphasize athletic performance, competition elements, and achievement recognitio
     saveApiKeySettings() {
         const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
         
-        // Get API keys (only if they're not masked)
-        const anthropicKey = document.getElementById('anthropic-api-key').value;
-        const openaiKey = document.getElementById('openai-api-key').value;
+        // Save key source setting
+        const keySource = document.querySelector('input[name="key-source"]:checked').value;
+        settings.key_source = keySource;
         
-        if (anthropicKey && !anthropicKey.startsWith('••••')) {
-            settings.anthropic_key = anthropicKey;
-        }
-        if (openaiKey && !openaiKey.startsWith('••••')) {
-            settings.openai_key = openaiKey;
+        // Only save API keys if using custom keys
+        if (keySource === 'custom') {
+            // Get API keys (only if they're not masked)
+            const anthropicKey = document.getElementById('anthropic-api-key').value;
+            const openaiKey = document.getElementById('openai-api-key').value;
+            
+            if (anthropicKey && !anthropicKey.startsWith('••••')) {
+                settings.anthropic_key = anthropicKey;
+            }
+            if (openaiKey && !openaiKey.startsWith('••••')) {
+                settings.openai_key = openaiKey;
+            }
+        } else {
+            // Clear custom keys when using server keys
+            delete settings.anthropic_key;
+            delete settings.openai_key;
         }
         
         // Get active provider
