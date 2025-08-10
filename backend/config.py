@@ -22,6 +22,9 @@ class Settings:
     ANTHROPIC_MODEL: str = "claude-3-opus-20240229"
     ANTHROPIC_MAX_TOKENS: int = 1024
     
+    # OpenAI API Settings  
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    
     # Database Settings
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/targetvision")
     
@@ -53,8 +56,11 @@ class Settings:
             errors.append("SMUGMUG_API_KEY not configured")
         if not self.SMUGMUG_API_SECRET:
             errors.append("SMUGMUG_API_SECRET not configured")
-        if not self.ANTHROPIC_API_KEY:
-            errors.append("ANTHROPIC_API_KEY not configured")
+        # Note: API keys are optional as they can be provided by users
+        # if not self.ANTHROPIC_API_KEY:
+        #     errors.append("ANTHROPIC_API_KEY not configured")
+        # if not self.OPENAI_API_KEY:
+        #     errors.append("OPENAI_API_KEY not configured")
         if not self.DATABASE_URL:
             errors.append("DATABASE_URL not configured")
             

@@ -367,6 +367,9 @@ class TargetVisionApp {
         await this.checkConnectionStatus();
         await this.checkAuthentication();
         
+        // Initialize LLM status checking
+        this.initializeStatusChecking();
+        
         // Load SmugMug albums first
         await this.loadSmugMugAlbums();
         
@@ -615,8 +618,7 @@ class TargetVisionApp {
     async checkConnectionStatus() {
         try {
             const response = await fetch(`${this.apiBase}/health`, { 
-                method: 'GET',
-                timeout: 5000 
+                method: 'GET'
             });
             
             if (response.ok) {
@@ -1462,29 +1464,29 @@ class TargetVisionApp {
             const imageUrl = folder.highlight_image.thumbnail_url || folder.highlight_image.image_url;
             div.className = 'folder-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center';
             div.style.backgroundImage = `url('${imageUrl}')`;
-            div.style.width = '150px';
-            div.style.height = '150px';
             
             div.innerHTML = `
-                <div class="absolute top-2 left-2 flex items-center space-x-2 bg-black bg-opacity-50 px-2 py-1 rounded">
-                    <svg class="h-4 w-4 text-amber-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                    </svg>
-                    <h3 class="text-sm font-medium text-white truncate">${folderName}</h3>
+                <div class="absolute top-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded">
+                    <h3 class="text-sm font-medium text-white break-words flex items-center">
+                        <svg class="h-4 w-4 text-amber-300 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        </svg>
+                        ${folderName}
+                    </h3>
                 </div>
             `;
         } else {
             // Fallback card with icon
             div.className = 'folder-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer';
-            div.style.width = '150px';
-            div.style.height = '150px';
             
             div.innerHTML = `
-                <div class="flex flex-col items-center text-center h-full justify-center">
-                    <svg class="h-16 w-16 text-amber-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                    </svg>
-                    <h3 class="text-sm font-medium text-gray-900 truncate w-full">${folderName}</h3>
+                <div class="flex items-center justify-center text-center h-full">
+                    <h3 class="text-sm font-medium text-gray-900 break-words flex items-center">
+                        <svg class="h-5 w-5 text-amber-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        </svg>
+                        ${folderName}
+                    </h3>
                 </div>
             `;
         }
@@ -1521,11 +1523,13 @@ class TargetVisionApp {
         div.innerHTML = `
             ${privacyBadge}
             <div class="flex flex-col items-center text-center h-full justify-center">
-                <svg class="h-16 w-16 text-blue-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
-                </svg>
-                <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
-                <div class="flex items-center justify-center mt-1 space-x-2">
+                <h3 class="text-sm font-medium text-gray-900 break-words flex items-center mb-2">
+                    <svg class="h-5 w-5 text-blue-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                    </svg>
+                    ${albumName}
+                </h3>
+                <div class="flex items-center justify-center space-x-2">
                     <p class="text-xs text-gray-500">${photoCount} photos</p>
                     <span class="flex-shrink-0">${syncIconSvg}</span>
                 </div>
@@ -1540,8 +1544,6 @@ class TargetVisionApp {
             const imageUrl = album.highlight_image.thumbnail_url || album.highlight_image.image_url;
             div.className = 'album-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center';
             div.style.backgroundImage = `url('${imageUrl}')`;
-            div.style.width = '150px';
-            div.style.height = '150px';
             
             // Privacy status badge
             const privacyBadge = album.privacy_info ? 
@@ -1567,8 +1569,6 @@ class TargetVisionApp {
         } else {
             // Fallback card with icon
             div.className = 'album-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative';
-            div.style.width = '150px';
-            div.style.height = '150px';
             
             // Privacy status badge
             const privacyBadge = album.privacy_info ? 
@@ -1584,7 +1584,7 @@ class TargetVisionApp {
                     <svg class="h-16 w-16 text-blue-600 mb-2" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
                     </svg>
-                    <h3 class="text-sm font-medium text-gray-900 truncate w-full">${albumName}</h3>
+                    <h3 class="text-sm font-medium text-gray-900 break-words w-full text-center">${albumName}</h3>
                     <div class="flex items-center justify-center mt-1 space-x-2">
                         <p class="text-xs text-gray-500">${photoCount} photos</p>
                         <span class="flex-shrink-0">${syncIconSvg}</span>
@@ -2602,12 +2602,6 @@ class TargetVisionApp {
         // Check if already processing
         if (this.processingPhotos.has(photo.local_photo_id)) {
             this.showErrorMessage('Processing in Progress', 'This photo is already being processed.');
-            return;
-        }
-        
-        // Check if already processed
-        if (photo.has_ai_metadata || photo.processing_status === 'completed') {
-            this.showErrorMessage('Already Processed', 'This photo has already been processed with AI.');
             return;
         }
         
@@ -5397,6 +5391,109 @@ Emphasize athletic performance, competition elements, and achievement recognitio
         } catch (error) {
             console.error('Error deleting collection:', error);
             this.showError(error.message);
+        }
+    }
+    
+    // LLM API Status Methods
+    async checkLLMStatus() {
+        try {
+            const response = await fetch(`${this.apiBase}/api/llm-status`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const status = await response.json();
+            this.updateLLMStatusDisplay(status);
+            return status;
+        } catch (error) {
+            console.error('Error checking LLM status:', error);
+            this.updateLLMStatusDisplay(null);
+            return null;
+        }
+    }
+    
+    updateLLMStatusDisplay(status) {
+        // Update navigation summary indicator
+        const navIndicator = document.getElementById('llm-status-indicator');
+        const navText = document.getElementById('llm-status-text');
+        
+        // Update settings page detailed indicators  
+        const anthropicIndicator = document.getElementById('anthropic-status-indicator');
+        const anthropicText = document.getElementById('anthropic-status-text');
+        const openaiIndicator = document.getElementById('openai-status-indicator');
+        const openaiText = document.getElementById('openai-status-text');
+        
+        if (!status) {
+            // Error state - show red
+            if (navIndicator) navIndicator.className = 'w-2 h-2 rounded-full bg-red-500';
+            if (navText) navText.textContent = 'Error';
+            if (anthropicIndicator) anthropicIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+            if (anthropicText) anthropicText.textContent = 'Error checking status';
+            if (openaiIndicator) openaiIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+            if (openaiText) openaiText.textContent = 'Error checking status';
+            return;
+        }
+        
+        const anthropicStatus = status.anthropic?.status;
+        const openaiStatus = status.openai?.status;
+        
+        // Update settings page detailed status
+        this.updateProviderStatus('anthropic', anthropicStatus, status.anthropic?.env_key_available, status.anthropic?.error);
+        this.updateProviderStatus('openai', openaiStatus, status.openai?.env_key_available, status.openai?.error);
+        
+        // Update navigation summary - show best available status
+        let overallStatus = 'red';
+        let overallText = 'Unavailable';
+        
+        if (anthropicStatus === 'available' || openaiStatus === 'available') {
+            overallStatus = 'green';
+            overallText = 'Available';
+        } else if (anthropicStatus === 'no_key' || openaiStatus === 'no_key') {
+            overallStatus = 'yellow'; 
+            overallText = 'No Keys';
+        }
+        
+        if (navIndicator) navIndicator.className = `w-2 h-2 rounded-full bg-${overallStatus}-500`;
+        if (navText) navText.textContent = overallText;
+    }
+    
+    updateProviderStatus(provider, status, envKeyAvailable, error) {
+        const indicator = document.getElementById(`${provider}-status-indicator`);
+        const text = document.getElementById(`${provider}-status-text`);
+        
+        if (!indicator || !text) return;
+        
+        switch (status) {
+            case 'available':
+                indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                text.textContent = envKeyAvailable ? 'Available (.env)' : 'Available (user key)';
+                break;
+            case 'no_key':
+                indicator.className = 'w-3 h-3 rounded-full bg-gray-400';
+                text.textContent = 'No API key configured';
+                break;
+            case 'error':
+                indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                text.textContent = error ? `Error: ${error}` : 'API Error';
+                break;
+            default:
+                indicator.className = 'w-3 h-3 rounded-full bg-gray-400';
+                text.textContent = 'Unknown';
+        }
+    }
+    
+    initializeStatusChecking() {
+        // Initial status check
+        this.checkLLMStatus();
+        
+        // Periodic status checks every 5 minutes
+        this.statusInterval = setInterval(() => {
+            this.checkLLMStatus();
+        }, 5 * 60 * 1000);
+    }
+    
+    stopStatusChecking() {
+        if (this.statusInterval) {
+            clearInterval(this.statusInterval);
+            this.statusInterval = null;
         }
     }
 }

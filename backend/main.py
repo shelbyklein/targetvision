@@ -122,6 +122,49 @@ async def api_status():
         "database_configured": bool(os.getenv("DATABASE_URL"))
     }
 
+@app.get("/api/llm-status")
+async def llm_status():
+    """Check LLM API status and key availability"""
+    
+    status = {
+        "anthropic": {
+            "env_key_available": bool(settings.ANTHROPIC_API_KEY),
+            "status": "unknown",
+            "error": None
+        },
+        "openai": {
+            "env_key_available": bool(settings.OPENAI_API_KEY),
+            "status": "unknown", 
+            "error": None
+        }
+    }
+    
+    # Test Anthropic API if key is available
+    if settings.ANTHROPIC_API_KEY:
+        try:
+            processor = AIProcessor(anthropic_api_key=settings.ANTHROPIC_API_KEY, openai_api_key=None)
+            # Simple test - we can't easily test without processing an actual photo
+            # For now, just check if the processor can be created
+            status["anthropic"]["status"] = "available"
+        except Exception as e:
+            status["anthropic"]["status"] = "error"
+            status["anthropic"]["error"] = str(e)
+    else:
+        status["anthropic"]["status"] = "no_key"
+        
+    # Test OpenAI API if key is available  
+    if settings.OPENAI_API_KEY:
+        try:
+            processor = AIProcessor(anthropic_api_key=None, openai_api_key=settings.OPENAI_API_KEY)
+            status["openai"]["status"] = "available"
+        except Exception as e:
+            status["openai"]["status"] = "error"
+            status["openai"]["error"] = str(e)
+    else:
+        status["openai"]["status"] = "no_key"
+    
+    return status
+
 # SmugMug OAuth Endpoints
 @app.post("/auth/smugmug/request")
 async def start_oauth():
@@ -1222,11 +1265,20 @@ async def process_photo(
         }
     
     try:
-        # Create AI processor with user's API keys
+        # Use user-provided keys first, fallback to environment keys
+        fallback_anthropic_key = anthropic_key or settings.ANTHROPIC_API_KEY
+        fallback_openai_key = openai_key or settings.OPENAI_API_KEY
+        
+        if not fallback_anthropic_key and not fallback_openai_key:
+            raise HTTPException(status_code=400, detail="No API keys available. Please provide keys in settings or configure environment variables.")
+        
+        # Create AI processor with fallback logic
         processor = AIProcessor(
-            anthropic_api_key=anthropic_key,
-            openai_api_key=openai_key
+            anthropic_api_key=fallback_anthropic_key,
+            openai_api_key=fallback_openai_key
         )
+        
+        logger.info(f"Processing photo {photo_id} with provider {provider} using {'user' if anthropic_key or openai_key else 'environment'} API keys")
         
         # Process the photo
         result = await processor.process_photo(photo_id, provider)
@@ -1301,11 +1353,20 @@ async def process_photos_batch(
         raise HTTPException(status_code=404, detail="No valid photos found")
     
     try:
-        # Create AI processor with user's API keys
+        # Use user-provided keys first, fallback to environment keys
+        fallback_anthropic_key = anthropic_key or settings.ANTHROPIC_API_KEY
+        fallback_openai_key = openai_key or settings.OPENAI_API_KEY
+        
+        if not fallback_anthropic_key and not fallback_openai_key:
+            raise HTTPException(status_code=400, detail="No API keys available. Please provide keys in settings or configure environment variables.")
+        
+        # Create AI processor with fallback logic
         processor = AIProcessor(
-            anthropic_api_key=anthropic_key,
-            openai_api_key=openai_key
+            anthropic_api_key=fallback_anthropic_key,
+            openai_api_key=fallback_openai_key
         )
+        
+        logger.info(f"Processing {len(existing_ids)} photos with provider {provider} using {'user' if anthropic_key or openai_key else 'environment'} API keys")
         
         # Add to processing queue (using default processor for queue management)
         await ai_processor.add_to_processing_queue(existing_ids)
