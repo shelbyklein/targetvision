@@ -233,7 +233,7 @@ Do not include speculation about metadata like camera settings, date, or photogr
                     ]
                 }
             ],
-            "max_tokens": 300
+            "max_tokens": 600
         }
         
         # Retry logic for rate limiting
@@ -243,6 +243,7 @@ Do not include speculation about metadata like camera settings, date, or photogr
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
+                    logger.debug(f"Sending OpenAI request with {len(image_b64)} char base64 image")
                     response = await client.post(
                         "https://api.openai.com/v1/chat/completions",
                         headers=headers,
@@ -251,10 +252,32 @@ Do not include speculation about metadata like camera settings, date, or photogr
                     response.raise_for_status()
                     
                     result = response.json()
+                    logger.debug(f"OpenAI response status: {response.status_code}")
+                    
+                    # Validate response structure
+                    if "choices" not in result or len(result["choices"]) == 0:
+                        logger.error(f"Invalid OpenAI response structure: {result}")
+                        raise ValueError("Invalid response structure from OpenAI")
+                    
+                    if "message" not in result["choices"][0] or "content" not in result["choices"][0]["message"]:
+                        logger.error(f"Missing content in OpenAI response: {result['choices'][0]}")
+                        raise ValueError("Missing content in OpenAI response")
+                    
                     response_text = result["choices"][0]["message"]["content"].strip()
+                    logger.info(f"OpenAI response length: {len(response_text)} characters")
+                    
                     return self._parse_ai_response(response_text, start_time)
                     
             except httpx.HTTPStatusError as e:
+                error_detail = ""
+                try:
+                    error_data = e.response.json()
+                    error_detail = f" - {error_data.get('error', {}).get('message', 'No error message')}"
+                except:
+                    error_detail = f" - Status: {e.response.status_code}"
+                
+                logger.error(f"OpenAI HTTP error{error_detail}")
+                
                 if e.response.status_code == 429 and attempt < max_retries - 1:
                     # Rate limit hit, wait with exponential backoff
                     delay = base_delay * (2 ** attempt)
@@ -263,12 +286,74 @@ Do not include speculation about metadata like camera settings, date, or photogr
                     continue
                 else:
                     # Re-raise if not a rate limit error or max retries exceeded
+                    logger.error(f"OpenAI API error after {attempt + 1} attempts: {e}")
                     raise
+            except Exception as e:
+                logger.error(f"Unexpected error calling OpenAI API: {e}")
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.info(f"Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    raise
+    
+    def _attempt_json_repair(self, json_text: str) -> str:
+        """Attempt to repair truncated or malformed JSON responses"""
+        json_text = json_text.strip()
+        
+        # If it doesn't look like JSON at all, return as-is
+        if not json_text.startswith('{') and not json_text.startswith('['):
+            return json_text
+        
+        # Count opening and closing braces/brackets
+        open_braces = json_text.count('{')
+        close_braces = json_text.count('}')
+        open_brackets = json_text.count('[')
+        close_brackets = json_text.count(']')
+        
+        repaired = json_text
+        
+        # Add missing closing brackets for arrays
+        if open_brackets > close_brackets:
+            missing_brackets = open_brackets - close_brackets
+            logger.debug(f"Adding {missing_brackets} missing closing brackets")
+            repaired += ']' * missing_brackets
+        
+        # Add missing closing braces for objects
+        if open_braces > close_braces:
+            missing_braces = open_braces - close_braces
+            logger.debug(f"Adding {missing_braces} missing closing braces")
+            repaired += '}' * missing_braces
+        
+        # Handle incomplete string at the end (common with truncation)
+        # If the last quote is not properly closed
+        if repaired.count('"') % 2 == 1:
+            # Find the last quote and see if it's within a string
+            last_quote_pos = repaired.rfind('"')
+            if last_quote_pos > 0:
+                # Check if this quote is opening a string that wasn't closed
+                before_quote = repaired[:last_quote_pos]
+                if before_quote.count('"') % 2 == 0:
+                    # This is an opening quote, close it
+                    logger.debug("Adding missing closing quote")
+                    repaired = repaired[:last_quote_pos + 1] + '"' + repaired[last_quote_pos + 1:]
+        
+        # Try to handle trailing commas that might cause issues
+        repaired = repaired.replace(',]', ']').replace(',}', '}')
+        
+        if repaired != json_text:
+            logger.debug(f"JSON repair applied: {len(json_text)} -> {len(repaired)} chars")
+        
+        return repaired
     
     def _parse_ai_response(self, response_text: str, start_time: float) -> Tuple[str, List[str], float]:
         """Parse AI response and extract description and keywords"""
         # Clean response text - remove markdown code blocks if present
         cleaned_text = response_text.strip()
+        
+        # Log raw response for debugging
+        logger.debug(f"Raw AI response: {response_text[:200]}...")
         
         # Handle markdown code blocks (```json ... ```)
         if cleaned_text.startswith('```json') and cleaned_text.endswith('```'):
@@ -294,32 +379,78 @@ Do not include speculation about metadata like camera settings, date, or photogr
             if '\n' in cleaned_text and not cleaned_text[0] in '{["':
                 cleaned_text = '\n'.join(cleaned_text.split('\n')[1:])
         
-        # Try to parse as JSON first (for new format prompts)
+        # Try to parse as JSON first (for structured responses)
         try:
             import json
-            response_data = json.loads(cleaned_text)
+            
+            # Check if JSON appears truncated and attempt to repair
+            repaired_text = self._attempt_json_repair(cleaned_text)
+            if repaired_text != cleaned_text:
+                logger.info("Attempted to repair truncated JSON response")
+            
+            response_data = json.loads(repaired_text)
+            
+            # Validate response structure
+            if not isinstance(response_data, dict):
+                logger.warning("Response is not a JSON object, falling back to text parsing")
+                raise json.JSONDecodeError("Not a JSON object", repaired_text, 0)
+            
+            # Extract description with validation
             description = response_data.get("description", "")
+            if not description:
+                logger.warning("No description field found in JSON response")
+                description = response_data.get("text", response_data.get("content", ""))
+            
+            # Extract and validate keywords
             keywords = response_data.get("keywords", [])
             
-            # Ensure keywords is a list of strings
+            # Handle different keyword formats
             if isinstance(keywords, str):
+                # If keywords is a comma-separated string
                 keywords = [kw.strip() for kw in keywords.split(',')]
             elif not isinstance(keywords, list):
+                # If keywords is neither string nor list, extract from description
+                logger.warning(f"Keywords field is not a list or string: {type(keywords)}")
                 keywords = []
             
-            # Clean keywords
+            # Clean and validate keywords
             keywords = [kw.strip() for kw in keywords if isinstance(kw, str) and kw.strip()]
             
-        except (json.JSONDecodeError, AttributeError):
+            # Additional validation for OpenAI format
+            if len(keywords) == 0 and description:
+                logger.info("No keywords found in response, extracting from description")
+                keywords = self.extract_keywords_from_description(description)
+            
+            logger.info(f"Successfully parsed JSON response - description: {len(description)} chars, keywords: {len(keywords)}")
+            
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.info(f"JSON parsing failed ({e}), treating response as plain text")
+            logger.debug(f"Failed to parse as JSON: {cleaned_text[:200]}...")
+            
+            # Check if this looks like truncated JSON that we couldn't repair
+            if cleaned_text.strip().startswith('{') and not cleaned_text.strip().endswith('}'):
+                logger.warning("Response appears to be truncated JSON that couldn't be repaired")
+            elif cleaned_text.strip().startswith('[') and not cleaned_text.strip().endswith(']'):
+                logger.warning("Response appears to be truncated JSON array that couldn't be repaired")
+            
             # Fallback to old format - treat entire response as description
-            description = response_text
+            description = response_text.strip()
+            keywords = self.extract_keywords_from_description(description)
+        
+        # Final validation
+        if not description:
+            logger.error("No description extracted from response!")
+            description = "AI analysis unavailable"
+        
+        if not keywords:
+            logger.warning("No keywords extracted, generating from description")
             keywords = self.extract_keywords_from_description(description)
         
         # Calculate processing time
         processing_time = time.time() - start_time
         
         logger.info(f"Generated description in {processing_time:.2f}s: {description[:100]}...")
-        logger.info(f"Extracted keywords: {keywords}")
+        logger.info(f"Extracted keywords ({len(keywords)}): {keywords[:5]}{'...' if len(keywords) > 5 else ''}")
         
         return description, keywords, processing_time
             
