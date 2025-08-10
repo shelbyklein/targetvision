@@ -2495,7 +2495,8 @@ class TargetVisionApp {
                 currentNodeUri: this.currentNodeUri,
                 breadcrumbs: [...this.breadcrumbs],
                 nodeHistory: [...this.nodeHistory],
-                selectedAlbumId: currentAlbumId
+                selectedAlbumId: currentAlbumId,
+                currentPage: this.currentPage  // Preserve current page
             };
             
             const response = await fetch(`${this.apiBase}/smugmug/albums/${currentAlbumId}/sync`, {
@@ -2542,8 +2543,13 @@ class TargetVisionApp {
                 await this.loadAlbumPhotos(currentAlbumId);
                 this.updateAlbumSelection();
                 
-                // Navigate to photos view after sync
-                this.showPage('photos');
+                // Restore original page state
+                if (savedState.currentPage) {
+                    this.currentPage = savedState.currentPage;
+                    if (savedState.currentPage !== 'albums') {
+                        this.showPage(savedState.currentPage);
+                    }
+                }
             }
             
             // Update breadcrumbs display
