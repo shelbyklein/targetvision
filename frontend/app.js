@@ -2654,6 +2654,9 @@ class TargetVisionApp {
             // Remove from processing state
             this.processingPhotos.delete(photo.local_photo_id);
             
+            // Immediately update the status indicator to green checkbox (UI only)
+            this.updatePhotoThumbnailStatus(photo.local_photo_id, 'completed');
+            
             // Refresh the photo grid to show updated status
             this.displayPhotos();
             
@@ -4174,6 +4177,9 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
             // Remove from processing state
             this.processingPhotos.delete(currentPhoto.local_photo_id);
+            
+            // Immediately update the status indicator to green checkbox (UI only)
+            this.updatePhotoThumbnailStatus(currentPhoto.local_photo_id, 'completed');
             
             // Refresh the modal with updated data
             await this.showPhotoModal(this.currentPhotos[photoIndex]);
