@@ -1375,6 +1375,55 @@ async def add_to_queue(
         logger.error(f"Error adding to queue: {e}")
         raise HTTPException(status_code=500, detail="Failed to add to queue")
 
+@app.post("/photos/confirm-processing-status")
+async def confirm_processing_status(db: Session = Depends(get_db)):
+    """Confirm processing status by syncing with ai_metadata presence"""
+    
+    try:
+        # Get all photos with their ai_metadata relationships
+        photos = db.query(Photo).outerjoin(AIMetadata).all()
+        
+        total_photos = len(photos)
+        photos_updated = 0
+        newly_completed = 0
+        newly_not_processed = 0
+        
+        for photo in photos:
+            has_ai_metadata = photo.ai_metadata is not None
+            current_status = photo.processing_status
+            
+            # If photo has AI metadata but status is not completed
+            if has_ai_metadata and current_status != "completed":
+                photo.processing_status = "completed"
+                newly_completed += 1
+                photos_updated += 1
+                logger.info(f"Updated photo {photo.id} status to completed (has AI metadata)")
+            
+            # If photo has no AI metadata but status is completed
+            elif not has_ai_metadata and current_status == "completed":
+                photo.processing_status = "not_processed"
+                newly_not_processed += 1
+                photos_updated += 1
+                logger.info(f"Updated photo {photo.id} status to not_processed (no AI metadata)")
+        
+        # Commit all changes
+        if photos_updated > 0:
+            db.commit()
+            logger.info(f"Confirmed processing status: {photos_updated} photos updated")
+        
+        return {
+            "total_photos": total_photos,
+            "photos_updated": photos_updated,
+            "newly_completed": newly_completed,
+            "newly_not_processed": newly_not_processed,
+            "message": f"Processing status confirmed for all photos. {photos_updated} photos updated."
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error confirming processing status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to confirm processing status: {str(e)}")
+
 # Search Endpoints
 @app.get("/search")
 async def search_photos(
