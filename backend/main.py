@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Query, File, UploadFile, Header, Form
+from fastapi import FastAPI, HTTPException, Depends, Query, File, UploadFile, Header, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -1412,9 +1412,30 @@ async def delete_ai_metadata(photo_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error deleting AI metadata for photo {photo_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete AI metadata: {str(e)}")
 
+@app.get("/photos/batch/status")
+async def get_batch_processing_status(db: Session = Depends(get_db)):
+    """Check if there are any photos currently being processed in batch"""
+    
+    # Count photos with processing status
+    processing_photos = db.query(Photo).filter(Photo.processing_status == "processing").all()
+    
+    if not processing_photos:
+        return {
+            "is_processing": False,
+            "processing_count": 0,
+            "photo_ids": []
+        }
+    
+    return {
+        "is_processing": True,
+        "processing_count": len(processing_photos),
+        "photo_ids": [p.id for p in processing_photos]
+    }
+
 @app.post("/photos/process/batch")
 async def process_photos_batch(
     photo_ids: List[int],
+    background_tasks: BackgroundTasks,
     max_concurrent: int = Query(default=3, le=5),
     provider: str = Query(default="anthropic", regex="^(anthropic|openai)$"),
     anthropic_key: Optional[str] = Header(default=None, alias="X-Anthropic-Key"),
@@ -1430,24 +1451,62 @@ async def process_photos_batch(
     if not existing_ids:
         raise HTTPException(status_code=404, detail="No valid photos found")
     
+    # Use user-provided keys first, fallback to environment keys
+    fallback_anthropic_key = anthropic_key or settings.ANTHROPIC_API_KEY
+    fallback_openai_key = openai_key or settings.OPENAI_API_KEY
+    
+    if not fallback_anthropic_key and not fallback_openai_key:
+        raise HTTPException(status_code=400, detail="No API keys available. Please provide keys in settings or configure environment variables.")
+    
     try:
-        # Use user-provided keys first, fallback to environment keys
-        fallback_anthropic_key = anthropic_key or settings.ANTHROPIC_API_KEY
-        fallback_openai_key = openai_key or settings.OPENAI_API_KEY
+        # Set photos to processing status immediately
+        db.query(Photo).filter(Photo.id.in_(existing_ids)).update(
+            {"processing_status": "processing"}, 
+            synchronize_session=False
+        )
+        db.commit()
         
-        if not fallback_anthropic_key and not fallback_openai_key:
-            raise HTTPException(status_code=400, detail="No API keys available. Please provide keys in settings or configure environment variables.")
+        logger.info(f"Starting background processing of {len(existing_ids)} photos with provider {provider}")
         
-        # Create AI processor with fallback logic
-        processor = AIProcessor(
-            anthropic_api_key=fallback_anthropic_key,
-            openai_api_key=fallback_openai_key
+        # Add background task for actual processing
+        background_tasks.add_task(
+            process_photos_background,
+            existing_ids,
+            max_concurrent,
+            provider,
+            fallback_anthropic_key,
+            fallback_openai_key
         )
         
-        logger.info(f"Processing {len(existing_ids)} photos with provider {provider} using {'user' if anthropic_key or openai_key else 'environment'} API keys")
+        return {
+            "message": f"Batch processing started for {len(existing_ids)} photos",
+            "total": len(existing_ids),
+            "status": "processing"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in batch processing: {e}")
+        raise HTTPException(status_code=500, detail=f"Batch processing failed: {str(e)}")
+
+async def process_photos_background(
+    photo_ids: List[int],
+    max_concurrent: int,
+    provider: str,
+    anthropic_key: Optional[str],
+    openai_key: Optional[str]
+):
+    """Background task to process photos without blocking the API response"""
+    try:
+        # Create AI processor with the provided keys
+        processor = AIProcessor(
+            anthropic_api_key=anthropic_key,
+            openai_api_key=openai_key
+        )
+        
+        logger.info(f"Background processing started for {len(photo_ids)} photos with provider {provider}")
         
         # Add to processing queue (using default processor for queue management)
-        await ai_processor.add_to_processing_queue(existing_ids)
+        await ai_processor.add_to_processing_queue(photo_ids)
         
         # Process batch with user's configured processor
         async def process_single_with_provider(photo_id: int):
@@ -1455,12 +1514,19 @@ async def process_photos_batch(
                 return await processor.process_photo(photo_id, provider)
             except Exception as e:
                 logger.error(f"Failed to process photo {photo_id}: {e}")
+                # Set status to failed for this specific photo
+                with get_db_connection() as db:
+                    db.query(Photo).filter(Photo.id == photo_id).update(
+                        {"processing_status": "failed"},
+                        synchronize_session=False
+                    )
+                    db.commit()
                 return {"photo_id": photo_id, "error": str(e)}
         
         # Process in batches to respect rate limits
         results = []
-        for i in range(0, len(existing_ids), max_concurrent):
-            batch = existing_ids[i:i + max_concurrent]
+        for i in range(0, len(photo_ids), max_concurrent):
+            batch = photo_ids[i:i + max_concurrent]
             
             # Process batch concurrently
             import asyncio
@@ -1470,21 +1536,31 @@ async def process_photos_batch(
             results.extend(batch_results)
             
             # Rate limiting - wait between batches
-            if i + max_concurrent < len(existing_ids):
+            if i + max_concurrent < len(photo_ids):
                 await asyncio.sleep(2)  # 2 second delay between batches
         
         successful = len([r for r in results if r and "error" not in r])
+        failed = len(results) - successful
         
-        return {
-            "message": f"Batch processing completed: {successful}/{len(existing_ids)} successful",
-            "processed": successful,
-            "total": len(existing_ids),
-            "results": results
-        }
+        logger.info(f"Background processing completed: {successful}/{len(photo_ids)} successful, {failed} failed")
         
     except Exception as e:
-        logger.error(f"Error in batch processing: {e}")
-        raise HTTPException(status_code=500, detail=f"Batch processing failed: {str(e)}")
+        logger.error(f"Background processing error: {e}")
+        # Set all photos to failed status on critical error
+        try:
+            with get_db_connection() as db:
+                db.query(Photo).filter(Photo.id.in_(photo_ids)).update(
+                    {"processing_status": "failed"},
+                    synchronize_session=False
+                )
+                db.commit()
+        except Exception as db_error:
+            logger.error(f"Failed to update photo status after error: {db_error}")
+
+def get_db_connection():
+    """Get a new database connection for background tasks"""
+    from backend.database import SessionLocal
+    return SessionLocal()
 
 @app.get("/photos/process/queue")
 async def get_processing_queue_status():

@@ -362,6 +362,8 @@ class TargetVisionApp {
 
     async initializeApp() {
         console.log('Starting app initialization...');
+        
+        // Phase 1: Immediate UI setup (non-blocking)
         this.bindEventListeners();
         console.log('Event listeners bound, checking connection...');
         await this.checkConnectionStatus();
@@ -369,6 +371,23 @@ class TargetVisionApp {
         
         // Initialize LLM status checking
         this.initializeStatusChecking();
+        
+        // Check for ongoing batch processing and resume if needed (non-blocking)
+        this.checkAndResumeBatchProcessing().catch(error => {
+            console.error('Error checking batch processing status during init:', error);
+        });
+        
+        // Phase 2: Load data progressively in background
+        this.loadApplicationData().catch(error => {
+            console.error('Error loading application data:', error);
+            this.showNotification('Failed to load application data. Please refresh the page.', 'error');
+        });
+        
+        console.log('Phase 1 initialization complete - UI is ready');
+    }
+    
+    async loadApplicationData() {
+        console.log('Loading application data...');
         
         // Load SmugMug albums first
         await this.loadSmugMugAlbums();
@@ -396,7 +415,7 @@ class TargetVisionApp {
             console.log('State restoration completed successfully');
         }
         
-        console.log('App initialization complete');
+        console.log('Application data loading complete');
         
         // Mark initialization as complete to allow state saving
         this.isInitializing = false;
@@ -2522,6 +2541,9 @@ class TargetVisionApp {
             if (this.currentAlbum) {
                 await this.loadAlbumPhotos(currentAlbumId);
                 this.updateAlbumSelection();
+                
+                // Navigate to photos view after sync
+                this.showPage('photos');
             }
             
             // Update breadcrumbs display
@@ -2533,6 +2555,8 @@ class TargetVisionApp {
             await this.loadSmugMugAlbums();
             if (savedState.selectedAlbumId) {
                 await this.loadAlbumPhotos(savedState.selectedAlbumId);
+                // Navigate to photos view after fallback sync
+                this.showPage('photos');
             }
         }
     }
@@ -2585,16 +2609,24 @@ class TargetVisionApp {
                 headers['X-OpenAI-Key'] = apiSettings.openai_key;
             }
             
-            // Start batch processing (don't await - let it run async)
+            // Start batch processing (now truly async background task)
             fetch(`${this.apiBase}/photos/process/batch?provider=${apiSettings.active_provider || 'anthropic'}`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(localPhotoIds)
+            }).then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }).then(result => {
+                console.log(`Batch processing started: ${result.message}`);
+                // Processing continues in background, polling will track progress
             }).catch(error => {
-                console.error('Batch processing failed:', error);
+                console.error('Failed to start batch processing:', error);
                 this.hideBatchProgress();
                 this.hideGlobalProgress();
-                this.showErrorMessage('Processing Failed', 'Batch processing failed. Please try again.');
+                this.showErrorMessage('Processing Failed', 'Failed to start batch processing. Please try again.');
             });
             
             // Start polling for progress updates
@@ -2678,6 +2710,12 @@ class TargetVisionApp {
             this.updateGlobalProgress(1, 1, 'Photo analysis complete!');
             
             this.showSuccessMessage('AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
+            
+            // Open modal to show the processed photo with new AI metadata
+            const updatedPhoto = this.currentPhotos.find(p => p.local_photo_id === photo.local_photo_id);
+            if (updatedPhoto) {
+                this.showPhotoModal(updatedPhoto);
+            }
             
         } catch (error) {
             console.error('AI processing failed:', error);
@@ -2864,21 +2902,20 @@ class TargetVisionApp {
         
         const poll = async () => {
             try {
-                // Check if photos are processed by fetching their current status
-                const statusPromises = photoIds.map(async (photoId) => {
-                    try {
-                        const response = await fetch(`${this.apiBase}/photos/${photoId}`);
-                        if (response.ok) {
-                            const photo = await response.json();
-                            return photo.processing_status || 'not_processed';
-                        }
-                        return 'not_processed';
-                    } catch {
-                        return 'not_processed';
-                    }
-                });
+                // Use batch status check instead of individual requests for better performance
+                const response = await fetch(`${this.apiBase}/photos/batch/status`);
+                if (!response.ok) {
+                    console.error('Failed to fetch batch status');
+                    return;
+                }
                 
-                const statuses = await Promise.all(statusPromises);
+                const batchStatus = await response.json();
+                const processingPhotoIds = new Set(batchStatus.photo_ids || []);
+                
+                // Determine status for each photo based on batch status
+                const statuses = photoIds.map(photoId => {
+                    return processingPhotoIds.has(photoId) ? 'processing' : 'completed';
+                });
                 
                 // Update individual photo thumbnails with new status and clean up processing state
                 photoIds.forEach((photoId, index) => {
@@ -4158,6 +4195,18 @@ You can also ask for help with syncing albums or processing photos with AI. What
                 return;
             }
             
+            // Add loading state to download button
+            const originalContent = modalDownload.innerHTML;
+            modalDownload.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading...
+            `;
+            modalDownload.style.opacity = '0.7';
+            modalDownload.style.pointerEvents = 'none';
+            
             console.log('Fetching largest image URL for download button:', photo.smugmug_id);
             
             const response = await fetch(`${this.apiBase}/smugmug/photo/${photo.smugmug_id}/largestimage`);
@@ -4170,18 +4219,37 @@ You can also ask for help with syncing albums or processing photos with AI. What
                     modalDownload.href = largestImageData.url;
                     console.log('Updated download button with largest image URL');
                     
-                    // Add visual feedback that we have the high-res version
-                    if (modalDownload.textContent.includes('Download') && !modalDownload.textContent.includes('High-Res')) {
-                        modalDownload.innerHTML = modalDownload.innerHTML.replace('Download', 'Download (High-Res)');
-                    }
+                    // Restore button with high-res indicator
+                    modalDownload.innerHTML = `
+                        <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Download (High-Res)
+                    `;
                 } else {
                     console.log('No largest image URL available, keeping original');
+                    modalDownload.innerHTML = originalContent;
                 }
             } else {
                 console.error('Failed to fetch largest image for download:', response.status, response.statusText);
+                modalDownload.innerHTML = originalContent;
             }
+            
+            // Restore button state
+            modalDownload.style.opacity = '1';
+            modalDownload.style.pointerEvents = 'auto';
+            
         } catch (error) {
             console.error('Error fetching largest image for download:', error);
+            // Restore original button on error
+            modalDownload.innerHTML = originalContent || `
+                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Download
+            `;
+            modalDownload.style.opacity = '1';
+            modalDownload.style.pointerEvents = 'auto';
         }
     }
     
@@ -5904,6 +5972,43 @@ Emphasize athletic performance, competition elements, and achievement recognitio
         this.statusInterval = setInterval(() => {
             this.checkLLMStatus();
         }, 5 * 60 * 1000);
+    }
+    
+    async checkAndResumeBatchProcessing() {
+        try {
+            console.log('Checking for ongoing batch processing...');
+            
+            const response = await fetch(`${this.apiBase}/photos/batch/status`);
+            if (response.ok) {
+                const batchStatus = await response.json();
+                
+                if (batchStatus.is_processing && batchStatus.processing_count > 0) {
+                    console.log(`Found ${batchStatus.processing_count} photos still being processed. Resuming progress tracking...`);
+                    
+                    // Add processing photos to our UI state
+                    batchStatus.photo_ids.forEach(photoId => {
+                        this.processingPhotos.add(photoId);
+                    });
+                    
+                    // Show progress bars
+                    this.showBatchProgress(0, batchStatus.processing_count, 0);
+                    this.showGlobalProgress(0, batchStatus.processing_count, 'Resuming AI analysis progress...', true);
+                    
+                    // Resume polling for progress updates (with small delay to let UI finish loading)
+                    setTimeout(() => {
+                        this.pollBatchProgress(batchStatus.photo_ids);
+                    }, 1000);
+                    
+                    console.log('Batch processing progress resumed successfully');
+                } else {
+                    console.log('No ongoing batch processing detected');
+                }
+            } else {
+                console.error('Failed to check batch processing status:', response.status);
+            }
+        } catch (error) {
+            console.error('Error checking batch processing status:', error);
+        }
     }
     
     stopStatusChecking() {
