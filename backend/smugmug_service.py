@@ -961,3 +961,59 @@ class SmugMugService:
         except Exception as e:
             logger.error(f"Error getting first album image thumbnail: {e}")
             return None
+
+    async def get_largest_image_url(self, smugmug_id: str) -> Optional[Dict]:
+        """Get the largest available image URL from SmugMug for a given image ID"""
+        try:
+            # Based on existing working URLs like: https://photos.smugmug.com/photos/i-czQ6cGq/0/L/i-czQ6cGq-L.jpg
+            # We know the L size works, so let's construct larger sizes based on the same pattern
+            
+            base_url = f"https://photos.smugmug.com/photos/i-{smugmug_id}/0"
+            
+            # Try different sizes in order from largest to smallest
+            # These are the actual SmugMug size codes
+            size_variants = [
+                {"code": "O", "width": 0, "height": 0},  # Original
+                {"code": "X5", "width": 5120, "height": 3840},  # X5Large
+                {"code": "X4", "width": 4096, "height": 3072},  # X4Large
+                {"code": "X3", "width": 3072, "height": 2304},  # X3Large
+                {"code": "X2", "width": 2048, "height": 1536},  # X2Large
+                {"code": "XL", "width": 1280, "height": 960},   # XLarge
+                {"code": "L", "width": 1024, "height": 768},    # Large (we know this works)
+            ]
+            
+            # Since we know "L" size works, let's try larger sizes and return the first one that exists
+            for size_variant in size_variants:
+                size_code = size_variant["code"]
+                test_url = f"{base_url}/{size_code}/i-{smugmug_id}-{size_code}.jpg"
+                
+                logger.info(f"Testing URL for {smugmug_id}: {test_url}")
+                
+                try:
+                    # Use httpx directly for a simple HEAD request to test if the URL exists
+                    import httpx
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        head_response = await client.head(test_url)
+                        
+                        if head_response.status_code == 200:
+                            logger.info(f"Found working size {size_code} for {smugmug_id}")
+                            return {
+                                "url": test_url,
+                                "width": size_variant["width"],
+                                "height": size_variant["height"],
+                                "file_size": 0,  # Unknown without content-length header
+                                "format": "JPG"
+                            }
+                        else:
+                            logger.debug(f"Size {size_code} returned {head_response.status_code} for {smugmug_id}")
+                            
+                except Exception as e:
+                    logger.debug(f"Size {size_code} failed for {smugmug_id}: {e}")
+                    continue
+            
+            logger.warning(f"No larger image sizes found for SmugMug ID: {smugmug_id}")
+            return None
+                
+        except Exception as e:
+            logger.error(f"Error getting largest image for {smugmug_id}: {e}")
+            return None

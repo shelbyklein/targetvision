@@ -1030,6 +1030,29 @@ async def sync_smugmug_album(
         logger.error(f"Error syncing SmugMug album {smugmug_album_key}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to sync album: {str(e)}")
 
+@app.get("/smugmug/photo/{photo_key}/largestimage")
+async def get_smugmug_photo_largest_image(photo_key: str, db: Session = Depends(get_db)):
+    """Get the largest available image URL directly from SmugMug API"""
+    
+    # Get stored access token
+    oauth_token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not oauth_token or not oauth_token.is_valid():
+        raise HTTPException(status_code=401, detail="SmugMug authentication not available")
+    
+    try:
+        # Create SmugMug service and get largest image
+        smugmug_service = SmugMugService(oauth_token.access_token, oauth_token.access_token_secret)
+        largest_image = await smugmug_service.get_largest_image_url(photo_key)
+        
+        if not largest_image:
+            raise HTTPException(status_code=404, detail="Largest image not found or not available")
+        
+        return largest_image
+        
+    except Exception as e:
+        logger.error(f"Error getting largest image for photo {photo_key}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get largest image: {str(e)}")
+
 # Local Database Album Management Endpoints (for processed items)
 @app.get("/albums", response_model=List[Dict])
 async def list_local_albums(db: Session = Depends(get_db)):
@@ -1239,6 +1262,61 @@ async def delete_photo(photo_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "Photo deleted successfully"}
+
+@app.get("/photos/{photo_id}/largest-image")
+async def get_largest_image(photo_id: int, db: Session = Depends(get_db)):
+    """Get the largest available image URL from SmugMug for a photo"""
+    # Get the photo from database
+    photo = db.query(Photo).filter_by(id=photo_id).first()
+    
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    if not photo.smugmug_id:
+        raise HTTPException(status_code=400, detail="Photo has no SmugMug ID")
+    
+    # Get SmugMug OAuth tokens
+    oauth_token = db.query(OAuthToken).filter_by(service="smugmug").first()
+    if not oauth_token or not oauth_token.is_valid():
+        raise HTTPException(status_code=401, detail="SmugMug authentication not available")
+    
+    try:
+        # Create SmugMug service and get largest image
+        smugmug_service = SmugMugService(oauth_token.access_token, oauth_token.access_token_secret)
+        largest_image = await smugmug_service.get_largest_image_url(photo.smugmug_id)
+        
+        if not largest_image:
+            # Fallback to existing image_url if largest image is not available
+            return {
+                "url": photo.image_url or photo.thumbnail_url,
+                "width": photo.width or 0,
+                "height": photo.height or 0,
+                "file_size": photo.file_size or 0,
+                "format": photo.format or "",
+                "is_fallback": True
+            }
+        
+        return {
+            "url": largest_image["url"],
+            "width": largest_image["width"],
+            "height": largest_image["height"],
+            "file_size": largest_image["file_size"],
+            "format": largest_image["format"],
+            "is_fallback": False
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting largest image for photo {photo_id}: {e}")
+        # Fallback to existing image_url if there's an error
+        return {
+            "url": photo.image_url or photo.thumbnail_url,
+            "width": photo.width or 0,
+            "height": photo.height or 0,
+            "file_size": photo.file_size or 0,
+            "format": photo.format or "",
+            "is_fallback": True,
+            "error": str(e)
+        }
 
 # AI Processing Endpoints
 @app.post("/photos/{photo_id}/process")

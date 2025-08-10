@@ -3813,14 +3813,23 @@ You can also ask for help with syncing albums or processing photos with AI. What
         const modalAiConfidence = document.getElementById('modal-ai-confidence');
         const modalAiTimestamp = document.getElementById('modal-ai-timestamp');
         
-        // Set main image - use image_url if available, otherwise thumbnail_url
-        const imageUrl = photo.image_url || photo.thumbnail_url;
-        modalImage.src = imageUrl;
+        // Set initial image - use image_url if available, otherwise thumbnail_url
+        const initialImageUrl = photo.image_url || photo.thumbnail_url;
+        modalImage.src = initialImageUrl;
         modalImage.alt = photo.title || 'Photo';
         
-        // Set download link
-        modalDownload.href = imageUrl;
+        // Set initial download link
+        modalDownload.href = initialImageUrl;
         modalDownload.download = photo.title || 'photo';
+        
+        // Add click handler to modal image to open full-screen lightbox
+        modalImage.style.cursor = 'pointer';
+        modalImage.title = 'Click to view full-screen';
+        
+        // Add click handler to open full-screen lightbox
+        modalImage.addEventListener('click', () => {
+            this.openFullScreenLightbox(photo);
+        });
         
         // Set photo info
         modalDimensions.textContent = `${photo.width || 0} × ${photo.height || 0} pixels`;
@@ -3902,6 +3911,117 @@ You can also ask for help with syncing albums or processing photos with AI. What
 
     closeModal() {
         document.getElementById('photo-modal').classList.add('hidden');
+    }
+    
+    async openFullScreenLightbox(photo) {
+        try {
+            // Create full-screen lightbox if it doesn't exist
+            let lightbox = document.getElementById('fullscreen-lightbox');
+            if (!lightbox) {
+                lightbox = document.createElement('div');
+                lightbox.id = 'fullscreen-lightbox';
+                lightbox.className = 'fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 hidden';
+                lightbox.innerHTML = `
+                    <div class="relative max-w-full max-h-full flex items-center justify-center">
+                        <img id="fullscreen-image" src="" alt="" class="max-w-full max-h-full object-contain">
+                        <button id="fullscreen-close" class="absolute top-4 right-4 text-white text-2xl hover:text-gray-300 z-10">
+                            ✕
+                        </button>
+                        <div id="fullscreen-loading" class="absolute inset-0 flex items-center justify-center text-white text-lg">
+                            <div class="text-center">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                                Loading largest image...
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(lightbox);
+                
+                // Add close handlers
+                document.getElementById('fullscreen-close').addEventListener('click', () => {
+                    this.closeFullScreenLightbox();
+                });
+                
+                // Close on background click
+                lightbox.addEventListener('click', (e) => {
+                    if (e.target === lightbox) {
+                        this.closeFullScreenLightbox();
+                    }
+                });
+                
+                // Close on Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) {
+                        this.closeFullScreenLightbox();
+                    }
+                });
+            }
+            
+            const fullscreenImage = document.getElementById('fullscreen-image');
+            const loadingDiv = document.getElementById('fullscreen-loading');
+            
+            // Show lightbox
+            lightbox.classList.remove('hidden');
+            
+            // Show loading state
+            fullscreenImage.style.display = 'none';
+            loadingDiv.style.display = 'flex';
+            
+            // First try to get the largest image from SmugMug
+            if (photo.smugmug_id) {
+                console.log('Fetching largest image for full-screen lightbox:', photo.smugmug_id);
+                
+                try {
+                    const response = await fetch(`${this.apiBase}/smugmug/photo/${photo.smugmug_id}/largestimage`);
+                    
+                    if (response.ok) {
+                        const largestImageData = await response.json();
+                        
+                        if (largestImageData.url) {
+                            // Load the largest image
+                            const img = new Image();
+                            img.onload = () => {
+                                fullscreenImage.src = largestImageData.url;
+                                fullscreenImage.style.display = 'block';
+                                loadingDiv.style.display = 'none';
+                            };
+                            img.onerror = () => {
+                                // Fallback to existing image
+                                this.loadFallbackImage(photo, fullscreenImage, loadingDiv);
+                            };
+                            img.src = largestImageData.url;
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching largest image:', error);
+                }
+            }
+            
+            // Fallback to existing image URL
+            this.loadFallbackImage(photo, fullscreenImage, loadingDiv);
+            
+        } catch (error) {
+            console.error('Error opening full-screen lightbox:', error);
+        }
+    }
+    
+    loadFallbackImage(photo, fullscreenImage, loadingDiv) {
+        const fallbackUrl = photo.image_url || photo.thumbnail_url;
+        if (fallbackUrl) {
+            fullscreenImage.src = fallbackUrl;
+            fullscreenImage.style.display = 'block';
+            loadingDiv.style.display = 'none';
+        } else {
+            loadingDiv.innerHTML = '<div class="text-center text-red-500">No image available</div>';
+        }
+    }
+    
+    closeFullScreenLightbox() {
+        const lightbox = document.getElementById('fullscreen-lightbox');
+        if (lightbox) {
+            lightbox.classList.add('hidden');
+        }
     }
 
     // Collection management methods for photo modal
