@@ -3822,6 +3822,12 @@ You can also ask for help with syncing albums or processing photos with AI. What
         modalDownload.href = initialImageUrl;
         modalDownload.download = photo.title || 'photo';
         
+        // Add click handler to ensure download dialog opens
+        modalDownload.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.downloadImage(modalDownload.href, modalDownload.download);
+        });
+        
         // Add click handler to modal image to open full-screen lightbox
         modalImage.style.cursor = 'pointer';
         modalImage.title = 'Click to view full-screen';
@@ -3830,6 +3836,9 @@ You can also ask for help with syncing albums or processing photos with AI. What
         modalImage.addEventListener('click', () => {
             this.openFullScreenLightbox(photo);
         });
+        
+        // Load largest image URL for download button
+        this.loadLargestImageForDownload(photo, modalDownload);
         
         // Set photo info
         modalDimensions.textContent = `${photo.width || 0} × ${photo.height || 0} pixels`;
@@ -3893,8 +3902,48 @@ You can also ask for help with syncing albums or processing photos with AI. What
         // Load collections for this photo
         await this.loadPhotoCollections(photo);
         
-        // Show modal
+        // Show modal with animation
         modal.classList.remove('hidden');
+        
+        // Get modal content elements for staggered animation
+        const modalContent = modal.querySelector('.bg-white');
+        const downloadButton = modal.querySelector('#modal-download');
+        
+        // Trigger animation after modal is visible
+        requestAnimationFrame(() => {
+            // Set initial states
+            modal.style.opacity = '0';
+            modalContent.style.transform = 'scale(0.9) translateY(20px)';
+            modalContent.style.opacity = '0';
+            
+            // Force a reflow
+            modal.offsetHeight;
+            
+            // Add transition classes
+            modal.style.transition = 'opacity 0.2s ease-out';
+            modalContent.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            
+            // Animate backdrop
+            modal.style.opacity = '1';
+            
+            // Animate content with slight delay
+            setTimeout(() => {
+                modalContent.style.opacity = '1';
+                modalContent.style.transform = 'scale(1) translateY(0)';
+                
+                // Animate download button with additional delay
+                if (downloadButton) {
+                    downloadButton.style.transform = 'translateY(10px)';
+                    downloadButton.style.opacity = '0.5';
+                    downloadButton.style.transition = 'all 0.3s ease-out';
+                    
+                    setTimeout(() => {
+                        downloadButton.style.transform = 'translateY(0)';
+                        downloadButton.style.opacity = '1';
+                    }, 100);
+                }
+            }, 50);
+        });
         
         // Focus trap for accessibility
         modalImage.focus();
@@ -3910,7 +3959,43 @@ You can also ask for help with syncing albums or processing photos with AI. What
     }
 
     closeModal() {
-        document.getElementById('photo-modal').classList.add('hidden');
+        const modal = document.getElementById('photo-modal');
+        const modalContent = modal.querySelector('.bg-white');
+        const downloadButton = modal.querySelector('#modal-download');
+        
+        // Animate out with reverse stagger
+        if (downloadButton) {
+            downloadButton.style.transition = 'all 0.15s ease-in';
+            downloadButton.style.transform = 'translateY(10px)';
+            downloadButton.style.opacity = '0.5';
+        }
+        
+        setTimeout(() => {
+            modalContent.style.transition = 'all 0.2s ease-in';
+            modalContent.style.transform = 'scale(0.9) translateY(20px)';
+            modalContent.style.opacity = '0';
+            
+            modal.style.transition = 'opacity 0.2s ease-in';
+            modal.style.opacity = '0';
+        }, 50);
+        
+        // Hide after animation completes
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            
+            // Reset all styles for next time
+            modal.style.opacity = '';
+            modal.style.transition = '';
+            modalContent.style.transform = '';
+            modalContent.style.opacity = '';
+            modalContent.style.transition = '';
+            
+            if (downloadButton) {
+                downloadButton.style.transform = '';
+                downloadButton.style.opacity = '';
+                downloadButton.style.transition = '';
+            }
+        }, 300);
     }
     
     async openFullScreenLightbox(photo) {
@@ -3920,15 +4005,15 @@ You can also ask for help with syncing albums or processing photos with AI. What
             if (!lightbox) {
                 lightbox = document.createElement('div');
                 lightbox.id = 'fullscreen-lightbox';
-                lightbox.className = 'fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 hidden';
+                lightbox.className = 'fixed inset-0 bg-black flex items-center justify-center z-50 opacity-0 transition-all duration-300 ease-out pointer-events-none p-4 md:p-8';
                 lightbox.innerHTML = `
-                    <div class="relative max-w-full max-h-full flex items-center justify-center">
-                        <img id="fullscreen-image" src="" alt="" class="max-w-full max-h-full object-contain">
-                        <button id="fullscreen-close" class="absolute top-4 right-4 text-white text-2xl hover:text-gray-300 z-10">
-                            ✕
-                        </button>
-                        <div id="fullscreen-loading" class="absolute inset-0 flex items-center justify-center text-white text-lg">
-                            <div class="text-center">
+                    <button id="fullscreen-close" class="absolute top-4 right-4 text-white text-2xl hover:text-gray-300 z-20 opacity-0 transition-all duration-300 ease-out hover:scale-110 transform">
+                        ✕
+                    </button>
+                    <div id="fullscreen-container" class="relative w-full h-full flex items-center justify-center transform scale-95 transition-all duration-300 ease-out">
+                        <img id="fullscreen-image" src="" alt="" class="max-w-full max-h-full object-contain opacity-0 transition-all duration-500 ease-out transform scale-95">
+                        <div id="fullscreen-loading" class="absolute inset-0 flex items-center justify-center text-white text-lg opacity-0 transition-all duration-300 ease-out">
+                            <div class="text-center transform translate-y-4 transition-all duration-300 ease-out">
                                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
                                 Loading largest image...
                             </div>
@@ -3959,13 +4044,20 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
             const fullscreenImage = document.getElementById('fullscreen-image');
             const loadingDiv = document.getElementById('fullscreen-loading');
+            const container = document.getElementById('fullscreen-container');
+            const closeBtn = document.getElementById('fullscreen-close');
             
-            // Show lightbox
-            lightbox.classList.remove('hidden');
-            
-            // Show loading state
-            fullscreenImage.style.display = 'none';
-            loadingDiv.style.display = 'flex';
+            // Show lightbox with animation
+            lightbox.style.pointerEvents = 'auto';
+            requestAnimationFrame(() => {
+                lightbox.style.opacity = '1';
+                container.style.transform = 'scale(1)';
+                closeBtn.style.opacity = '1';
+                
+                // Show loading state with animation
+                loadingDiv.style.opacity = '1';
+                loadingDiv.querySelector('.text-center').style.transform = 'translateY(0)';
+            });
             
             // First try to get the largest image from SmugMug
             if (photo.smugmug_id) {
@@ -3982,8 +4074,13 @@ You can also ask for help with syncing albums or processing photos with AI. What
                             const img = new Image();
                             img.onload = () => {
                                 fullscreenImage.src = largestImageData.url;
-                                fullscreenImage.style.display = 'block';
-                                loadingDiv.style.display = 'none';
+                                
+                                // Animate image in and loading out
+                                loadingDiv.style.opacity = '0';
+                                setTimeout(() => {
+                                    fullscreenImage.style.opacity = '1';
+                                    fullscreenImage.style.transform = 'scale(1)';
+                                }, 150);
                             };
                             img.onerror = () => {
                                 // Fallback to existing image
@@ -4010,17 +4107,116 @@ You can also ask for help with syncing albums or processing photos with AI. What
         const fallbackUrl = photo.image_url || photo.thumbnail_url;
         if (fallbackUrl) {
             fullscreenImage.src = fallbackUrl;
-            fullscreenImage.style.display = 'block';
-            loadingDiv.style.display = 'none';
+            
+            // Animate fallback image in
+            loadingDiv.style.opacity = '0';
+            setTimeout(() => {
+                fullscreenImage.style.opacity = '1';
+                fullscreenImage.style.transform = 'scale(1)';
+            }, 150);
         } else {
-            loadingDiv.innerHTML = '<div class="text-center text-red-500">No image available</div>';
+            loadingDiv.innerHTML = '<div class="text-center text-red-500 transform transition-all duration-300 ease-out">No image available</div>';
         }
     }
     
     closeFullScreenLightbox() {
         const lightbox = document.getElementById('fullscreen-lightbox');
         if (lightbox) {
-            lightbox.classList.add('hidden');
+            const container = document.getElementById('fullscreen-container');
+            const closeBtn = document.getElementById('fullscreen-close');
+            
+            // Animate out
+            lightbox.style.opacity = '0';
+            container.style.transform = 'scale(0.95)';
+            closeBtn.style.opacity = '0';
+            
+            // Hide after animation completes
+            setTimeout(() => {
+                lightbox.style.pointerEvents = 'none';
+                
+                // Reset states for next use
+                const fullscreenImage = document.getElementById('fullscreen-image');
+                const loadingDiv = document.getElementById('fullscreen-loading');
+                
+                fullscreenImage.style.opacity = '0';
+                fullscreenImage.style.transform = 'scale(0.95)';
+                fullscreenImage.src = '';
+                
+                loadingDiv.style.opacity = '0';
+                loadingDiv.querySelector('.text-center').style.transform = 'translateY(4px)';
+                
+                container.style.transform = 'scale(0.95)';
+            }, 300);
+        }
+    }
+    
+    async loadLargestImageForDownload(photo, modalDownload) {
+        try {
+            // Only attempt to fetch largest image if photo has a SmugMug ID
+            if (!photo.smugmug_id) {
+                console.log('Photo has no SmugMug ID, using existing image for download');
+                return;
+            }
+            
+            console.log('Fetching largest image URL for download button:', photo.smugmug_id);
+            
+            const response = await fetch(`${this.apiBase}/smugmug/photo/${photo.smugmug_id}/largestimage`);
+            
+            if (response.ok) {
+                const largestImageData = await response.json();
+                
+                // Update download link with largest image URL
+                if (largestImageData.url) {
+                    modalDownload.href = largestImageData.url;
+                    console.log('Updated download button with largest image URL');
+                    
+                    // Add visual feedback that we have the high-res version
+                    if (modalDownload.textContent.includes('Download') && !modalDownload.textContent.includes('High-Res')) {
+                        modalDownload.innerHTML = modalDownload.innerHTML.replace('Download', 'Download (High-Res)');
+                    }
+                } else {
+                    console.log('No largest image URL available, keeping original');
+                }
+            } else {
+                console.error('Failed to fetch largest image for download:', response.status, response.statusText);
+            }
+        } catch (error) {
+            console.error('Error fetching largest image for download:', error);
+        }
+    }
+    
+    async downloadImage(imageUrl, filename) {
+        try {
+            console.log('Downloading image:', imageUrl);
+            
+            // Fetch the image as a blob
+            const response = await fetch(imageUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const blob = await response.blob();
+            
+            // Create a temporary download link
+            const downloadLink = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            downloadLink.href = url;
+            downloadLink.download = filename || 'image';
+            
+            // Append to body, click, and remove
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Clean up the object URL
+            URL.revokeObjectURL(url);
+            
+            console.log('Download initiated successfully');
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            // Fallback to opening the image in a new tab
+            window.open(imageUrl, '_blank');
         }
     }
 

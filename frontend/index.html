@@ -986,12 +986,7 @@
         <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center p-4 border-b">
                 <h3 class="text-lg font-medium text-gray-900">Photo Details</h3>
-                <div class="flex items-center space-x-2">
-                    <a id="modal-download" href="" download="" class="text-green-600 hover:text-green-700 p-2" title="Download">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </a>
+                <div class="flex items-center">
                     <button id="modal-close" class="text-gray-400 hover:text-gray-600">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -1005,6 +1000,16 @@
                     <!-- Photo Display -->
                     <div class="space-y-4">
                         <img id="modal-image" src="" alt="" class="w-full h-auto rounded-lg shadow-sm">
+                        
+                        <!-- Download Button -->
+                        <div class="flex justify-center">
+                            <a id="modal-download" href="" download="" class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                                <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                Download
+                            </a>
+                        </div>
                         
                         <!-- Photo Info -->
                         <div class="text-sm text-gray-600">

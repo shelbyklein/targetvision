@@ -450,3 +450,71 @@ img[loading="lazy"] {
     width: 100%; /* Full width, height will be automatically calculated */
     min-height: 0; /* Allow flex items to shrink below content size */
 }
+
+/* Full-screen lightbox animations */
+#fullscreen-lightbox {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+#fullscreen-image {
+    filter: drop-shadow(0 25px 25px rgba(0, 0, 0, 0.5));
+    will-change: transform, opacity;
+}
+
+#fullscreen-close {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    will-change: transform, opacity;
+}
+
+#fullscreen-close:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#fullscreen-loading {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+/* Smooth transitions for all animated elements */
+#fullscreen-lightbox *,
+#fullscreen-container *,
+#fullscreen-image,
+#fullscreen-close {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Photo modal animations */
+#photo-modal {
+    transform-origin: center center;
+    will-change: transform, opacity;
+}
+
+#photo-modal .bg-white {
+    transform-origin: center center;
+}
+
+/* Smooth modal backdrop */
+#photo-modal {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+/* Download button animations */
+#modal-download {
+    transform: translateY(0);
+    transition: all 0.2s ease-out;
+}
+
+#modal-download:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(34, 197, 94, 0.3);
+}
