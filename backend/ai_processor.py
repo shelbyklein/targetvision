@@ -14,6 +14,7 @@ import anthropic
 from config import get_settings
 from models import Photo, AIMetadata, ProcessingQueue
 from database import get_db
+from embeddings import EmbeddingGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,9 @@ class AIProcessor:
             self.client = anthropic.Anthropic(api_key=self.anthropic_api_key)
         else:
             self.client = None
+        
+        # Initialize embedding generator for vector processing
+        self.embedding_generator = EmbeddingGenerator()
             
         self.max_image_size = 5 * 1024 * 1024  # 5MB limit for Claude API
         self.max_dimension = 2200  # Claude API recommendation
@@ -479,13 +483,21 @@ Do not include speculation about metadata like camera settings, date, or photogr
             # Generate AI description
             description, keywords, processing_time, prompt = await self.generate_description(image_data, provider)
             
+            # Generate CLIP embedding for semantic search
+            logger.info(f"Generating CLIP embedding for photo {photo_id}")
+            embedding_start_time = time.time()
+            embedding = await self.embedding_generator.generate_image_embedding(image_data)
+            embedding_time = time.time() - embedding_start_time
+            logger.info(f"CLIP embedding generated in {embedding_time:.2f}s")
+            
             # Create AI metadata record
             ai_metadata = AIMetadata(
                 photo_id=photo_id,
                 description=description,
                 ai_keywords=keywords,
+                embedding=embedding.tolist() if embedding is not None else None,  # Convert numpy array to list
                 confidence_score=0.85,  # Default confidence - could be enhanced
-                processing_time=processing_time,
+                processing_time=processing_time + embedding_time,  # Include embedding generation time
                 model_version=f"{provider}-{datetime.now().strftime('%Y-%m-%d')}",
                 processed_at=datetime.now()
             )

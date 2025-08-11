@@ -154,22 +154,16 @@ class VectorSearch:
             # Generate query embedding
             query_embedding = await self.embedding_generator.generate_text_embedding(query)
             
-            # Get all AI metadata with embeddings
-            # Note: This is a simple implementation for MVP
-            # In production, you'd want to use pgvector's built-in similarity functions
-            metadata_records = db.query(AIMetadata).all()
+            # Get AI metadata with embeddings (only those that have embeddings stored)
+            metadata_records = db.query(AIMetadata).filter(AIMetadata.embedding.isnot(None)).all()
             
             results = []
             for metadata in metadata_records:
-                # Skip if no embedding stored (for MVP without pgvector)
-                if not hasattr(metadata, 'embedding') or not metadata.embedding:
-                    continue
-                
-                # Calculate similarity
-                # Note: This would be handled by pgvector in production
+                # Calculate cosine similarity using stored embedding
+                stored_embedding = np.array(metadata.embedding)
                 similarity = self.embedding_generator.calculate_similarity(
                     query_embedding,
-                    np.array(metadata.embedding)  # This would come from pgvector
+                    stored_embedding
                 )
                 
                 if similarity >= min_similarity:
@@ -200,18 +194,19 @@ class VectorSearch:
         try:
             # Get the target photo's embedding
             target_metadata = db.query(AIMetadata).filter(AIMetadata.photo_id == photo_id).first()
-            if not target_metadata or not hasattr(target_metadata, 'embedding'):
+            if not target_metadata or not target_metadata.embedding:
                 return []
             
             target_embedding = np.array(target_metadata.embedding)
             
-            # Get all other metadata records
-            all_metadata = db.query(AIMetadata).filter(AIMetadata.photo_id != photo_id).all()
+            # Get all other metadata records that have embeddings
+            all_metadata = db.query(AIMetadata).filter(
+                AIMetadata.photo_id != photo_id,
+                AIMetadata.embedding.isnot(None)
+            ).all()
             
             results = []
             for metadata in all_metadata:
-                if not hasattr(metadata, 'embedding') or not metadata.embedding:
-                    continue
                 
                 similarity = self.embedding_generator.calculate_similarity(
                     target_embedding,

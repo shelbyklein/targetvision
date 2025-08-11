@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, ARRAY, UniqueConstraint
+from sqlalchemy.dialects.postgresql import ARRAY as PgArray
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 # from pgvector.sqlalchemy import Vector  # Commented out for testing without pgvector
@@ -121,7 +122,7 @@ class AIMetadata(Base):
     photo_id = Column(Integer, ForeignKey("photos.id", ondelete="CASCADE"), nullable=False, index=True)
     description = Column(Text)
     ai_keywords = Column(ARRAY(Text), default=[])
-    # embedding = Column(Vector(512))  # CLIP ViT-B/32 embeddings - disabled for testing
+    embedding = Column(PgArray(Float), nullable=True)  # CLIP ViT-B/32 embeddings (512 dimensions)
     confidence_score = Column(Float)
     processing_time = Column(Float)  # Time taken to process in seconds
     model_version = Column(String(100))  # Track which model generated this
