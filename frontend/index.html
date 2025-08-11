@@ -225,6 +225,13 @@
                             <button id="process-selected" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50" disabled>
                                 Process Selected
                             </button>
+                            
+                            <button id="generate-embeddings" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50" title="Generate CLIP embeddings for photos that have descriptions but no embeddings">
+                                <svg class="h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                Generate Embeddings
+                            </button>
                         </div>
                     </div>
                     
@@ -842,6 +849,30 @@
                                     <input type="checkbox" id="retry-failed" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                                     <span class="ml-2 text-sm text-gray-700">Automatically retry failed processing</span>
                                 </label>
+                            </div>
+                            
+                            <!-- Batch Processing Control -->
+                            <div class="mt-4 pt-4 border-t border-gray-200">
+                                <h5 class="text-sm font-medium text-gray-800 mb-3">Batch Processing Control</h5>
+                                <div class="flex flex-col space-y-2">
+                                    <button id="cancel-batch-processing" class="flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                        Cancel All Batch Processing
+                                    </button>
+                                    <p class="text-xs text-gray-600">Stop all currently running batch processing jobs. Completed photos will be preserved.</p>
+                                    <div id="batch-cancel-status" class="text-sm hidden"></div>
+                                    
+                                    <button id="clear-batch-queue" class="flex items-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2">
+                                        <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                        Clear Processing Queue
+                                    </button>
+                                    <p class="text-xs text-gray-600">Remove all pending items from the batch processing queue. Currently processing items will be reset.</p>
+                                    <div id="clear-queue-status" class="text-sm hidden"></div>
+                                </div>
                             </div>
                         </div>
                         

@@ -1234,6 +1234,38 @@ async def list_photos(
         photos = query.offset(skip).limit(limit).all()
         return [photo.to_dict() for photo in photos]
 
+@app.get("/photos/embedding-stats")
+async def get_embedding_stats(db: Session = Depends(get_db)):
+    """Get statistics about photo embeddings"""
+    
+    try:
+        # Count total photos
+        total_photos = db.query(Photo).count()
+        
+        # Count photos with AI metadata
+        total_with_ai = db.query(AIMetadata).count()
+        
+        # Count photos with embeddings
+        total_with_embeddings = db.query(AIMetadata).filter(AIMetadata.embedding.isnot(None)).count()
+        
+        # Get a sample embedding for validation
+        sample_embedding_record = db.query(AIMetadata).filter(AIMetadata.embedding.isnot(None)).first()
+        embedding_dimensions = len(sample_embedding_record.embedding) if sample_embedding_record and sample_embedding_record.embedding else None
+        
+        return {
+            "total_photos": total_photos,
+            "photos_with_ai_metadata": total_with_ai,
+            "photos_with_embeddings": total_with_embeddings,
+            "embedding_dimensions": embedding_dimensions,
+            "ai_metadata_coverage": round((total_with_ai / total_photos * 100), 2) if total_photos > 0 else 0,
+            "embedding_coverage": round((total_with_embeddings / total_photos * 100), 2) if total_photos > 0 else 0,
+            "photos_without_embeddings": total_with_ai - total_with_embeddings
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting embedding stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get embedding stats: {str(e)}")
+
 @app.get("/photos/{photo_id}")
 async def get_photo(photo_id: int, db: Session = Depends(get_db)):
     """Get single photo by ID"""
@@ -1431,6 +1463,236 @@ async def get_batch_processing_status(db: Session = Depends(get_db)):
         "processing_count": len(processing_photos),
         "photo_ids": [p.id for p in processing_photos]
     }
+
+@app.post("/photos/batch/cancel")
+async def cancel_batch_processing(db: Session = Depends(get_db)):
+    """Cancel all currently processing batch jobs"""
+    
+    try:
+        # Find all photos with processing status
+        processing_photos = db.query(Photo).filter(Photo.processing_status == "processing").all()
+        
+        if not processing_photos:
+            return {
+                "message": "No batch processing jobs to cancel",
+                "cancelled_count": 0
+            }
+        
+        # Reset processing status to not_processed (so they can be reprocessed later)
+        cancelled_count = 0
+        for photo in processing_photos:
+            # Only cancel if they don't already have AI metadata (preserve completed work)
+            existing_ai = db.query(AIMetadata).filter(AIMetadata.photo_id == photo.id).first()
+            if existing_ai:
+                photo.processing_status = "completed"  # They were already processed
+            else:
+                photo.processing_status = "not_processed"  # Reset for reprocessing
+            cancelled_count += 1
+        
+        db.commit()
+        
+        logger.info(f"Cancelled {cancelled_count} batch processing jobs")
+        
+        return {
+            "message": f"Successfully cancelled {cancelled_count} batch processing jobs",
+            "cancelled_count": cancelled_count
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error cancelling batch processing: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to cancel batch processing: {str(e)}")
+
+@app.post("/photos/batch/clear-queue")
+async def clear_batch_processing_queue(db: Session = Depends(get_db)):
+    """Clear all items from the batch processing queue"""
+    
+    try:
+        # Count pending items before clearing
+        pending_count = db.query(ProcessingQueue).filter(ProcessingQueue.status == "pending").count()
+        processing_count = db.query(ProcessingQueue).filter(ProcessingQueue.status == "processing").count()
+        
+        if pending_count == 0 and processing_count == 0:
+            return {
+                "message": "Processing queue is already empty",
+                "cleared_count": 0
+            }
+        
+        # Delete all pending items from the queue
+        deleted_pending = db.query(ProcessingQueue).filter(ProcessingQueue.status == "pending").delete()
+        
+        # Reset any processing photos to not_processed (don't delete them from queue, just reset status)
+        processing_items = db.query(ProcessingQueue).filter(ProcessingQueue.status == "processing").all()
+        processing_reset_count = 0
+        
+        for item in processing_items:
+            # Check if the photo has AI metadata already
+            photo = db.query(Photo).filter(Photo.id == item.photo_id).first()
+            existing_ai = db.query(AIMetadata).filter(AIMetadata.photo_id == item.photo_id).first()
+            
+            if existing_ai:
+                # Already processed, mark queue item as completed and photo as completed
+                item.status = "completed"
+                if photo:
+                    photo.processing_status = "completed"
+            else:
+                # Not processed yet, reset photo status and mark queue item as pending
+                item.status = "pending"  # Keep in queue but reset to pending
+                if photo:
+                    photo.processing_status = "not_processed"
+            processing_reset_count += 1
+        
+        db.commit()
+        
+        total_cleared = deleted_pending + processing_reset_count
+        logger.info(f"Cleared {deleted_pending} pending items and reset {processing_reset_count} processing items from batch queue")
+        
+        return {
+            "message": f"Successfully cleared {total_cleared} items from batch processing queue",
+            "cleared_count": total_cleared,
+            "deleted_pending": deleted_pending,
+            "reset_processing": processing_reset_count
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error clearing batch processing queue: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear batch processing queue: {str(e)}")
+
+@app.post("/photos/batch/generate-embeddings")
+async def generate_missing_embeddings(
+    album_id: Optional[int] = Query(default=None),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    db: Session = Depends(get_db)
+):
+    """Generate CLIP embeddings for photos that have AI metadata but no embeddings"""
+    
+    try:
+        # Build query to find photos with AI metadata but no embeddings
+        query = db.query(AIMetadata).filter(AIMetadata.embedding.is_(None))
+        
+        # Filter by album if provided
+        if album_id:
+            query = query.join(Photo).filter(Photo.album_id == album_id)
+        
+        
+        # Get all records that need embeddings
+        records_needing_embeddings = query.all()
+        
+        if not records_needing_embeddings:
+            return {
+                "message": "No photos found that need embedding generation",
+                "photos_to_process": 0
+            }
+        
+        photo_ids_to_process = [record.photo_id for record in records_needing_embeddings]
+        
+        # Add to background processing
+        background_tasks.add_task(
+            generate_embeddings_background_task,
+            photo_ids_to_process,
+            db.bind.url
+        )
+        
+        # Update photo processing status to indicate embedding generation in progress
+        for photo_id in photo_ids_to_process:
+            photo = db.query(Photo).filter(Photo.id == photo_id).first()
+            if photo:
+                photo.processing_status = "processing"
+        
+        db.commit()
+        
+        logger.info(f"Started embedding generation for {len(photo_ids_to_process)} photos")
+        
+        return {
+            "message": f"Started embedding generation for {len(photo_ids_to_process)} photos",
+            "photos_to_process": len(photo_ids_to_process),
+            "photo_ids": photo_ids_to_process
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error starting embedding generation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start embedding generation: {str(e)}")
+
+async def generate_embeddings_background_task(photo_ids: List[int], db_url):
+    """Background task to generate embeddings for photos"""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from backend.embeddings import EmbeddingGenerator
+    import asyncio
+    
+    # Create new database session for background task
+    engine = create_engine(str(db_url))
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+    
+    embedding_generator = EmbeddingGenerator()
+    processed_count = 0
+    failed_count = 0
+    
+    try:
+        for photo_id in photo_ids:
+            try:
+                # Get photo and its AI metadata
+                photo = db.query(Photo).filter(Photo.id == photo_id).first()
+                ai_metadata = db.query(AIMetadata).filter(AIMetadata.photo_id == photo_id).first()
+                
+                if not photo or not ai_metadata:
+                    logger.warning(f"Photo {photo_id} or AI metadata not found, skipping")
+                    continue
+                
+                if ai_metadata.embedding is not None:
+                    logger.info(f"Photo {photo_id} already has embeddings, skipping")
+                    photo.processing_status = "completed"
+                    db.commit()
+                    continue
+                
+                # Download image and generate embedding
+                logger.info(f"Generating embedding for photo {photo_id}: {photo.title}")
+                
+                # Download image
+                import httpx
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(photo.image_url)
+                    response.raise_for_status()
+                    image_data = response.content
+                
+                # Generate CLIP embedding
+                embedding = await embedding_generator.generate_image_embedding(image_data)
+                
+                # Update AI metadata with embedding
+                ai_metadata.embedding = embedding.tolist() if embedding is not None else None
+                
+                # Update photo status
+                photo.processing_status = "completed"
+                
+                db.commit()
+                processed_count += 1
+                
+                logger.info(f"Generated embedding for photo {photo_id} ({processed_count}/{len(photo_ids)})")
+                
+                # Small delay to prevent overwhelming the system
+                await asyncio.sleep(0.1)
+                
+            except Exception as e:
+                logger.error(f"Failed to generate embedding for photo {photo_id}: {e}")
+                failed_count += 1
+                
+                # Update photo status to failed
+                photo = db.query(Photo).filter(Photo.id == photo_id).first()
+                if photo:
+                    photo.processing_status = "failed"
+                db.commit()
+                
+                continue
+        
+        logger.info(f"Embedding generation completed: {processed_count} successful, {failed_count} failed")
+        
+    except Exception as e:
+        logger.error(f"Critical error in embedding generation background task: {e}")
+    finally:
+        db.close()
 
 @app.post("/photos/process/batch")
 async def process_photos_batch(

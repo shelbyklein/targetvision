@@ -7,6 +7,9 @@ class TargetVisionApp {
         this.currentPhotos = [];
         this.selectedPhotos = new Set();
         this.processingPhotos = new Set(); // UI-only state for photos currently being processed
+        this.isPollingProgress = false; // Flag to control batch progress polling
+        this.currentPollingInstance = null; // Track current polling instance
+        this.pollingInstanceId = 0; // Counter for unique polling instances
         this.statusFilter = '';
         this.showProcessedPhotos = true;
         this.showUnprocessedPhotos = true;
@@ -550,6 +553,7 @@ class TargetVisionApp {
         document.getElementById('select-all').addEventListener('click', () => this.selectAllPhotos());
         document.getElementById('select-none').addEventListener('click', () => this.clearSelection());
         document.getElementById('process-selected').addEventListener('click', () => this.processSelectedPhotos());
+        document.getElementById('generate-embeddings').addEventListener('click', () => this.generateMissingEmbeddings());
         
         // Global progress bar
         document.getElementById('global-progress-close').addEventListener('click', () => this.hideGlobalProgress());
@@ -610,6 +614,27 @@ class TargetVisionApp {
         document.getElementById('reset-prompt').addEventListener('click', () => this.resetPrompt());
         document.getElementById('test-prompt').addEventListener('click', () => this.testPrompt());
         document.getElementById('save-settings').addEventListener('click', () => this.saveApplicationSettings());
+        const cancelButton = document.getElementById('cancel-batch-processing');
+        if (cancelButton) {
+            console.log('Cancel batch processing button found, adding event listener');
+            cancelButton.addEventListener('click', () => {
+                console.log('Cancel batch processing button clicked');
+                this.cancelBatchProcessing();
+            });
+        } else {
+            console.error('Cancel batch processing button NOT found in DOM');
+        }
+        
+        const clearQueueButton = document.getElementById('clear-batch-queue');
+        if (clearQueueButton) {
+            console.log('Clear batch queue button found, adding event listener');
+            clearQueueButton.addEventListener('click', () => {
+                console.log('Clear batch queue button clicked');
+                this.clearBatchQueue();
+            });
+        } else {
+            console.error('Clear batch queue button NOT found in DOM');
+        }
         
         // Cache management
         document.getElementById('clear-cache').addEventListener('click', () => this.clearCacheAndRefresh());
@@ -2649,6 +2674,123 @@ class TargetVisionApp {
         }
     }
 
+    async generateMissingEmbeddings() {
+        if (!this.currentAlbum || !this.currentAlbum.local_album_id) {
+            this.showErrorMessage('No Album Selected', 'Please select an album to generate embeddings for.');
+            return;
+        }
+
+        try {
+            this.showGlobalProgress(0, 1, 'Finding photos that need embeddings...');
+
+            // Call the backend API to start embedding generation
+            const response = await fetch(`${this.apiBase}/photos/batch/generate-embeddings?album_id=${this.currentAlbum.local_album_id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.photos_to_process === 0) {
+                this.hideGlobalProgress();
+                this.showSuccessMessage('Up to Date', 'All photos in this album already have embeddings.');
+                return;
+            }
+
+            // Show success message and progress
+            this.showGlobalProgress(0, result.photos_to_process, `Generating embeddings for ${result.photos_to_process} photos...`);
+            console.log(`Started embedding generation for ${result.photos_to_process} photos`);
+
+            // Start polling for progress - we can reuse the existing batch progress polling
+            // but with a different message
+            const originalMessage = 'Processing photos with AI...';
+            this.showGlobalProgress(0, result.photos_to_process, 'Generating CLIP embeddings...');
+            
+            // Use a simple polling approach for embedding progress
+            this.pollEmbeddingProgress(result.photos_to_process);
+
+        } catch (error) {
+            console.error('Failed to generate embeddings:', error);
+            this.hideGlobalProgress();
+            this.showErrorMessage('Embedding Generation Failed', `Failed to start embedding generation: ${error.message}`);
+        }
+    }
+
+    async pollEmbeddingProgress(totalPhotos) {
+        // Stop any existing polling first
+        this.stopBatchPolling();
+        
+        // Create unique instance ID for this embedding polling session
+        const instanceId = ++this.pollingInstanceId;
+        this.currentPollingInstance = instanceId;
+        this.isPollingProgress = true;
+        
+        let completedCount = 0;
+        const startTime = Date.now();
+        const maxPollTime = 30 * 60 * 1000; // 30 minutes max polling
+        
+        console.log(`Starting embedding polling instance ${instanceId} for ${totalPhotos} photos`);
+        
+        const poll = async () => {
+            try {
+                // Check if this polling instance should continue
+                if (!this.isPollingProgress || this.currentPollingInstance !== instanceId) {
+                    console.log(`Embedding polling instance ${instanceId} terminated`);
+                    return;
+                }
+                
+                // Check if we've been polling too long
+                if (Date.now() - startTime > maxPollTime) {
+                    console.log(`Embedding polling instance ${instanceId}: Timeout reached`);
+                    if (this.currentPollingInstance === instanceId) {
+                        this.stopBatchPolling();
+                        this.hideGlobalProgress();
+                        this.showErrorMessage('Embedding Timeout', 'Embedding generation is taking longer than expected.');
+                    }
+                    return;
+                }
+
+                // Simple progress estimation - we don't have a specific endpoint for embedding progress
+                // so we'll just show a generic progress that increments over time
+                if (completedCount < totalPhotos) {
+                    completedCount = Math.min(totalPhotos, completedCount + Math.ceil(totalPhotos * 0.03)); // 3% increment per check
+                    this.showGlobalProgress(completedCount, totalPhotos, `Generated embeddings for ${completedCount}/${totalPhotos} photos...`);
+                }
+                
+                // Continue polling if not complete
+                if (completedCount < totalPhotos && this.currentPollingInstance === instanceId) {
+                    setTimeout(poll, 4000); // Check every 4 seconds (slower for embedding estimation)
+                } else if (this.currentPollingInstance === instanceId) {
+                    // Completed
+                    this.stopBatchPolling();
+                    this.showGlobalProgress(totalPhotos, totalPhotos, 'Embedding generation complete!');
+                    setTimeout(() => {
+                        this.hideGlobalProgress();
+                        this.showSuccessMessage('Embeddings Generated', `Successfully generated CLIP embeddings for ${totalPhotos} photos.`);
+                    }, 2000);
+                }
+                
+            } catch (error) {
+                console.error(`Embedding polling instance ${instanceId} error:`, error);
+                if (this.currentPollingInstance === instanceId) {
+                    this.stopBatchPolling();
+                    this.hideGlobalProgress();
+                    this.showErrorMessage('Progress Update Failed', 'Could not track embedding generation progress.');
+                }
+            }
+        };
+
+        // Start polling
+        poll();
+    }
+
     async processSinglePhoto(photo) {
         // Check if photo is synced and has required data
         if (!photo.is_synced || !photo.local_photo_id) {
@@ -2897,50 +3039,131 @@ class TargetVisionApp {
     
     // Progress Polling for Real-time Updates
     async pollBatchProgress(photoIds) {
+        // Stop any existing polling first
+        this.stopBatchPolling();
+        
+        // Create unique instance ID for this polling session
+        const instanceId = ++this.pollingInstanceId;
+        this.currentPollingInstance = instanceId;
+        this.isPollingProgress = true;
+        
         const startTime = Date.now();
-        const maxPollingTime = 30 * 60 * 1000; // 30 minutes max (increased for 1-image-at-a-time processing)
-        const pollInterval = 1000; // Poll every second
+        const maxPollingTime = 30 * 60 * 1000; // 30 minutes max
+        const pollInterval = 2000; // Poll every 2 seconds (reduced frequency)
         
         let completed = 0;
         let processing = 0;
         let failed = 0;
         const total = photoIds.length;
         
+        console.log(`Starting batch polling instance ${instanceId} for ${total} photos`);
+        
         const poll = async () => {
             try {
+                // Check if this polling instance should continue
+                if (!this.isPollingProgress || this.currentPollingInstance !== instanceId) {
+                    console.log(`Polling instance ${instanceId} terminated`);
+                    return;
+                }
+                
                 // Use batch status check instead of individual requests for better performance
                 const response = await fetch(`${this.apiBase}/photos/batch/status`);
                 if (!response.ok) {
-                    console.error('Failed to fetch batch status');
+                    console.error(`Polling instance ${instanceId}: Failed to fetch batch status`);
+                    // Stop this polling instance on repeated errors
+                    if (this.currentPollingInstance === instanceId) {
+                        this.stopBatchPolling();
+                    }
                     return;
                 }
                 
                 const batchStatus = await response.json();
                 const processingPhotoIds = new Set(batchStatus.photo_ids || []);
                 
+                // If no photos are currently processing globally, stop this instance
+                if (processingPhotoIds.size === 0) {
+                    console.log(`Polling instance ${instanceId}: No photos processing, completing`);
+                    
+                    // Only handle completion if this is the current instance
+                    if (this.currentPollingInstance === instanceId) {
+                        this.stopBatchPolling();
+                        
+                        // Clear all processing state
+                        this.processingPhotos.clear();
+                        
+                        // Update all photos as completed (less verbose logging)
+                        let updatedCount = 0;
+                        photoIds.forEach((photoId) => {
+                            const currentPhoto = this.currentPhotos.find(p => p.local_photo_id === photoId);
+                            const displayId = currentPhoto ? (currentPhoto.smugmug_id || currentPhoto.image_key || currentPhoto.local_photo_id) : photoId;
+                            this.updatePhotoThumbnailStatus(displayId, 'completed');
+                            this.processingPhotos.delete(displayId);
+                            updatedCount++;
+                        });
+                        
+                        console.log(`Updated ${updatedCount} photos to completed status`);
+                        
+                        // Show completion message
+                        this.updateGlobalProgress(total, total, 'Processing complete! Reloading photos...');
+                        
+                        // Reload photos and albums
+                        try {
+                            const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
+                            await this.loadAlbumPhotos(currentAlbumId);
+                            await this.loadSmugMugAlbums();
+                            this.clearSelection();
+                        } catch (reloadError) {
+                            console.error('Error reloading after completion:', reloadError);
+                        }
+                        
+                        // Auto-hide progress bar after completion
+                        setTimeout(() => {
+                            this.hideGlobalProgress();
+                        }, 4000);
+                        
+                        const message = `Batch processing completed! ${total} photos processed successfully`;
+                        this.showSuccessMessage('Processing Complete', message);
+                    }
+                    
+                    return; // Stop polling
+                }
+                
                 // Determine status for each photo based on batch status
                 const statuses = photoIds.map(photoId => {
                     return processingPhotoIds.has(photoId) ? 'processing' : 'completed';
                 });
                 
-                // Update individual photo thumbnails with new status and clean up processing state
+                // Update individual photo thumbnails (minimal logging)
+                let statusChanges = 0;
                 photoIds.forEach((photoId, index) => {
                     const newStatus = statuses[index];
-                    this.updatePhotoThumbnailStatus(photoId, newStatus);
+                    const currentPhoto = this.currentPhotos.find(p => p.local_photo_id === photoId);
+                    const displayId = currentPhoto ? (currentPhoto.smugmug_id || currentPhoto.image_key || currentPhoto.local_photo_id) : photoId;
+                    
+                    // Only log status changes, not every update
+                    const currentStatusElement = document.querySelector(`[data-photo-id="${displayId}"] .status-indicator`);
+                    const currentDisplayStatus = currentStatusElement?.getAttribute('data-status');
+                    
+                    if (currentDisplayStatus !== newStatus) {
+                        statusChanges++;
+                    }
+                    
+                    this.updatePhotoThumbnailStatus(displayId, newStatus);
                     
                     // Remove from processing state if completed or failed
-                    const currentPhoto = this.currentPhotos.find(p => p.local_photo_id === photoId);
-                    const photoId_ui = currentPhoto ? (currentPhoto.smugmug_id || currentPhoto.image_key || currentPhoto.local_photo_id) : photoId;
                     if (newStatus === 'completed' || newStatus === 'failed') {
-                        this.processingPhotos.delete(photoId_ui);
+                        this.processingPhotos.delete(displayId);
                     }
                 });
                 
-                // Count statuses (no longer checking for "processing" since it's UI-only)
+                // Only log significant status changes (reduce noise)
+                if (statusChanges > 5) {
+                    console.log(`Instance ${instanceId}: ${statusChanges} photos changed status`);
+                }
+                
+                // Count statuses
                 completed = statuses.filter(status => status === 'completed').length;
                 failed = statuses.filter(status => status === 'failed').length;
-                
-                // Calculate remaining as photos still being processed (not yet completed or failed)
                 const remaining = total - completed - failed;
                 
                 // Update progress bars
@@ -2955,59 +3178,35 @@ class TargetVisionApp {
                 
                 this.updateGlobalProgress(completed, total, detailMessage);
                 
-                // Check if all photos are done processing
-                if (remaining === 0) {
-                    // All photos processed, stop polling and clean up
-                    this.isPollingProgress = false;
-                    
-                    // Clear all processing state
-                    this.processingPhotos.clear();
-                    
-                    // Show completion message
-                    this.updateGlobalProgress(completed, total, 'Processing complete! Reloading photos...');
-                    
-                    // Reload photos and albums
-                    const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
-                    await this.loadAlbumPhotos(currentAlbumId);
-                    await this.loadSmugMugAlbums();
-                    
-                    this.clearSelection();
-                    
-                    // Auto-hide progress bar after completion
-                    setTimeout(() => {
-                        this.hideGlobalProgress();
-                    }, 4000);
-                    
-                    const message = `Batch processing completed! ${completed}/${total} photos processed successfully`;
-                    if (failed > 0) {
-                        this.showErrorMessage('Processing Completed with Errors', message + ` (${failed} failed)`);
-                    } else {
-                        this.showSuccessMessage('Processing Complete', message);
-                    }
-                    
-                    return; // Stop polling
-                }
-                
                 // Check timeout
                 if (Date.now() - startTime > maxPollingTime) {
-                    this.showErrorMessage('Processing Timeout', 'Processing is taking longer than expected. Please check the status later.');
-                    this.hideBatchProgress();
-                    this.hideGlobalProgress();
+                    console.log(`Polling instance ${instanceId}: Timeout reached`);
+                    if (this.currentPollingInstance === instanceId) {
+                        this.stopBatchPolling();
+                        this.showErrorMessage('Processing Timeout', 'Processing is taking longer than expected. Please check the status later.');
+                        this.hideBatchProgress();
+                        this.hideGlobalProgress();
+                    }
                     return;
                 }
                 
-                // Schedule next poll
-                setTimeout(poll, pollInterval);
+                // Schedule next poll only if this instance should continue
+                if (this.isPollingProgress && this.currentPollingInstance === instanceId) {
+                    setTimeout(poll, pollInterval);
+                }
                 
             } catch (error) {
-                console.error('Error polling batch progress:', error);
-                // Continue polling despite errors
-                setTimeout(poll, pollInterval);
+                console.error(`Polling instance ${instanceId} error:`, error);
+                // Stop this polling instance on errors to prevent infinite loops
+                if (this.currentPollingInstance === instanceId) {
+                    this.stopBatchPolling();
+                    this.showErrorMessage('Polling Error', 'Error checking processing status. Please refresh the page.');
+                }
             }
         };
         
         // Start polling
-        setTimeout(poll, 1000); // Start after 1 second
+        setTimeout(poll, 2000); // Start after 2 seconds
     }
     
     // Update individual photo thumbnail status indicator (UI only)
@@ -5217,6 +5416,173 @@ Emphasize athletic performance, competition elements, and achievement recognitio
         console.log('Settings saved:', settings);
     }
     
+    stopBatchPolling() {
+        if (this.isPollingProgress || this.currentPollingInstance) {
+            this.isPollingProgress = false;
+            this.currentPollingInstance = null;
+            console.log('Batch polling stopped - all instances terminated');
+        }
+    }
+    
+    // Emergency stop function - can be called from browser console
+    emergencyStopAllPolling() {
+        console.log('🚨 EMERGENCY STOP: Terminating all polling instances');
+        this.isPollingProgress = false;
+        this.currentPollingInstance = null;
+        this.pollingInstanceId += 100; // Jump counter to invalidate any existing instances
+        this.processingPhotos.clear();
+        this.hideGlobalProgress();
+        this.hideBatchProgress();
+        console.log('✅ All polling stopped, state cleared');
+        return 'All polling instances terminated';
+    }
+
+    async cancelBatchProcessing() {
+        console.log('cancelBatchProcessing method called');
+        
+        // Stop any ongoing polling
+        this.stopBatchPolling();
+        
+        const button = document.getElementById('cancel-batch-processing');
+        const statusDiv = document.getElementById('batch-cancel-status');
+        console.log('Button element:', button);
+        console.log('Status div element:', statusDiv);
+        
+        try {
+            // Disable button and show loading state
+            button.disabled = true;
+            button.innerHTML = `
+                <svg class="h-4 w-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Cancelling...
+            `;
+            
+            statusDiv.className = 'text-sm text-blue-600';
+            statusDiv.textContent = 'Cancelling batch processing jobs...';
+            statusDiv.classList.remove('hidden');
+            
+            const response = await fetch(`${this.apiBase}/photos/batch/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Show success message
+            statusDiv.className = 'text-sm text-green-600';
+            statusDiv.textContent = result.message || `Successfully cancelled ${result.cancelled_count || 0} batch processing jobs`;
+            
+            // Auto-hide status message after 5 seconds
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+            
+            console.log('Batch processing cancelled:', result);
+            
+        } catch (error) {
+            console.error('Error cancelling batch processing:', error);
+            
+            // Show error message
+            statusDiv.className = 'text-sm text-red-600';
+            statusDiv.textContent = `Error: ${error.message}`;
+            
+            // Auto-hide error message after 7 seconds
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 7000);
+            
+        } finally {
+            // Re-enable button and restore original text
+            button.disabled = false;
+            button.innerHTML = `
+                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Cancel All Batch Processing
+            `;
+        }
+    }
+    
+    async clearBatchQueue() {
+        // Stop any ongoing polling
+        this.stopBatchPolling();
+        
+        const button = document.getElementById('clear-batch-queue');
+        const statusDiv = document.getElementById('clear-queue-status');
+        
+        try {
+            // Disable button and show loading state
+            button.disabled = true;
+            button.innerHTML = `
+                <svg class="h-4 w-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Clearing Queue...
+            `;
+            
+            statusDiv.className = 'text-sm text-blue-600';
+            statusDiv.textContent = 'Clearing batch processing queue...';
+            statusDiv.classList.remove('hidden');
+            
+            const response = await fetch(`${this.apiBase}/photos/batch/clear-queue`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Show success message
+            statusDiv.className = 'text-sm text-green-600';
+            statusDiv.textContent = result.message || `Successfully cleared ${result.cleared_count || 0} items from processing queue`;
+            
+            // Auto-hide status message after 5 seconds
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+            
+            console.log('Batch processing queue cleared:', result);
+            
+        } catch (error) {
+            console.error('Error clearing batch processing queue:', error);
+            
+            // Show error message
+            statusDiv.className = 'text-sm text-red-600';
+            statusDiv.textContent = `Error: ${error.message}`;
+            
+            // Auto-hide error message after 7 seconds
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 7000);
+            
+        } finally {
+            // Re-enable button and restore original text
+            button.disabled = false;
+            button.innerHTML = `
+                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Clear Processing Queue
+            `;
+        }
+    }
+    
     // API Key Management Methods
     getApiSettings() {
         const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
@@ -6001,7 +6367,10 @@ Emphasize athletic performance, competition elements, and achievement recognitio
                     this.showGlobalProgress(0, batchStatus.processing_count, 'Resuming AI analysis progress...', true);
                     
                     // Resume polling for progress updates (with small delay to let UI finish loading)
+                    // Use the new instance management system
                     setTimeout(() => {
+                        // Stop any existing polling first, then start new instance
+                        this.stopBatchPolling();
                         this.pollBatchProgress(batchStatus.photo_ids);
                     }, 1000);
                     
@@ -6031,6 +6400,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         window.app = new TargetVisionApp();
         console.log('TargetVisionApp initialized successfully');
+        
+        // Make emergency stop globally accessible from browser console
+        window.emergencyStopAllPolling = () => window.app.emergencyStopAllPolling();
+        console.log('Emergency stop function available: emergencyStopAllPolling()');
     } catch (error) {
         console.error('Error initializing TargetVisionApp:', error);
     }
