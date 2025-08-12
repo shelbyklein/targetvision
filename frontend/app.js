@@ -599,6 +599,9 @@ class TargetVisionApp {
         document.getElementById('modal-regenerate-ai').addEventListener('click', () => this.regenerateAIMetadata());
         document.getElementById('modal-delete-ai').addEventListener('click', () => this.deleteAIMetadata());
         
+        // Embedding details toggle
+        document.getElementById('modal-embedding-details-toggle').addEventListener('click', () => this.toggleEmbeddingDetails());
+        
         // Collection management
         document.getElementById('modal-add-to-collection').addEventListener('click', () => this.showCollectionInterface());
         document.getElementById('modal-add-collection-confirm').addEventListener('click', () => this.addPhotoToCollection());
@@ -3834,8 +3837,25 @@ You can also ask for help with syncing albums or processing photos with AI. What
     async showPhotoModal(photo) {
         console.log('Show modal for photo:', photo);
         
+        // Fetch complete photo data including embeddings from API
+        let completePhoto = photo;
+        if (photo.id || photo.local_photo_id) {
+            try {
+                const photoId = photo.id || photo.local_photo_id;
+                const response = await fetch(`${this.apiBase}/photos/${photoId}?include_embedding=true`);
+                if (response.ok) {
+                    completePhoto = await response.json();
+                    console.log('Fetched complete photo data with embeddings:', completePhoto);
+                } else {
+                    console.warn('Could not fetch complete photo data, using provided data');
+                }
+            } catch (error) {
+                console.warn('Error fetching complete photo data:', error);
+            }
+        }
+        
         // Store current photo for editing functions
-        this.currentPhoto = photo;
+        this.currentPhoto = completePhoto;
         
         // Populate modal with photo data
         const modal = document.getElementById('photo-modal');
@@ -3878,24 +3898,24 @@ You can also ask for help with syncing albums or processing photos with AI. What
         this.loadLargestImageForDownload(photo, modalDownload);
         
         // Set photo info
-        modalDimensions.textContent = `${photo.width || 0} × ${photo.height || 0} pixels`;
-        modalAlbum.textContent = `Album: ${photo.album_name || 'Unknown Album'}`;
+        modalDimensions.textContent = `${completePhoto.width || 0} × ${completePhoto.height || 0} pixels`;
+        modalAlbum.textContent = `Album: ${completePhoto.album_name || 'Unknown Album'}`;
         
         
         // Handle AI metadata - support multiple data structures for backward compatibility
         let aiData = null;
         
         // Try to get AI data from different possible locations
-        if (photo.ai_metadata) {
+        if (completePhoto.ai_metadata) {
             // New structure: nested ai_metadata object
-            aiData = photo.ai_metadata;
-        } else if (photo.description || photo.ai_keywords) {
+            aiData = completePhoto.ai_metadata;
+        } else if (completePhoto.description || completePhoto.ai_keywords) {
             // Old structure: AI data at top level (legacy search results)
             aiData = {
-                description: photo.description,
-                ai_keywords: photo.ai_keywords,
-                confidence_score: photo.confidence_score,
-                processed_at: photo.processed_at
+                description: completePhoto.description,
+                ai_keywords: completePhoto.ai_keywords,
+                confidence_score: completePhoto.confidence_score,
+                processed_at: completePhoto.processed_at
             };
         }
         
@@ -3936,8 +3956,16 @@ You can also ask for help with syncing albums or processing photos with AI. What
             modalNoAi.classList.remove('hidden');
         }
         
+        // Update embedding display if AI data is available
+        if (aiData) {
+            console.log('Updating embedding display with AI data:', aiData);
+            this.updateEmbeddingDisplay(aiData);
+        } else {
+            console.log('No AI data available for embedding display');
+        }
+        
         // Load collections for this photo
-        await this.loadPhotoCollections(photo);
+        await this.loadPhotoCollections(completePhoto);
         
         // Show modal with animation
         modal.classList.remove('hidden');
@@ -4762,6 +4790,80 @@ You can also ask for help with syncing albums or processing photos with AI. What
             const confidence = Math.round((metadata.confidence_score || 0.85) * 100);
             confidenceSpan.textContent = `${confidence}% confidence`;
             confidenceSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
+        }
+        
+        // Update embedding information
+        this.updateEmbeddingDisplay(metadata);
+    }
+    
+    updateEmbeddingDisplay(metadata) {
+        console.log('updateEmbeddingDisplay called with metadata:', metadata);
+        
+        const embeddingInfo = document.getElementById('modal-embedding-info');
+        const embeddingStatus = document.getElementById('modal-embedding-status');
+        const embeddingDimensions = document.getElementById('modal-embedding-dimensions');
+        const embeddingModel = document.getElementById('modal-embedding-model');
+        const embeddingDimCount = document.getElementById('modal-embedding-dim-count');
+        const embeddingSample = document.getElementById('modal-embedding-sample');
+        
+        console.log('Embedding info element found:', !!embeddingInfo);
+        
+        // Check if embedding exists (either as array or we can infer from model_version)
+        const hasEmbedding = metadata.embedding || 
+                           (metadata.model_version && metadata.model_version.includes('clip'));
+        
+        console.log('Has embedding:', hasEmbedding);
+        console.log('Embedding data:', metadata.embedding);
+        console.log('Model version:', metadata.model_version);
+        
+        if (hasEmbedding) {
+            console.log('Showing embedding info');
+            embeddingInfo.classList.remove('hidden');
+            
+            // Update status and dimensions
+            const dimensions = metadata.embedding ? 
+                             (Array.isArray(metadata.embedding) ? metadata.embedding.length : 512) : 
+                             512; // Default for CLIP models
+                             
+            embeddingDimensions.textContent = `${dimensions}D`;
+            embeddingDimCount.textContent = dimensions;
+            
+            // Update model information
+            const modelName = metadata.model_version || 'CLIP ViT-B-32';
+            embeddingModel.textContent = modelName;
+            
+            // Show sample values if embedding data is available
+            if (metadata.embedding && Array.isArray(metadata.embedding)) {
+                const sampleValues = metadata.embedding.slice(0, 3)
+                    .map(val => val.toFixed(3))
+                    .join(', ');
+                embeddingSample.textContent = `[${sampleValues}...]`;
+            } else {
+                embeddingSample.textContent = '[Generated by AI model]';
+            }
+            
+            // Update status icon and text
+            embeddingStatus.innerHTML = `
+                <svg class="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                Generated
+            `;
+        } else {
+            embeddingInfo.classList.add('hidden');
+        }
+    }
+    
+    toggleEmbeddingDetails() {
+        const detailsDiv = document.getElementById('modal-embedding-details');
+        const toggleButton = document.getElementById('modal-embedding-details-toggle');
+        
+        if (detailsDiv.classList.contains('hidden')) {
+            detailsDiv.classList.remove('hidden');
+            toggleButton.textContent = 'Hide Details';
+        } else {
+            detailsDiv.classList.add('hidden');
+            toggleButton.textContent = 'Show Details';
         }
     }
     

@@ -1097,6 +1097,42 @@
                                     <div id="modal-ai-keywords" class="mt-1 flex flex-wrap gap-1"></div>
                                 </div>
                                 
+                                <!-- Embedding Information -->
+                                <div id="modal-embedding-info" class="hidden">
+                                    <label class="text-sm font-medium text-blue-900">Vector Embedding</label>
+                                    <div class="mt-1 flex items-center space-x-3 text-xs text-blue-700">
+                                        <span id="modal-embedding-status" class="flex items-center">
+                                            <svg class="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            Generated
+                                        </span>
+                                        <span id="modal-embedding-dimensions" class="bg-blue-100 px-2 py-1 rounded"></span>
+                                        <button id="modal-embedding-details-toggle" class="text-blue-600 hover:text-blue-800 underline">
+                                            Show Details
+                                        </button>
+                                    </div>
+                                    <div id="modal-embedding-details" class="hidden mt-2 text-xs">
+                                        <div class="bg-blue-100 rounded p-2">
+                                            <div class="mb-1">
+                                                <span class="font-medium text-blue-900">Model:</span>
+                                                <span id="modal-embedding-model" class="text-blue-800"></span>
+                                            </div>
+                                            <div class="mb-1">
+                                                <span class="font-medium text-blue-900">Dimensions:</span>
+                                                <span id="modal-embedding-dim-count" class="text-blue-800"></span>
+                                            </div>
+                                            <div class="mb-1">
+                                                <span class="font-medium text-blue-900">Sample values:</span>
+                                                <span id="modal-embedding-sample" class="text-blue-800 font-mono"></span>
+                                            </div>
+                                            <div class="text-blue-700 text-xs mt-1">
+                                                Vector embeddings enable visual similarity search across your photo collection.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <div class="text-xs text-blue-600">
                                     <span id="modal-ai-timestamp"></span>
                                 </div>

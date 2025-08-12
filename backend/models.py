@@ -75,7 +75,7 @@ class Photo(Base):
     ai_metadata = relationship("AIMetadata", back_populates="photo", uselist=False, cascade="all, delete-orphan")
     collection_items = relationship("CollectionItem", back_populates="photo", cascade="all, delete-orphan")
     
-    def to_dict(self, include_ai_metadata=True, include_collections=True):
+    def to_dict(self, include_ai_metadata=True, include_collections=True, include_embedding=False):
         result = {
             "id": self.id,
             "smugmug_id": self.smugmug_id,
@@ -95,7 +95,7 @@ class Photo(Base):
         
         # Include AI metadata if requested and available
         if include_ai_metadata and self.ai_metadata:
-            result["ai_metadata"] = self.ai_metadata.to_dict()
+            result["ai_metadata"] = self.ai_metadata.to_dict(include_embedding=include_embedding)
         
         # Include collections if requested and available
         if include_collections and self.collection_items:
@@ -133,16 +133,28 @@ class AIMetadata(Base):
     # Relationship to photo
     photo = relationship("Photo", back_populates="ai_metadata")
     
-    def to_dict(self):
-        return {
+    def to_dict(self, include_embedding=False):
+        result = {
             "id": self.id,
             "photo_id": self.photo_id,
             "description": self.description,
             "ai_keywords": self.ai_keywords,
             "confidence_score": self.confidence_score,
+            "model_version": self.model_version,
+            "processing_time": self.processing_time,
             "approved": self.approved,
             "processed_at": self.processed_at.isoformat() if self.processed_at else None
         }
+        
+        # Include embedding data if requested (for detailed views)
+        if include_embedding and self.embedding is not None:
+            # Convert embedding to list if it's not already
+            if hasattr(self.embedding, '__iter__') and not isinstance(self.embedding, str):
+                result["embedding"] = list(self.embedding)
+            else:
+                result["embedding"] = self.embedding
+        
+        return result
 
 class OAuthToken(Base):
     """Store OAuth tokens for SmugMug"""

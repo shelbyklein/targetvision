@@ -1267,20 +1267,19 @@ async def get_embedding_stats(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to get embedding stats: {str(e)}")
 
 @app.get("/photos/{photo_id}")
-async def get_photo(photo_id: int, db: Session = Depends(get_db)):
-    """Get single photo by ID"""
+async def get_photo(
+    photo_id: int, 
+    include_embedding: bool = Query(default=True, description="Include embedding data in AI metadata"),
+    db: Session = Depends(get_db)
+):
+    """Get single photo by ID with optional embedding data"""
     photo = db.query(Photo).filter_by(id=photo_id).first()
     
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
     
-    photo_dict = photo.to_dict()
-    
-    # Include AI metadata if available
-    if photo.ai_metadata:
-        photo_dict["ai_metadata"] = photo.ai_metadata.to_dict()
-    
-    return photo_dict
+    # Include embedding data for detailed view (used by photo modal)
+    return photo.to_dict(include_embedding=include_embedding)
 
 @app.delete("/photos/{photo_id}")
 async def delete_photo(photo_id: int, db: Session = Depends(get_db)):
