@@ -1,4 +1,14 @@
 // TargetVision Finder-Style Frontend Application
+
+// Import managers and services
+import eventBus from './services/EventBus.js';
+import apiService from './services/APIService.js';
+import cacheManager from './managers/CacheManager.js';
+import stateManager from './managers/StateManager.js';
+import smugMugAPI from './managers/SmugMugAPI.js';
+import photoProcessor from './managers/PhotoProcessor.js';
+import { EVENTS, PHOTO_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from './utils/Constants.js';
+import UIUtils from './utils/UIUtils.js';
 class TargetVisionApp {
     constructor() {
         this.apiBase = 'http://localhost:8000';
@@ -44,134 +54,13 @@ class TargetVisionApp {
             }
         };
         
-        // Load cache from localStorage
-        this.loadCache();
+        // Cache is now managed by cacheManager
+        // No need to initialize cache here
         
         this.initializeApp();
     }
 
-    // Cache Management Methods
-    loadCache() {
-        try {
-            const albumsCache = localStorage.getItem('targetvision_albums_cache');
-            const foldersCache = localStorage.getItem('targetvision_folders_cache');
-            
-            if (albumsCache) {
-                const parsed = JSON.parse(albumsCache);
-                this.cache.albums = new Map(Object.entries(parsed));
-            }
-            
-            if (foldersCache) {
-                const parsed = JSON.parse(foldersCache);
-                this.cache.folders = new Map(Object.entries(parsed));
-            }
-            
-            console.log('Cache loaded:', {
-                albums: this.cache.albums.size,
-                folders: this.cache.folders.size
-            });
-        } catch (error) {
-            console.error('Error loading cache:', error);
-            this.cache.albums = new Map();
-            this.cache.folders = new Map();
-        }
-    }
-    
-    saveCache() {
-        try {
-            // Convert Maps to Objects for storage
-            const albumsObj = Object.fromEntries(this.cache.albums.entries());
-            const foldersObj = Object.fromEntries(this.cache.folders.entries());
-            
-            localStorage.setItem('targetvision_albums_cache', JSON.stringify(albumsObj));
-            localStorage.setItem('targetvision_folders_cache', JSON.stringify(foldersObj));
-        } catch (error) {
-            console.error('Error saving cache:', error);
-        }
-    }
-    
-    isCacheValid(timestamp, type = 'photos') {
-        const now = Date.now();
-        const expiry = this.cache.expiry[type] || this.cache.expiry.photos;
-        return (now - timestamp) < expiry;
-    }
-    
-    getCachedAlbumPhotos(albumId) {
-        const cached = this.cache.albums.get(albumId);
-        if (cached && this.isCacheValid(cached.timestamp, 'photos')) {
-            console.log('Using cached photos for album:', albumId);
-            return cached.photos;
-        }
-        return null;
-    }
-    
-    setCachedAlbumPhotos(albumId, photos, metadata = {}) {
-        this.cache.albums.set(albumId, {
-            photos: photos,
-            metadata: metadata,
-            timestamp: Date.now()
-        });
-        this.saveCache();
-        console.log('Cached photos for album:', albumId, `(${photos.length} photos)`);
-    }
-    
-    getCachedFolderContents(nodeUri) {
-        const key = nodeUri || 'root';
-        const cached = this.cache.folders.get(key);
-        if (cached && this.isCacheValid(cached.timestamp, 'folders')) {
-            console.log('Using cached folder contents for:', key);
-            return cached.contents;
-        }
-        return null;
-    }
-    
-    setCachedFolderContents(nodeUri, contents) {
-        const key = nodeUri || 'root';
-        this.cache.folders.set(key, {
-            contents: contents,
-            timestamp: Date.now()
-        });
-        this.saveCache();
-        console.log('Cached folder contents for:', key);
-    }
-    
-    clearCache() {
-        this.cache.albums.clear();
-        this.cache.folders.clear();
-        localStorage.removeItem('targetvision_albums_cache');
-        localStorage.removeItem('targetvision_folders_cache');
-        console.log('🔍 DEBUG: Cache cleared');
-    }
-    
-    // Debug function to clear cache and reload current album
-    debugClearCacheAndReload() {
-        console.log('🔍 DEBUG: Clearing cache and reloading current album...');
-        this.clearCache();
-        if (this.currentAlbum) {
-            const albumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
-            this.loadAlbumPhotos(albumId);
-        }
-    }
-    
-    clearCacheAndRefresh() {
-        // Clear cache
-        this.clearCache();
-        
-        // Update UI status
-        this.updateCacheStatus();
-        
-        // Show success message
-        const successMsg = document.getElementById('cache-cleared');
-        if (successMsg) {
-            successMsg.classList.remove('hidden');
-            setTimeout(() => {
-                successMsg.classList.add('hidden');
-            }, 3000);
-        }
-        
-        // Show toast notification
-        this.showToast('Cache Cleared', 'All cached data has been cleared successfully', 'success');
-    }
+    // Cache Management - Now handled by CacheManager
     
     async confirmProcessingStatus() {
         const button = document.getElementById('confirm-processing-status');
@@ -240,125 +129,8 @@ class TargetVisionApp {
         }
     }
     
-    updateCacheStatus() {
-        // Update cache count displays
-        const albumsCountElement = document.getElementById('cache-albums-count');
-        const foldersCountElement = document.getElementById('cache-folders-count');
-        
-        if (albumsCountElement) {
-            albumsCountElement.textContent = this.cache.albums.size;
-        }
-        if (foldersCountElement) {
-            foldersCountElement.textContent = this.cache.folders.size;
-        }
-        
-        console.log('Cache status updated:', {
-            albums: this.cache.albums.size,
-            folders: this.cache.folders.size
-        });
-    }
 
-    // State Persistence Methods
-    saveAppState() {
-        try {
-            // Don't save state during initial loading to prevent overriding URL params
-            if (this.isInitializing) {
-                console.log('Skipping saveAppState during initialization');
-                return;
-            }
-            
-            const state = {
-                currentPage: this.currentPage,
-                currentAlbum: this.currentAlbum,
-                currentNodeUri: this.currentNodeUri,
-                breadcrumbs: this.breadcrumbs,
-                nodeHistory: this.nodeHistory,
-                statusFilter: this.statusFilter,
-                showProcessedPhotos: this.showProcessedPhotos,
-                showUnprocessedPhotos: this.showUnprocessedPhotos,
-                timestamp: Date.now()
-            };
-            console.log('saveAppState called with:', {
-                currentPage: this.currentPage,
-                currentAlbum: this.currentAlbum?.title || this.currentAlbum?.smugmug_id,
-                currentNodeUri: this.currentNodeUri
-            });
-            localStorage.setItem('targetvision_state', JSON.stringify(state));
-            
-            // Also update URL for bookmarkable links
-            this.updateURL();
-        } catch (error) {
-            console.error('Error saving app state:', error);
-        }
-    }
-    
-    loadAppState() {
-        try {
-            const savedState = localStorage.getItem('targetvision_state');
-            if (!savedState) return null;
-            
-            const state = JSON.parse(savedState);
-            
-            // Check if state is not too old (24 hours)
-            if (Date.now() - state.timestamp > 24 * 60 * 60 * 1000) {
-                localStorage.removeItem('targetvision_state');
-                return null;
-            }
-            
-            return state;
-        } catch (error) {
-            console.error('Error loading app state:', error);
-            localStorage.removeItem('targetvision_state');
-            return null;
-        }
-    }
-    
-    updateURL() {
-        try {
-            const params = new URLSearchParams();
-            
-            console.log('updateURL called with state:', {
-                currentPage: this.currentPage,
-                currentAlbum: this.currentAlbum?.title || this.currentAlbum?.smugmug_id,
-                currentNodeUri: this.currentNodeUri
-            });
-            
-            if (this.currentPage !== 'albums') {
-                params.set('page', this.currentPage);
-            }
-            
-            if (this.currentAlbum) {
-                params.set('album', this.currentAlbum.smugmug_id || this.currentAlbum.album_key);
-            }
-            
-            if (this.currentNodeUri) {
-                params.set('node', encodeURIComponent(this.currentNodeUri));
-            }
-            
-            // Update URL without page reload
-            const newURL = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-            console.log('Setting URL to:', newURL);
-            window.history.replaceState(null, '', newURL);
-        } catch (error) {
-            console.error('Error updating URL:', error);
-        }
-    }
-    
-    loadStateFromURL() {
-        try {
-            const params = new URLSearchParams(window.location.search);
-            const state = {
-                currentPage: params.get('page') || 'albums',
-                albumId: params.get('album'),
-                nodeUri: params.get('node') ? decodeURIComponent(params.get('node')) : null
-            };
-            console.log('loadStateFromURL found:', state, 'from URL:', window.location.search);
-            return state;
-        } catch (error) {
-            console.error('Error loading state from URL:', error);
-            return null;
-        }
-    }
+    // State Management - Now handled by StateManager
 
     async initializeApp() {
         console.log('Starting app initialization...');
@@ -367,7 +139,7 @@ class TargetVisionApp {
         this.bindEventListeners();
         console.log('Event listeners bound, checking connection...');
         await this.checkConnectionStatus();
-        await this.checkAuthentication();
+        await smugMugAPI.checkAuthentication();
         
         // Initialize LLM status checking
         this.initializeStatusChecking();
@@ -390,21 +162,21 @@ class TargetVisionApp {
         console.log('Loading application data...');
         
         // Load SmugMug albums first
-        await this.loadSmugMugAlbums();
+        await smugMugAPI.loadSmugMugAlbums();
         
         // Try to restore state from URL first, then localStorage
         let restoredState = false;
-        const urlState = this.loadStateFromURL();
-        const savedState = this.loadAppState();
+        const urlState = stateManager.loadStateFromURL();
+        const savedState = stateManager.loadAppState();
         
         console.log('Restoration check:', { urlState, savedState });
         
         if (urlState && (urlState.albumId || urlState.nodeUri || urlState.currentPage !== 'albums')) {
             console.log('Attempting to restore from URL state');
-            restoredState = await this.restoreStateFromData(urlState);
+            restoredState = await stateManager.restoreStateFromData(urlState);
         } else if (savedState) {
             console.log('Attempting to restore from saved state');
-            restoredState = await this.restoreStateFromData(savedState);
+            restoredState = await stateManager.restoreStateFromData(savedState);
         }
         
         if (!restoredState) {
@@ -421,70 +193,6 @@ class TargetVisionApp {
         this.isInitializing = false;
     }
     
-    async restoreStateFromData(stateData) {
-        try {
-            let restored = false;
-            
-            // Restore page
-            if (stateData.currentPage && stateData.currentPage !== 'albums') {
-                console.log('Restoring page to:', stateData.currentPage);
-                this.showPage(stateData.currentPage);
-                restored = true;
-            }
-            
-            // Restore folder navigation FIRST (sets folder context)
-            if (stateData.nodeUri || stateData.currentNodeUri) {
-                const nodeUri = stateData.nodeUri || stateData.currentNodeUri;
-                if (nodeUri) {
-                    await this.loadFolderContents(nodeUri);
-                    restored = true;
-                }
-            }
-            
-            // Then restore album selection AFTER folder context is set
-            if (stateData.albumId || stateData.currentAlbum) {
-                const albumId = stateData.albumId || (stateData.currentAlbum ? 
-                    stateData.currentAlbum.smugmug_id || stateData.currentAlbum.album_key : null);
-                
-                if (albumId) {
-                    const album = this.smugmugAlbums.find(a => 
-                        (a.smugmug_id && a.smugmug_id === albumId) || 
-                        (a.album_key && a.album_key === albumId)
-                    );
-                    
-                    if (album) {
-                        await this.selectAlbum(album);
-                        restored = true;
-                    }
-                }
-            }
-            
-            // Restore other state properties
-            if (stateData.breadcrumbs) {
-                this.breadcrumbs = stateData.breadcrumbs;
-            }
-            if (stateData.nodeHistory) {
-                this.nodeHistory = stateData.nodeHistory;
-            }
-            if (stateData.statusFilter) {
-                this.statusFilter = stateData.statusFilter;
-            }
-            if (typeof stateData.showProcessedPhotos !== 'undefined') {
-                this.showProcessedPhotos = stateData.showProcessedPhotos;
-            }
-            if (typeof stateData.showUnprocessedPhotos !== 'undefined') {
-                this.showUnprocessedPhotos = stateData.showUnprocessedPhotos;
-            }
-            
-            // Update breadcrumbs display
-            this.updateBreadcrumbs();
-            
-            return restored;
-        } catch (error) {
-            console.error('Error restoring state:', error);
-            return false;
-        }
-    }
 
     bindEventListeners() {
         console.log('Binding event listeners...');
@@ -542,19 +250,19 @@ class TargetVisionApp {
         // Album selection (breadcrumb-albums is now created dynamically, so we'll handle this in updateBreadcrumbs)
         
         // Album actions
-        document.getElementById('sync-album').addEventListener('click', () => this.syncCurrentAlbum());
+        document.getElementById('sync-album').addEventListener('click', () => smugMugAPI.syncCurrentAlbum(this.currentAlbum));
         document.getElementById('refresh-photos').addEventListener('click', () => this.refreshCurrentPhotos());
         document.getElementById('sync-all-albums').addEventListener('click', () => this.syncAllAlbums());
         
         // Photo selection
         document.getElementById('select-all').addEventListener('click', () => this.selectAllPhotos());
         document.getElementById('select-none').addEventListener('click', () => this.clearSelection());
-        document.getElementById('process-selected').addEventListener('click', () => this.processSelectedPhotos());
-        document.getElementById('generate-embeddings').addEventListener('click', () => this.generateMissingEmbeddings());
+        document.getElementById('process-selected').addEventListener('click', () => photoProcessor.processSelectedPhotos(this.selectedPhotos, this.currentPhotos));
+        document.getElementById('generate-embeddings').addEventListener('click', () => photoProcessor.generateMissingEmbeddings(this.currentAlbum));
         document.getElementById('refresh-status').addEventListener('click', () => this.refreshAlbumStatus());
         
         // Global progress bar
-        document.getElementById('global-progress-close').addEventListener('click', () => this.hideGlobalProgress());
+        document.getElementById('global-progress-close').addEventListener('click', () => photoProcessor.hideGlobalProgress());
         
         // Filters
         document.getElementById('status-filter').addEventListener('change', (e) => this.filterPhotos(e.target.value));
@@ -639,7 +347,7 @@ class TargetVisionApp {
         
         // Cache management
         document.getElementById('clear-cache').addEventListener('click', () => this.clearCacheAndRefresh());
-        document.getElementById('refresh-cache-status').addEventListener('click', () => this.updateCacheStatus());
+        document.getElementById('refresh-cache-status').addEventListener('click', () => cacheManager.updateCacheStatus());
         
         // Data management
         document.getElementById('confirm-processing-status').addEventListener('click', () => this.confirmProcessingStatus());
@@ -678,156 +386,7 @@ class TargetVisionApp {
         }
     }
 
-    async checkAuthentication() {
-        try {
-            const response = await fetch(`${this.apiBase}/auth/status`);
-            const authStatus = await response.json();
-            
-            const loading = document.getElementById('auth-loading');
-            const success = document.getElementById('auth-success');
-            const error = document.getElementById('auth-error');
-            const username = document.getElementById('auth-username');
-            
-            if (loading) loading.classList.add('hidden');
-            
-            if (authStatus.authenticated) {
-                if (success) success.classList.remove('hidden');
-                if (username) username.textContent = `(@${authStatus.username})`;
-            } else {
-                if (error) error.classList.remove('hidden');
-            }
-        } catch (err) {
-            console.error('Authentication check failed:', err);
-            const loading = document.getElementById('auth-loading');
-            const error = document.getElementById('auth-error');
-            if (loading) loading.classList.add('hidden');
-            if (error) error.classList.remove('hidden');
-        }
-    }
-
-    // Albums Management
-    async loadSmugMugAlbums() {
-        // Use the new folder navigation system
-        await this.loadFolderContents();
-    }
-    
-    async loadFolderContents(nodeUri = null) {
-        // Check cache first for instant loading
-        const cachedContents = this.getCachedFolderContents(nodeUri);
-        if (cachedContents) {
-            console.log('Using cached folder contents');
-            this.smugmugAlbums = cachedContents.nodes || [];
-            this.currentNodeUri = nodeUri;
-            
-            // Save state after folder navigation
-            this.saveAppState();
-            
-            // Update breadcrumbs from cache
-            if (cachedContents.breadcrumbs) {
-                this.breadcrumbs = cachedContents.breadcrumbs;
-            } else {
-                this.breadcrumbs = [];
-            }
-            
-            this.displayFolderContents();
-            
-            // Also update the right panel to show folder contents
-            if (this.smugmugAlbums.length > 0) {
-                this.displayRootFolderContentsInRightPanel();
-            }
-            
-            // Refresh in background to ensure cache is up to date
-            this.refreshFolderContentsInBackground(nodeUri);
-            return;
-        }
-        
-        // No cache, show loading and fetch fresh data
-        this.showAlbumsLoading();
-        await this.fetchFolderContents(nodeUri);
-    }
-    
-    async fetchFolderContents(nodeUri = null) {
-        try {
-            const url = nodeUri 
-                ? `${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(nodeUri)}`
-                : `${this.apiBase}/smugmug/nodes`;
-            
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            
-            // Cache the fresh data
-            this.setCachedFolderContents(nodeUri, data);
-            
-            this.smugmugAlbums = data.nodes || [];
-            this.currentNodeUri = nodeUri;
-            
-            // Save state after folder navigation
-            this.saveAppState();
-            
-            // Update breadcrumbs
-            if (data.breadcrumbs) {
-                this.breadcrumbs = data.breadcrumbs;
-            } else {
-                this.breadcrumbs = [];
-            }
-            
-            this.displayFolderContents();
-            
-            // Also update the right panel to show folder contents
-            if (this.smugmugAlbums.length > 0) {
-                this.displayRootFolderContentsInRightPanel();
-            }
-            
-            this.hideAlbumsLoading();
-            
-        } catch (error) {
-            console.error('Failed to load folder contents:', error);
-            this.showErrorMessage('Failed to Load Folders', 'Could not fetch folders from SmugMug. Please check your connection and try again.', error.message);
-            this.hideAlbumsLoading();
-        }
-    }
-    
-    async refreshFolderContentsInBackground(nodeUri = null) {
-        try {
-            console.log('Refreshing folder contents in background for:', nodeUri || 'root');
-            const url = nodeUri 
-                ? `${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(nodeUri)}`
-                : `${this.apiBase}/smugmug/nodes`;
-            
-            const response = await fetch(url);
-            if (!response.ok) return; // Silently fail for background refresh
-            
-            const freshData = await response.json();
-            
-            // Update cache with fresh data
-            this.setCachedFolderContents(nodeUri, freshData);
-            
-            // Only update UI if this is still the current folder
-            if (this.currentNodeUri === nodeUri) {
-                // Check if data actually changed to avoid unnecessary re-renders
-                if (JSON.stringify(this.smugmugAlbums) !== JSON.stringify(freshData.nodes || [])) {
-                    console.log('Folder data updated from background refresh');
-                    this.smugmugAlbums = freshData.nodes || [];
-                    
-                    // Update breadcrumbs if they changed
-                    if (freshData.breadcrumbs) {
-                        this.breadcrumbs = freshData.breadcrumbs;
-                    }
-                    
-                    this.displayFolderContents();
-                    
-                    // Also update the right panel if needed
-                    if (this.smugmugAlbums.length > 0) {
-                        this.displayRootFolderContentsInRightPanel();
-                    }
-                }
-            }
-        } catch (error) {
-            console.log('Background folder refresh failed (ignoring):', error.message);
-        }
-    }
+    // SmugMug API - Now handled by SmugMugAPI manager
 
     displayAlbums() {
         // Delegate to folder contents display for backward compatibility
@@ -1060,7 +619,7 @@ class TargetVisionApp {
     
     navigateToFolder(folder) {
         // Navigate into the folder (replaces current level)
-        this.loadFolderContents(folder.node_uri);
+        smugMugAPI.loadFolderContents(folder.node_uri);
     }
 
     createAlbumListItem(album) {
@@ -1315,7 +874,7 @@ class TargetVisionApp {
             // Navigate on click
             button.addEventListener('click', () => {
                 const nodeUri = isRoot ? null : item.node_uri;
-                this.loadFolderContents(nodeUri);
+                smugMugAPI.loadFolderContents(nodeUri);
             });
         }
         
@@ -1431,7 +990,7 @@ class TargetVisionApp {
     async navigateToRoot() {
         this.nodeHistory = [];
         this.breadcrumbs = [];
-        await this.loadFolderContents();
+        await smugMugAPI.loadFolderContents();
     }
     
     displayFolderContentsInRightPanel(folder) {
@@ -1974,7 +1533,7 @@ class TargetVisionApp {
         this.currentAlbum = album;
         
         // Save state after album selection
-        this.saveAppState();
+        stateManager.saveAppState();
         
         // Update UI
         this.updateAlbumSelection();
@@ -2079,7 +1638,7 @@ class TargetVisionApp {
         this.clearSelection();
         
         // Check cache first
-        const cachedPhotos = this.getCachedAlbumPhotos(albumId);
+        const cachedPhotos = cacheManager.getCachedAlbumPhotos(albumId);
         if (cachedPhotos) {
             // Show cached data immediately for fast navigation
             console.log(`🔍 DEBUG: Using cached photos for album ${albumId} (${cachedPhotos.length} photos)`);
@@ -2129,7 +1688,7 @@ class TargetVisionApp {
             console.log('🔍 Status breakdown:', statusCounts);
             
             // Cache the fresh data
-            this.setCachedAlbumPhotos(albumId, this.currentPhotos);
+            cacheManager.setCachedAlbumPhotos(albumId, this.currentPhotos);
             
             this.displayPhotos();
             this.updatePhotoStats();
@@ -2151,7 +1710,7 @@ class TargetVisionApp {
             const freshPhotos = await response.json();
             
             // Update cache with fresh data
-            this.setCachedAlbumPhotos(albumId, freshPhotos);
+            cacheManager.setCachedAlbumPhotos(albumId, freshPhotos);
             
             // Only update UI if this is still the current album
             if (this.currentAlbum && (this.currentAlbum.smugmug_id === albumId || this.currentAlbum.album_key === albumId)) {
@@ -2397,7 +1956,7 @@ class TargetVisionApp {
         if (statusIndicator) {
             statusIndicator.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.processSinglePhoto(photo);
+                photoProcessor.processSinglePhoto(photo);
             });
             
             // Add cursor pointer and hover state for unprocessed photos
@@ -2503,240 +2062,10 @@ class TargetVisionApp {
         });
     }
 
-    // Processing
-    async syncCurrentAlbum() {
-        if (!this.currentAlbum) return;
-        
-        const button = document.getElementById('sync-album');
-        const originalText = button.textContent;
-        
-        button.textContent = 'Syncing...';
-        button.disabled = true;
-        
-        try {
-            const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
-            
-            // Save current navigation state
-            const savedState = {
-                currentNodeUri: this.currentNodeUri,
-                breadcrumbs: [...this.breadcrumbs],
-                nodeHistory: [...this.nodeHistory],
-                selectedAlbumId: currentAlbumId,
-                currentPage: this.currentPage  // Preserve current page
-            };
-            
-            const response = await fetch(`${this.apiBase}/smugmug/albums/${currentAlbumId}/sync`, {
-                method: 'POST'
-            });
-            
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const result = await response.json();
-            
-            // Context-preserving refresh: only update current folder and album data
-            await this.refreshCurrentContext(savedState);
-            
-            this.showSuccessMessage('Album Synced', `Successfully synced ${result.synced_photos} photos from "${result.album_name}"`);
-            
-        } catch (error) {
-            console.error('Album sync failed:', error);
-            this.showErrorMessage('Sync Failed', 'Could not sync album with local database.', error.message);
-        } finally {
-            button.textContent = originalText;
-            button.disabled = false;
-        }
-    }
+    // Album sync - Now handled by SmugMugAPI manager
 
-    async refreshCurrentContext(savedState) {
-        try {
-            // Restore navigation state
-            this.currentNodeUri = savedState.currentNodeUri;
-            this.breadcrumbs = savedState.breadcrumbs;
-            this.nodeHistory = savedState.nodeHistory;
-            
-            // Refresh current folder contents (which includes updated album data)
-            await this.loadFolderContents(this.currentNodeUri);
-            
-            // Find and restore the current album selection with updated data
-            const currentAlbumId = savedState.selectedAlbumId;
-            this.currentAlbum = this.smugmugAlbums.find(a => 
-                (a.smugmug_id && a.smugmug_id === currentAlbumId) || 
-                (a.album_key && a.album_key === currentAlbumId)
-            );
-            
-            // Refresh album photos if we have a current album
-            if (this.currentAlbum) {
-                await this.loadAlbumPhotos(currentAlbumId);
-                this.updateAlbumSelection();
-                
-                // Restore original page state
-                if (savedState.currentPage) {
-                    this.currentPage = savedState.currentPage;
-                    if (savedState.currentPage !== 'albums') {
-                        this.showPage(savedState.currentPage);
-                    }
-                }
-            }
-            
-            // Update breadcrumbs display
-            this.updateBreadcrumbs();
-            
-        } catch (error) {
-            console.error('Error refreshing context:', error);
-            // Fallback to full reload if context refresh fails
-            await this.loadSmugMugAlbums();
-            if (savedState.selectedAlbumId) {
-                await this.loadAlbumPhotos(savedState.selectedAlbumId);
-                // Stay on albums page - photos are displayed in right panel
-                this.currentPage = 'albums';
-            }
-        }
-    }
+    // Photo processing - Now handled by PhotoProcessor manager
 
-    async processSelectedPhotos() {
-        if (this.selectedPhotos.size === 0) return;
-        
-        const photoIds = Array.from(this.selectedPhotos);
-        
-        // Find local photo IDs for selected SmugMug IDs
-        const localPhotoIds = [];
-        for (const smugmugId of photoIds) {
-            const photo = this.currentPhotos.find(p => p.smugmug_id === smugmugId);
-            if (photo && photo.local_photo_id) {
-                localPhotoIds.push(photo.local_photo_id);
-            }
-        }
-        
-        if (localPhotoIds.length === 0) {
-            this.showErrorMessage('Processing Error', 'Selected photos must be synced before processing.');
-            return;
-        }
-        
-        // Add photos to UI processing state
-        Array.from(this.selectedPhotos).forEach(photoId => {
-            this.processingPhotos.add(photoId);
-        });
-        
-        // Update UI to show processing indicators
-        this.displayPhotos();
-        
-        this.showBatchProgress(0, localPhotoIds.length, 0);
-        this.showGlobalProgress(0, localPhotoIds.length, 'Starting AI analysis of selected photos...', true);
-        
-        try {
-            // Note: No longer updating backend status to "processing" - this is now UI-only state
-            
-            // Get user's API settings
-            const apiSettings = this.getApiSettings();
-            
-            // Prepare headers with API keys
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            if (apiSettings.anthropic_key) {
-                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
-            }
-            if (apiSettings.openai_key) {
-                headers['X-OpenAI-Key'] = apiSettings.openai_key;
-            }
-            
-            // Start batch processing (now truly async background task)
-            fetch(`${this.apiBase}/photos/process/batch?provider=${apiSettings.active_provider || 'anthropic'}`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(localPhotoIds)
-            }).then(response => {
-                if (response.ok) {
-                    return response.json();
-                }
-                throw new Error(`HTTP ${response.status}`);
-            }).then(result => {
-                console.log(`Batch processing started: ${result.message}`);
-                // Processing continues in background
-            }).catch(error => {
-                console.error('Failed to start batch processing:', error);
-                this.hideBatchProgress();
-                this.hideGlobalProgress();
-                this.showErrorMessage('Processing Failed', 'Failed to start batch processing. Please try again.');
-            });
-            
-            // Immediately update UI to show processing status
-            localPhotoIds.forEach(photoId => {
-                const currentPhoto = this.currentPhotos.find(p => p.local_photo_id === photoId);
-                const displayId = currentPhoto ? (currentPhoto.smugmug_id || currentPhoto.image_key || currentPhoto.local_photo_id) : photoId;
-                this.updatePhotoThumbnailStatus(displayId, 'processing');
-            });
-            
-            // Show completion message with refresh instruction
-            this.showSuccessMessage('Batch Processing Started', 
-                `Processing ${localPhotoIds.length} photos in background. Results will appear when you refresh or navigate back to this album.`);
-            
-            // Optional: Add delayed status check after 1 minute
-            setTimeout(() => {
-                this.refreshAlbumStatus();
-            }, 60000);
-            
-        } catch (error) {
-            console.error('Batch processing failed:', error);
-            // Clear processing state on error
-            this.processingPhotos.clear();
-            this.displayPhotos(); // Refresh UI to remove processing indicators
-            this.hideBatchProgress();
-            this.hideGlobalProgress();
-            this.showErrorMessage('Processing Failed', 'Batch processing failed. Please try again.');
-        }
-    }
-
-    async generateMissingEmbeddings() {
-        if (!this.currentAlbum || !this.currentAlbum.local_album_id) {
-            this.showErrorMessage('No Album Selected', 'Please select an album to generate embeddings for.');
-            return;
-        }
-
-        try {
-            this.showGlobalProgress(0, 1, 'Finding photos that need embeddings...');
-
-            // Call the backend API to start embedding generation
-            const response = await fetch(`${this.apiBase}/photos/batch/generate-embeddings?album_id=${this.currentAlbum.local_album_id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            
-            if (result.photos_to_process === 0) {
-                this.hideGlobalProgress();
-                this.showSuccessMessage('Up to Date', 'All photos in this album already have embeddings.');
-                return;
-            }
-
-            // Show success message and progress
-            this.showGlobalProgress(0, result.photos_to_process, `Generating embeddings for ${result.photos_to_process} photos...`);
-            console.log(`Started embedding generation for ${result.photos_to_process} photos`);
-
-            // Start polling for progress - we can reuse the existing batch progress polling
-            // but with a different message
-            const originalMessage = 'Processing photos with AI...';
-            this.showGlobalProgress(0, result.photos_to_process, 'Generating CLIP embeddings...');
-            
-            // Show completion message with refresh instruction
-            this.showSuccessMessage('Embedding Generation Started', 
-                `Generating embeddings for ${result.photos_to_process} photos in background. Results will appear when you refresh or navigate back to this album.`);
-
-        } catch (error) {
-            console.error('Failed to generate embeddings:', error);
-            this.hideGlobalProgress();
-            this.showErrorMessage('Embedding Generation Failed', `Failed to start embedding generation: ${error.message}`);
-        }
-    }
 
     // Refresh album status to check for processing completion
     async refreshAlbumStatus() {
@@ -2748,7 +2077,7 @@ class TargetVisionApp {
             console.log('Refreshing album status...');
             const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
             await this.loadAlbumPhotos(currentAlbumId);
-            await this.loadSmugMugAlbums();
+            await smugMugAPI.loadSmugMugAlbums();
             
             // Count any still processing
             const processingCount = this.currentPhotos.filter(p => p.processing_status === 'processing').length;
@@ -2765,90 +2094,6 @@ class TargetVisionApp {
         }
     }
 
-    async processSinglePhoto(photo) {
-        // Check if photo is synced and has required data
-        if (!photo.is_synced || !photo.local_photo_id) {
-            this.showErrorMessage('Processing Error', 'This photo must be synced to the database before it can be processed with AI.');
-            return;
-        }
-        
-        // Check if already processing
-        if (this.processingPhotos.has(photo.local_photo_id)) {
-            this.showErrorMessage('Processing in Progress', 'This photo is already being processed.');
-            return;
-        }
-        
-        // Immediately show processing status in UI
-        const displayId = photo.smugmug_id || photo.image_key || photo.local_photo_id;
-        this.updatePhotoThumbnailStatus(displayId, 'processing');
-        
-        // Add to UI processing state
-        this.processingPhotos.add(photo.local_photo_id);
-        
-        // Show global progress for single photo
-        this.showGlobalProgress(0, 1, 'Analyzing photo with AI...');
-        
-        try {
-            // Get user's API settings
-            const apiSettings = this.getApiSettings();
-            
-            // Prepare headers with API keys
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            if (apiSettings.anthropic_key) {
-                headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
-            }
-            if (apiSettings.openai_key) {
-                headers['X-OpenAI-Key'] = apiSettings.openai_key;
-            }
-            
-            const response = await fetch(`${this.apiBase}/photos/${photo.local_photo_id}/process?provider=${apiSettings.active_provider || 'anthropic'}`, {
-                method: 'POST',
-                headers: headers
-            });
-            
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const result = await response.json();
-            
-            // Update the photo data with AI metadata
-            const photoIndex = this.currentPhotos.findIndex(p => p.local_photo_id === photo.local_photo_id);
-            if (photoIndex !== -1) {
-                this.currentPhotos[photoIndex].ai_metadata = result.ai_metadata;
-                this.currentPhotos[photoIndex].has_ai_metadata = true;
-            }
-            
-            // Remove from processing state
-            this.processingPhotos.delete(photo.local_photo_id);
-            
-            // Immediately update the status indicator to green checkbox (UI only)
-            this.updatePhotoThumbnailStatus(displayId, 'completed');
-            
-            // Update global progress to complete
-            this.updateGlobalProgress(1, 1, 'Photo analysis complete!');
-            
-            this.showSuccessMessage('AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
-            
-            // Open modal to show the processed photo with new AI metadata
-            const updatedPhoto = this.currentPhotos.find(p => p.local_photo_id === photo.local_photo_id);
-            if (updatedPhoto) {
-                this.showPhotoModal(updatedPhoto);
-            }
-            
-        } catch (error) {
-            console.error('AI processing failed:', error);
-            this.hideGlobalProgress();
-            this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
-            
-            // Remove from processing state on error
-            this.processingPhotos.delete(photo.local_photo_id);
-            
-            // Update status indicator to show error
-            this.updatePhotoThumbnailStatus(displayId, 'failed');
-        }
-    }
 
     // UI State Management
     async showAlbumsView() {
@@ -2883,7 +2128,7 @@ class TargetVisionApp {
         });
         
         // Load root folder contents
-        await this.loadFolderContents();
+        await smugMugAPI.loadFolderContents();
     }
 
     showPhotosView() {
@@ -2924,143 +2169,7 @@ class TargetVisionApp {
         document.getElementById('loading-photos').classList.add('hidden');
     }
 
-    showBatchProgress(processed, total, success) {
-        const progressContainer = document.getElementById('batch-progress');
-        const progressText = document.getElementById('batch-progress-text');
-        const progressBar = document.getElementById('batch-progress-bar');
-        
-        // Check if elements exist before trying to use them
-        if (!progressContainer || !progressText || !progressBar) {
-            return; // Elements were removed, skip batch progress display
-        }
-        
-        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
-        
-        progressText.textContent = `${processed}/${total}`;
-        progressBar.style.width = `${percentage}%`;
-        progressContainer.classList.remove('hidden');
-        
-        if (processed >= total) {
-            setTimeout(() => {
-                progressContainer.classList.add('hidden');
-            }, 3000);
-        }
-    }
-
-    hideBatchProgress() {
-        const progressContainer = document.getElementById('batch-progress');
-        if (progressContainer) {
-            progressContainer.classList.add('hidden');
-        }
-    }
-    
-    // Global Progress Bar Methods
-    showGlobalProgress(processed, total, details = 'Analyzing images and generating metadata...') {
-        const progressContainer = document.getElementById('global-progress-bar');
-        const progressText = document.getElementById('global-progress-text');
-        const progressFill = document.getElementById('global-progress-fill');
-        const progressDetails = document.getElementById('global-progress-details');
-        
-        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
-        
-        progressText.textContent = `${processed}/${total}`;
-        progressFill.style.width = `${percentage}%`;
-        progressDetails.textContent = details;
-        progressContainer.classList.remove('hidden');
-        
-        // Auto-hide after completion
-        if (processed >= total) {
-            setTimeout(() => {
-                this.hideGlobalProgress();
-            }, 4000);
-        }
-    }
-    
-    hideGlobalProgress() {
-        const progressContainer = document.getElementById('global-progress-bar');
-        progressContainer.classList.add('hidden');
-    }
-    
-    updateGlobalProgress(processed, total, details = null) {
-        const progressContainer = document.getElementById('global-progress-bar');
-        if (progressContainer.classList.contains('hidden')) return;
-        
-        const progressText = document.getElementById('global-progress-text');
-        const progressFill = document.getElementById('global-progress-fill');
-        const progressDetails = document.getElementById('global-progress-details');
-        
-        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
-        
-        progressText.textContent = `${processed}/${total}`;
-        progressFill.style.width = `${percentage}%`;
-        
-        if (details) {
-            progressDetails.textContent = details;
-        }
-        
-        // Auto-hide after completion
-        if (processed >= total) {
-            setTimeout(() => {
-                this.hideGlobalProgress();
-            }, 4000);
-        }
-    }
-    
-    
-    // Update individual photo thumbnail status indicator (UI only)
-    updatePhotoThumbnailStatus(photoId, newStatus) {
-        try {
-            // Find the photo card in the DOM using data attribute
-            const targetCard = document.querySelector(`[data-photo-id="${photoId}"]`);
-            if (!targetCard) return;
-            
-            // Update the status indicator
-            const statusConfig = {
-                'completed': { color: 'bg-green-500', icon: '✓', text: 'Processed' },
-                'processing': { color: 'bg-yellow-500', icon: '⏳', text: 'Processing' },
-                'failed': { color: 'bg-red-500', icon: '✗', text: 'Failed' },
-                'not_processed': { color: 'bg-orange-500', icon: '○', text: 'Not Processed' },
-                'not_synced': { color: 'bg-gray-400', icon: '○', text: 'Not Synced' }
-            };
-            
-            const statusInfo = statusConfig[newStatus] || statusConfig['not_processed'];
-            const statusIndicator = targetCard.querySelector('div[class*="absolute top-2 right-2"]');
-            
-            if (statusIndicator) {
-                // Update classes and content
-                statusIndicator.className = `absolute top-2 right-2 ${statusInfo.color} text-white text-xs px-2 py-1 rounded-full flex items-center z-20`;
-                const iconSpan = statusIndicator.querySelector('span');
-                if (iconSpan) {
-                    iconSpan.textContent = statusInfo.icon;
-                }
-                
-                // Update hover state and tooltip based on new status
-                statusIndicator.classList.remove('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
-                statusIndicator.style.cursor = 'pointer';
-                
-                if (newStatus === 'not_processed') {
-                    statusIndicator.classList.add('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
-                    statusIndicator.title = 'Click to process with AI';
-                } else if (newStatus === 'completed') {
-                    statusIndicator.title = 'Processed - click to reprocess';
-                } else if (newStatus === 'failed') {
-                    statusIndicator.title = 'Processing failed - click to retry';
-                } else if (newStatus === 'processing') {
-                    statusIndicator.title = 'Processing in progress...';
-                    statusIndicator.style.cursor = 'default';
-                }
-                
-                // Add a subtle animation to show the change
-                statusIndicator.style.transform = 'scale(1.2)';
-                setTimeout(() => {
-                    statusIndicator.style.transform = 'scale(1)';
-                }, 300);
-            }
-            
-        } catch (error) {
-            console.error('Error updating photo thumbnail status:', error);
-        }
-    }
+    // Progress management and photo status updates - Now handled by PhotoProcessor manager
 
     updatePhotoStats() {
         if (!this.currentAlbum) return;
@@ -3252,7 +2361,7 @@ class TargetVisionApp {
             this.currentPage = pageName;
             
             // Save state after page change
-            this.saveAppState();
+            stateManager.saveAppState();
             
             // Initialize page if needed
             if (pageName === 'collections') {
@@ -4584,7 +3693,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         this.processingPhotos.add(currentPhoto.local_photo_id);
         
         // Show global progress for single photo
-        this.showGlobalProgress(0, 1, 'Analyzing photo with AI...');
+        photoProcessor.showGlobalProgress(0, 1, 'Analyzing photo with AI...');
         
         try {
             // Get user's API settings
@@ -4621,7 +3730,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             this.processingPhotos.delete(currentPhoto.local_photo_id);
             
             // Immediately update the status indicator to green checkbox (UI only)
-            this.updatePhotoThumbnailStatus(currentPhoto.local_photo_id, 'completed');
+            photoProcessor.updatePhotoThumbnailStatus(currentPhoto.local_photo_id, 'completed');
             
             // Refresh the modal with updated data
             await this.showPhotoModal(this.currentPhotos[photoIndex]);
@@ -4630,13 +3739,13 @@ You can also ask for help with syncing albums or processing photos with AI. What
             this.displayPhotos();
             
             // Update global progress to complete
-            this.updateGlobalProgress(1, 1, 'Photo analysis complete!');
+            photoProcessor.updateGlobalProgress(1, 1, 'Photo analysis complete!');
             
             this.showSuccessMessage('AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
             
         } catch (error) {
             console.error('AI processing failed:', error);
-            this.hideGlobalProgress();
+            photoProcessor.hideGlobalProgress();
             this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
             
             // Remove from processing state on error
@@ -4986,7 +4095,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         this.loadApplicationSettings();
         this.loadApiKeySettings();
         this.updateSystemInfo();
-        this.updateCacheStatus();
+        cacheManager.updateCacheStatus();
         
         // Add event listeners for key source toggle
         document.querySelectorAll('input[name="key-source"]').forEach(radio => {
@@ -6240,8 +5349,8 @@ Emphasize athletic performance, competition elements, and achievement recognitio
                     });
                     
                     // Show progress bars
-                    this.showBatchProgress(0, batchStatus.processing_count, 0);
-                    this.showGlobalProgress(0, batchStatus.processing_count, 'Resuming AI analysis progress...', true);
+                    photoProcessor.showBatchProgress(0, batchStatus.processing_count, 0);
+                    photoProcessor.showGlobalProgress(0, batchStatus.processing_count, 'Resuming AI analysis progress...', true);
                     
                     // Resume polling for progress updates (with small delay to let UI finish loading)
                     // Use the new instance management system
