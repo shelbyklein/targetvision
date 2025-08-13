@@ -1,0 +1,623 @@
+/**
+ * ModalManager Component
+ * 
+ * Handles all modal functionality across the application including photo modals,
+ * collection modals, full-screen lightbox, and metadata editing.
+ * 
+ * Key Responsibilities:
+ * - Photo modal display and management
+ * - Full-screen lightbox functionality
+ * - Collection creation/edit modals
+ * - Metadata editing and AI processing
+ * - Modal animations and keyboard handling
+ */
+
+import { eventBus } from '../services/EventBus.js';
+
+class ModalManager {
+    constructor() {
+        this.currentPhoto = null;
+        this.setupEventListeners();
+        this.setupModalEventHandlers();
+        console.log('ModalManager initialized');
+    }
+
+    setupEventListeners() {
+        // Photo modal events
+        eventBus.on('photo:show-modal', (data) => this.showPhotoModal(data.photo));
+        eventBus.on('modal:close', () => this.closeModal());
+        eventBus.on('lightbox:open', (data) => this.openFullScreenLightbox(data.photo));
+        eventBus.on('lightbox:close', () => this.closeFullScreenLightbox());
+        
+        // Collection modal events
+        eventBus.on('collection:create-modal:show', () => this.showCreateCollectionModal());
+        eventBus.on('collection:create-modal:hide', () => this.hideCreateCollectionModal());
+        eventBus.on('collection:edit-modal:show', () => this.showEditCollectionModal());
+        eventBus.on('collection:edit-modal:hide', () => this.hideEditCollectionModal());
+        
+        // Metadata editing events
+        eventBus.on('metadata:edit:toggle', () => this.toggleMetadataEdit());
+        eventBus.on('metadata:edit:save', () => this.saveMetadataChanges());
+        eventBus.on('metadata:edit:cancel', () => this.cancelMetadataEdit());
+        eventBus.on('metadata:ai:regenerate', () => this.regenerateAIMetadata());
+        eventBus.on('metadata:ai:delete', () => this.deleteAIMetadata());
+    }
+
+    setupModalEventHandlers() {
+        // Photo modal handlers
+        document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
+        document.getElementById('photo-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'photo-modal') this.closeModal();
+        });
+        document.getElementById('modal-process-button').addEventListener('click', () => this.processPhotoWithAI());
+        
+        // Metadata editing handlers
+        document.getElementById('modal-edit-toggle').addEventListener('click', () => this.toggleMetadataEdit());
+        document.getElementById('modal-save-metadata').addEventListener('click', () => this.saveMetadataChanges());
+        document.getElementById('modal-cancel-edit').addEventListener('click', () => this.cancelMetadataEdit());
+        document.getElementById('modal-regenerate-ai').addEventListener('click', () => this.regenerateAIMetadata());
+        document.getElementById('modal-delete-ai').addEventListener('click', () => this.deleteAIMetadata());
+        
+        // Embedding details toggle
+        document.getElementById('modal-embedding-details-toggle').addEventListener('click', () => this.toggleEmbeddingDetails());
+        
+        // Collection handlers
+        document.getElementById('modal-add-to-collection').addEventListener('click', () => this.showCollectionInterface());
+        document.getElementById('modal-add-collection-confirm').addEventListener('click', () => this.addPhotoToCollection());
+        document.getElementById('modal-add-collection-cancel').addEventListener('click', () => this.hideCollectionInterface());
+        document.getElementById('modal-create-collection').addEventListener('click', () => this.createCollectionFromModal());
+    }
+
+    // Photo Modal Management
+    async showPhotoModal(photo) {
+        console.log('Show modal for photo:', photo);
+        
+        // Fetch complete photo data including embeddings from API
+        let completePhoto = photo;
+        if (photo.id || photo.local_photo_id) {
+            try {
+                const photoId = photo.id || photo.local_photo_id;
+                const response = await fetch(`http://localhost:8000/photos/${photoId}?include_embedding=true`);
+                if (response.ok) {
+                    completePhoto = await response.json();
+                    console.log('Fetched complete photo data with embeddings:', completePhoto);
+                } else {
+                    console.warn('Could not fetch complete photo data, using provided data');
+                }
+            } catch (error) {
+                console.warn('Error fetching complete photo data:', error);
+            }
+        }
+        
+        // Store current photo for editing functions
+        this.currentPhoto = completePhoto;
+        
+        // Populate modal with photo data
+        this.populateModalData(completePhoto, photo);
+        
+        // Load collections for this photo
+        await this.loadPhotoCollections(completePhoto);
+        
+        // Show modal with animation
+        this.showModalWithAnimation();
+    }
+
+    populateModalData(completePhoto, photo) {
+        const modal = document.getElementById('photo-modal');
+        const modalImage = document.getElementById('modal-image');
+        const modalDownload = document.getElementById('modal-download');
+        const modalDimensions = document.getElementById('modal-dimensions');
+        const modalAlbum = document.getElementById('modal-album');
+        const modalAiSection = document.getElementById('modal-ai-section');
+        const modalNoAi = document.getElementById('modal-no-ai');
+        const modalAiDescription = document.getElementById('modal-ai-description');
+        const modalAiKeywords = document.getElementById('modal-ai-keywords');
+        const modalAiConfidence = document.getElementById('modal-ai-confidence');
+        const modalAiTimestamp = document.getElementById('modal-ai-timestamp');
+        
+        // Set initial image - use image_url if available, otherwise thumbnail_url
+        const initialImageUrl = photo.image_url || photo.thumbnail_url;
+        modalImage.src = initialImageUrl;
+        modalImage.alt = photo.title || 'Photo';
+        
+        // Set initial download link
+        modalDownload.href = initialImageUrl;
+        modalDownload.download = photo.title || 'photo';
+        
+        // Add click handler to ensure download dialog opens
+        modalDownload.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.downloadImage(modalDownload.href, modalDownload.download);
+        });
+        
+        // Add click handler to modal image to open full-screen lightbox
+        modalImage.style.cursor = 'pointer';
+        modalImage.title = 'Click to view full-screen';
+        
+        // Add click handler to open full-screen lightbox
+        modalImage.addEventListener('click', () => {
+            this.openFullScreenLightbox(photo);
+        });
+        
+        // Load largest image for download
+        this.loadLargestImageForDownload(photo, modalDownload);
+        
+        // Populate basic photo information
+        modalDimensions.textContent = `${completePhoto.width || 0} × ${completePhoto.height || 0} pixels`;
+        modalAlbum.textContent = `Album: ${completePhoto.album_name || 'Unknown Album'}`;
+        
+        // Populate AI metadata section
+        this.populateAIMetadata(completePhoto);
+        
+        // Populate embedding information
+        this.populateEmbeddingInfo(completePhoto);
+    }
+
+    populateAIMetadata(completePhoto) {
+        const modalAiSection = document.getElementById('modal-ai-section');
+        const modalNoAi = document.getElementById('modal-no-ai');
+        const modalAiDescription = document.getElementById('modal-ai-description');
+        const modalAiKeywords = document.getElementById('modal-ai-keywords');
+        const modalAiConfidence = document.getElementById('modal-ai-confidence');
+        const modalAiTimestamp = document.getElementById('modal-ai-timestamp');
+        
+        // Check if there's AI metadata
+        if (completePhoto.ai_metadata && completePhoto.ai_metadata.length > 0) {
+            const aiData = completePhoto.ai_metadata[0]; // Use the first AI metadata entry
+            
+            modalAiSection.classList.remove('hidden');
+            modalNoAi.classList.add('hidden');
+            
+            // Populate AI description
+            if (aiData.description) {
+                modalAiDescription.textContent = aiData.description;
+            } else {
+                modalAiDescription.textContent = 'No AI description available';
+            }
+            
+            // Populate AI keywords
+            if (aiData.keywords && aiData.keywords.length > 0) {
+                const keywords = Array.isArray(aiData.keywords) ? aiData.keywords : aiData.keywords.split(',').map(k => k.trim());
+                const aiKeywordTags = keywords.map(keyword => 
+                    `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1">${keyword}</span>`
+                ).join('');
+                modalAiKeywords.innerHTML = aiKeywordTags;
+            } else {
+                modalAiKeywords.innerHTML = '<span class="text-blue-400">No AI keywords</span>';
+            }
+            
+            // Populate confidence score
+            if (aiData.confidence_score !== undefined && aiData.confidence_score !== null) {
+                modalAiConfidence.textContent = `${Math.round(aiData.confidence_score * 100)}% confidence`;
+            } else {
+                modalAiConfidence.textContent = '';
+            }
+            
+            // Populate timestamp
+            if (aiData.created_at) {
+                const processedDate = new Date(aiData.created_at);
+                modalAiTimestamp.textContent = `Processed: ${processedDate.toLocaleString()}`;
+            } else {
+                modalAiTimestamp.textContent = '';
+            }
+            
+        } else {
+            modalAiSection.classList.add('hidden');
+            modalNoAi.classList.remove('hidden');
+        }
+    }
+
+    populateEmbeddingInfo(completePhoto) {
+        const embeddingInfo = document.getElementById('modal-embedding-info');
+        const embeddingStatus = document.getElementById('modal-embedding-status');
+        const embeddingDimensions = document.getElementById('modal-embedding-dimensions');
+        const embeddingModel = document.getElementById('modal-embedding-model');
+        const embeddingDimCount = document.getElementById('modal-embedding-dim-count');
+        const embeddingSample = document.getElementById('modal-embedding-sample');
+        
+        if (completePhoto.embedding && completePhoto.embedding.length > 0) {
+            embeddingStatus.textContent = 'Available';
+            embeddingStatus.className = 'text-green-600 font-medium';
+            
+            const dimensions = completePhoto.embedding.length;
+            embeddingDimensions.textContent = `${dimensions}D vector`;
+            embeddingModel.textContent = 'CLIP (OpenAI)';
+            embeddingDimCount.textContent = `${dimensions} dimensions`;
+            
+            // Show first few embedding values as sample
+            const sampleValues = completePhoto.embedding.slice(0, 5).map(val => val.toFixed(4)).join(', ');
+            embeddingSample.textContent = `[${sampleValues}...]`;
+            
+            embeddingInfo.classList.remove('hidden');
+        } else {
+            embeddingStatus.textContent = 'Not Available';
+            embeddingStatus.className = 'text-gray-400';
+            embeddingInfo.classList.add('hidden');
+        }
+    }
+
+    showModalWithAnimation() {
+        const modal = document.getElementById('photo-modal');
+        
+        // Show modal with animation
+        modal.classList.remove('hidden');
+        
+        // Get modal content elements for staggered animation
+        const modalContent = modal.querySelector('.bg-white');
+        const downloadButton = modal.querySelector('#modal-download');
+        
+        // Trigger animation after modal is visible
+        requestAnimationFrame(() => {
+            // Set initial animation state
+            modal.style.opacity = '0';
+            modalContent.style.transform = 'scale(0.9) translateY(20px)';
+            modalContent.style.opacity = '0';
+            
+            // Force reflow
+            modal.offsetHeight;
+            
+            // Apply transitions
+            modal.style.transition = 'opacity 0.2s ease-out';
+            modalContent.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            
+            // Animate to final state
+            modal.style.opacity = '1';
+            
+            setTimeout(() => {
+                modalContent.style.opacity = '1';
+                modalContent.style.transform = 'scale(1) translateY(0)';
+            }, 50);
+        });
+        
+        // Focus management for accessibility
+        setTimeout(() => {
+            const modalImage = document.getElementById('modal-image');
+            modalImage.focus();
+        }, 300);
+        
+        // Add escape key handler
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                this.closeModal();
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        document.addEventListener('keydown', escapeHandler);
+    }
+
+    closeModal() {
+        const modal = document.getElementById('photo-modal');
+        const modalContent = modal.querySelector('.bg-white');
+        const downloadButton = modal.querySelector('#modal-download');
+        
+        // Only animate if modal is visible
+        if (!modal.classList.contains('hidden')) {
+            // Animate out with smoother transition
+            modalContent.style.transition = 'all 0.2s ease-in';
+            modalContent.style.transform = 'scale(0.9) translateY(20px)';
+            modalContent.style.opacity = '0';
+            
+            modal.style.transition = 'opacity 0.2s ease-in';
+            modal.style.opacity = '0';
+            
+            setTimeout(() => {
+                // Hide modal and reset styles
+                modal.classList.add('hidden');
+                
+                // Reset all inline styles for next time
+                modal.style.opacity = '';
+                modal.style.transition = '';
+                modalContent.style.transform = '';
+                modalContent.style.opacity = '';
+                modalContent.style.transition = '';
+            }, 200);
+        }
+        
+        // Clear current photo reference
+        this.currentPhoto = null;
+    }
+
+    // Full-screen Lightbox
+    async openFullScreenLightbox(photo) {
+        try {
+            // Create full-screen lightbox if it doesn't exist
+            let lightbox = document.getElementById('fullscreen-lightbox');
+            if (!lightbox) {
+                lightbox = document.createElement('div');
+                lightbox.id = 'fullscreen-lightbox';
+                lightbox.className = 'fixed inset-0 bg-black flex items-center justify-center z-50 opacity-0 transition-all duration-300 ease-out pointer-events-none p-4 md:p-8';
+                lightbox.innerHTML = `
+                    <div id="fullscreen-container" class="relative max-w-full max-h-full">
+                        <img id="fullscreen-image" class="max-w-full max-h-full object-contain opacity-0 transform scale-95 transition-all duration-300 ease-out" />
+                        <div id="fullscreen-loading" class="absolute inset-0 flex items-center justify-center text-white text-lg opacity-0 transition-all duration-300 ease-out">
+                            <div class="text-center transform transition-all duration-300 ease-out" style="transform: translateY(4px)">
+                                <div class="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent mx-auto mb-2"></div>
+                                Loading largest image...
+                            </div>
+                        </div>
+                        <button id="fullscreen-close" class="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-10">
+                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(lightbox);
+                
+                // Add close button handler
+                document.getElementById('fullscreen-close').addEventListener('click', () => {
+                    this.closeFullScreenLightbox();
+                });
+                
+                // Add click-outside-to-close handler
+                lightbox.addEventListener('click', (e) => {
+                    if (e.target === lightbox) {
+                        this.closeFullScreenLightbox();
+                    }
+                });
+                
+                // Add escape key handler
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) {
+                        this.closeFullScreenLightbox();
+                    }
+                });
+            }
+            
+            const fullscreenImage = document.getElementById('fullscreen-image');
+            const loadingDiv = document.getElementById('fullscreen-loading');
+            
+            // Show lightbox with animation
+            lightbox.style.pointerEvents = 'auto';
+            setTimeout(() => {
+                lightbox.style.opacity = '1';
+            }, 10);
+            
+            // Try to load the largest available image
+            if (photo.smugmug_id) {
+                try {
+                    console.log('Fetching largest image for full-screen lightbox:', photo.smugmug_id);
+                    const response = await fetch(`http://localhost:8000/smugmug/photos/${photo.smugmug_id}/largest`);
+                    
+                    if (response.ok) {
+                        const largestImageData = await response.json();
+                        console.log('Largest image data:', largestImageData);
+                        
+                        if (largestImageData && largestImageData.url) {
+                            // Show loading state with animation
+                            loadingDiv.style.opacity = '1';
+                            loadingDiv.querySelector('.text-center').style.transform = 'translateY(0)';
+                            
+                            // Create image to test loading
+                            const img = new Image();
+                            img.onload = () => {
+                                // Image loaded successfully
+                                fullscreenImage.src = largestImageData.url;
+                                setTimeout(() => {
+                                    // Animate image in and loading out
+                                    loadingDiv.style.opacity = '0';
+                                    fullscreenImage.style.opacity = '1';
+                                    fullscreenImage.style.transform = 'scale(1)';
+                                }, 150);
+                            };
+                            img.onerror = () => {
+                                // Fallback to existing image
+                                eventBus.emit('image:fallback:load', { photo, fullscreenImage, loadingDiv });
+                            };
+                            img.src = largestImageData.url;
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching largest image:', error);
+                }
+            }
+            
+            // Fallback to existing image URL
+            eventBus.emit('image:fallback:load', { photo, fullscreenImage, loadingDiv });
+            
+        } catch (error) {
+            console.error('Error opening full-screen lightbox:', error);
+        }
+    }
+
+    closeFullScreenLightbox() {
+        const lightbox = document.getElementById('fullscreen-lightbox');
+        if (lightbox) {
+            const container = document.getElementById('fullscreen-container');
+            const fullscreenImage = document.getElementById('fullscreen-image');
+            
+            // Animate out
+            lightbox.style.opacity = '0';
+            fullscreenImage.style.opacity = '0';
+            fullscreenImage.style.transform = 'scale(0.95)';
+            
+            setTimeout(() => {
+                lightbox.style.pointerEvents = 'none';
+            }, 300);
+            
+            // Reset for next time
+            setTimeout(() => {
+                const loadingDiv = document.getElementById('fullscreen-loading');
+                if (loadingDiv) {
+                    loadingDiv.style.opacity = '0';
+                    loadingDiv.querySelector('.text-center').style.transform = 'translateY(4px)';
+                }
+                fullscreenImage.style.transform = 'scale(0.95)';
+            }, 300);
+        }
+    }
+
+    // Collection Modal Management
+    showCreateCollectionModal() {
+        const modal = document.getElementById('create-collection-modal');
+        // Clear form
+        const nameInput = document.getElementById('create-collection-name');
+        const descInput = document.getElementById('create-collection-description');
+        if (nameInput) nameInput.value = '';
+        if (descInput) descInput.value = '';
+        
+        if (modal) {
+            modal.classList.remove('hidden');
+            if (nameInput) nameInput.focus();
+        }
+    }
+
+    hideCreateCollectionModal() {
+        const modal = document.getElementById('create-collection-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    showEditCollectionModal() {
+        // This would be implemented with actual collection data
+        const modal = document.getElementById('edit-collection-modal');
+        
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideEditCollectionModal() {
+        const modal = document.getElementById('edit-collection-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    // Utility methods for other components to use
+    downloadImage(imageUrl, filename) {
+        console.log('Downloading image:', imageUrl);
+        
+        // Create a temporary link element to trigger download
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = filename || 'photo';
+        link.target = '_blank'; // Open in new tab as fallback
+        
+        // Append to body, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    async loadLargestImageForDownload(photo, modalDownload) {
+        // Implementation for loading largest image for download
+        // This integrates with the SmugMug API to get the highest resolution image
+        try {
+            const originalContent = modalDownload.innerHTML;
+            modalDownload.innerHTML = `
+                <svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="m12,2a10,10,0,1,0,10,10,1,1,0,0,0-2,0,8,8,0,1,1-8-8,1,1,0,0,0,0-2Z"></path>
+                </svg>
+                Loading...
+            `;
+            modalDownload.style.opacity = '0.7';
+            modalDownload.style.pointerEvents = 'none';
+
+            if (photo.smugmug_id) {
+                const response = await fetch(`http://localhost:8000/smugmug/photos/${photo.smugmug_id}/largest`);
+                
+                if (response.ok) {
+                    const largestImageData = await response.json();
+                    
+                    if (largestImageData && largestImageData.url) {
+                        modalDownload.href = largestImageData.url;
+                        
+                        // Update button with size info if available
+                        const sizeText = largestImageData.width && largestImageData.height 
+                            ? ` (${largestImageData.width}×${largestImageData.height})`
+                            : '';
+                        modalDownload.innerHTML = `
+                            <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download Original${sizeText}
+                        `;
+                    } else {
+                        modalDownload.innerHTML = originalContent;
+                    }
+                } else {
+                    modalDownload.innerHTML = originalContent;
+                }
+            }
+            
+            modalDownload.style.opacity = '1';
+            modalDownload.style.pointerEvents = 'auto';
+            
+        } catch (error) {
+            console.error('Error loading largest image for download:', error);
+            modalDownload.innerHTML = originalContent || `
+                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download
+            `;
+            modalDownload.style.opacity = '1';
+            modalDownload.style.pointerEvents = 'auto';
+        }
+    }
+
+    // Placeholder methods for features that will be implemented by other managers
+    async loadPhotoCollections(photo) {
+        // This will be handled by CollectionsManager when implemented
+        console.log('Loading collections for photo:', photo.id);
+    }
+
+    processPhotoWithAI() {
+        // This will emit event to PhotoProcessor
+        eventBus.emit('photos:process-single', { photo: this.currentPhoto });
+    }
+
+    toggleMetadataEdit() {
+        // Metadata editing implementation
+        console.log('Toggle metadata edit mode');
+    }
+
+    saveMetadataChanges() {
+        // Save metadata changes implementation
+        console.log('Save metadata changes');
+    }
+
+    cancelMetadataEdit() {
+        // Cancel metadata edit implementation
+        console.log('Cancel metadata edit');
+    }
+
+    regenerateAIMetadata() {
+        // Regenerate AI metadata implementation
+        console.log('Regenerate AI metadata');
+    }
+
+    deleteAIMetadata() {
+        // Delete AI metadata implementation
+        console.log('Delete AI metadata');
+    }
+
+    toggleEmbeddingDetails() {
+        // Toggle embedding details implementation
+        console.log('Toggle embedding details');
+    }
+
+    showCollectionInterface() {
+        // Show collection interface implementation
+        console.log('Show collection interface');
+    }
+
+    hideCollectionInterface() {
+        // Hide collection interface implementation
+        console.log('Hide collection interface');
+    }
+
+    addPhotoToCollection() {
+        // Add photo to collection implementation
+        console.log('Add photo to collection');
+    }
+
+    createCollectionFromModal() {
+        // Create collection from modal implementation
+        console.log('Create collection from modal');
+    }
+}
+
+// Create and export singleton instance
+const modalManager = new ModalManager();
+export default modalManager;
