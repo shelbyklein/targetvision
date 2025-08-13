@@ -6,7 +6,7 @@
     <title>TargetVision - AI-Powered Photo Discovery</title>
     <link rel="icon" type="image/webp" href="targetvision-icon.webp">
     <link rel="shortcut icon" href="targetvision-icon.webp">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
     <link rel="stylesheet" href="styles.css">
     <script>
         tailwind.config = {
@@ -18,6 +18,17 @@
                     }
                 }
             }
+        }
+        
+        // Suppress Tailwind CDN production warning for development
+        if (typeof console !== 'undefined' && console.warn) {
+            const originalWarn = console.warn;
+            console.warn = function(message) {
+                if (typeof message === 'string' && message.includes('cdn.tailwindcss.com should not be used in production')) {
+                    return; // Suppress this specific warning
+                }
+                originalWarn.apply(console, arguments);
+            };
         }
     </script>
 </head>
@@ -1394,6 +1405,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -152,7 +152,7 @@ class TargetVisionApp {
         // Phase 2: Load data progressively in background
         this.loadApplicationData().catch(error => {
             console.error('Error loading application data:', error);
-            this.showNotification('Failed to load application data. Please refresh the page.', 'error');
+            this.showErrorMessage('Initialization Error', 'Failed to load application data. Please refresh the page.');
         });
         
         console.log('Phase 1 initialization complete - UI is ready');
@@ -250,15 +250,24 @@ class TargetVisionApp {
         // Album selection (breadcrumb-albums is now created dynamically, so we'll handle this in updateBreadcrumbs)
         
         // Album actions
-        document.getElementById('sync-album').addEventListener('click', () => smugMugAPI.syncCurrentAlbum(this.currentAlbum));
+        document.getElementById('sync-album').addEventListener('click', () => {
+            eventBus.emit('app:sync-album', { album: this.currentAlbum });
+        });
         document.getElementById('refresh-photos').addEventListener('click', () => this.refreshCurrentPhotos());
         document.getElementById('sync-all-albums').addEventListener('click', () => this.syncAllAlbums());
         
         // Photo selection
         document.getElementById('select-all').addEventListener('click', () => this.selectAllPhotos());
         document.getElementById('select-none').addEventListener('click', () => this.clearSelection());
-        document.getElementById('process-selected').addEventListener('click', () => photoProcessor.processSelectedPhotos(this.selectedPhotos, this.currentPhotos));
-        document.getElementById('generate-embeddings').addEventListener('click', () => photoProcessor.generateMissingEmbeddings(this.currentAlbum));
+        document.getElementById('process-selected').addEventListener('click', () => {
+            eventBus.emit('photos:process-selected', { 
+                selectedPhotos: this.selectedPhotos, 
+                currentPhotos: this.currentPhotos 
+            });
+        });
+        document.getElementById('generate-embeddings').addEventListener('click', () => {
+            eventBus.emit('photos:generate-embeddings', { album: this.currentAlbum });
+        });
         document.getElementById('refresh-status').addEventListener('click', () => this.refreshAlbumStatus());
         
         // Global progress bar
@@ -347,7 +356,9 @@ class TargetVisionApp {
         
         // Cache management
         document.getElementById('clear-cache').addEventListener('click', () => this.clearCacheAndRefresh());
-        document.getElementById('refresh-cache-status').addEventListener('click', () => cacheManager.updateCacheStatus());
+        document.getElementById('refresh-cache-status').addEventListener('click', () => {
+            eventBus.emit('cache:refresh-status');
+        });
         
         // Data management
         document.getElementById('confirm-processing-status').addEventListener('click', () => this.confirmProcessingStatus());
@@ -365,6 +376,99 @@ class TargetVisionApp {
         document.querySelectorAll('[data-template]').forEach(template => {
             template.addEventListener('click', () => this.selectTemplate(template.dataset.template));
         });
+
+        // Setup event-driven communication with managers
+        this.setupEventBusListeners();
+    }
+
+    setupEventBusListeners() {
+        // SmugMug API events
+        eventBus.on('smugmug:folder-loaded', (data) => {
+            this.handleFolderLoaded(data);
+        });
+
+        eventBus.on('smugmug:sync-success', (data) => {
+            this.showSuccessMessage('Sync Complete', data.message);
+            this.refreshCurrentPhotos();
+        });
+
+        eventBus.on('smugmug:sync-error', (data) => {
+            this.showErrorMessage('Sync Failed', `Failed to sync album: ${data.error.message}`);
+        });
+
+        eventBus.on('smugmug:folder-error', (data) => {
+            console.error('SmugMug folder loading error:', data);
+            this.showErrorMessage('Folder Loading Error', `Failed to load folder: ${data.error.message}`);
+        });
+
+        // Photo processing events
+        eventBus.on('photos:single-processing-success', (data) => {
+            this.showSuccessMessage('Processing Complete', data.message);
+            this.displayPhotos(); // Refresh photo grid
+        });
+
+        eventBus.on('photos:single-processing-error', (data) => {
+            this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
+        });
+
+        eventBus.on('photos:batch-processing-started', (data) => {
+            this.showSuccessMessage('Batch Processing Started', data.message);
+        });
+
+        eventBus.on('photos:status-updated', (data) => {
+            // Photo status updated - UI already handled by PhotoProcessor
+            console.log(`Photo ${data.photoId} status updated to ${data.newStatus}`);
+        });
+
+        // UI events from managers
+        eventBus.on('ui:show-success', (data) => {
+            this.showSuccessMessage(data.title, data.message);
+        });
+
+        eventBus.on('ui:show-error', (data) => {
+            this.showErrorMessage(data.title, data.message);
+        });
+
+        // State management events
+        eventBus.on('state:restore-page', (data) => {
+            this.showPage(data.page);
+        });
+
+        eventBus.on('state:restore-folder', async (data) => {
+            await smugMugAPI.loadFolderContents(data.nodeUri);
+        });
+
+        eventBus.on('state:restore-album', (data) => {
+            const album = smugMugAPI.findAlbum(data.albumId);
+            if (album) {
+                this.selectAlbum(album);
+            }
+        });
+
+        // Cache events
+        eventBus.on('cache:updated', (data) => {
+            console.log('Cache updated:', data.action);
+        });
+
+        // Settings events  
+        eventBus.on('settings:get-api-settings', (data) => {
+            // Provide API settings to managers when requested
+            const settings = this.getApiSettings();
+            data.callback(settings);
+        });
+    }
+
+    handleFolderLoaded(data) {
+        // Update breadcrumbs and display albums
+        this.currentNodeUri = data.nodeUri;
+        this.breadcrumbs = data.breadcrumbs || [];
+        this.smugmugAlbums = data.albums;
+        
+        this.updateBreadcrumbs();
+        this.displayAlbums();
+        
+        // Update URL with current folder state
+        stateManager.updateURL();
     }
 
     // Authentication and Connection
@@ -617,10 +721,6 @@ class TargetVisionApp {
         this.selectAlbum(album);
     }
     
-    navigateToFolder(folder) {
-        // Navigate into the folder (replaces current level)
-        smugMugAPI.loadFolderContents(folder.node_uri);
-    }
 
     createAlbumListItem(album) {
         const div = document.createElement('div');
@@ -769,7 +869,7 @@ class TargetVisionApp {
         });
         
         // Load the folder contents using the node URI
-        await this.loadFolderContents(folder.node_uri);
+        await smugMugAPI.loadFolderContents(folder.node_uri);
         
         // Update right panel to show folder contents
         this.displayFolderContentsInRightPanel(folder);
@@ -874,7 +974,17 @@ class TargetVisionApp {
             // Navigate on click
             button.addEventListener('click', () => {
                 const nodeUri = isRoot ? null : item.node_uri;
-                smugMugAPI.loadFolderContents(nodeUri);
+                console.log('Breadcrumb clicked:', { 
+                    item: item.name || 'Root', 
+                    nodeUri, 
+                    isRoot 
+                });
+                try {
+                    smugMugAPI.loadFolderContents(nodeUri);
+                } catch (error) {
+                    console.error('Error loading folder contents:', error);
+                    this.showErrorMessage('Navigation Error', `Failed to load folder: ${error.message}`);
+                }
             });
         }
         
@@ -1956,7 +2066,7 @@ class TargetVisionApp {
         if (statusIndicator) {
             statusIndicator.addEventListener('click', (e) => {
                 e.stopPropagation();
-                photoProcessor.processSinglePhoto(photo);
+                eventBus.emit('photos:process-single', { photo });
             });
             
             // Add cursor pointer and hover state for unprocessed photos

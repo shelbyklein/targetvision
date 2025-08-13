@@ -8,7 +8,7 @@ class APIService {
                 'Content-Type': 'application/json',
                 ...options.headers
             },
-            timeout: options.timeout || 30000,
+            timeout: options.timeout || 60000,
             ...options
         };
         this.interceptors = {
@@ -47,6 +47,8 @@ class APIService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
+        console.log('APIService making request to:', url);
+        
         try {
             const response = await fetch(url, {
                 ...config,
@@ -155,7 +157,7 @@ class APIService {
     }
 }
 
-const apiService = new APIService('/api');
+const apiService = new APIService('http://localhost:8000');
 
 apiService.addRequestInterceptor(async (config) => {
     eventBus.emit('api:request:start', config);

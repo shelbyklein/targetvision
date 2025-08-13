@@ -21,6 +21,10 @@ class CacheManager {
         eventBus.on('app:shutdown', () => {
             this.saveCache();
         });
+        
+        eventBus.on('cache:refresh-status', () => {
+            this.updateCacheStatus();
+        });
     }
 
     loadCache() {
