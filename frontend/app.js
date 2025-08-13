@@ -73,6 +73,12 @@ class TargetVisionApp {
             restoredState = await stateManager.restoreStateFromData(savedState);
         }
         
+        // If no state was restored, show the default albums page
+        if (!restoredState) {
+            console.log('No state restored, showing default albums page');
+            eventBus.emit('navigation:show-page', { pageName: 'albums' });
+        }
+        
         this.isInitializing = false;
     }
     
@@ -331,9 +337,13 @@ class TargetVisionApp {
 
     // UI State Management
     async showAlbumsView() {
+        console.log('Showing albums view');
         this.currentAlbum = null;
         eventBus.emit('photos:clear-selection');
         eventBus.emit('navigation:show-albums-view');
+        
+        // Ensure albums are displayed
+        eventBus.emit('albums:display', { albums: this.smugmugAlbums || [] });
     }
 
     showPhotosView() {
