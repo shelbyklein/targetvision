@@ -18,6 +18,7 @@ import chatManager from './components/ChatManager.js';
 import settingsManager from './components/SettingsManager.js';
 import navigationManager from './components/NavigationManager.js';
 import dataManager from './components/DataManager.js';
+import folderGrid from './components/FolderGrid.js';
 import { EVENTS, PHOTO_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from './utils/Constants.js';
 import UIUtils from './utils/UIUtils.js';
 class TargetVisionApp {
@@ -259,6 +260,12 @@ class TargetVisionApp {
             console.log('Folder selected for preview:', data.folder.name);
         });
 
+        eventBus.on('folder:navigate', async (data) => {
+            // Handle folder navigation from grid view
+            console.log('Navigating to folder from grid:', data.folder.name);
+            await smugMugAPI.loadFolderContents(data.folder.node_uri);
+        });
+
         // PhotoGrid events
         eventBus.on('photos:selection-changed', (data) => {
             // Update main app state when photo selection changes
@@ -342,10 +349,8 @@ class TargetVisionApp {
         eventBus.emit('photos:clear-selection');
         eventBus.emit('navigation:show-albums-view');
         
-        // Show welcome state in right column when no album is selected
-        this.showWelcomeState();
-        
-        // Ensure albums are displayed - AlbumBrowser will use its own data
+        // Ensure albums are displayed - AlbumBrowser will emit folders:display-grid
+        // which will show folder/album cards in the right column
         eventBus.emit('albums:display');
     }
 
@@ -353,6 +358,7 @@ class TargetVisionApp {
         // Hide all photo-related states
         document.getElementById('loading-photos').classList.add('hidden');
         document.getElementById('photo-grid').classList.add('hidden');
+        document.getElementById('folder-grid').classList.add('hidden');
         document.getElementById('empty-photos').classList.add('hidden');
         document.getElementById('photo-controls').classList.add('hidden');
         document.getElementById('album-actions').classList.add('hidden');
@@ -367,6 +373,7 @@ class TargetVisionApp {
 
     showPhotosView() {
         document.getElementById('welcome-state').classList.add('hidden');
+        document.getElementById('folder-grid').classList.add('hidden');
     }
 
 

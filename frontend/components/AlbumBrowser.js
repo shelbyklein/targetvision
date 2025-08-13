@@ -66,11 +66,16 @@ class AlbumBrowser {
                     <p class="text-sm">No folders or albums found</p>
                 </div>
             `;
+            // Also emit empty state for right column
+            eventBus.emit('folders:display-grid', { items: [] });
             return;
         }
         
-        // Create hierarchical tree structure
+        // Create hierarchical tree structure in left column
         this.createHierarchicalTree(this.smugmugAlbums, albumsList);
+        
+        // Also emit event to display folder/album cards in right column
+        eventBus.emit('folders:display-grid', { items: this.smugmugAlbums });
     }
 
     createHierarchicalTree(items, container, level = 0) {
