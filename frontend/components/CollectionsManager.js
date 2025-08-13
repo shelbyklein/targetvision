@@ -555,15 +555,15 @@ class CollectionsManager {
     }
     
     showCollectionInterface() {
-        const interface = document.getElementById('modal-collection-interface');
-        if (interface) interface.classList.remove('hidden');
+        const interfaceEl = document.getElementById('modal-collection-interface');
+        if (interfaceEl) interfaceEl.classList.remove('hidden');
     }
     
     hideCollectionInterface() {
-        const interface = document.getElementById('modal-collection-interface');
+        const interfaceEl = document.getElementById('modal-collection-interface');
         const select = document.getElementById('modal-collection-select');
         
-        if (interface) interface.classList.add('hidden');
+        if (interfaceEl) interfaceEl.classList.add('hidden');
         if (select) select.value = '';
     }
     
