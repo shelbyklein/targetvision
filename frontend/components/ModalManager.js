@@ -13,6 +13,7 @@
  */
 
 import eventBus from '../services/EventBus.js';
+import apiService from '../services/APIService.js';
 
 class ModalManager {
     constructor() {
@@ -81,15 +82,11 @@ class ModalManager {
         if (photo.id || photo.local_photo_id) {
             try {
                 const photoId = photo.id || photo.local_photo_id;
-                const response = await fetch(`http://localhost:8000/photos/${photoId}?include_embedding=true`);
-                if (response.ok) {
-                    completePhoto = await response.json();
-                    console.log('Fetched complete photo data with embeddings:', completePhoto);
-                } else {
-                    console.warn('Could not fetch complete photo data, using provided data');
-                }
+                completePhoto = await apiService.get(`/photos/${photoId}?include_embedding=true`);
+                console.log('Fetched complete photo data with embeddings:', completePhoto);
             } catch (error) {
                 console.warn('Error fetching complete photo data:', error);
+                // Use provided photo data as fallback
             }
         }
         
@@ -517,11 +514,10 @@ class ModalManager {
             modalDownload.style.opacity = '0.7';
             modalDownload.style.pointerEvents = 'none';
 
-            if (photo.smugmug_id) {
-                const response = await fetch(`http://localhost:8000/smugmug/photos/${photo.smugmug_id}/largest`);
-                
-                if (response.ok) {
-                    const largestImageData = await response.json();
+            if (photo.id || photo.local_photo_id) {
+                try {
+                    const photoId = photo.id || photo.local_photo_id;
+                    const largestImageData = await apiService.get(`/photos/${photoId}/largest-image`);
                     
                     if (largestImageData && largestImageData.url) {
                         modalDownload.href = largestImageData.url;
@@ -539,7 +535,8 @@ class ModalManager {
                     } else {
                         modalDownload.innerHTML = originalContent;
                     }
-                } else {
+                } catch (error) {
+                    console.warn('Error loading largest image:', error);
                     modalDownload.innerHTML = originalContent;
                 }
             }

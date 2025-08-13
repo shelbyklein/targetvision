@@ -1273,7 +1273,15 @@ async def get_photo(
     db: Session = Depends(get_db)
 ):
     """Get single photo by ID with optional embedding data"""
-    photo = db.query(Photo).filter_by(id=photo_id).first()
+    from sqlalchemy.orm import joinedload
+    
+    # Use joinedload to eagerly load relationships and avoid lazy loading issues
+    query = db.query(Photo).options(
+        joinedload(Photo.ai_metadata),
+        joinedload(Photo.collection_items).joinedload(CollectionItem.collection)
+    )
+    
+    photo = query.filter(Photo.id == photo_id).first()
     
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
