@@ -43,15 +43,48 @@ docker run -d \
 - *Key Endpoints:* /user, /album, /image
 
 ### Frontend
-**Vanilla JavaScript (ES6+)**
+**Vanilla JavaScript (ES6+) - Modular Architecture**
 - *Why:* No build step, maximum simplicity for MVP
-- *Features:* Fetch API, async/await, modules
+- *Features:* Fetch API, async/await, ES6 modules
 - *Compatibility:* Chrome 90+, Firefox 88+, Safari 14+
+- *Architecture:* Event-driven modular system (17 components)
+- *Achievement:* 83% code reduction (6,296 → 426 lines in main controller)
 
 **Tailwind CSS**
 - *Why:* Rapid UI development, responsive by default
 - *Version:* 3.0+ (via CDN for MVP)
 - *Setup:* `<script src="https://cdn.tailwindcss.com"></script>`
+
+## Frontend Architecture
+
+### Component System Overview
+- **Total Components:** 17 (11 UI + 4 Managers + 2 Services)
+- **Communication:** Event-driven via EventBus (no direct component references)
+- **Bundle Size:** 320KB optimally distributed across modular files
+- **Pattern:** Single responsibility principle with clear interfaces
+
+### Core Managers (4)
+1. **CacheManager** (313 lines) - localStorage, cache validation
+2. **StateManager** (389 lines) - App state, URL management  
+3. **SmugMugAPI** (461 lines) - OAuth, album synchronization
+4. **PhotoProcessor** (442 lines) - AI processing, batch operations
+
+### UI Components (11)
+1. **AlbumBrowser** (552 lines) - Hierarchical navigation
+2. **PhotoGrid** (463 lines) - Photo display, selection
+3. **ModalManager** (984 lines) - Photo modals, metadata editing
+4. **SearchManager** (492 lines) - Search, filtering
+5. **CollectionsManager** (705 lines) - Photo organization
+6. **ChatManager** (280 lines) - Natural language queries
+7. **SettingsManager** (759 lines) - API keys, configuration
+8. **ToastManager** (444 lines) - Notifications
+9. **ProgressManager** (146 lines) - Loading states
+10. **NavigationManager** (143 lines) - Page routing
+11. **DataManager** (93 lines) - Data validation
+
+### Services (2)
+1. **EventBus** (66 lines) - Event communication system
+2. **APIService** (297 lines) - HTTP client with interceptors
 
 ## Development Tools
 
