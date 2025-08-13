@@ -148,11 +148,21 @@ class AIMetadata(Base):
         
         # Include embedding data if requested (for detailed views)
         if include_embedding and self.embedding is not None:
-            # Convert embedding to list if it's not already
-            if hasattr(self.embedding, '__iter__') and not isinstance(self.embedding, str):
-                result["embedding"] = list(self.embedding)
-            else:
-                result["embedding"] = self.embedding
+            # Convert embedding to list if it's not already, handling numpy types
+            try:
+                if hasattr(self.embedding, '__iter__') and not isinstance(self.embedding, str):
+                    # Handle numpy arrays and other iterables
+                    import numpy as np
+                    if isinstance(self.embedding, np.ndarray):
+                        result["embedding"] = self.embedding.tolist()
+                    else:
+                        result["embedding"] = [float(x) if hasattr(x, '__float__') else x for x in self.embedding]
+                else:
+                    result["embedding"] = float(self.embedding) if hasattr(self.embedding, '__float__') else self.embedding
+            except Exception as e:
+                # If embedding conversion fails, skip it but log the error
+                print(f"Warning: Could not serialize embedding: {e}")
+                result["embedding"] = None
         
         return result
 
