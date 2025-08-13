@@ -14,6 +14,8 @@ import modalManager from './components/ModalManager.js';
 import toastManager from './components/ToastManager.js';
 import collectionsManager from './components/CollectionsManager.js';
 import searchManager from './components/SearchManager.js';
+import chatManager from './components/ChatManager.js';
+import settingsManager from './components/SettingsManager.js';
 import { EVENTS, PHOTO_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from './utils/Constants.js';
 import UIUtils from './utils/UIUtils.js';
 class TargetVisionApp {
@@ -28,7 +30,6 @@ class TargetVisionApp {
         this.showProcessedPhotos = true;
         this.showUnprocessedPhotos = true;
         this.currentPage = 'albums';
-        this.chatMessages = [];
         
         // Collections state now managed by CollectionsManager
         
@@ -278,14 +279,14 @@ class TargetVisionApp {
         document.getElementById('toggle-unprocessed').addEventListener('click', () => eventBus.emit('photos:toggle-unprocessed'));
         
         // Chat functionality
-        document.getElementById('chat-send').addEventListener('click', () => this.sendChatMessage());
+        document.getElementById('chat-send').addEventListener('click', () => eventBus.emit('chat:send-message'));
         document.getElementById('chat-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendChatMessage();
+            if (e.key === 'Enter') eventBus.emit('chat:send-message');
         });
         document.getElementById('chat-input').addEventListener('input', (e) => {
             document.getElementById('chat-send').disabled = !e.target.value.trim();
         });
-        document.getElementById('clear-chat').addEventListener('click', () => this.clearChat());
+        document.getElementById('clear-chat').addEventListener('click', () => eventBus.emit('chat:clear'));
         
         // Search functionality
         document.getElementById('search-main-button').addEventListener('click', () => eventBus.emit('search:perform'));
@@ -361,17 +362,17 @@ class TargetVisionApp {
         document.getElementById('confirm-processing-status').addEventListener('click', () => this.confirmProcessingStatus());
         
         // API Key management
-        document.getElementById('test-anthropic-key').addEventListener('click', () => this.testApiKey('anthropic'));
-        document.getElementById('test-openai-key').addEventListener('click', () => this.testApiKey('openai'));
-        document.getElementById('test-image-upload').addEventListener('change', (e) => this.handleTestImageUpload(e));
-        document.getElementById('analyze-test-image').addEventListener('click', () => this.analyzeTestImage());
+        document.getElementById('test-anthropic-key').addEventListener('click', () => eventBus.emit('settings:test-api-key', { provider: 'anthropic' }));
+        document.getElementById('test-openai-key').addEventListener('click', () => eventBus.emit('settings:test-api-key', { provider: 'openai' }));
+        document.getElementById('test-image-upload').addEventListener('change', (e) => eventBus.emit('settings:handle-test-image-upload', { event: e }));
+        document.getElementById('analyze-test-image').addEventListener('click', () => eventBus.emit('settings:analyze-test-image'));
         
         // Prompt textarea character count
-        document.getElementById('prompt-textarea').addEventListener('input', () => this.updateCharCount());
+        document.getElementById('prompt-textarea').addEventListener('input', () => eventBus.emit('settings:update-char-count'));
         
         // Template selection
         document.querySelectorAll('[data-template]').forEach(template => {
-            template.addEventListener('click', () => this.selectTemplate(template.dataset.template));
+            template.addEventListener('click', () => eventBus.emit('settings:select-template', { template: template.dataset.template }));
         });
 
         // Setup event-driven communication with managers
@@ -420,11 +421,11 @@ class TargetVisionApp {
 
         // UI events from managers
         eventBus.on('ui:show-success', (data) => {
-            eventBus.emit('toast:success', { title: data.title, data.message);
+            eventBus.emit('toast:success', { title: data.title, message: data.message });
         });
 
         eventBus.on('ui:show-error', (data) => {
-            eventBus.emit('toast:error', { title: data.title, data.message);
+            eventBus.emit('toast:error', { title: data.title, message: data.message });
         });
 
         // State management events
@@ -448,12 +449,6 @@ class TargetVisionApp {
             console.log('Cache updated:', data.action);
         });
 
-        // Settings events  
-        eventBus.on('settings:get-api-settings', (data) => {
-            // Provide API settings to managers when requested
-            const settings = this.getApiSettings();
-            data.callback(settings);
-        });
 
         // AlbumBrowser events
         eventBus.on('album:selected', (data) => {
@@ -477,10 +472,6 @@ class TargetVisionApp {
             eventBus.emit('photo:set-current', { photo: data.photo });
         });
 
-        // Chat events from SearchManager
-        eventBus.on('chat:add-message', (data) => {
-            this.addChatMessage(data.type, data.message);
-        });
     }
 
     handleFolderLoaded(data) {
@@ -1119,7 +1110,7 @@ class TargetVisionApp {
             await this.loadAlbumPhotos(albumId);
         } else {
             console.error('No album ID found in album object:', album);
-            eventBus.emit('toast:error', { title: 'Album Error', 'Could not load album photos - missing album identifier');
+            eventBus.emit('toast:error', { title: 'Album Error', message: 'Could not load album photos - missing album identifier' });
         }
     }
 
@@ -1271,7 +1262,7 @@ class TargetVisionApp {
             
         } catch (error) {
             console.error('Failed to load photos:', error);
-            eventBus.emit('toast:error', { title: 'Failed to Load Photos', 'Could not fetch photos from this album.', error.message);
+            eventBus.emit('toast:error', { title: 'Failed to Load Photos', message: `Could not fetch photos from this album. ${error.message}` });
             eventBus.emit('photos:loading:hide');
         }
     }
@@ -1330,7 +1321,7 @@ class TargetVisionApp {
                 console.log(`${processingCount} photos still processing`);
             } else {
                 console.log('All photos have completed processing');
-                eventBus.emit('toast:success', { title: 'Processing Complete', 'All background processing has completed!');
+                eventBus.emit('toast:success', { title: 'Processing Complete', message: 'All background processing has completed!' });
             }
             
         } catch (error) {
@@ -1556,234 +1547,18 @@ class TargetVisionApp {
                 });
             } else if (pageName === 'collections') {
                 eventBus.emit('collections:initialize-page');
-            } else if (pageName === 'chat' && this.chatMessages.length === 0) {
-                this.initializeChatPage();
+            } else if (pageName === 'chat') {
+                eventBus.emit('chat:initialize-page');
             } else if (pageName === 'search') {
                 eventBus.emit('search:initialize-page');
             } else if (pageName === 'settings') {
-                this.initializeSettingsPage().catch(error => {
-                    console.error('Error initializing settings page:', error);
-                });
+                eventBus.emit('settings:initialize-page');
             }
         } catch (error) {
             console.error('Error in showPage:', error);
         }
     }
     
-    initializeChatPage() {
-        // Chat page is ready by default with welcome message
-        console.log('Chat page initialized');
-    }
-    
-
-    // Chat Functionality
-    async sendChatMessage() {
-        const input = document.getElementById('chat-input');
-        const message = input.value.trim();
-        
-        if (!message) return;
-        
-        // Add user message to UI
-        this.addChatMessage('user', message);
-        input.value = '';
-        document.getElementById('chat-send').disabled = true;
-        
-        try {
-            // Check if this is a photo search query
-            if (this.isPhotoSearchQuery(message)) {
-                eventBus.emit('search:chat:handle', { message: message });
-            } else {
-                // Handle general conversation
-                await this.handleGeneralChat(message);
-            }
-            
-        } catch (error) {
-            console.error('Chat error:', error);
-            this.addChatMessage('system', 'Sorry, there was an error processing your message. Please try again.');
-        }
-    }
-    
-    isPhotoSearchQuery(message) {
-        const searchKeywords = ['find', 'show', 'search', 'look', 'photos', 'images', 'pictures', 'with', 'containing', 'have'];
-        const lowerMessage = message.toLowerCase();
-        return searchKeywords.some(keyword => lowerMessage.includes(keyword));
-    }
-    
-    
-    async handleGeneralChat(message) {
-        // Handle general conversation about the app, photos, etc.
-        const lowerMessage = message.toLowerCase();
-        
-        if (lowerMessage.includes('help') || lowerMessage.includes('what can you do')) {
-            this.addChatMessage('system', `I can help you find photos in your SmugMug collection! Here's what you can ask me:
-
-📸 **Photo Search:**
-• "Find photos with medals"
-• "Show me archery competition images"  
-• "Look for photos containing awards"
-
-🔧 **Getting Started:**
-• Go to the Albums page to sync your SmugMug photos
-• Use "Sync Album" to add photos to the database
-• Process photos with AI to enable smart search
-
-Try asking me to find something specific in your photos!`);
-        } else if (lowerMessage.includes('sync') || lowerMessage.includes('album')) {
-            this.addChatMessage('system', `To search photos, you'll need to sync them first:
-
-1. Go to the **Albums** page
-2. Select an album from your SmugMug account
-3. Click **"Sync Album"** to add photos to the database
-4. Select photos and click **"Process Selected"** to analyze them with AI
-
-Once photos are processed, you can search them by asking me things like "Find photos with trophies" or "Show me competition images".`);
-        } else if (lowerMessage.includes('process') || lowerMessage.includes('ai')) {
-            this.addChatMessage('system', `AI processing analyzes your photos to understand their content:
-
-🤖 **What AI Processing Does:**
-• Generates detailed descriptions of what's in each photo
-• Extracts keywords for better searchability
-• Enables content-based search (find photos by what's actually in them)
-
-💡 **How to Process Photos:**
-• Sync an album first
-• Select photos you want to analyze  
-• Click "Process Selected" to run AI analysis
-• Or use the lightbox button on individual photos
-
-Once processed, I can find your photos based on their actual content!`);
-        } else {
-            this.addChatMessage('system', `I'm here to help you find photos in your SmugMug collection! 
-
-Try asking me things like:
-• "Find photos with medals"
-• "Show me archery images"
-• "Look for competition photos"
-
-You can also ask for help with syncing albums or processing photos with AI. What would you like to find?`);
-        }
-    }
-    
-    addChatMessage(sender, message) {
-        const messagesContainer = document.getElementById('chat-messages');
-        
-        // Remove welcome state if it exists
-        const welcomeState = messagesContainer.querySelector('.flex.flex-col.items-center.justify-center');
-        if (welcomeState) {
-            welcomeState.remove();
-        }
-        
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
-        
-        const bubbleClass = sender === 'user' 
-            ? 'bg-blue-600 text-white' 
-            : 'bg-gray-100 text-gray-900';
-            
-        messageDiv.innerHTML = `
-            <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${bubbleClass}">
-                <p class="text-sm">${message}</p>
-                <p class="text-xs mt-1 opacity-70">${new Date().toLocaleTimeString()}</p>
-            </div>
-        `;
-        
-        messagesContainer.appendChild(messageDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        this.chatMessages.push({ sender, message, timestamp: new Date() });
-    }
-    
-    addPhotoResults(photos) {
-        const messagesContainer = document.getElementById('chat-messages');
-        
-        // Remove welcome state if it exists
-        const welcomeState = messagesContainer.querySelector('.flex.flex-col.items-center.justify-center');
-        if (welcomeState) {
-            welcomeState.remove();
-        }
-        
-        const photoResultsDiv = document.createElement('div');
-        photoResultsDiv.className = 'flex justify-start mb-4';
-        
-        photoResultsDiv.innerHTML = `
-            <div class="max-w-4xl">
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg">
-                    ${photos.map(photo => {
-                        const photoData = photo.photo || photo;
-                        const score = photo.score ? Math.round(photo.score * 100) : 0;
-                        return `
-                            <div class="chat-photo-result relative group cursor-pointer" 
-                                 data-photo='${JSON.stringify(photoData).replace(/'/g, '&apos;')}'>
-                                <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
-                                    <img 
-                                        src="${photoData.thumbnail_url}" 
-                                        alt="${photoData.title || 'Photo'}"
-                                        class="w-full h-full object-cover"
-                                        loading="lazy"
-                                    />
-                                    
-                                    <!-- Relevance score -->
-                                    ${score > 0 ? `
-                                        <div class="absolute top-1 right-1 bg-blue-600 text-white text-xs px-1 py-0.5 rounded">
-                                            ${score}%
-                                        </div>
-                                    ` : ''}
-                                    
-                                    <!-- Hover overlay -->
-                                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
-                                        <div class="opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                            </svg>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Photo title -->
-                                <p class="text-xs text-gray-600 mt-1 truncate">${photoData.title || photoData.filename || 'Untitled'}</p>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-                <p class="text-xs text-gray-500 mt-2 px-2">Click any photo to view details</p>
-            </div>
-        `;
-        
-        messagesContainer.appendChild(photoResultsDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // Add click handlers for photo results
-        photoResultsDiv.querySelectorAll('.chat-photo-result').forEach(photoDiv => {
-            photoDiv.addEventListener('click', () => {
-                try {
-                    const photoData = JSON.parse(photoDiv.dataset.photo.replace(/&apos;/g, "'"));
-                    this.showPhotoModal(photoData);
-                } catch (error) {
-                    console.error('Error parsing photo data:', error);
-                }
-            });
-        });
-    }
-    
-    clearChat() {
-        const messagesContainer = document.getElementById('chat-messages');
-        messagesContainer.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full text-gray-500">
-                <svg class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                </svg>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">Start a Conversation</h3>
-                <p class="text-center max-w-md mb-4">Ask me anything about your SmugMug photos! I can help you find specific images, understand their content, or answer questions about your collection.</p>
-                <div class="text-sm text-gray-500 space-y-1">
-                    <p><strong>Try asking:</strong></p>
-                    <p>"Show me photos with medals"</p>
-                    <p>"Find archery competition images"</p>
-                    <p>"What photos have been processed with AI?"</p>
-                </div>
-            </div>
-        `;
-        this.chatMessages = [];
-    }
 
 
     // Modal and other functionality
@@ -2277,7 +2052,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         );
         
         if (!currentPhoto || !currentPhoto.local_photo_id) {
-            eventBus.emit('toast:error', { title: 'Processing Error', 'This photo must be synced to the database before it can be processed with AI.');
+            eventBus.emit('toast:error', { title: 'Processing Error', message: 'This photo must be synced to the database before it can be processed with AI.' });
             return;
         }
         
@@ -2294,8 +2069,11 @@ You can also ask for help with syncing albums or processing photos with AI. What
         photoProcessor.showGlobalProgress(0, 1, 'Analyzing photo with AI...');
         
         try {
-            // Get user's API settings
-            const apiSettings = this.getApiSettings();
+            // Get user's API settings from SettingsManager
+            let apiSettings = null;
+            eventBus.emit('settings:get-api-settings', {
+                callback: (settings) => { apiSettings = settings; }
+            });
             
             // Prepare headers with API keys
             const headers = {};
@@ -2339,12 +2117,12 @@ You can also ask for help with syncing albums or processing photos with AI. What
             // Update global progress to complete
             photoProcessor.updateGlobalProgress(1, 1, 'Photo analysis complete!');
             
-            eventBus.emit('toast:success', { title: 'AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
+            eventBus.emit('toast:success', { title: 'AI Processing Complete', message: 'Photo has been analyzed and metadata generated successfully.' });
             
         } catch (error) {
             console.error('AI processing failed:', error);
             photoProcessor.hideGlobalProgress();
-            eventBus.emit('toast:error', { title: 'Processing Failed', 'Could not process photo with AI. Please try again.');
+            eventBus.emit('toast:error', { title: 'Processing Failed', message: 'Could not process photo with AI. Please try again.' });
             
             // Remove from processing state on error
             this.processingPhotos.delete(currentPhoto.local_photo_id);
@@ -2464,7 +2242,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
         } catch (error) {
             console.error('Error saving metadata:', error);
-            eventBus.emit('toast:error', { title: 'Save Failed', 'Failed to save metadata. Please try again.');
+            eventBus.emit('toast:error', { title: 'Save Failed', message: 'Failed to save metadata. Please try again.' });
         } finally {
             const saveButton = document.getElementById('modal-save-metadata');
             saveButton.disabled = false;
@@ -2585,8 +2363,11 @@ You can also ask for help with syncing albums or processing photos with AI. What
             regenerateButton.disabled = true;
             regenerateButton.innerHTML = '🔄 Regenerating...';
             
-            // Get user's API settings
-            const apiSettings = this.getApiSettings();
+            // Get user's API settings from SettingsManager
+            let apiSettings = null;
+            eventBus.emit('settings:get-api-settings', {
+                callback: (settings) => { apiSettings = settings; }
+            });
             
             // Prepare headers with API keys
             const headers = {};
@@ -2621,7 +2402,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
         } catch (error) {
             console.error('Error regenerating AI metadata:', error);
-            eventBus.emit('toast:error', { title: 'Regeneration Failed', 'Failed to regenerate AI metadata. Please try again.');
+            eventBus.emit('toast:error', { title: 'Regeneration Failed', message: 'Failed to regenerate AI metadata. Please try again.' });
         } finally {
             const regenerateButton = document.getElementById('modal-regenerate-ai');
             regenerateButton.disabled = false;
@@ -2673,12 +2454,12 @@ You can also ask for help with syncing albums or processing photos with AI. What
             // Refresh the photo grid to show updated status
             eventBus.emit('photos:display', { photos: this.currentPhotos });
             
-            eventBus.emit('toast:success', { title: 'AI Data Deleted', 'AI-generated metadata has been successfully removed from this photo.');
+            eventBus.emit('toast:success', { title: 'AI Data Deleted', message: 'AI-generated metadata has been successfully removed from this photo.' });
             console.log('AI metadata deleted successfully');
             
         } catch (error) {
             console.error('Error deleting AI metadata:', error);
-            eventBus.emit('toast:error', { title: 'Deletion Failed', 'Failed to delete AI metadata. Please try again.');
+            eventBus.emit('toast:error', { title: 'Deletion Failed', message: 'Failed to delete AI metadata. Please try again.' });
         } finally {
             const deleteButton = document.getElementById('modal-delete-ai');
             deleteButton.disabled = false;
@@ -2686,868 +2467,6 @@ You can also ask for help with syncing albums or processing photos with AI. What
         }
     }
     
-    // Settings Page Methods
-    async initializeSettingsPage() {
-        console.log('Settings page initialized');
-        await this.loadCurrentPrompt();
-        this.loadApplicationSettings();
-        this.loadApiKeySettings();
-        this.updateSystemInfo();
-        cacheManager.updateCacheStatus();
-        
-        // Add event listeners for key source toggle
-        document.querySelectorAll('input[name="key-source"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                this.handleKeySourceChange();
-            });
-        });
-    }
-    
-    handleKeySourceChange() {
-        const keySource = document.querySelector('input[name="key-source"]:checked').value;
-        const customKeysContainer = document.getElementById('custom-keys-container');
-        
-        if (keySource === 'custom') {
-            customKeysContainer.classList.remove('hidden');
-        } else {
-            customKeysContainer.classList.add('hidden');
-        }
-        
-        // Auto-save the setting
-        this.saveApiKeySettings();
-    }
-    
-    async loadCurrentPrompt() {
-        try {
-            const response = await fetch(`${this.apiBase}/settings/prompt`);
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('current-prompt').textContent = data.prompt || this.getDefaultPrompt();
-                
-                // Update status indicator
-                const statusSpan = document.getElementById('prompt-status');
-                if (data.is_custom) {
-                    statusSpan.textContent = 'Custom';
-                    statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
-                } else {
-                    statusSpan.textContent = 'Default';
-                    statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
-                }
-            } else {
-                // Fallback to default prompt
-                document.getElementById('current-prompt').textContent = this.getDefaultPrompt();
-            }
-        } catch (error) {
-            console.error('Error loading current prompt:', error);
-            document.getElementById('current-prompt').textContent = this.getDefaultPrompt();
-        }
-    }
-    
-    getDefaultPrompt() {
-        return `Analyze this image and provide a detailed description focusing on the main subjects, actions, and context. Then extract relevant keywords.
-
-Return your response as a JSON object with these fields:
-- "description": A detailed description of what you see in the image
-- "keywords": An array of relevant keywords that describe the image content
-
-Focus on:
-- Main subjects and people
-- Actions being performed
-- Objects and equipment visible
-- Setting and environment
-- Events or activities
-- Emotions or mood if apparent
-
-Do not include speculation about metadata like camera settings, date, or photographer information.`;
-    }
-    
-    loadApplicationSettings() {
-        // Load settings from localStorage or set defaults
-        const settings = JSON.parse(localStorage.getItem('targetvision_settings') || '{}');
-        
-        document.getElementById('auto-approve').checked = settings.autoApprove || false;
-        document.getElementById('batch-processing').checked = settings.batchProcessing !== false; // default true
-        document.getElementById('retry-failed').checked = settings.retryFailed || false;
-        document.getElementById('show-confidence').checked = settings.showConfidence !== false; // default true
-        document.getElementById('advanced-filters-default').checked = settings.advancedFiltersDefault || false;
-        document.getElementById('compact-view').checked = settings.compactView || false;
-    }
-    
-    editPrompt() {
-        const viewMode = document.getElementById('prompt-view');
-        const editMode = document.getElementById('prompt-edit');
-        const currentPrompt = document.getElementById('current-prompt').textContent;
-        
-        // Switch to edit mode
-        viewMode.classList.add('hidden');
-        editMode.classList.remove('hidden');
-        
-        // Populate textarea
-        document.getElementById('prompt-textarea').value = currentPrompt;
-        this.updateCharCount();
-    }
-    
-    cancelPromptEdit() {
-        const viewMode = document.getElementById('prompt-view');
-        const editMode = document.getElementById('prompt-edit');
-        
-        // Switch back to view mode
-        viewMode.classList.remove('hidden');
-        editMode.classList.add('hidden');
-    }
-    
-    async savePrompt() {
-        const promptText = document.getElementById('prompt-textarea').value.trim();
-        
-        if (!promptText) {
-            this.showToast('Missing Prompt', 'Please enter a prompt before saving.', 'warning');
-            return;
-        }
-        
-        try {
-            const saveButton = document.getElementById('save-prompt');
-            saveButton.disabled = true;
-            saveButton.textContent = 'Saving...';
-            
-            const response = await fetch(`${this.apiBase}/settings/prompt`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    prompt: promptText
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Failed to save prompt: ${response.status}`);
-            }
-            
-            // Update display
-            document.getElementById('current-prompt').textContent = promptText;
-            
-            // Update status
-            const statusSpan = document.getElementById('prompt-status');
-            statusSpan.textContent = 'Custom';
-            statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
-            
-            // Switch back to view mode
-            this.cancelPromptEdit();
-            
-            console.log('Prompt saved successfully');
-            
-        } catch (error) {
-            console.error('Error saving prompt:', error);
-            eventBus.emit('toast:error', { title: 'Save Failed', 'Failed to save prompt. Please try again.');
-        } finally {
-            const saveButton = document.getElementById('save-prompt');
-            saveButton.disabled = false;
-            saveButton.textContent = 'Save Prompt';
-        }
-    }
-    
-    async resetPrompt() {
-        if (!confirm('Are you sure you want to reset to the default prompt? This will overwrite any custom changes.')) {
-            return;
-        }
-        
-        try {
-            const response = await fetch(`${this.apiBase}/settings/prompt`, {
-                method: 'DELETE'
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Failed to reset prompt: ${response.status}`);
-            }
-            
-            // Update display
-            const defaultPrompt = this.getDefaultPrompt();
-            document.getElementById('current-prompt').textContent = defaultPrompt;
-            
-            // Update status
-            const statusSpan = document.getElementById('prompt-status');
-            statusSpan.textContent = 'Default';
-            statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
-            
-            console.log('Prompt reset to default');
-            
-        } catch (error) {
-            console.error('Error resetting prompt:', error);
-            eventBus.emit('toast:error', { title: 'Reset Failed', 'Failed to reset prompt. Please try again.');
-        }
-    }
-    
-    async testPrompt() {
-        const promptText = document.getElementById('prompt-textarea').value.trim();
-        
-        if (!promptText) {
-            this.showToast('Missing Prompt', 'Please enter a prompt to test.', 'warning');
-            return;
-        }
-        
-        const testButton = document.getElementById('test-prompt');
-        testButton.disabled = true;
-        testButton.textContent = 'Testing...';
-        
-        try {
-            // This would test the prompt with a sample image
-            // For now, just simulate the test
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            eventBus.emit('toast:success', { title: 'Test Successful', 'Prompt test completed! The prompt structure looks valid.');
-            
-        } catch (error) {
-            console.error('Error testing prompt:', error);
-            eventBus.emit('toast:error', { title: 'Test Failed', 'Failed to test prompt. Please check the format.');
-        } finally {
-            testButton.disabled = false;
-            testButton.textContent = 'Test Prompt';
-        }
-    }
-    
-    selectTemplate(templateName) {
-        const templates = {
-            detailed: `Analyze this image comprehensively and provide a detailed description covering all visual elements, technical aspects, emotions, and context. Then extract comprehensive keywords.
-
-Return your response as a JSON object with these fields:
-- "description": A thorough, detailed description covering composition, lighting, subjects, actions, environment, mood, and technical observations
-- "keywords": An extensive array of relevant keywords including subjects, objects, emotions, settings, actions, technical terms, and style descriptors
-
-Focus on:
-- Complete scene composition and framing
-- Lighting conditions and quality
-- All visible subjects and their interactions
-- Detailed object and equipment identification
-- Environmental context and setting details
-- Emotional expressions and body language
-- Artistic and technical photographic elements
-- Color palette and visual mood
-
-Provide comprehensive coverage without speculation about metadata.`,
-
-            concise: `Analyze this image and provide a brief, focused description of the main subjects and primary action. Then list key identifying keywords.
-
-Return your response as a JSON object with these fields:
-- "description": A concise 1-2 sentence description of the primary subject and main action
-- "keywords": A focused array of 5-8 key terms that best identify the image content
-
-Focus on:
-- Primary subject(s)
-- Main action or activity
-- Key objects or equipment
-- Basic setting or location
-
-Keep descriptions brief and keywords essential for searchability.`,
-
-            artistic: `Analyze this image from an artistic perspective, focusing on composition, visual elements, mood, and aesthetic qualities. Then extract relevant artistic keywords.
-
-Return your response as a JSON object with these fields:
-- "description": A description emphasizing artistic composition, lighting, mood, visual flow, and aesthetic impact
-- "keywords": An array of keywords including artistic terms, mood descriptors, composition elements, and style characteristics
-
-Focus on:
-- Composition and visual balance
-- Lighting quality and direction  
-- Color harmony and palette
-- Mood and emotional resonance
-- Artistic technique and style
-- Visual texture and patterns
-- Depth and perspective
-- Overall aesthetic impact
-
-Emphasize the artistic and emotional qualities of the image.`,
-
-            sports: `Analyze this sports or event image with focus on athletic activities, competition elements, achievements, and event context. Then extract relevant sports keywords.
-
-Return your response as a JSON object with these fields:
-- "description": A detailed description focusing on the sport, competition, athletes, actions, achievements, and event context
-- "keywords": An array of keywords including sport names, positions, actions, equipment, achievements, and event types
-
-Focus on:
-- Specific sport or activity
-- Athlete positions and actions
-- Competition or event type
-- Equipment and gear
-- Achievements (medals, trophies, awards)
-- Team or individual performance
-- Venue and event setting
-- Competitive context and results
-
-Emphasize athletic performance, competition elements, and achievement recognition.`
-        };
-        
-        if (templates[templateName]) {
-            document.getElementById('prompt-textarea').value = templates[templateName];
-            this.updateCharCount();
-            
-            // Visual feedback
-            document.querySelectorAll('[data-template]').forEach(t => {
-                t.classList.remove('border-blue-500', 'bg-blue-50');
-                t.classList.add('border-gray-200');
-            });
-            
-            const selectedTemplate = document.querySelector(`[data-template="${templateName}"]`);
-            selectedTemplate.classList.remove('border-gray-200');
-            selectedTemplate.classList.add('border-blue-500', 'bg-blue-50');
-        }
-    }
-    
-    updateCharCount() {
-        const textarea = document.getElementById('prompt-textarea');
-        const charCount = document.getElementById('prompt-char-count');
-        charCount.textContent = `${textarea.value.length} characters`;
-    }
-    
-    saveApplicationSettings() {
-        const settings = {
-            autoApprove: document.getElementById('auto-approve').checked,
-            batchProcessing: document.getElementById('batch-processing').checked,
-            retryFailed: document.getElementById('retry-failed').checked,
-            showConfidence: document.getElementById('show-confidence').checked,
-            advancedFiltersDefault: document.getElementById('advanced-filters-default').checked,
-            compactView: document.getElementById('compact-view').checked
-        };
-        
-        localStorage.setItem('targetvision_settings', JSON.stringify(settings));
-        
-        // Show success message
-        const savedIndicator = document.getElementById('settings-saved');
-        savedIndicator.classList.remove('hidden');
-        setTimeout(() => {
-            savedIndicator.classList.add('hidden');
-        }, 3000);
-        
-        console.log('Settings saved:', settings);
-    }
-    
-
-    async cancelBatchProcessing() {
-        console.log('cancelBatchProcessing method called');
-        
-        // Clear any UI processing state
-        this.processingPhotos.clear();
-        
-        const button = document.getElementById('cancel-batch-processing');
-        const statusDiv = document.getElementById('batch-cancel-status');
-        console.log('Button element:', button);
-        console.log('Status div element:', statusDiv);
-        
-        try {
-            // Disable button and show loading state
-            button.disabled = true;
-            button.innerHTML = `
-                <svg class="h-4 w-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Cancelling...
-            `;
-            
-            statusDiv.className = 'text-sm text-blue-600';
-            statusDiv.textContent = 'Cancelling batch processing jobs...';
-            statusDiv.classList.remove('hidden');
-            
-            const response = await fetch(`${this.apiBase}/photos/batch/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `HTTP ${response.status}`);
-            }
-            
-            const result = await response.json();
-            
-            // Show success message
-            statusDiv.className = 'text-sm text-green-600';
-            statusDiv.textContent = result.message || `Successfully cancelled ${result.cancelled_count || 0} batch processing jobs`;
-            
-            // Auto-hide status message after 5 seconds
-            setTimeout(() => {
-                statusDiv.classList.add('hidden');
-            }, 5000);
-            
-            console.log('Batch processing cancelled:', result);
-            
-        } catch (error) {
-            console.error('Error cancelling batch processing:', error);
-            
-            // Show error message
-            statusDiv.className = 'text-sm text-red-600';
-            statusDiv.textContent = `Error: ${error.message}`;
-            
-            // Auto-hide error message after 7 seconds
-            setTimeout(() => {
-                statusDiv.classList.add('hidden');
-            }, 7000);
-            
-        } finally {
-            // Re-enable button and restore original text
-            button.disabled = false;
-            button.innerHTML = `
-                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                Cancel All Batch Processing
-            `;
-        }
-    }
-    
-    async clearBatchQueue() {
-        // Clear any UI processing state
-        this.processingPhotos.clear();
-        
-        const button = document.getElementById('clear-batch-queue');
-        const statusDiv = document.getElementById('clear-queue-status');
-        
-        try {
-            // Disable button and show loading state
-            button.disabled = true;
-            button.innerHTML = `
-                <svg class="h-4 w-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Clearing Queue...
-            `;
-            
-            statusDiv.className = 'text-sm text-blue-600';
-            statusDiv.textContent = 'Clearing batch processing queue...';
-            statusDiv.classList.remove('hidden');
-            
-            const response = await fetch(`${this.apiBase}/photos/batch/clear-queue`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `HTTP ${response.status}`);
-            }
-            
-            const result = await response.json();
-            
-            // Show success message
-            statusDiv.className = 'text-sm text-green-600';
-            statusDiv.textContent = result.message || `Successfully cleared ${result.cleared_count || 0} items from processing queue`;
-            
-            // Auto-hide status message after 5 seconds
-            setTimeout(() => {
-                statusDiv.classList.add('hidden');
-            }, 5000);
-            
-            console.log('Batch processing queue cleared:', result);
-            
-        } catch (error) {
-            console.error('Error clearing batch processing queue:', error);
-            
-            // Show error message
-            statusDiv.className = 'text-sm text-red-600';
-            statusDiv.textContent = `Error: ${error.message}`;
-            
-            // Auto-hide error message after 7 seconds
-            setTimeout(() => {
-                statusDiv.classList.add('hidden');
-            }, 7000);
-            
-        } finally {
-            // Re-enable button and restore original text
-            button.disabled = false;
-            button.innerHTML = `
-                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-                Clear Processing Queue
-            `;
-        }
-    }
-    
-    // API Key Management Methods
-    getApiSettings() {
-        const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
-        const keySource = settings.key_source || 'default';
-        
-        return {
-            // Only return API keys if using custom key source
-            anthropic_key: keySource === 'custom' ? settings.anthropic_key : undefined,
-            openai_key: keySource === 'custom' ? settings.openai_key : undefined,
-            active_provider: settings.active_provider || 'anthropic',
-            key_source: keySource
-        };
-    }
-    
-    loadApiKeySettings() {
-        const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
-        
-        // Load key source setting (default to 'default' for server keys)
-        const keySource = settings.key_source || 'default';
-        document.getElementById(`use-${keySource}-keys`).checked = true;
-        
-        // Show/hide custom keys container based on setting
-        const customKeysContainer = document.getElementById('custom-keys-container');
-        if (keySource === 'custom') {
-            customKeysContainer.classList.remove('hidden');
-            
-            // Load API keys (masked for security)
-            if (settings.anthropic_key) {
-                document.getElementById('anthropic-api-key').value = '••••••••••••••••';
-            }
-            if (settings.openai_key) {
-                document.getElementById('openai-api-key').value = '••••••••••••••••';
-            }
-        } else {
-            customKeysContainer.classList.add('hidden');
-        }
-        
-        // Load active provider
-        const activeProvider = settings.active_provider || 'anthropic';
-        document.getElementById(`provider-${activeProvider}`).checked = true;
-    }
-    
-    saveApiKeySettings() {
-        const settings = JSON.parse(localStorage.getItem('targetvision_api_settings') || '{}');
-        
-        // Save key source setting
-        const keySource = document.querySelector('input[name="key-source"]:checked').value;
-        settings.key_source = keySource;
-        
-        // Only save API keys if using custom keys
-        if (keySource === 'custom') {
-            // Get API keys (only if they're not masked)
-            const anthropicKey = document.getElementById('anthropic-api-key').value;
-            const openaiKey = document.getElementById('openai-api-key').value;
-            
-            if (anthropicKey && !anthropicKey.startsWith('••••')) {
-                settings.anthropic_key = anthropicKey;
-            }
-            if (openaiKey && !openaiKey.startsWith('••••')) {
-                settings.openai_key = openaiKey;
-            }
-        } else {
-            // Clear custom keys when using server keys
-            delete settings.anthropic_key;
-            delete settings.openai_key;
-        }
-        
-        // Get active provider
-        const activeProvider = document.querySelector('input[name="ai-provider"]:checked').value;
-        settings.active_provider = activeProvider;
-        
-        localStorage.setItem('targetvision_api_settings', JSON.stringify(settings));
-        return settings;
-    }
-    
-    async testApiKey(provider) {
-        const button = document.getElementById(`test-${provider}-key`);
-        const statusDiv = document.getElementById(`${provider}-key-status`);
-        const keyInput = document.getElementById(`${provider}-api-key`);
-        
-        const apiKey = keyInput.value;
-        if (!apiKey || apiKey.startsWith('••••')) {
-            this.showKeyStatus(statusDiv, 'error', 'Please enter a valid API key');
-            return;
-        }
-        
-        // Update button state
-        button.disabled = true;
-        button.textContent = 'Testing...';
-        statusDiv.classList.remove('hidden');
-        this.showKeyStatus(statusDiv, 'info', 'Testing API key...');
-        
-        try {
-            const response = await fetch(`${this.apiBase}/settings/test-api-key`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    provider: provider,
-                    api_key: apiKey
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (response.ok) {
-                this.showKeyStatus(statusDiv, 'success', 'API key is valid!');
-                // Save the key since it's valid
-                this.saveApiKeySettings();
-            } else {
-                this.showKeyStatus(statusDiv, 'error', result.error || 'Invalid API key');
-            }
-        } catch (error) {
-            this.showKeyStatus(statusDiv, 'error', 'Failed to test API key');
-            console.error('API key test error:', error);
-        } finally {
-            button.disabled = false;
-            button.textContent = 'Test';
-        }
-    }
-    
-    showKeyStatus(statusDiv, type, message) {
-        statusDiv.className = `mt-1 text-xs ${type === 'success' ? 'text-green-600' : type === 'error' ? 'text-red-600' : 'text-blue-600'}`;
-        statusDiv.textContent = message;
-        statusDiv.classList.remove('hidden');
-    }
-    
-    handleTestImageUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            alert('Please select an image file');
-            return;
-        }
-        
-        // Show preview
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const previewImg = document.getElementById('test-preview-img');
-            const previewDiv = document.getElementById('test-image-preview');
-            const analyzeButton = document.getElementById('analyze-test-image');
-            
-            previewImg.src = e.target.result;
-            previewDiv.classList.remove('hidden');
-            analyzeButton.disabled = false;
-        };
-        reader.readAsDataURL(file);
-    }
-    
-    async analyzeTestImage() {
-        const fileInput = document.getElementById('test-image-upload');
-        const analyzeButton = document.getElementById('analyze-test-image');
-        const resultDiv = document.getElementById('test-analysis-result');
-        const resultContent = document.getElementById('test-result-content');
-        
-        if (!fileInput.files[0]) {
-            alert('Please select an image first');
-            return;
-        }
-        
-        // Get API settings respecting the key source toggle
-        const apiSettings = this.getApiSettings();
-        const activeProvider = apiSettings.active_provider;
-        
-        // Check if we're using custom keys and they're available
-        if (apiSettings.key_source === 'custom') {
-            const hasKey = activeProvider === 'anthropic' ? apiSettings.anthropic_key : apiSettings.openai_key;
-            if (!hasKey) {
-                alert(`Please configure your ${activeProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key first, or switch to using server keys`);
-                return;
-            }
-        }
-        
-        // Prepare form data
-        const formData = new FormData();
-        formData.append('image', fileInput.files[0]);
-        formData.append('provider', activeProvider);
-        
-        analyzeButton.disabled = true;
-        analyzeButton.textContent = 'Analyzing...';
-        resultDiv.classList.add('hidden');
-        
-        try {
-            // Prepare headers with API keys only if using custom keys
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            // Only send custom API keys if key_source is 'custom'
-            if (apiSettings.key_source === 'custom') {
-                if (apiSettings.anthropic_key) {
-                    headers['X-Anthropic-Key'] = apiSettings.anthropic_key;
-                }
-                if (apiSettings.openai_key) {
-                    headers['X-OpenAI-Key'] = apiSettings.openai_key;
-                }
-            }
-            
-            // Remove Content-Type header since we're using FormData
-            delete headers['Content-Type'];
-            
-            const response = await fetch(`${this.apiBase}/settings/test-image-analysis`, {
-                method: 'POST',
-                headers: headers,
-                body: formData
-            });
-            
-            const result = await response.json();
-            
-            if (response.ok) {
-                // Display results
-                resultContent.innerHTML = `
-                    <div class="space-y-3">
-                        <div>
-                            <strong class="text-gray-700">Provider:</strong> 
-                            <span class="px-2 py-1 bg-${activeProvider === 'anthropic' ? 'purple' : 'blue'}-100 text-${activeProvider === 'anthropic' ? 'purple' : 'blue'}-800 text-xs rounded">
-                                ${activeProvider === 'anthropic' ? 'Anthropic Claude' : 'OpenAI GPT-4V'}
-                            </span>
-                        </div>
-                        <div>
-                            <strong class="text-gray-700">Description:</strong>
-                            <p class="mt-1 text-sm text-gray-800">${result.analysis.description}</p>
-                        </div>
-                        <div>
-                            <strong class="text-gray-700">Keywords:</strong>
-                            <div class="mt-1 flex flex-wrap gap-1">
-                                ${result.analysis.keywords.map(keyword => 
-                                    `<span class="bg-gray-100 text-gray-700 px-2 py-1 text-xs rounded">${keyword}</span>`
-                                ).join('')}
-                            </div>
-                        </div>
-                        ${result.prompt_used ? `
-                        <div>
-                            <strong class="text-gray-700">Analysis Prompt Used:</strong>
-                            <details class="mt-1">
-                                <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-800">Show/Hide Prompt</summary>
-                                <div class="mt-2 p-3 bg-gray-50 rounded-md border text-xs text-gray-700 font-mono whitespace-pre-wrap">${result.prompt_used}</div>
-                            </details>
-                        </div>
-                        ` : ''}
-                        <div class="text-xs text-gray-500">
-                            Analysis completed in ${result.processing_time || 'N/A'} seconds
-                        </div>
-                    </div>
-                `;
-                resultDiv.classList.remove('hidden');
-            } else {
-                alert(`Analysis failed: ${result.error || 'Unknown error'}`);
-            }
-        } catch (error) {
-            console.error('Image analysis error:', error);
-            alert('Failed to analyze image. Please check your network connection and API key.');
-        } finally {
-            analyzeButton.disabled = false;
-            analyzeButton.textContent = 'Analyze Image';
-        }
-    }
-    
-    async updateSystemInfo() {
-        try {
-            // Update photo counts
-            const response = await fetch(`${this.apiBase}/photos?stats_only=true`);
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('total-photos').textContent = data.total || '0';
-                document.getElementById('processed-photos').textContent = data.processed || '0';
-            }
-            
-            // Update queue status
-            const queueResponse = await fetch(`${this.apiBase}/photos/process/queue`);
-            if (queueResponse.ok) {
-                const queueData = await queueResponse.json();
-                document.getElementById('queue-status').textContent = 
-                    `${queueData.pending || 0} pending, ${queueData.processing || 0} processing`;
-            }
-            
-        } catch (error) {
-            console.error('Error updating system info:', error);
-        }
-    }
-
-    // Collections functionality now handled by CollectionsManager component
-    
-    // LLM API Status Methods
-    async checkLLMStatus() {
-        try {
-            const response = await fetch(`${this.apiBase}/api/llm-status`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const status = await response.json();
-            this.updateLLMStatusDisplay(status);
-            return status;
-        } catch (error) {
-            console.error('Error checking LLM status:', error);
-            this.updateLLMStatusDisplay(null);
-            return null;
-        }
-    }
-    
-    updateLLMStatusDisplay(status) {
-        // Update navigation summary indicator
-        const navIndicator = document.getElementById('llm-status-indicator');
-        const navText = document.getElementById('llm-status-text');
-        
-        // Update settings page detailed indicators  
-        const anthropicIndicator = document.getElementById('anthropic-status-indicator');
-        const anthropicText = document.getElementById('anthropic-status-text');
-        const openaiIndicator = document.getElementById('openai-status-indicator');
-        const openaiText = document.getElementById('openai-status-text');
-        
-        if (!status) {
-            // Error state - show red
-            if (navIndicator) navIndicator.className = 'w-2 h-2 rounded-full bg-red-500';
-            if (navText) navText.textContent = 'Error';
-            if (anthropicIndicator) anthropicIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
-            if (anthropicText) anthropicText.textContent = 'Error checking status';
-            if (openaiIndicator) openaiIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
-            if (openaiText) openaiText.textContent = 'Error checking status';
-            return;
-        }
-        
-        const anthropicStatus = status.anthropic?.status;
-        const openaiStatus = status.openai?.status;
-        
-        // Update settings page detailed status
-        this.updateProviderStatus('anthropic', anthropicStatus, status.anthropic?.env_key_available, status.anthropic?.error);
-        this.updateProviderStatus('openai', openaiStatus, status.openai?.env_key_available, status.openai?.error);
-        
-        // Update navigation summary - show best available status
-        let overallStatus = 'red';
-        let overallText = 'Unavailable';
-        
-        if (anthropicStatus === 'available' || openaiStatus === 'available') {
-            overallStatus = 'green';
-            overallText = 'Available';
-        } else if (anthropicStatus === 'no_key' || openaiStatus === 'no_key') {
-            overallStatus = 'yellow'; 
-            overallText = 'No Keys';
-        }
-        
-        if (navIndicator) navIndicator.className = `w-2 h-2 rounded-full bg-${overallStatus}-500`;
-        if (navText) navText.textContent = overallText;
-    }
-    
-    updateProviderStatus(provider, status, envKeyAvailable, error) {
-        const indicator = document.getElementById(`${provider}-status-indicator`);
-        const text = document.getElementById(`${provider}-status-text`);
-        
-        if (!indicator || !text) return;
-        
-        switch (status) {
-            case 'available':
-                indicator.className = 'w-3 h-3 rounded-full bg-green-500';
-                text.textContent = envKeyAvailable ? 'Available (.env)' : 'Available (user key)';
-                break;
-            case 'no_key':
-                indicator.className = 'w-3 h-3 rounded-full bg-gray-400';
-                text.textContent = 'No API key configured';
-                break;
-            case 'error':
-                indicator.className = 'w-3 h-3 rounded-full bg-red-500';
-                text.textContent = error ? `Error: ${error}` : 'API Error';
-                break;
-            default:
-                indicator.className = 'w-3 h-3 rounded-full bg-gray-400';
-                text.textContent = 'Unknown';
-        }
-    }
-    
-    initializeStatusChecking() {
-        // Initial status check
-        this.checkLLMStatus();
-        
-        // Periodic status checks every 5 minutes
-        this.statusInterval = setInterval(() => {
-            this.checkLLMStatus();
-        }, 5 * 60 * 1000);
-    }
     
     async checkAndResumeBatchProcessing() {
         try {
@@ -3574,7 +2493,7 @@ Emphasize athletic performance, competition elements, and achievement recognitio
                     setTimeout(() => {
                         // Show message about ongoing processing
                         console.log(`Found ${batchStatus.photo_ids.length} photos still processing from previous session`);
-                        eventBus.emit('toast:success', { title: 'Processing Recovery', `Continuing background processing for ${batchStatus.photo_ids.length} photos.`);
+                        eventBus.emit('toast:success', { title: 'Processing Recovery', message: `Continuing background processing for ${batchStatus.photo_ids.length} photos.` });
                     }, 1000);
                     
                     console.log('Batch processing progress resumed successfully');
