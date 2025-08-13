@@ -101,7 +101,7 @@ class PhotoGrid {
         const emptyState = document.getElementById('empty-photos');
         const welcomeState = document.getElementById('welcome-state');
         
-        // Hide states
+        // Hide states - this means an album is selected
         welcomeState.classList.add('hidden');
         emptyState.classList.add('hidden');
         

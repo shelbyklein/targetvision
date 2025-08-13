@@ -21,11 +21,6 @@ class NavigationManager {
         this.setupEventListeners();
         this.setupDOMEventListeners();
         
-        // Show initial albums page after a brief delay to ensure DOM is ready
-        setTimeout(() => {
-            this.showPage('albums');
-        }, 100);
-        
         console.log('NavigationManager initialized');
     }
 

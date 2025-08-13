@@ -342,8 +342,27 @@ class TargetVisionApp {
         eventBus.emit('photos:clear-selection');
         eventBus.emit('navigation:show-albums-view');
         
-        // Ensure albums are displayed
-        eventBus.emit('albums:display', { albums: this.smugmugAlbums || [] });
+        // Show welcome state in right column when no album is selected
+        this.showWelcomeState();
+        
+        // Ensure albums are displayed - AlbumBrowser will use its own data
+        eventBus.emit('albums:display');
+    }
+
+    showWelcomeState() {
+        // Hide all photo-related states
+        document.getElementById('loading-photos').classList.add('hidden');
+        document.getElementById('photo-grid').classList.add('hidden');
+        document.getElementById('empty-photos').classList.add('hidden');
+        document.getElementById('photo-controls').classList.add('hidden');
+        document.getElementById('album-actions').classList.add('hidden');
+        document.getElementById('album-stats').classList.add('hidden');
+        
+        // Show welcome state
+        document.getElementById('welcome-state').classList.remove('hidden');
+        
+        // Reset album title
+        document.getElementById('current-album-title').textContent = 'Select an album';
     }
 
     showPhotosView() {
