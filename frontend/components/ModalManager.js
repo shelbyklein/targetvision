@@ -41,6 +41,10 @@ class ModalManager {
         eventBus.on('metadata:edit:cancel', () => this.cancelMetadataEdit());
         eventBus.on('metadata:ai:regenerate', () => this.regenerateAIMetadata());
         eventBus.on('metadata:ai:delete', () => this.deleteAIMetadata());
+        
+        // Additional modal events
+        eventBus.on('modal:process-photo', () => this.processPhotoWithAI());
+        eventBus.on('modal:toggle-embedding-details', () => this.toggleEmbeddingDetails());
     }
 
     setupModalEventHandlers() {

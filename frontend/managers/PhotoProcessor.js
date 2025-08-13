@@ -29,6 +29,14 @@ class PhotoProcessor {
         eventBus.on('photos:generate-embeddings', (data) => {
             this.generateMissingEmbeddings(data.album);
         });
+        
+        eventBus.on('photos:check-and-resume-batch-processing', () => {
+            this.checkAndResumeBatchProcessing();
+        });
+        
+        eventBus.on('photos:refresh-album-status', (data) => {
+            this.refreshAlbumStatus(data.album);
+        });
     }
 
     async processSelectedPhotos(selectedPhotos, currentPhotos) {
@@ -479,6 +487,49 @@ class PhotoProcessor {
             batchActive: this.batchProcessingStatus.isActive,
             batchProgress: this.batchProcessingStatus
         };
+    }
+    
+    // Batch Processing Resume
+    async checkAndResumeBatchProcessing() {
+        try {
+            const response = await fetch('http://localhost:8000/photos/batch/status');
+            if (response.ok) {
+                const batchStatus = await response.json();
+                
+                if (batchStatus.is_processing && batchStatus.processing_count > 0) {
+                    batchStatus.photo_ids.forEach(photoId => {
+                        this.processingPhotos.add(photoId);
+                    });
+                    
+                    this.showBatchProgress(0, batchStatus.processing_count, 0);
+                    this.showGlobalProgress(0, batchStatus.processing_count, 'Resuming AI analysis progress...', true);
+                    
+                    setTimeout(() => {
+                        eventBus.emit('toast:success', { title: 'Processing Recovery', message: `Continuing background processing for ${batchStatus.photo_ids.length} photos.` });
+                    }, 1000);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking batch processing status:', error);
+        }
+    }
+    
+    // Album Status Refresh
+    async refreshAlbumStatus(album) {
+        try {
+            eventBus.emit('data:load-album-photos', { albumId: album.smugmug_id || album.album_key, app: window.app });
+            eventBus.emit('albums:reload');
+            
+            // Check processing status
+            if (window.app.currentPhotos) {
+                const processingCount = window.app.currentPhotos.filter(p => p.processing_status === 'processing').length;
+                if (processingCount === 0) {
+                    eventBus.emit('toast:success', { title: 'Processing Complete', message: 'All background processing has completed!' });
+                }
+            }
+        } catch (error) {
+            console.error('Error refreshing album status:', error);
+        }
     }
 }
 

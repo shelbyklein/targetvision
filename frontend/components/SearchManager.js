@@ -52,6 +52,47 @@ class SearchManager {
         
         // Page initialization
         eventBus.on('search:initialize-page', () => this.initializeSearchPage());
+
+        // DOM event listeners for search functionality (moved from app.js)
+        this.bindDOMEventListeners();
+    }
+
+    bindDOMEventListeners() {
+        // Main search functionality DOM events
+        const searchMainButton = document.getElementById('search-main-button');
+        const searchMainInput = document.getElementById('search-main-input');
+        const clearMainSearch = document.getElementById('clear-main-search');
+
+        if (searchMainButton) {
+            searchMainButton.addEventListener('click', () => eventBus.emit('search:perform'));
+        }
+
+        if (searchMainInput) {
+            searchMainInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') eventBus.emit('search:perform');
+            });
+        }
+
+        if (clearMainSearch) {
+            clearMainSearch.addEventListener('click', () => eventBus.emit('search:clear'));
+        }
+
+        // Filter functionality DOM events  
+        const toggleFilters = document.getElementById('toggle-filters');
+        const applyFilters = document.getElementById('apply-filters');
+        const clearFilters = document.getElementById('clear-filters');
+
+        if (toggleFilters) {
+            toggleFilters.addEventListener('click', () => eventBus.emit('search:filters:toggle'));
+        }
+
+        if (applyFilters) {
+            applyFilters.addEventListener('click', () => eventBus.emit('search:filters:apply'));
+        }
+
+        if (clearFilters) {
+            clearFilters.addEventListener('click', () => eventBus.emit('search:filters:clear'));
+        }
     }
 
     // Search Page Initialization

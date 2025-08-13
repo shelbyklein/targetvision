@@ -37,6 +37,37 @@ class ChatManager {
         eventBus.on('chat:show-photo-modal', (data) => {
             eventBus.emit('photo:show-modal', { photo: data.photo });
         });
+
+        // DOM event listeners for chat functionality (moved from app.js)
+        this.bindDOMEventListeners();
+    }
+
+    bindDOMEventListeners() {
+        // Chat functionality DOM events
+        const chatSendButton = document.getElementById('chat-send');
+        const chatInput = document.getElementById('chat-input');
+        const clearChatButton = document.getElementById('clear-chat');
+
+        if (chatSendButton) {
+            chatSendButton.addEventListener('click', () => eventBus.emit('chat:send-message'));
+        }
+
+        if (chatInput) {
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') eventBus.emit('chat:send-message');
+            });
+            
+            chatInput.addEventListener('input', (e) => {
+                const chatSendBtn = document.getElementById('chat-send');
+                if (chatSendBtn) {
+                    chatSendBtn.disabled = !e.target.value.trim();
+                }
+            });
+        }
+
+        if (clearChatButton) {
+            clearChatButton.addEventListener('click', () => eventBus.emit('chat:clear'));
+        }
     }
 
     // Chat Page Initialization

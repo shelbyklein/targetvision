@@ -42,6 +42,76 @@ class SettingsManager {
             const settings = this.getApiSettings();
             data.callback(settings);
         });
+
+        // DOM event listeners for settings functionality (moved from app.js)
+        this.bindDOMEventListeners();
+    }
+
+    bindDOMEventListeners() {
+        // Settings functionality DOM events
+        const editPrompt = document.getElementById('edit-prompt');
+        const savePrompt = document.getElementById('save-prompt');
+        const cancelPromptEdit = document.getElementById('cancel-prompt-edit');
+        const resetPrompt = document.getElementById('reset-prompt');
+        const testPrompt = document.getElementById('test-prompt');
+        const saveSettings = document.getElementById('save-settings');
+
+        if (editPrompt) {
+            editPrompt.addEventListener('click', () => eventBus.emit('settings:edit-prompt'));
+        }
+
+        if (savePrompt) {
+            savePrompt.addEventListener('click', () => eventBus.emit('settings:save-prompt'));
+        }
+
+        if (cancelPromptEdit) {
+            cancelPromptEdit.addEventListener('click', () => eventBus.emit('settings:cancel-prompt-edit'));
+        }
+
+        if (resetPrompt) {
+            resetPrompt.addEventListener('click', () => eventBus.emit('settings:reset-prompt'));
+        }
+
+        if (testPrompt) {
+            testPrompt.addEventListener('click', () => eventBus.emit('settings:test-prompt'));
+        }
+
+        if (saveSettings) {
+            saveSettings.addEventListener('click', () => eventBus.emit('settings:save-application-settings'));
+        }
+
+        // API Key management DOM events
+        const testAnthropicKey = document.getElementById('test-anthropic-key');
+        const testOpenaiKey = document.getElementById('test-openai-key');
+        const testImageUpload = document.getElementById('test-image-upload');
+        const analyzeTestImage = document.getElementById('analyze-test-image');
+
+        if (testAnthropicKey) {
+            testAnthropicKey.addEventListener('click', () => eventBus.emit('settings:test-api-key', { provider: 'anthropic' }));
+        }
+
+        if (testOpenaiKey) {
+            testOpenaiKey.addEventListener('click', () => eventBus.emit('settings:test-api-key', { provider: 'openai' }));
+        }
+
+        if (testImageUpload) {
+            testImageUpload.addEventListener('change', (e) => eventBus.emit('settings:handle-test-image-upload', { event: e }));
+        }
+
+        if (analyzeTestImage) {
+            analyzeTestImage.addEventListener('click', () => eventBus.emit('settings:analyze-test-image'));
+        }
+
+        // Prompt textarea character count
+        const promptTextarea = document.getElementById('prompt-textarea');
+        if (promptTextarea) {
+            promptTextarea.addEventListener('input', () => eventBus.emit('settings:update-char-count'));
+        }
+
+        // Template selection
+        document.querySelectorAll('[data-template]').forEach(template => {
+            template.addEventListener('click', () => eventBus.emit('settings:select-template', { template: template.dataset.template }));
+        });
     }
 
     // Settings Page Initialization

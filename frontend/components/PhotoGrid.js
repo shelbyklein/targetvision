@@ -59,6 +59,41 @@ class PhotoGrid {
             this.processingPhotos.delete(data.photoId);
             this.displayPhotos();
         });
+
+        // DOM event listeners for photo grid functionality (moved from app.js)
+        this.bindDOMEventListeners();
+    }
+
+    bindDOMEventListeners() {
+        // Photo selection DOM events
+        const selectAllButton = document.getElementById('select-all');
+        const selectNoneButton = document.getElementById('select-none');
+        
+        if (selectAllButton) {
+            selectAllButton.addEventListener('click', () => eventBus.emit('photos:select-all'));
+        }
+
+        if (selectNoneButton) {
+            selectNoneButton.addEventListener('click', () => eventBus.emit('photos:clear-selection'));
+        }
+
+        // Photo filtering DOM events
+        const statusFilter = document.getElementById('status-filter');
+        if (statusFilter) {
+            statusFilter.addEventListener('change', (e) => eventBus.emit('photos:set-filter', { filter: e.target.value }));
+        }
+
+        // Visibility toggle DOM events
+        const toggleProcessed = document.getElementById('toggle-processed');
+        const toggleUnprocessed = document.getElementById('toggle-unprocessed');
+
+        if (toggleProcessed) {
+            toggleProcessed.addEventListener('click', () => eventBus.emit('photos:toggle-processed'));
+        }
+
+        if (toggleUnprocessed) {
+            toggleUnprocessed.addEventListener('click', () => eventBus.emit('photos:toggle-unprocessed'));
+        }
     }
 
     displayPhotos() {
