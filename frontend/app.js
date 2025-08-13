@@ -9,6 +9,10 @@ import smugMugAPI from './managers/SmugMugAPI.js';
 import photoProcessor from './managers/PhotoProcessor.js';
 import albumBrowser from './components/AlbumBrowser.js';
 import photoGrid from './components/PhotoGrid.js';
+import progressManager from './components/ProgressManager.js';
+import modalManager from './components/ModalManager.js';
+import toastManager from './components/ToastManager.js';
+import collectionsManager from './components/CollectionsManager.js';
 import { EVENTS, PHOTO_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from './utils/Constants.js';
 import UIUtils from './utils/UIUtils.js';
 class TargetVisionApp {
@@ -32,10 +36,7 @@ class TargetVisionApp {
             dateTo: ''
         };
         
-        // Collections state
-        this.collections = [];
-        this.currentCollection = null;
-        this.currentCollectionPhotos = [];
+        // Collections state now managed by CollectionsManager
         
         // Folder navigation state
         this.currentNodeUri = null;
@@ -99,7 +100,7 @@ class TargetVisionApp {
             resultDiv.classList.remove('hidden');
             
             // Show toast notification
-            this.showToast('Status Confirmed', `${result.photos_updated} photos updated`, 'success');
+            eventBus.emit('toast:success', { title: 'Status Confirmed', message: `${result.photos_updated} photos updated` });
             
             // Refresh photo grid if we're on the albums page
             if (this.currentPage === 'albums' && this.currentPhotos.length > 0) {
@@ -118,7 +119,7 @@ class TargetVisionApp {
             `;
             resultDiv.classList.remove('hidden');
             
-            this.showToast('Error', 'Failed to confirm processing status', 'error');
+            eventBus.emit('toast:error', { title: 'Error', message: 'Failed to confirm processing status' });
         } finally {
             // Restore button
             button.textContent = originalText;
@@ -154,7 +155,7 @@ class TargetVisionApp {
         // Phase 2: Load data progressively in background
         this.loadApplicationData().catch(error => {
             console.error('Error loading application data:', error);
-            this.showErrorMessage('Initialization Error', 'Failed to load application data. Please refresh the page.');
+            eventBus.emit('toast:error', { title: 'Initialization Error', message: 'Failed to load application data. Please refresh the page.' });
         });
         
         console.log('Phase 1 initialization complete - UI is ready');
@@ -322,10 +323,10 @@ class TargetVisionApp {
         document.getElementById('modal-embedding-details-toggle').addEventListener('click', () => this.toggleEmbeddingDetails());
         
         // Collection management
-        document.getElementById('modal-add-to-collection').addEventListener('click', () => this.showCollectionInterface());
-        document.getElementById('modal-add-collection-confirm').addEventListener('click', () => this.addPhotoToCollection());
-        document.getElementById('modal-add-collection-cancel').addEventListener('click', () => this.hideCollectionInterface());
-        document.getElementById('modal-create-collection').addEventListener('click', () => this.createCollectionFromModal());
+        document.getElementById('modal-add-to-collection').addEventListener('click', () => eventBus.emit('collections:show-interface'));
+        document.getElementById('modal-add-collection-confirm').addEventListener('click', () => eventBus.emit('collections:add-photo'));
+        document.getElementById('modal-add-collection-cancel').addEventListener('click', () => eventBus.emit('collections:hide-interface'));
+        document.getElementById('modal-create-collection').addEventListener('click', () => eventBus.emit('collections:create-from-modal'));
         
         // Settings functionality
         document.getElementById('edit-prompt').addEventListener('click', () => this.editPrompt());
@@ -390,32 +391,32 @@ class TargetVisionApp {
         });
 
         eventBus.on('smugmug:sync-success', (data) => {
-            this.showSuccessMessage('Sync Complete', data.message);
+            eventBus.emit('toast:success', { title: 'Sync Complete', message: data.message });
             this.refreshCurrentPhotos();
         });
 
         eventBus.on('smugmug:sync-error', (data) => {
-            this.showErrorMessage('Sync Failed', `Failed to sync album: ${data.error.message}`);
+            eventBus.emit('toast:error', { title: 'Sync Failed', message: `Failed to sync album: ${data.error.message}` });
         });
 
         eventBus.on('smugmug:folder-error', (data) => {
             console.error('SmugMug folder loading error:', data);
-            this.showErrorMessage('Folder Loading Error', `Failed to load folder: ${data.error.message}`);
+            eventBus.emit('toast:error', { title: 'Folder Loading Error', message: `Failed to load folder: ${data.error.message}` });
         });
 
         // Photo processing events
         eventBus.on('photos:single-processing-success', (data) => {
-            this.showSuccessMessage('Processing Complete', data.message);
+            eventBus.emit('toast:success', { title: 'Processing Complete', message: data.message });
             // Refresh photo grid via PhotoGrid component
             eventBus.emit('photos:display', { photos: this.currentPhotos });
         });
 
         eventBus.on('photos:single-processing-error', (data) => {
-            this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
+            eventBus.emit('toast:error', { title: 'Processing Failed', message: 'Could not process photo with AI. Please try again.' });
         });
 
         eventBus.on('photos:batch-processing-started', (data) => {
-            this.showSuccessMessage('Batch Processing Started', data.message);
+            eventBus.emit('toast:success', { title: 'Batch Processing Started', message: data.message });
         });
 
         eventBus.on('photos:status-updated', (data) => {
@@ -425,11 +426,11 @@ class TargetVisionApp {
 
         // UI events from managers
         eventBus.on('ui:show-success', (data) => {
-            this.showSuccessMessage(data.title, data.message);
+            eventBus.emit('toast:success', { title: data.title, data.message);
         });
 
         eventBus.on('ui:show-error', (data) => {
-            this.showErrorMessage(data.title, data.message);
+            eventBus.emit('toast:error', { title: data.title, data.message);
         });
 
         // State management events
@@ -476,8 +477,10 @@ class TargetVisionApp {
             this.selectedPhotos = new Set(data.selectedPhotos);
         });
 
+        // Photo modal events are now handled by ModalManager
         eventBus.on('photo:show-modal', (data) => {
-            this.showPhotoModal(data.photo);
+            // Set current photo for collections manager
+            eventBus.emit('photo:set-current', { photo: data.photo });
         });
     }
 
@@ -1114,7 +1117,7 @@ class TargetVisionApp {
             await this.loadAlbumPhotos(albumId);
         } else {
             console.error('No album ID found in album object:', album);
-            this.showErrorMessage('Album Error', 'Could not load album photos - missing album identifier');
+            eventBus.emit('toast:error', { title: 'Album Error', 'Could not load album photos - missing album identifier');
         }
     }
 
@@ -1222,7 +1225,7 @@ class TargetVisionApp {
         }
         
         // No cache available, show loading and fetch fresh data
-        this.showPhotosLoading();
+        eventBus.emit('photos:loading:show');
         await this.fetchAlbumPhotos(albumId);
     }
     
@@ -1262,12 +1265,12 @@ class TargetVisionApp {
             
             eventBus.emit('photos:display', { photos: this.currentPhotos });
             this.updatePhotoStats();
-            this.hidePhotosLoading();
+            eventBus.emit('photos:loading:hide');
             
         } catch (error) {
             console.error('Failed to load photos:', error);
-            this.showErrorMessage('Failed to Load Photos', 'Could not fetch photos from this album.', error.message);
-            this.hidePhotosLoading();
+            eventBus.emit('toast:error', { title: 'Failed to Load Photos', 'Could not fetch photos from this album.', error.message);
+            eventBus.emit('photos:loading:hide');
         }
     }
     
@@ -1325,7 +1328,7 @@ class TargetVisionApp {
                 console.log(`${processingCount} photos still processing`);
             } else {
                 console.log('All photos have completed processing');
-                this.showSuccessMessage('Processing Complete', 'All background processing has completed!');
+                eventBus.emit('toast:success', { title: 'Processing Complete', 'All background processing has completed!');
             }
             
         } catch (error) {
@@ -1378,39 +1381,6 @@ class TargetVisionApp {
         document.getElementById('welcome-state').classList.add('hidden');
     }
 
-    showAlbumsLoading() {
-        const loading = document.getElementById('loading-albums');
-        if (!loading) {
-            const albumsList = document.getElementById('albums-list');
-            albumsList.innerHTML = `
-                <div id="loading-albums" class="p-4 text-center text-gray-500">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    Loading albums...
-                </div>
-            `;
-        }
-    }
-
-    hideAlbumsLoading() {
-        const loading = document.getElementById('loading-albums');
-        if (loading) loading.remove();
-    }
-
-    showPhotosLoading() {
-        document.getElementById('loading-photos').classList.remove('hidden');
-        
-        // Clear existing photos immediately to avoid showing old photos during loading
-        const photoGrid = document.getElementById('photo-grid');
-        photoGrid.innerHTML = '';
-        photoGrid.classList.add('hidden');
-        
-        document.getElementById('empty-photos').classList.add('hidden');
-        document.getElementById('welcome-state').classList.add('hidden');
-    }
-
-    hidePhotosLoading() {
-        document.getElementById('loading-photos').classList.add('hidden');
-    }
 
     // Progress management and photo status updates - Now handled by PhotoProcessor manager
 
@@ -1583,9 +1553,7 @@ class TargetVisionApp {
                     console.error('Error loading albums view:', error);
                 });
             } else if (pageName === 'collections') {
-                this.initializeCollectionsPage().catch(error => {
-                    console.error('Error initializing collections page:', error);
-                });
+                eventBus.emit('collections:initialize-page');
             } else if (pageName === 'chat' && this.chatMessages.length === 0) {
                 this.initializeChatPage();
             } else if (pageName === 'search') {
@@ -2005,7 +1973,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         
         if (!query) return;
         
-        this.showSearchLoading();
+        eventBus.emit('search:loading:show');
         
         try {
             // Build search URL with filters
@@ -2034,11 +2002,11 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
             this.searchResults = results.photos || [];
             this.displaySearchResults(query, results);
-            this.hideSearchLoading();
+            eventBus.emit('search:loading:hide');
             
         } catch (error) {
             console.error('Search error:', error);
-            this.hideSearchLoading();
+            eventBus.emit('search:loading:hide');
             this.showSearchError('Search failed. Please try again.');
         }
     }
@@ -2135,16 +2103,6 @@ You can also ask for help with syncing albums or processing photos with AI. What
         return div;
     }
     
-    showSearchLoading() {
-        document.getElementById('search-welcome').classList.add('hidden');
-        document.getElementById('search-results-grid').classList.add('hidden');
-        document.getElementById('search-no-results').classList.add('hidden');
-        document.getElementById('search-loading').classList.remove('hidden');
-    }
-    
-    hideSearchLoading() {
-        document.getElementById('search-loading').classList.add('hidden');
-    }
     
     showSearchError(message) {
         console.error('Search error:', message);
@@ -2291,8 +2249,8 @@ You can also ask for help with syncing albums or processing photos with AI. What
             console.log('No AI data available for embedding display');
         }
         
-        // Load collections for this photo
-        await this.loadPhotoCollections(completePhoto);
+        // Load collections for this photo via CollectionsManager
+        eventBus.emit('collections:load-for-photo', { photo: completePhoto });
         
         // Show modal with animation
         modal.classList.remove('hidden');
@@ -2476,7 +2434,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
                             };
                             img.onerror = () => {
                                 // Fallback to existing image
-                                this.loadFallbackImage(photo, fullscreenImage, loadingDiv);
+                                eventBus.emit('image:fallback:load', { photo, fullscreenImage, loadingDiv });
                             };
                             img.src = largestImageData.url;
                             return;
@@ -2488,28 +2446,13 @@ You can also ask for help with syncing albums or processing photos with AI. What
             }
             
             // Fallback to existing image URL
-            this.loadFallbackImage(photo, fullscreenImage, loadingDiv);
+            eventBus.emit('image:fallback:load', { photo, fullscreenImage, loadingDiv });
             
         } catch (error) {
             console.error('Error opening full-screen lightbox:', error);
         }
     }
     
-    loadFallbackImage(photo, fullscreenImage, loadingDiv) {
-        const fallbackUrl = photo.image_url || photo.thumbnail_url;
-        if (fallbackUrl) {
-            fullscreenImage.src = fallbackUrl;
-            
-            // Animate fallback image in
-            loadingDiv.style.opacity = '0';
-            setTimeout(() => {
-                fullscreenImage.style.opacity = '1';
-                fullscreenImage.style.transform = 'scale(1)';
-            }, 150);
-        } else {
-            loadingDiv.innerHTML = '<div class="text-center text-red-500 transform transition-all duration-300 ease-out">No image available</div>';
-        }
-    }
     
     closeFullScreenLightbox() {
         const lightbox = document.getElementById('fullscreen-lightbox');
@@ -2643,238 +2586,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         }
     }
 
-    // Collection management methods for photo modal
-    async loadPhotoCollections(photo) {
-        try {
-            // Load all collections to populate the dropdown
-            await this.loadCollections();
-            
-            // First, ensure this photo exists in our local database
-            const localPhoto = await this.ensurePhotoInDatabase(photo);
-            
-            if (!localPhoto || !localPhoto.id) {
-                console.error('Could not get local photo ID for:', photo);
-                this.renderPhotoCollections([]);
-                this.populateCollectionSelect();
-                return;
-            }
-            
-            console.log('Loading collections for local photo ID:', localPhoto.id);
-            
-            // Get collections this photo is in using the local photo ID
-            const response = await fetch(`${this.apiBase}/photos/${localPhoto.id}/collections`);
-            if (response.ok) {
-                const data = await response.json();
-                this.renderPhotoCollections(data || []);
-                this.populateCollectionSelect();
-            } else {
-                console.error('Failed to load photo collections:', response.status, response.statusText);
-                this.renderPhotoCollections([]);
-                this.populateCollectionSelect();
-            }
-        } catch (error) {
-            console.error('Error loading photo collections:', error);
-            this.renderPhotoCollections([]);
-            this.populateCollectionSelect();
-        }
-    }
-    
-    // Ensure a photo exists in our local database and return the local photo object
-    async ensurePhotoInDatabase(photo) {
-        try {
-            // If photo already has a local ID, return it
-            if (photo.id) {
-                return photo;
-            }
-            
-            // Try to find the photo in local database by SmugMug ID
-            const smugmugId = photo.ImageKey || photo.smugmug_id;
-            if (!smugmugId) {
-                console.error('No SmugMug ID found for photo:', photo);
-                return null;
-            }
-            
-            // Query local database for this photo
-            const response = await fetch(`${this.apiBase}/photos?smugmug_id=${smugmugId}`);
-            if (response.ok) {
-                const data = await response.json();
-                if (data.length > 0) {
-                    // Found existing photo in local database
-                    return data[0];
-                }
-            }
-            
-            // Photo doesn't exist locally, we need to sync it first
-            console.log('Photo not found in local database, syncing from SmugMug:', smugmugId);
-            
-            // For now, return null - we could implement auto-sync here if needed
-            return null;
-            
-        } catch (error) {
-            console.error('Error ensuring photo in database:', error);
-            return null;
-        }
-    }
-    
-    renderPhotoCollections(collections) {
-        const collectionsList = document.getElementById('modal-collections-list');
-        
-        if (collections.length === 0) {
-            collectionsList.innerHTML = '<span class="text-sm text-gray-500 italic">No collections</span>';
-            return;
-        }
-        
-        collectionsList.innerHTML = collections.map(collection => `
-            <div class="flex items-center bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
-                <span>${collection.name}</span>
-                <button onclick="app.removePhotoFromCollection(${collection.id})" class="ml-1 text-purple-600 hover:text-purple-800">
-                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                    </svg>
-                </button>
-            </div>
-        `).join('');
-    }
-    
-    populateCollectionSelect() {
-        const select = document.getElementById('modal-collection-select');
-        select.innerHTML = '<option value="">Choose a collection...</option>';
-        
-        this.collections.forEach(collection => {
-            const option = document.createElement('option');
-            option.value = collection.id;
-            option.textContent = collection.name;
-            select.appendChild(option);
-        });
-    }
-    
-    showCollectionInterface() {
-        document.getElementById('modal-collection-interface').classList.remove('hidden');
-    }
-    
-    hideCollectionInterface() {
-        document.getElementById('modal-collection-interface').classList.add('hidden');
-        document.getElementById('modal-collection-select').value = '';
-    }
-    
-    async addPhotoToCollection() {
-        const collectionId = document.getElementById('modal-collection-select').value;
-        if (!collectionId) {
-            this.showToast('Please select a collection', 'error');
-            return;
-        }
-        
-        if (!this.currentPhoto) {
-            this.showToast('No photo selected', 'error');
-            return;
-        }
-        
-        // First, ensure this photo exists in our local database
-        const localPhoto = await this.ensurePhotoInDatabase(this.currentPhoto);
-        
-        if (!localPhoto || !localPhoto.id) {
-            this.showToast('Photo must be synced to database before adding to collections', 'error');
-            console.error('Could not get local photo ID for:', this.currentPhoto);
-            return;
-        }
-        
-        try {
-            console.log('Adding photo to collection:', {collectionId, photoId: localPhoto.id, photo: localPhoto});
-            
-            const response = await fetch(`${this.apiBase}/collections/${collectionId}/photos`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    photo_ids: [localPhoto.id]
-                })
-            });
-            
-            if (response.ok) {
-                this.showToast('Photo added to collection successfully', 'success');
-                this.hideCollectionInterface();
-                await this.loadPhotoCollections(this.currentPhoto);
-            } else {
-                console.error('Server response:', response.status, response.statusText);
-                const errorText = await response.text();
-                console.error('Server error text:', errorText);
-                this.showToast('Failed to add photo to collection', 'error');
-            }
-        } catch (error) {
-            console.error('Error adding photo to collection:', error);
-            this.showToast('Failed to add photo to collection', 'error');
-        }
-    }
-    
-    async removePhotoFromCollection(collectionId) {
-        if (!this.currentPhoto) {
-            this.showToast('No photo selected', 'error');
-            return;
-        }
-        
-        // First, ensure this photo exists in our local database
-        const localPhoto = await this.ensurePhotoInDatabase(this.currentPhoto);
-        
-        if (!localPhoto || !localPhoto.id) {
-            this.showToast('Photo not found in database', 'error');
-            console.error('Could not get local photo ID for:', this.currentPhoto);
-            return;
-        }
-        
-        try {
-            console.log('Removing photo from collection:', {collectionId, photoId: localPhoto.id, photo: localPhoto});
-            
-            const response = await fetch(`${this.apiBase}/collections/${collectionId}/photos/${localPhoto.id}`, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                this.showToast('Photo removed from collection', 'success');
-                await this.loadPhotoCollections(this.currentPhoto);
-            } else {
-                console.error('Server response:', response.status, response.statusText);
-                const errorText = await response.text();
-                console.error('Server error text:', errorText);
-                this.showToast('Failed to remove photo from collection', 'error');
-            }
-        } catch (error) {
-            console.error('Error removing photo from collection:', error);
-            this.showToast('Failed to remove photo from collection', 'error');
-        }
-    }
-    
-    async createCollectionFromModal() {
-        const name = prompt('Enter collection name:');
-        if (!name) return;
-        
-        try {
-            const response = await fetch('/collections', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: name,
-                    description: ''
-                })
-            });
-            
-            if (response.ok) {
-                const collection = await response.json();
-                this.showToast('Collection created successfully', 'success');
-                await this.loadCollections();
-                this.populateCollectionSelect();
-                document.getElementById('modal-collection-select').value = collection.id;
-            } else {
-                const error = await response.json();
-                this.showToast(error.detail || 'Failed to create collection', 'error');
-            }
-        } catch (error) {
-            console.error('Error creating collection:', error);
-            this.showToast('Failed to create collection', 'error');
-        }
-    }
+    // Photo modal collection management now handled by CollectionsManager component
 
     async syncAllAlbums() {
         console.log('Sync all albums functionality to be implemented');
@@ -2897,7 +2609,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
         );
         
         if (!currentPhoto || !currentPhoto.local_photo_id) {
-            this.showErrorMessage('Processing Error', 'This photo must be synced to the database before it can be processed with AI.');
+            eventBus.emit('toast:error', { title: 'Processing Error', 'This photo must be synced to the database before it can be processed with AI.');
             return;
         }
         
@@ -2959,12 +2671,12 @@ You can also ask for help with syncing albums or processing photos with AI. What
             // Update global progress to complete
             photoProcessor.updateGlobalProgress(1, 1, 'Photo analysis complete!');
             
-            this.showSuccessMessage('AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
+            eventBus.emit('toast:success', { title: 'AI Processing Complete', 'Photo has been analyzed and metadata generated successfully.');
             
         } catch (error) {
             console.error('AI processing failed:', error);
             photoProcessor.hideGlobalProgress();
-            this.showErrorMessage('Processing Failed', 'Could not process photo with AI. Please try again.');
+            eventBus.emit('toast:error', { title: 'Processing Failed', 'Could not process photo with AI. Please try again.');
             
             // Remove from processing state on error
             this.processingPhotos.delete(currentPhoto.local_photo_id);
@@ -3084,7 +2796,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
         } catch (error) {
             console.error('Error saving metadata:', error);
-            this.showErrorMessage('Save Failed', 'Failed to save metadata. Please try again.');
+            eventBus.emit('toast:error', { title: 'Save Failed', 'Failed to save metadata. Please try again.');
         } finally {
             const saveButton = document.getElementById('modal-save-metadata');
             saveButton.disabled = false;
@@ -3241,7 +2953,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             
         } catch (error) {
             console.error('Error regenerating AI metadata:', error);
-            this.showErrorMessage('Regeneration Failed', 'Failed to regenerate AI metadata. Please try again.');
+            eventBus.emit('toast:error', { title: 'Regeneration Failed', 'Failed to regenerate AI metadata. Please try again.');
         } finally {
             const regenerateButton = document.getElementById('modal-regenerate-ai');
             regenerateButton.disabled = false;
@@ -3293,12 +3005,12 @@ You can also ask for help with syncing albums or processing photos with AI. What
             // Refresh the photo grid to show updated status
             eventBus.emit('photos:display', { photos: this.currentPhotos });
             
-            this.showSuccessMessage('AI Data Deleted', 'AI-generated metadata has been successfully removed from this photo.');
+            eventBus.emit('toast:success', { title: 'AI Data Deleted', 'AI-generated metadata has been successfully removed from this photo.');
             console.log('AI metadata deleted successfully');
             
         } catch (error) {
             console.error('Error deleting AI metadata:', error);
-            this.showErrorMessage('Deletion Failed', 'Failed to delete AI metadata. Please try again.');
+            eventBus.emit('toast:error', { title: 'Deletion Failed', 'Failed to delete AI metadata. Please try again.');
         } finally {
             const deleteButton = document.getElementById('modal-delete-ai');
             deleteButton.disabled = false;
@@ -3458,7 +3170,7 @@ Do not include speculation about metadata like camera settings, date, or photogr
             
         } catch (error) {
             console.error('Error saving prompt:', error);
-            this.showErrorMessage('Save Failed', 'Failed to save prompt. Please try again.');
+            eventBus.emit('toast:error', { title: 'Save Failed', 'Failed to save prompt. Please try again.');
         } finally {
             const saveButton = document.getElementById('save-prompt');
             saveButton.disabled = false;
@@ -3493,7 +3205,7 @@ Do not include speculation about metadata like camera settings, date, or photogr
             
         } catch (error) {
             console.error('Error resetting prompt:', error);
-            this.showErrorMessage('Reset Failed', 'Failed to reset prompt. Please try again.');
+            eventBus.emit('toast:error', { title: 'Reset Failed', 'Failed to reset prompt. Please try again.');
         }
     }
     
@@ -3514,11 +3226,11 @@ Do not include speculation about metadata like camera settings, date, or photogr
             // For now, just simulate the test
             await new Promise(resolve => setTimeout(resolve, 2000));
             
-            this.showSuccessMessage('Test Successful', 'Prompt test completed! The prompt structure looks valid.');
+            eventBus.emit('toast:success', { title: 'Test Successful', 'Prompt test completed! The prompt structure looks valid.');
             
         } catch (error) {
             console.error('Error testing prompt:', error);
-            this.showErrorMessage('Test Failed', 'Failed to test prompt. Please check the format.');
+            eventBus.emit('toast:error', { title: 'Test Failed', 'Failed to test prompt. Please check the format.');
         } finally {
             testButton.disabled = false;
             testButton.textContent = 'Test Prompt';
@@ -4071,388 +3783,7 @@ Emphasize athletic performance, competition elements, and achievement recognitio
         }
     }
 
-    // Collections Management Functions
-    async initializeCollectionsPage() {
-        console.log('Initializing collections page...');
-        
-        // Bind collection event listeners
-        this.bindCollectionEventListeners();
-        
-        // Load collections
-        await this.loadCollections();
-        
-        // Clear current selection
-        this.currentCollection = null;
-        this.currentCollectionPhotos = [];
-        this.showCollectionPlaceholder();
-    }
-
-    bindCollectionEventListeners() {
-        // Create collection button
-        const createBtn = document.getElementById('create-collection');
-        if (createBtn) {
-            createBtn.addEventListener('click', () => this.showCreateCollectionModal());
-        }
-
-        // Create collection modal events
-        const createModal = document.getElementById('create-collection-modal');
-        const createForm = document.getElementById('create-collection-form');
-        const createCloseBtn = document.getElementById('create-collection-close');
-        const createCancelBtn = document.getElementById('create-collection-cancel');
-
-        if (createCloseBtn) createCloseBtn.addEventListener('click', () => this.hideCreateCollectionModal());
-        if (createCancelBtn) createCancelBtn.addEventListener('click', () => this.hideCreateCollectionModal());
-        if (createForm) createForm.addEventListener('submit', (e) => this.handleCreateCollection(e));
-
-        // Edit collection modal events
-        const editModal = document.getElementById('edit-collection-modal');
-        const editForm = document.getElementById('edit-collection-form');
-        const editCloseBtn = document.getElementById('edit-collection-close');
-        const editCancelBtn = document.getElementById('edit-collection-cancel');
-
-        if (editCloseBtn) editCloseBtn.addEventListener('click', () => this.hideEditCollectionModal());
-        if (editCancelBtn) editCancelBtn.addEventListener('click', () => this.hideEditCollectionModal());
-        if (editForm) editForm.addEventListener('submit', (e) => this.handleEditCollection(e));
-
-        // Collection action buttons
-        const editBtn = document.getElementById('edit-collection');
-        const deleteBtn = document.getElementById('delete-collection');
-
-        if (editBtn) editBtn.addEventListener('click', () => this.showEditCollectionModal());
-        if (deleteBtn) deleteBtn.addEventListener('click', () => this.handleDeleteCollection());
-    }
-
-    async loadCollections() {
-        try {
-            const response = await fetch(`${this.apiBase}/collections`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            this.collections = await response.json();
-            this.renderCollectionsList();
-            
-        } catch (error) {
-            console.error('Error loading collections:', error);
-            this.showError('Failed to load collections');
-        }
-    }
-
-    renderCollectionsList() {
-        const collectionsList = document.getElementById('collections-list');
-        const collectionCount = document.getElementById('collection-count');
-        const loadingEl = document.getElementById('loading-collections');
-
-        if (!collectionsList) return;
-
-        // Hide loading indicator
-        if (loadingEl) loadingEl.style.display = 'none';
-
-        // Update count
-        if (collectionCount) {
-            collectionCount.textContent = this.collections.length;
-        }
-
-        if (this.collections.length === 0) {
-            collectionsList.innerHTML = `
-                <div class="p-4 text-center text-gray-500">
-                    <svg class="h-12 w-12 mx-auto mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                    </svg>
-                    <p class="text-sm text-gray-600 mb-3">No collections yet</p>
-                    <p class="text-xs text-gray-500">Create your first collection to get started</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Render collections
-        const collectionsHtml = this.collections.map(collection => {
-            const coverImageUrl = collection.cover_photo?.thumbnail_url || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMCA0MEgyNEwyOCAzNkgzNkMzNy4xIDM2IDM4IDM1LjEgMzggMzRWMjJDMzggMjAuOSAzNy4xIDIwIDM2IDIwSDI0QzIyLjkgMjAgMjIgMjAuOSAyMiAyMlYzNEgyMFY0MFoiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
-
-            return `
-                <div class="collection-item p-3 border-b border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors" 
-                     data-collection-id="${collection.id}"
-                     onclick="window.app.selectCollection(${collection.id})">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                            <img src="${coverImageUrl}" alt="${collection.name}" 
-                                 class="w-full h-full object-cover" 
-                                 onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMCA0MEgyNEwyOCAzNkgzNkMzNy4xIDM2IDM4IDM1LjEgMzggMzRWMjJDMzggMjAuOSAzNy4xIDIwIDM2IDIwSDI0QzIyLjkgMjAgMjIgMjAuOSAyMiAyMlYzNEgyMFY0MFoiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+'">
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-gray-900 truncate">${collection.name}</h3>
-                            <p class="text-xs text-gray-500 mt-1">${collection.photo_count} photos</p>
-                            ${collection.description ? `<p class="text-xs text-gray-400 truncate mt-1">${collection.description}</p>` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        collectionsList.innerHTML = collectionsHtml;
-    }
-
-    async selectCollection(collectionId) {
-        try {
-            const response = await fetch(`${this.apiBase}/collections/${collectionId}?include_photos=true`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            this.currentCollection = await response.json();
-            this.currentCollectionPhotos = this.currentCollection.photos || [];
-            
-            // Update UI
-            this.updateCollectionHeader();
-            this.renderCollectionPhotos();
-            
-            // Update active state in sidebar
-            document.querySelectorAll('.collection-item').forEach(item => {
-                item.classList.remove('bg-blue-50', 'border-blue-200');
-            });
-            
-            const selectedItem = document.querySelector(`[data-collection-id="${collectionId}"]`);
-            if (selectedItem) {
-                selectedItem.classList.add('bg-blue-50', 'border-blue-200');
-            }
-            
-        } catch (error) {
-            console.error('Error selecting collection:', error);
-            this.showError('Failed to load collection');
-        }
-    }
-
-    updateCollectionHeader() {
-        const titleEl = document.getElementById('current-collection-title');
-        const statsEl = document.getElementById('collection-stats');
-        const photoCountEl = document.getElementById('collection-photo-count');
-        const createdEl = document.getElementById('collection-created');
-        const actionsEl = document.getElementById('collection-actions');
-
-        if (this.currentCollection) {
-            if (titleEl) titleEl.textContent = this.currentCollection.name;
-            
-            if (photoCountEl) {
-                photoCountEl.textContent = `${this.currentCollection.photo_count} photos`;
-            }
-            
-            if (createdEl && this.currentCollection.created_at) {
-                const createdDate = new Date(this.currentCollection.created_at);
-                createdEl.textContent = `Created ${createdDate.toLocaleDateString()}`;
-            }
-            
-            if (statsEl) statsEl.classList.remove('hidden');
-            if (actionsEl) actionsEl.classList.remove('hidden');
-        } else {
-            this.showCollectionPlaceholder();
-        }
-    }
-
-    showCollectionPlaceholder() {
-        const titleEl = document.getElementById('current-collection-title');
-        const statsEl = document.getElementById('collection-stats');
-        const actionsEl = document.getElementById('collection-actions');
-        const photosGrid = document.getElementById('collection-photos-grid');
-        const placeholder = document.getElementById('collection-photos-placeholder');
-
-        if (titleEl) titleEl.textContent = 'Select a collection';
-        if (statsEl) statsEl.classList.add('hidden');
-        if (actionsEl) actionsEl.classList.add('hidden');
-        if (photosGrid) photosGrid.classList.add('hidden');
-        if (placeholder) placeholder.classList.remove('hidden');
-    }
-
-    renderCollectionPhotos() {
-        const photosGrid = document.getElementById('collection-photos-grid');
-        const placeholder = document.getElementById('collection-photos-placeholder');
-
-        if (!photosGrid) return;
-
-        if (!this.currentCollectionPhotos || this.currentCollectionPhotos.length === 0) {
-            photosGrid.classList.add('hidden');
-            if (placeholder) placeholder.classList.remove('hidden');
-            return;
-        }
-
-        photosGrid.classList.remove('hidden');
-        if (placeholder) placeholder.classList.add('hidden');
-
-        const photosHtml = this.currentCollectionPhotos.map(photo => `
-            <div class="photo-thumbnail group relative bg-gray-100 aspect-square rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                 onclick="window.app.showPhotoModal(${JSON.stringify(photo).replace(/"/g, '&quot;')})">
-                <img src="${photo.thumbnail_url}" 
-                     alt="${photo.title || 'Photo'}" 
-                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuNGVtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+'">
-                
-                ${this.currentCollection.cover_photo_id === photo.id ? `
-                    <div class="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
-                        Cover
-                    </div>
-                ` : ''}
-                
-                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                    <div class="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-
-        photosGrid.innerHTML = photosHtml;
-    }
-
-    // Collection Modal Functions
-    showCreateCollectionModal() {
-        const modal = document.getElementById('create-collection-modal');
-        const nameInput = document.getElementById('collection-name');
-        const descInput = document.getElementById('collection-description');
-        
-        if (modal) {
-            modal.classList.remove('hidden');
-            if (nameInput) {
-                nameInput.value = '';
-                nameInput.focus();
-            }
-            if (descInput) descInput.value = '';
-        }
-    }
-
-    hideCreateCollectionModal() {
-        const modal = document.getElementById('create-collection-modal');
-        if (modal) modal.classList.add('hidden');
-    }
-
-    async handleCreateCollection(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        const name = formData.get('name');
-        const description = formData.get('description');
-
-        try {
-            const params = new URLSearchParams();
-            params.append('name', name);
-            if (description) params.append('description', description);
-
-            const response = await fetch(`${this.apiBase}/collections?${params}`, {
-                method: 'POST'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to create collection');
-            }
-
-            const result = await response.json();
-            
-            // Hide modal and reload collections
-            this.hideCreateCollectionModal();
-            await this.loadCollections();
-            
-            this.showSuccess(`Collection "${name}" created successfully`);
-
-        } catch (error) {
-            console.error('Error creating collection:', error);
-            this.showError(error.message);
-        }
-    }
-
-    showEditCollectionModal() {
-        if (!this.currentCollection) return;
-
-        const modal = document.getElementById('edit-collection-modal');
-        const nameInput = document.getElementById('edit-collection-name');
-        const descInput = document.getElementById('edit-collection-description');
-        
-        if (modal) {
-            modal.classList.remove('hidden');
-            if (nameInput) {
-                nameInput.value = this.currentCollection.name;
-                nameInput.focus();
-            }
-            if (descInput) {
-                descInput.value = this.currentCollection.description || '';
-            }
-        }
-    }
-
-    hideEditCollectionModal() {
-        const modal = document.getElementById('edit-collection-modal');
-        if (modal) modal.classList.add('hidden');
-    }
-
-    async handleEditCollection(e) {
-        e.preventDefault();
-        if (!this.currentCollection) return;
-        
-        const formData = new FormData(e.target);
-        const name = formData.get('name');
-        const description = formData.get('description');
-
-        try {
-            const params = new URLSearchParams();
-            params.append('name', name);
-            params.append('description', description || '');
-
-            const response = await fetch(`${this.apiBase}/collections/${this.currentCollection.id}?${params}`, {
-                method: 'PUT'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to update collection');
-            }
-
-            const result = await response.json();
-            
-            // Update current collection and reload
-            this.currentCollection = result.collection;
-            this.hideEditCollectionModal();
-            await this.loadCollections();
-            this.updateCollectionHeader();
-            
-            this.showSuccess(`Collection updated successfully`);
-
-        } catch (error) {
-            console.error('Error updating collection:', error);
-            this.showError(error.message);
-        }
-    }
-
-    async handleDeleteCollection() {
-        if (!this.currentCollection) return;
-
-        const confirmed = confirm(`Are you sure you want to delete the collection "${this.currentCollection.name}"? This action cannot be undone.`);
-        if (!confirmed) return;
-
-        try {
-            const response = await fetch(`${this.apiBase}/collections/${this.currentCollection.id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to delete collection');
-            }
-
-            // Clear current selection and reload
-            this.currentCollection = null;
-            this.currentCollectionPhotos = [];
-            this.showCollectionPlaceholder();
-            await this.loadCollections();
-            
-            this.showSuccess('Collection deleted successfully');
-
-        } catch (error) {
-            console.error('Error deleting collection:', error);
-            this.showError(error.message);
-        }
-    }
+    // Collections functionality now handled by CollectionsManager component
     
     // LLM API Status Methods
     async checkLLMStatus() {
@@ -4575,7 +3906,7 @@ Emphasize athletic performance, competition elements, and achievement recognitio
                     setTimeout(() => {
                         // Show message about ongoing processing
                         console.log(`Found ${batchStatus.photo_ids.length} photos still processing from previous session`);
-                        this.showSuccessMessage('Processing Recovery', `Continuing background processing for ${batchStatus.photo_ids.length} photos.`);
+                        eventBus.emit('toast:success', { title: 'Processing Recovery', `Continuing background processing for ${batchStatus.photo_ids.length} photos.`);
                     }, 1000);
                     
                     console.log('Batch processing progress resumed successfully');
