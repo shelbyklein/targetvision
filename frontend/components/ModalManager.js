@@ -45,7 +45,6 @@ class ModalManager {
         
         // Additional modal events
         eventBus.on('modal:process-photo', () => this.processPhotoWithAI());
-        eventBus.on('modal:toggle-embedding-details', () => this.toggleEmbeddingDetails());
     }
 
     setupModalEventHandlers() {
@@ -63,8 +62,6 @@ class ModalManager {
         document.getElementById('modal-regenerate-ai').addEventListener('click', () => this.regenerateAIMetadata());
         document.getElementById('modal-delete-ai').addEventListener('click', () => this.deleteAIMetadata());
         
-        // Embedding details toggle
-        document.getElementById('modal-embedding-details-toggle').addEventListener('click', () => this.toggleEmbeddingDetails());
         
         // Collection handlers
         document.getElementById('modal-add-to-collection').addEventListener('click', () => this.showCollectionInterface());
@@ -162,9 +159,9 @@ class ModalManager {
         const modalAiConfidence = document.getElementById('modal-ai-confidence');
         const modalAiTimestamp = document.getElementById('modal-ai-timestamp');
         
-        // Check if there's AI metadata
-        if (completePhoto.ai_metadata && completePhoto.ai_metadata.length > 0) {
-            const aiData = completePhoto.ai_metadata[0]; // Use the first AI metadata entry
+        // Check if there's AI metadata (it's an object, not an array)
+        if (completePhoto.ai_metadata && typeof completePhoto.ai_metadata === 'object') {
+            const aiData = completePhoto.ai_metadata; // Use the AI metadata object directly
             
             modalAiSection.classList.remove('hidden');
             modalNoAi.classList.add('hidden');
@@ -177,8 +174,8 @@ class ModalManager {
             }
             
             // Populate AI keywords
-            if (aiData.keywords && aiData.keywords.length > 0) {
-                const keywords = Array.isArray(aiData.keywords) ? aiData.keywords : aiData.keywords.split(',').map(k => k.trim());
+            if (aiData.ai_keywords && aiData.ai_keywords.length > 0) {
+                const keywords = Array.isArray(aiData.ai_keywords) ? aiData.ai_keywords : aiData.ai_keywords.split(',').map(k => k.trim());
                 const aiKeywordTags = keywords.map(keyword => 
                     `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1 mb-1">${keyword}</span>`
                 ).join('');
@@ -195,8 +192,8 @@ class ModalManager {
             }
             
             // Populate timestamp
-            if (aiData.created_at) {
-                const processedDate = new Date(aiData.created_at);
+            if (aiData.processed_at) {
+                const processedDate = new Date(aiData.processed_at);
                 modalAiTimestamp.textContent = `Processed: ${processedDate.toLocaleString()}`;
             } else {
                 modalAiTimestamp.textContent = '';
@@ -216,17 +213,19 @@ class ModalManager {
         const embeddingDimCount = document.getElementById('modal-embedding-dim-count');
         const embeddingSample = document.getElementById('modal-embedding-sample');
         
-        if (completePhoto.embedding && completePhoto.embedding.length > 0) {
+        // Check if embedding data is available (it's nested in ai_metadata)
+        const embedding = completePhoto.ai_metadata?.embedding;
+        if (embedding && Array.isArray(embedding) && embedding.length > 0) {
             embeddingStatus.textContent = 'Available';
             embeddingStatus.className = 'text-green-600 font-medium';
             
-            const dimensions = completePhoto.embedding.length;
+            const dimensions = embedding.length;
             embeddingDimensions.textContent = `${dimensions}D vector`;
             embeddingModel.textContent = 'CLIP (OpenAI)';
             embeddingDimCount.textContent = `${dimensions} dimensions`;
             
             // Show first few embedding values as sample
-            const sampleValues = completePhoto.embedding.slice(0, 5).map(val => val.toFixed(4)).join(', ');
+            const sampleValues = embedding.slice(0, 5).map(val => val.toFixed(4)).join(', ');
             embeddingSample.textContent = `[${sampleValues}...]`;
             
             embeddingInfo.classList.remove('hidden');
@@ -593,10 +592,6 @@ class ModalManager {
         console.log('Delete AI metadata');
     }
 
-    toggleEmbeddingDetails() {
-        // Toggle embedding details implementation
-        console.log('Toggle embedding details');
-    }
 
     showCollectionInterface() {
         // Show collection interface implementation

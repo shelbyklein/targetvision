@@ -102,9 +102,6 @@ class TargetVisionApp {
                 currentPhotos: this.currentPhotos 
             });
         });
-        document.getElementById('generate-embeddings').addEventListener('click', () => {
-            eventBus.emit('photos:generate-embeddings', { album: this.currentAlbum });
-        });
         document.getElementById('refresh-status').addEventListener('click', () => this.refreshAlbumStatus());
         
         // Global progress bar
@@ -130,8 +127,6 @@ class TargetVisionApp {
         document.getElementById('modal-regenerate-ai').addEventListener('click', () => eventBus.emit('metadata:ai:regenerate'));
         document.getElementById('modal-delete-ai').addEventListener('click', () => eventBus.emit('metadata:ai:delete'));
         
-        // Embedding details toggle - delegate to ModalManager
-        document.getElementById('modal-embedding-details-toggle').addEventListener('click', () => eventBus.emit('modal:toggle-embedding-details'));
         
         // Collection management
         document.getElementById('modal-add-to-collection').addEventListener('click', () => eventBus.emit('collections:show-interface'));

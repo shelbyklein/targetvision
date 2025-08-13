@@ -237,12 +237,6 @@
                                 Process Selected
                             </button>
                             
-                            <button id="generate-embeddings" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50" title="Generate CLIP embeddings for photos that have descriptions but no embeddings">
-                                <svg class="h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                </svg>
-                                Generate Embeddings
-                            </button>
                             
                             <button id="refresh-status" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50" title="Refresh processing status">
                                 <svg class="h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1124,11 +1118,8 @@
                                             Generated
                                         </span>
                                         <span id="modal-embedding-dimensions" class="bg-blue-100 px-2 py-1 rounded"></span>
-                                        <button id="modal-embedding-details-toggle" class="text-blue-600 hover:text-blue-800 underline">
-                                            Show Details
-                                        </button>
                                     </div>
-                                    <div id="modal-embedding-details" class="hidden mt-2 text-xs">
+                                    <div id="modal-embedding-details" class="mt-2 text-xs">
                                         <div class="bg-blue-100 rounded p-2">
                                             <div class="mb-1">
                                                 <span class="font-medium text-blue-900">Model:</span>

@@ -4,7 +4,7 @@
 **Reporter**: User  
 **Priority**: Low  
 **Component**: PhotoGrid, Album Controls  
-**Status**: Open  
+**Status**: Resolved  
 
 ## Description
 The "Generate Embeddings" button in the album view should be removed as it creates confusion and may not be necessary for the current user workflow. Embedding generation should be handled automatically or through other means.
