@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Albums Fix</title>
+</head>
+<body>
+    <h1>Testing Albums Fix</h1>
+    <p>Check the browser console for logs...</p>
+    
+    <script>
+        // Test if the frontend loads correctly
+        fetch('http://localhost:3000/app.js')
+            .then(response => response.text())
+            .then(text => {
+                console.log('app.js loaded successfully');
+                
+                // Check if showAlbumsView method exists
+                if (text.includes('showAlbumsView')) {
+                    console.log('✅ showAlbumsView method found in app.js');
+                } else {
+                    console.log('❌ showAlbumsView method NOT found in app.js');
+                }
+                
+                // Check if albums:display event is emitted
+                if (text.includes("emit('albums:display')")) {
+                    console.log('✅ albums:display event emission found');
+                } else {
+                    console.log('❌ albums:display event emission NOT found');
+                }
+                
+                // Check if AlbumBrowser component is imported
+                if (text.includes('AlbumBrowser.js')) {
+                    console.log('✅ AlbumBrowser import found');
+                } else {
+                    console.log('❌ AlbumBrowser import NOT found');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading app.js:', error);
+            });
+            
+        // Test backend API
+        fetch('http://localhost:8000/smugmug/nodes')
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Backend API is working');
+                console.log(`Found ${data.nodes ? data.nodes.length : 0} nodes/albums`);
+            })
+            .catch(error => {
+                console.error('❌ Backend API error:', error);
+            });
+    </script>
+</body>
+</html>

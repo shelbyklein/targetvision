@@ -7,6 +7,8 @@ import cacheManager from './managers/CacheManager.js';
 import stateManager from './managers/StateManager.js';
 import smugMugAPI from './managers/SmugMugAPI.js';
 import photoProcessor from './managers/PhotoProcessor.js';
+import albumBrowser from './components/AlbumBrowser.js';
+import photoGrid from './components/PhotoGrid.js';
 import { EVENTS, PHOTO_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from './utils/Constants.js';
 import UIUtils from './utils/UIUtils.js';
 class TargetVisionApp {
@@ -101,7 +103,7 @@ class TargetVisionApp {
             
             // Refresh photo grid if we're on the albums page
             if (this.currentPage === 'albums' && this.currentPhotos.length > 0) {
-                this.displayPhotos();
+                eventBus.emit('photos:display', { photos: this.currentPhotos });
             }
             
         } catch (error) {
@@ -182,7 +184,7 @@ class TargetVisionApp {
         if (!restoredState) {
             console.log('No state restored, using defaults');
             // Default initialization
-            this.updateBreadcrumbs();
+            // Breadcrumbs now handled by AlbumBrowser component
         } else {
             console.log('State restoration completed successfully');
         }
@@ -247,7 +249,7 @@ class TargetVisionApp {
             console.error('Error binding event listeners:', error);
         }
         
-        // Album selection (breadcrumb-albums is now created dynamically, so we'll handle this in updateBreadcrumbs)
+        // Album browser now handled by AlbumBrowser component
         
         // Album actions
         document.getElementById('sync-album').addEventListener('click', () => {
@@ -256,9 +258,9 @@ class TargetVisionApp {
         document.getElementById('refresh-photos').addEventListener('click', () => this.refreshCurrentPhotos());
         document.getElementById('sync-all-albums').addEventListener('click', () => this.syncAllAlbums());
         
-        // Photo selection
-        document.getElementById('select-all').addEventListener('click', () => this.selectAllPhotos());
-        document.getElementById('select-none').addEventListener('click', () => this.clearSelection());
+        // Photo selection - delegate to PhotoGrid component
+        document.getElementById('select-all').addEventListener('click', () => eventBus.emit('photos:select-all'));
+        document.getElementById('select-none').addEventListener('click', () => eventBus.emit('photos:clear-selection'));
         document.getElementById('process-selected').addEventListener('click', () => {
             eventBus.emit('photos:process-selected', { 
                 selectedPhotos: this.selectedPhotos, 
@@ -277,8 +279,8 @@ class TargetVisionApp {
         document.getElementById('status-filter').addEventListener('change', (e) => this.filterPhotos(e.target.value));
         
         // Visibility toggles
-        document.getElementById('toggle-processed').addEventListener('click', () => this.toggleProcessedVisibility());
-        document.getElementById('toggle-unprocessed').addEventListener('click', () => this.toggleUnprocessedVisibility());
+        document.getElementById('toggle-processed').addEventListener('click', () => eventBus.emit('photos:toggle-processed'));
+        document.getElementById('toggle-unprocessed').addEventListener('click', () => eventBus.emit('photos:toggle-unprocessed'));
         
         // Chat functionality
         document.getElementById('chat-send').addEventListener('click', () => this.sendChatMessage());
@@ -404,7 +406,8 @@ class TargetVisionApp {
         // Photo processing events
         eventBus.on('photos:single-processing-success', (data) => {
             this.showSuccessMessage('Processing Complete', data.message);
-            this.displayPhotos(); // Refresh photo grid
+            // Refresh photo grid via PhotoGrid component
+            eventBus.emit('photos:display', { photos: this.currentPhotos });
         });
 
         eventBus.on('photos:single-processing-error', (data) => {
@@ -456,6 +459,26 @@ class TargetVisionApp {
             const settings = this.getApiSettings();
             data.callback(settings);
         });
+
+        // AlbumBrowser events
+        eventBus.on('album:selected', (data) => {
+            this.selectAlbum(data.album);
+        });
+
+        eventBus.on('folder:selected-for-preview', (data) => {
+            // Handle folder preview if needed
+            console.log('Folder selected for preview:', data.folder.name);
+        });
+
+        // PhotoGrid events
+        eventBus.on('photos:selection-changed', (data) => {
+            // Update main app state when photo selection changes
+            this.selectedPhotos = new Set(data.selectedPhotos);
+        });
+
+        eventBus.on('photo:show-modal', (data) => {
+            this.showPhotoModal(data.photo);
+        });
     }
 
     handleFolderLoaded(data) {
@@ -464,8 +487,7 @@ class TargetVisionApp {
         this.breadcrumbs = data.breadcrumbs || [];
         this.smugmugAlbums = data.albums;
         
-        this.updateBreadcrumbs();
-        this.displayAlbums();
+        // AlbumBrowser will handle display via event listeners
         
         // Update URL with current folder state
         stateManager.updateURL();
@@ -492,234 +514,13 @@ class TargetVisionApp {
 
     // SmugMug API - Now handled by SmugMugAPI manager
 
-    displayAlbums() {
-        // Delegate to folder contents display for backward compatibility
-        this.displayFolderContents();
-    }
+    // Album display methods moved to AlbumBrowser component
     
-    displayFolderContents() {
-        const albumsList = document.getElementById('albums-list');
-        const albumCount = document.getElementById('album-count');
-        
-        // Clear loading state
-        const loading = document.getElementById('loading-albums');
-        if (loading) loading.remove();
-        
-        // Update breadcrumbs
-        this.updateBreadcrumbs();
-        
-        albumCount.textContent = this.smugmugAlbums.length.toString();
-        
-        albumsList.innerHTML = '';
-        
-        if (this.smugmugAlbums.length === 0) {
-            albumsList.innerHTML = `
-                <div class="p-4 text-center text-gray-500">
-                    <p class="text-sm">No folders or albums found</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Create hierarchical tree structure
-        this.createHierarchicalTree(this.smugmugAlbums, albumsList);
-    }
     
-    createHierarchicalTree(items, container, level = 0) {
-        // Separate folders and albums for better organization
-        const folders = items.filter(item => item.type === 'folder');
-        const albums = items.filter(item => item.type === 'album');
-        
-        // Display folders first with dropdown capability
-        folders.forEach(folder => {
-            const folderElement = this.createHierarchicalFolderItem(folder, level);
-            container.appendChild(folderElement);
-        });
-        
-        // Then display albums
-        albums.forEach(album => {
-            const albumElement = this.createHierarchicalAlbumItem(album, level);
-            container.appendChild(albumElement);
-        });
-    }
     
-    createHierarchicalFolderItem(folder, level) {
-        const div = document.createElement('div');
-        div.className = 'folder-tree-item';
-        
-        const paddingLeft = `${level * 16 + 8}px`;
-        
-        div.innerHTML = `
-            <div class="folder-item flex items-center justify-between p-2 hover:bg-gray-100 cursor-pointer group" 
-                 style="padding-left: ${paddingLeft}" data-node-uri="${folder.node_uri || ''}">
-                <div class="flex items-center flex-1">
-                    <button class="folder-toggle mr-2 w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-700" 
-                            ${!folder.has_children ? 'style="visibility: hidden"' : ''}>
-                        <svg class="w-3 h-3 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                    
-                    <svg class="folder-icon h-4 w-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                    </svg>
-                    
-                    <span class="folder-name text-sm text-gray-900 font-medium flex-1 truncate">${folder.name}</span>
-                    
-                </div>
-                
-                <div class="folder-info text-xs text-gray-500 ml-2">
-                    ${folder.has_children ? '›' : ''}
-                </div>
-            </div>
-            
-            <div class="folder-children hidden pl-4"></div>
-        `;
-        
-        // Add click handlers
-        const folderItem = div.querySelector('.folder-item');
-        const folderToggle = div.querySelector('.folder-toggle');
-        const folderChildren = div.querySelector('.folder-children');
-        
-        // Single click to navigate to folder contents
-        folderItem.addEventListener('click', (e) => {
-            if (e.target.closest('.folder-toggle')) return; // Don't handle if toggle was clicked
-            this.selectFolderItem(folder, div);
-        });
-        
-        // Toggle dropdown for folders with children
-        if (folder.has_children) {
-            folderToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleFolderExpansion(folder, div, folderChildren);
-            });
-        }
-        
-        return div;
-    }
     
-    createHierarchicalAlbumItem(album, level) {
-        const div = document.createElement('div');
-        div.className = 'album-tree-item';
-        
-        const paddingLeft = `${level * 16 + 24}px`; // Extra padding for albums
-        
-        const progressBar = album.processing_progress > 0 ? 
-            `<div class="w-16 bg-gray-200 rounded-full h-1 ml-2">
-                <div class="bg-green-600 h-1 rounded-full transition-all duration-300" 
-                     style="width: ${album.processing_progress}%"></div>
-             </div>` : '';
-        
-        div.innerHTML = `
-            <div class="album-item flex items-center justify-between p-2 hover:bg-blue-50 cursor-pointer group rounded-sm" 
-                 style="padding-left: ${paddingLeft}" data-album-key="${album.album_key || ''}" data-album-uri="${album.album_uri || ''}">
-                <div class="flex items-center flex-1">
-                    <div class="w-4 h-4 mr-2"></div> <!-- Spacer for alignment -->
-                    
-                    <svg class="album-icon h-4 w-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4zM2 7v8a2 2 0 002 2h8.172a2 2 0 001.414-.586l2.828-2.828A2 2 0 0017 12.184V4a2 2 0 00-2-2H9.828a2 2 0 00-1.414.586L5.586 5.414A2 2 0 004 6.828V7z"/>
-                    </svg>
-                    
-                    <span class="album-name text-sm text-gray-900 flex-1 truncate">${album.name}</span>
-                    
-                </div>
-                
-                <div class="album-info flex items-center text-xs text-gray-500 ml-2">
-                    <span class="mr-2">${album.image_count || 0}</span>
-                    ${progressBar}
-                </div>
-            </div>
-        `;
-        
-        // Add click handler
-        const albumItem = div.querySelector('.album-item');
-        albumItem.addEventListener('click', () => {
-            this.selectAlbumFromTree(album, div);
-        });
-        
-        return div;
-    }
     
-    async toggleFolderExpansion(folder, folderElement, childrenContainer) {
-        const toggle = folderElement.querySelector('.folder-toggle svg');
-        const isExpanded = !childrenContainer.classList.contains('hidden');
-        
-        if (isExpanded) {
-            // Collapse
-            childrenContainer.classList.add('hidden');
-            toggle.style.transform = 'rotate(0deg)';
-            childrenContainer.innerHTML = '';
-        } else {
-            // Expand - load children
-            toggle.style.transform = 'rotate(90deg)';
-            childrenContainer.classList.remove('hidden');
-            
-            // Show loading state
-            childrenContainer.innerHTML = `
-                <div class="flex items-center py-2 px-4 text-xs text-gray-500">
-                    <div class="animate-spin rounded-full h-3 w-3 border-b border-gray-400 mr-2"></div>
-                    Loading...
-                </div>
-            `;
-            
-            try {
-                // Fetch folder children
-                const response = await fetch(`${this.apiBase}/smugmug/nodes?node_uri=${encodeURIComponent(folder.node_uri)}`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                
-                const data = await response.json();
-                const children = data.nodes || [];
-                
-                // Clear loading and display children
-                childrenContainer.innerHTML = '';
-                if (children.length > 0) {
-                    this.createHierarchicalTree(children, childrenContainer, 1);
-                } else {
-                    childrenContainer.innerHTML = `
-                        <div class="py-2 px-4 text-xs text-gray-500 italic">
-                            No items found
-                        </div>
-                    `;
-                }
-                
-            } catch (error) {
-                console.error('Failed to load folder children:', error);
-                childrenContainer.innerHTML = `
-                    <div class="py-2 px-4 text-xs text-red-500">
-                        Failed to load folder contents
-                    </div>
-                `;
-            }
-        }
-    }
     
-    selectFolderItem(folder, element) {
-        // Remove selection from other items
-        document.querySelectorAll('.folder-item, .album-item').forEach(item => {
-            item.classList.remove('bg-blue-100', 'border-l-4', 'border-blue-500');
-        });
-        
-        // Add selection to current item
-        const folderItem = element.querySelector('.folder-item');
-        folderItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
-        
-        // Navigate to folder contents instead of showing folder info
-        this.navigateToFolder(folder);
-    }
-    
-    selectAlbumFromTree(album, element) {
-        // Remove selection from other items
-        document.querySelectorAll('.folder-item, .album-item').forEach(item => {
-            item.classList.remove('bg-blue-100', 'border-l-4', 'border-blue-500');
-        });
-        
-        // Add selection to current item
-        const albumItem = element.querySelector('.album-item');
-        albumItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
-        
-        // Load album photos in right panel
-        this.selectAlbum(album);
-    }
     
 
     createAlbumListItem(album) {
@@ -861,354 +662,13 @@ class TargetVisionApp {
         return div;
     }
     
-    async navigateToFolder(folder) {
-        // Add current location to history for back navigation
-        this.nodeHistory.push({
-            nodeUri: this.currentNodeUri,
-            folderName: this.breadcrumbs.length > 0 ? this.breadcrumbs[this.breadcrumbs.length - 1].name : 'Root'
-        });
-        
-        // Load the folder contents using the node URI
-        await smugMugAPI.loadFolderContents(folder.node_uri);
-        
-        // Update right panel to show folder contents
-        this.displayFolderContentsInRightPanel(folder);
-    }
     
-    updateBreadcrumbs() {
-        const breadcrumbContainer = document.getElementById('breadcrumb-path');
-        if (!breadcrumbContainer) return;
-        
-        // Clear existing breadcrumbs
-        breadcrumbContainer.innerHTML = '';
-        
-        // Create Albums root breadcrumb with dropdown
-        const rootDropdown = this.createBreadcrumbDropdown('root', {
-            name: 'SmugMug Albums',
-            node_uri: null,
-            icon: `<svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
-            </svg>`
-        }, true);
-        breadcrumbContainer.appendChild(rootDropdown);
-        
-        // Add breadcrumbs for each folder in the path with dropdowns
-        this.breadcrumbs.forEach((breadcrumb, index) => {
-            // Add separator
-            const separator = document.createElement('span');
-            separator.className = 'mx-2 text-gray-400';
-            separator.textContent = '/';
-            breadcrumbContainer.appendChild(separator);
-            
-            // Create dropdown for each breadcrumb level
-            const isLast = index === this.breadcrumbs.length - 1;
-            const dropdown = this.createBreadcrumbDropdown(
-                `level-${index}`,
-                breadcrumb,
-                false,
-                isLast
-            );
-            breadcrumbContainer.appendChild(dropdown);
-        });
-    }
     
-    createBreadcrumbDropdown(id, item, isRoot = false, isLast = false) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'relative inline-block';
-        wrapper.setAttribute('data-dropdown-id', id);
-        
-        // Create main button
-        const button = document.createElement('button');
-        button.className = isLast 
-            ? 'text-gray-700 text-sm font-medium flex items-center' 
-            : 'text-blue-600 hover:text-blue-800 text-sm flex items-center hover:bg-blue-50 rounded px-1 py-1';
-        
-        button.innerHTML = `
-            ${item.icon || ''}
-            <span>${item.name}</span>
-            ${!isLast ? `
-                <svg class="w-3 h-3 ml-1 transform transition-transform duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            ` : ''}
-        `;
-        
-        // Create dropdown menu
-        const dropdown = document.createElement('div');
-        dropdown.className = 'absolute left-0 mt-1 w-64 bg-white rounded-md shadow-lg border border-gray-200 z-50 hidden';
-        dropdown.innerHTML = `
-            <div class="py-1">
-                <div class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
-                    Quick Navigation
-                </div>
-                <div class="dropdown-loading px-3 py-2 text-center">
-                    <div class="animate-spin rounded-full h-4 w-4 border-b border-gray-400 mx-auto"></div>
-                </div>
-            </div>
-        `;
-        
-        // Event listeners for dropdown
-        if (!isLast) {
-            let timeoutId = null;
-            
-            // Show dropdown on hover (with delay)
-            button.addEventListener('mouseenter', () => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => {
-                    this.showBreadcrumbDropdown(id, item, dropdown);
-                }, 300);
-            });
-            
-            // Hide dropdown when leaving both button and dropdown
-            wrapper.addEventListener('mouseleave', () => {
-                clearTimeout(timeoutId);
-                setTimeout(() => {
-                    if (!wrapper.matches(':hover')) {
-                        dropdown.classList.add('hidden');
-                        const arrow = button.querySelector('svg:last-child');
-                        if (arrow) arrow.style.transform = 'rotate(0deg)';
-                    }
-                }, 100);
-            });
-            
-            // Navigate on click
-            button.addEventListener('click', () => {
-                const nodeUri = isRoot ? null : item.node_uri;
-                console.log('Breadcrumb clicked:', { 
-                    item: item.name || 'Root', 
-                    nodeUri, 
-                    isRoot 
-                });
-                try {
-                    smugMugAPI.loadFolderContents(nodeUri);
-                } catch (error) {
-                    console.error('Error loading folder contents:', error);
-                    this.showErrorMessage('Navigation Error', `Failed to load folder: ${error.message}`);
-                }
-            });
-        }
-        
-        wrapper.appendChild(button);
-        wrapper.appendChild(dropdown);
-        
-        return wrapper;
-    }
     
-    async showBreadcrumbDropdown(id, item, dropdownElement) {
-        const dropdown = dropdownElement;
-        dropdown.classList.remove('hidden');
-        
-        // Rotate arrow
-        const wrapper = dropdown.parentElement;
-        const arrow = wrapper.querySelector('button svg:last-child');
-        if (arrow) arrow.style.transform = 'rotate(180deg)';
-        
-        // Load folder contents for dropdown
-        try {
-            const nodeUri = item.node_uri;
-            const response = await fetch(`${this.apiBase}/smugmug/nodes${nodeUri ? `?node_uri=${encodeURIComponent(nodeUri)}` : ''}`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            const contents = data.nodes || [];
-            
-            // Create dropdown content
-            const folders = contents.filter(node => node.type === 'folder');
-            const albums = contents.filter(node => node.type === 'album');
-            
-            const dropdownContent = dropdown.querySelector('.py-1');
-            dropdownContent.innerHTML = `
-                <div class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
-                    Quick Navigation
-                </div>
-                
-                ${folders.length > 0 ? `
-                    <div class="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-50">
-                        Folders (${folders.length})
-                    </div>
-                    ${folders.slice(0, 8).map(folder => `
-                        <button onclick="app.loadFolderContents('${folder.node_uri}')" 
-                                class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center">
-                            ${folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url) ? `
-                                <div class="w-6 h-6 mr-2 rounded overflow-hidden bg-gray-100 flex-shrink-0">
-                                    <img src="${folder.highlight_image.thumbnail_url || folder.highlight_image.image_url}" 
-                                         alt="${folder.name}" 
-                                         class="w-full h-full object-cover">
-                                </div>
-                            ` : `
-                                <svg class="w-4 h-4 mr-2 text-yellow-600 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                                </svg>
-                            `}
-                            <span class="truncate">${folder.name}</span>
-                        </button>
-                    `).join('')}
-                    ${folders.length > 8 ? `<div class="px-3 py-1 text-xs text-gray-500">...and ${folders.length - 8} more</div>` : ''}
-                ` : ''}
-                
-                ${albums.length > 0 ? `
-                    <div class="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-50 ${folders.length > 0 ? 'border-t' : ''}">
-                        Albums (${albums.length})
-                    </div>
-                    ${albums.slice(0, 8).map(album => `
-                        <button onclick="app.selectAlbum(${JSON.stringify(album).replace(/"/g, '&quot;')})" 
-                                class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center">
-                            ${album.highlight_image && (album.highlight_image.thumbnail_url || album.highlight_image.image_url) ? `
-                                <div class="w-6 h-6 mr-2 rounded overflow-hidden bg-gray-100 flex-shrink-0">
-                                    <img src="${album.highlight_image.thumbnail_url || album.highlight_image.image_url}" 
-                                         alt="${album.name}" 
-                                         class="w-full h-full object-cover">
-                                </div>
-                            ` : `
-                                <svg class="w-4 h-4 mr-2 text-blue-600 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M4 3a2 2 0 00-2 2v1.816a2 2 0 00.586 1.414l2.828 2.828A2 2 0 008.172 12H15a2 2 0 002-2V5a2 2 0 00-2-2H4z"/>
-                                </svg>
-                            `}
-                            <span class="truncate flex-1">${album.name}</span>
-                            ${album.privacy_info && album.privacy_info.is_private ? 
-                                '<span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded mr-1">Private</span>' :
-                                album.privacy_info && album.privacy_info.is_unlisted ? 
-                                '<span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded mr-1">Unlisted</span>' : ''
-                            }
-                            <span class="text-xs text-gray-500">${album.image_count || 0}</span>
-                        </button>
-                    `).join('')}
-                    ${albums.length > 8 ? `<div class="px-3 py-1 text-xs text-gray-500">...and ${albums.length - 8} more</div>` : ''}
-                ` : ''}
-                
-                ${contents.length === 0 ? `
-                    <div class="px-3 py-4 text-sm text-gray-500 text-center">
-                        No items found
-                    </div>
-                ` : ''}
-            `;
-            
-        } catch (error) {
-            console.error('Failed to load breadcrumb dropdown:', error);
-            const dropdownContent = dropdown.querySelector('.py-1');
-            dropdownContent.innerHTML = `
-                <div class="px-3 py-2 text-xs text-gray-500 bg-gray-50 border-b">
-                    Quick Navigation
-                </div>
-                <div class="px-3 py-4 text-sm text-red-500 text-center">
-                    Failed to load contents
-                </div>
-            `;
-        }
-    }
     
-    async navigateToRoot() {
-        this.nodeHistory = [];
-        this.breadcrumbs = [];
-        await smugMugAPI.loadFolderContents();
-    }
     
-    displayFolderContentsInRightPanel(folder) {
-        // Clear current album state since we're viewing folder contents
-        this.currentAlbum = null;
-        
-        // Update UI to show folder contents view
-        this.showPhotosView();
-        
-        // Update the header to show folder name
-        const folderName = folder.name || 'Folder';
-        document.getElementById('current-album-title').textContent = folderName;
-        
-        // Hide album-specific actions
-        document.getElementById('album-actions').classList.add('hidden');
-        document.getElementById('album-stats').classList.add('hidden');
-        
-        // Show folder contents in the photo grid area
-        this.displayFolderItemsInGrid(this.smugmugAlbums);
-        
-        // Update breadcrumb to show current folder
-        const breadcrumbArrow = document.getElementById('breadcrumb-arrow');
-        const breadcrumbCurrent = document.getElementById('breadcrumb-current');
-        if (breadcrumbArrow) breadcrumbArrow.classList.remove('hidden');
-        if (breadcrumbCurrent) {
-            breadcrumbCurrent.classList.remove('hidden');
-            breadcrumbCurrent.textContent = folderName;
-        }
-    }
     
-    displayFolderItemsInGrid(items) {
-        const photoGrid = document.getElementById('photo-grid');
-        const emptyState = document.getElementById('empty-photos');
-        const welcomeState = document.getElementById('welcome-state');
-        
-        // Hide other states
-        welcomeState.classList.add('hidden');
-        emptyState.classList.add('hidden');
-        
-        // Clear existing content
-        photoGrid.innerHTML = '';
-        
-        if (items.length === 0) {
-            emptyState.classList.remove('hidden');
-            photoGrid.classList.add('hidden');
-            return;
-        }
-        
-        // Show photo grid
-        photoGrid.classList.remove('hidden');
-        
-        // Separate folders and albums
-        const folders = items.filter(item => item.type === 'folder');
-        const albums = items.filter(item => item.type === 'album');
-        
-        // Display folders first
-        folders.forEach(folder => {
-            const folderCard = this.createFolderCard(folder);
-            photoGrid.appendChild(folderCard);
-        });
-        
-        // Then display albums
-        albums.forEach(album => {
-            const albumCard = this.createAlbumCard(album);
-            photoGrid.appendChild(albumCard);
-        });
-    }
     
-    createFolderCard(folder) {
-        const div = document.createElement('div');
-        const folderName = folder.name || 'Untitled Folder';
-        
-        if (folder.highlight_image && (folder.highlight_image.thumbnail_url || folder.highlight_image.image_url)) {
-            // Card with background image
-            const imageUrl = folder.highlight_image.thumbnail_url || folder.highlight_image.image_url;
-            div.className = 'folder-card rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden bg-cover bg-center';
-            div.style.backgroundImage = `url('${imageUrl}')`;
-            
-            div.innerHTML = `
-                <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 p-2 rounded-b-lg">
-                    <h3 class="text-sm font-medium text-white break-words flex items-center justify-center text-center">
-                        <svg class="h-4 w-4 text-amber-300 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                        </svg>
-                        ${folderName}
-                    </h3>
-                </div>
-            `;
-        } else {
-            // Fallback card with icon
-            div.className = 'folder-card bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer';
-            
-            div.innerHTML = `
-                <div class="flex items-center justify-center text-center h-full">
-                    <h3 class="text-sm font-medium text-gray-900 break-words flex items-center">
-                        <svg class="h-5 w-5 text-amber-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                        </svg>
-                        ${folderName}
-                    </h3>
-                </div>
-            `;
-        }
-        
-        div.addEventListener('click', () => this.navigateToFolder(folder));
-        
-        return div;
-    }
     
     createAlbumCard(album) {
         const div = document.createElement('div');
@@ -1745,7 +1205,7 @@ class TargetVisionApp {
 
     // Photos Management
     async loadAlbumPhotos(albumId) {
-        this.clearSelection();
+        eventBus.emit('photos:clear-selection');
         
         // Check cache first
         const cachedPhotos = cacheManager.getCachedAlbumPhotos(albumId);
@@ -1753,7 +1213,7 @@ class TargetVisionApp {
             // Show cached data immediately for fast navigation
             console.log(`🔍 DEBUG: Using cached photos for album ${albumId} (${cachedPhotos.length} photos)`);
             this.currentPhotos = cachedPhotos;
-            this.displayPhotos();
+            eventBus.emit('photos:display', { photos: this.currentPhotos });
             this.updatePhotoStats();
             
             // Still fetch fresh data in background to update cache and UI
@@ -1800,7 +1260,7 @@ class TargetVisionApp {
             // Cache the fresh data
             cacheManager.setCachedAlbumPhotos(albumId, this.currentPhotos);
             
-            this.displayPhotos();
+            eventBus.emit('photos:display', { photos: this.currentPhotos });
             this.updatePhotoStats();
             this.hidePhotosLoading();
             
@@ -1828,7 +1288,7 @@ class TargetVisionApp {
                 if (JSON.stringify(this.currentPhotos) !== JSON.stringify(freshPhotos)) {
                     console.log('Album data updated from background refresh');
                     this.currentPhotos = freshPhotos;
-                    this.displayPhotos();
+                    eventBus.emit('photos:display', { photos: this.currentPhotos });
                     this.updatePhotoStats();
                 }
             }
@@ -1837,340 +1297,9 @@ class TargetVisionApp {
         }
     }
 
-    displayPhotos() {
-        const photoGrid = document.getElementById('photo-grid');
-        const emptyState = document.getElementById('empty-photos');
-        const welcomeState = document.getElementById('welcome-state');
-        
-        // Hide states
-        welcomeState.classList.add('hidden');
-        emptyState.classList.add('hidden');
-        
-        if (this.currentPhotos.length === 0) {
-            photoGrid.classList.add('hidden');
-            emptyState.classList.remove('hidden');
-            return;
-        }
-        
-        // Show photo controls
-        document.getElementById('photo-controls').classList.remove('hidden');
-        
-        // Filter photos if needed
-        let photosToShow = this.currentPhotos;
-        
-        // Apply status filter first
-        if (this.statusFilter) {
-            if (this.statusFilter === 'processed') {
-                // Show photos that have AI metadata
-                photosToShow = photosToShow.filter(photo => photo.ai_metadata && photo.ai_metadata.length > 0);
-            } else if (this.statusFilter === 'unprocessed') {
-                // Show photos that don't have AI metadata
-                photosToShow = photosToShow.filter(photo => !photo.ai_metadata || photo.ai_metadata.length === 0);
-            } else {
-                // Standard status filtering
-                photosToShow = photosToShow.filter(photo => photo.processing_status === this.statusFilter);
-            }
-        }
-        
-        // Apply visibility toggles
-        photosToShow = photosToShow.filter(photo => {
-            const isProcessed = photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
-            const isUnprocessed = !isProcessed;
-            
-            if (isProcessed && !this.showProcessedPhotos) return false;
-            if (isUnprocessed && !this.showUnprocessedPhotos) return false;
-            
-            return true;
-        });
-        
-        photoGrid.classList.remove('hidden');
-        photoGrid.innerHTML = '';
-        
-        photosToShow.forEach(photo => {
-            const photoElement = this.createPhotoCard(photo);
-            photoGrid.appendChild(photoElement);
-        });
-        
-        // Update toggle button styles to reflect current state
-        this.updateToggleButtonStyles();
-    }
 
-    // Helper function to determine consistent photo processing status
-    getPhotoProcessingStatus(photo) {
-        // Check if photo is currently being processed (UI-only state)
-        const photoId = photo.smugmug_id || photo.image_key || photo.local_photo_id;
-        if (this.processingPhotos.has(photoId)) {
-            return 'processing'; // Temporary UI state
-        }
-        
-        let status = photo.processing_status || 'not_synced';
-        const originalStatus = status;
-        
-        // If photo has AI metadata, it should show as completed regardless of processing_status
-        // Exception: respect 'failed' status even if AI metadata exists (edge case)
-        if (photo.ai_metadata && photo.ai_metadata.length > 0) {
-            if (photo.processing_status !== 'failed') {
-                status = 'completed';
-            }
-        }
-        
-        // DEBUG: Log status changes for debugging
-        if (status !== originalStatus || (photo.processing_status === 'completed' && photo.title)) {
-            console.log('🔍 Status determination:', {
-                title: photo.title || photo.filename || 'Untitled',
-                originalStatus: photo.processing_status,
-                finalStatus: status,
-                hasAiMetadata: !!(photo.ai_metadata && photo.ai_metadata.length > 0),
-                aiMetadataCount: photo.ai_metadata ? photo.ai_metadata.length : 0
-            });
-        }
-        
-        return status;
-    }
 
-    createPhotoCard(photo) {
-        const div = document.createElement('div');
-        const cursorClass = photo.is_synced ? 'cursor-pointer' : 'cursor-not-allowed';
-        const opacityClass = photo.is_synced ? '' : 'opacity-60';
-        div.className = `photo-card relative group ${cursorClass} ${opacityClass}`;
-        
-        // Use consistent photo ID - prefer smugmug_id, fallback to image_key, then local_photo_id
-        const photoId = photo.smugmug_id || photo.image_key || photo.local_photo_id;
-        div.setAttribute('data-photo-id', photoId);
-        
-        // Status indicator styling
-        const statusConfig = {
-            'completed': { color: 'bg-green-500', icon: '✓', text: 'Processed' },
-            'processing': { color: 'bg-yellow-500', icon: '⏳', text: 'Processing' },
-            'failed': { color: 'bg-red-500', icon: '✗', text: 'Failed' },
-            'not_processed': { color: 'bg-orange-500', icon: '○', text: 'Not Processed' },
-            'not_synced': { color: 'bg-gray-400', icon: '○', text: 'Not Synced' }
-        };
-        
-        // Determine status consistently with filtering logic
-        const status = this.getPhotoProcessingStatus(photo);
-        const statusInfo = statusConfig[status];
-        
-        // Check if photo is selected
-        const isSelected = this.selectedPhotos.has(photo.smugmug_id);
-        const selectionBorder = isSelected ? 'ring-4 ring-blue-500' : '';
-        
-        div.innerHTML = `
-            <div class="photo-container aspect-square bg-gray-100 rounded-lg overflow-hidden relative ${selectionBorder}">
-                <img 
-                    src="${photo.thumbnail_url}" 
-                    alt="${photo.title || 'Photo'}"
-                    class="photo-thumbnail w-full h-full object-cover"
-                    loading="lazy"
-                />
-                
-                <!-- Selection hover checkmark (shows on hover when not selected) -->
-                <div class="selection-hover-checkmark absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity z-19 ${isSelected ? 'hidden' : ''} flex items-center justify-center">
-                    <div class="w-8 h-8 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center text-gray-700 shadow-lg transition-all cursor-pointer">
-                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                </div>
-                
-                <!-- Selection overlay (shows when selected) -->
-                ${isSelected ? `
-                    <div class="selection-overlay absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center z-15">
-                        <div class="selection-checkmark bg-blue-500 text-white rounded-full p-2 shadow-lg">
-                            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <!-- Collection indicator -->
-                ${photo.collections && photo.collections.length > 0 ? `
-                    <div class="collection-indicator absolute top-2 left-2 z-20">
-                        <div class="w-7 h-7 bg-black bg-opacity-60 rounded-full flex items-center justify-center text-yellow-400">
-                            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                            </svg>
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <!-- Status indicator (top-right) -->
-                <div class="status-indicator absolute top-2 right-2 w-7 h-7 ${statusInfo.color} text-white text-xs rounded-full flex items-center justify-center z-20">
-                    <span class="status-icon">${statusInfo.icon}</span>
-                </div>
-                
-                <!-- Lightbox button (moved to bottom-right) -->
-                <div class="lightbox-button-container absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <button class="lightbox-btn w-7 h-7 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full flex items-center justify-center text-white transition-all" 
-                            onclick="event.stopPropagation()">
-                        <svg class="lightbox-icon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </button>
-                </div>
-                
-                
-                <!-- Hover overlay for visual feedback -->
-                <div class="hover-overlay absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all z-10">
-                    ${!photo.is_synced ? `
-                        <div class="sync-tooltip-container absolute inset-0 flex items-center justify-center">
-                            <div class="sync-tooltip bg-black bg-opacity-70 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                Sync album to enable selection
-                            </div>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-        
-        // Add click handler - clicking thumbnail selects photo
-        div.addEventListener('click', (e) => {
-            // Don't select if clicking on buttons or checkboxes
-            if (e.target.type === 'checkbox' || e.target.closest('button')) return;
-            
-            // If photo is synced, toggle selection
-            if (photo.is_synced) {
-                const isCurrentlySelected = this.selectedPhotos.has(photo.smugmug_id);
-                this.togglePhotoSelection(photo.smugmug_id, !isCurrentlySelected);
-            } else {
-                // Show message for non-synced photos
-                this.showErrorMessage('Sync Required', 'This photo must be synced to the database before it can be selected for processing. Use the "Sync Album" button first.');
-            }
-        });
-        
-        // Add lightbox button handler
-        const lightboxBtn = div.querySelector('.lightbox-btn');
-        if (lightboxBtn) {
-            lightboxBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showPhotoModal(photo);
-            });
-        }
-        
-        // Add selection hover checkmark handler
-        const hoverCheckmark = div.querySelector('.selection-hover-checkmark');
-        if (hoverCheckmark) {
-            hoverCheckmark.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (photo.is_synced) {
-                    this.togglePhotoSelection(photo.smugmug_id, true);
-                } else {
-                    this.showErrorMessage('Sync Required', 'This photo must be synced to the database before it can be selected for processing. Use the "Sync Album" button first.');
-                }
-            });
-        }
-        
-        // Add status indicator click handler for processing
-        const statusIndicator = div.querySelector('.status-indicator');
-        if (statusIndicator) {
-            statusIndicator.addEventListener('click', (e) => {
-                e.stopPropagation();
-                eventBus.emit('photos:process-single', { photo });
-            });
-            
-            // Add cursor pointer and hover state for unprocessed photos
-            statusIndicator.style.cursor = 'pointer';
-            
-            // Add hover effect only for unprocessed photos
-            if (status === 'not_processed') {
-                statusIndicator.classList.add('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
-                statusIndicator.title = 'Click to process with AI';
-            } else if (status === 'completed') {
-                statusIndicator.title = 'Processed - click to reprocess';
-            } else if (status === 'failed') {
-                statusIndicator.title = 'Processing failed - click to retry';
-            } else if (status === 'processing') {
-                statusIndicator.title = 'Processing in progress...';
-                statusIndicator.style.cursor = 'default';
-            }
-        }
-        
-        return div;
-    }
 
-    // Selection Management
-    togglePhotoSelection(photoId, isSelected) {
-        console.log('togglePhotoSelection called:', { photoId, isSelected, selectedCount: this.selectedPhotos.size });
-        if (isSelected) {
-            this.selectedPhotos.add(photoId);
-        } else {
-            this.selectedPhotos.delete(photoId);
-        }
-        console.log('After toggle, selectedPhotos:', Array.from(this.selectedPhotos));
-        this.updateSelectionUI();
-    }
-
-    selectAllPhotos() {
-        const syncedPhotos = this.currentPhotos.filter(p => p.is_synced);
-        syncedPhotos.forEach(photo => {
-            this.selectedPhotos.add(photo.smugmug_id);
-        });
-        this.updateSelectionUI();
-    }
-
-    clearSelection() {
-        this.selectedPhotos.clear();
-        this.updateSelectionUI();
-    }
-
-    updateSelectionUI() {
-        const count = this.selectedPhotos.size;
-        document.getElementById('selection-count').textContent = `${count} selected`;
-        document.getElementById('process-selected').disabled = count === 0;
-        
-        // Update visual indicators for all photos
-        this.updatePhotoSelectionVisuals();
-    }
-    
-    updatePhotoSelectionVisuals() {
-        console.log('updatePhotoSelectionVisuals called, selectedPhotos:', Array.from(this.selectedPhotos));
-        // Update visual indicators for each photo
-        document.querySelectorAll('.photo-card').forEach(photoCard => {
-            const photoId = photoCard.getAttribute('data-photo-id');
-            if (!photoId) return;
-            
-            const isSelected = this.selectedPhotos.has(photoId);
-            const imageContainer = photoCard.querySelector('.aspect-square');
-            console.log(`Photo ${photoId}: isSelected=${isSelected}, imageContainer exists=${!!imageContainer}`);
-            
-            // Update selection border
-            if (isSelected) {
-                imageContainer.classList.add('ring-4', 'ring-blue-500');
-            } else {
-                imageContainer.classList.remove('ring-4', 'ring-blue-500');
-            }
-            
-            // Update selection overlay
-            let selectionOverlay = photoCard.querySelector('.selection-overlay');
-            if (isSelected && !selectionOverlay) {
-                // Create selection overlay
-                selectionOverlay = document.createElement('div');
-                selectionOverlay.className = 'selection-overlay absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center z-15';
-                selectionOverlay.innerHTML = `
-                    <div class="bg-blue-500 text-white rounded-full p-2 shadow-lg">
-                        <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                `;
-                imageContainer.appendChild(selectionOverlay);
-            } else if (!isSelected && selectionOverlay) {
-                // Remove selection overlay
-                selectionOverlay.remove();
-            }
-            
-            // Update hover checkmark visibility
-            const hoverCheckmark = photoCard.querySelector('.selection-hover-checkmark');
-            if (hoverCheckmark) {
-                if (isSelected) {
-                    hoverCheckmark.classList.add('hidden');
-                } else {
-                    hoverCheckmark.classList.remove('hidden');
-                }
-            }
-        });
-    }
 
     // Album sync - Now handled by SmugMugAPI manager
 
@@ -2208,7 +1337,7 @@ class TargetVisionApp {
     // UI State Management
     async showAlbumsView() {
         this.currentAlbum = null;
-        this.clearSelection();
+        eventBus.emit('photos:clear-selection');
         
         // Reset folder navigation state and go to root
         this.nodeHistory = [];
@@ -2239,6 +1368,10 @@ class TargetVisionApp {
         
         // Load root folder contents
         await smugMugAPI.loadFolderContents();
+        
+        // Emit event to trigger AlbumBrowser display
+        console.log('Triggering albums display...');
+        eventBus.emit('albums:display');
     }
 
     showPhotosView() {
@@ -2293,39 +1426,9 @@ class TargetVisionApp {
 
     filterPhotos(status) {
         this.statusFilter = status;
-        this.displayPhotos();
+        eventBus.emit('photos:display', { photos: this.currentPhotos });
     }
 
-    toggleProcessedVisibility() {
-        this.showProcessedPhotos = !this.showProcessedPhotos;
-        this.updateToggleButtonStyles();
-        this.displayPhotos();
-    }
-
-    toggleUnprocessedVisibility() {
-        this.showUnprocessedPhotos = !this.showUnprocessedPhotos;
-        this.updateToggleButtonStyles();
-        this.displayPhotos();
-    }
-
-    updateToggleButtonStyles() {
-        const processedBtn = document.getElementById('toggle-processed');
-        const unprocessedBtn = document.getElementById('toggle-unprocessed');
-
-        // Update processed button style
-        if (this.showProcessedPhotos) {
-            processedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-blue-100 text-blue-800 hover:bg-blue-200';
-        } else {
-            processedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300';
-        }
-
-        // Update unprocessed button style - now uses same blue theme when active for consistency
-        if (this.showUnprocessedPhotos) {
-            unprocessedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-blue-100 text-blue-800 hover:bg-blue-200';
-        } else {
-            unprocessedBtn.className = 'text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-500 hover:bg-gray-300';
-        }
-    }
 
     async refreshCurrentPhotos() {
         if (this.currentAlbum) {
@@ -2474,7 +1577,12 @@ class TargetVisionApp {
             stateManager.saveAppState();
             
             // Initialize page if needed
-            if (pageName === 'collections') {
+            if (pageName === 'albums') {
+                // Load and display albums
+                this.showAlbumsView().catch(error => {
+                    console.error('Error loading albums view:', error);
+                });
+            } else if (pageName === 'collections') {
                 this.initializeCollectionsPage().catch(error => {
                     console.error('Error initializing collections page:', error);
                 });
@@ -3846,7 +2954,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             await this.showPhotoModal(this.currentPhotos[photoIndex]);
             
             // Refresh the photo grid to show updated status
-            this.displayPhotos();
+            eventBus.emit('photos:display', { photos: this.currentPhotos });
             
             // Update global progress to complete
             photoProcessor.updateGlobalProgress(1, 1, 'Photo analysis complete!');
@@ -4183,7 +3291,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
             this.showPhotoModal(this.currentPhoto);
             
             // Refresh the photo grid to show updated status
-            this.displayPhotos();
+            eventBus.emit('photos:display', { photos: this.currentPhotos });
             
             this.showSuccessMessage('AI Data Deleted', 'AI-generated metadata has been successfully removed from this photo.');
             console.log('AI metadata deleted successfully');
