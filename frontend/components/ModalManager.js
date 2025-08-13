@@ -554,10 +554,10 @@ class ModalManager {
         }
     }
 
-    // Placeholder methods for features that will be implemented by other managers
+    // Load photo collections - delegate to CollectionsManager
     async loadPhotoCollections(photo) {
-        // This will be handled by CollectionsManager when implemented
         console.log('Loading collections for photo:', photo.id);
+        eventBus.emit('collections:load-for-photo', { photo });
     }
 
     processPhotoWithAI() {

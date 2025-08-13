@@ -369,42 +369,7 @@ Focus on:
     
     // System Information
     async updateSystemInfo() {
-        // Safely update system information elements if they exist
-        const userAgentEl = document.getElementById('user-agent');
-        if (userAgentEl) {
-            userAgentEl.textContent = navigator.userAgent;
-        }
-        
-        const localTimeEl = document.getElementById('local-time');
-        if (localTimeEl) {
-            localTimeEl.textContent = new Date().toLocaleString();
-        }
-        
-        const timezoneEl = document.getElementById('timezone');
-        if (timezoneEl) {
-            timezoneEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        }
-        
-        // Memory info if available
-        if (performance.memory) {
-            const memInfo = performance.memory;
-            const jsHeapEl = document.getElementById('js-heap-size');
-            if (jsHeapEl) {
-                jsHeapEl.textContent = 
-                    `${Math.round(memInfo.usedJSHeapSize / 1024 / 1024)} MB / ${Math.round(memInfo.jsHeapSizeLimit / 1024 / 1024)} MB`;
-            }
-        }
-        
-        // Connection info if available
-        if (navigator.connection) {
-            const conn = navigator.connection;
-            const connectionEl = document.getElementById('connection-type');
-            if (connectionEl) {
-                connectionEl.textContent = conn.effectiveType || 'Unknown';
-            }
-        }
-        
-        // Fetch and display photo statistics
+        // Only update photo statistics (system info elements not present in HTML)
         await this.updatePhotoStatistics();
     }
     

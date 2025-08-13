@@ -52,9 +52,6 @@ class SearchManager {
         
         // Page initialization
         eventBus.on('search:initialize-page', () => this.initializeSearchPage());
-
-        // DOM event listeners for search functionality (moved from app.js)
-        this.bindDOMEventListeners();
     }
 
     bindDOMEventListeners() {
@@ -63,18 +60,42 @@ class SearchManager {
         const searchMainInput = document.getElementById('search-main-input');
         const clearMainSearch = document.getElementById('clear-main-search');
 
+        console.log('SearchManager bindDOMEventListeners:', {
+            searchMainButton: !!searchMainButton,
+            searchMainInput: !!searchMainInput,
+            clearMainSearch: !!clearMainSearch
+        });
+
         if (searchMainButton) {
-            searchMainButton.addEventListener('click', () => eventBus.emit('search:perform'));
+            // Remove existing listeners first
+            searchMainButton.replaceWith(searchMainButton.cloneNode(true));
+            const newButton = document.getElementById('search-main-button');
+            
+            newButton.addEventListener('click', () => {
+                console.log('Search button clicked');
+                this.performMainSearch();
+            });
+        } else {
+            console.warn('Search button not found');
         }
 
         if (searchMainInput) {
-            searchMainInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') eventBus.emit('search:perform');
+            // Remove existing listeners first
+            searchMainInput.replaceWith(searchMainInput.cloneNode(true));
+            const newInput = document.getElementById('search-main-input');
+            
+            newInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    console.log('Search input Enter pressed');
+                    this.performMainSearch();
+                }
             });
+        } else {
+            console.warn('Search input not found');
         }
 
         if (clearMainSearch) {
-            clearMainSearch.addEventListener('click', () => eventBus.emit('search:clear'));
+            clearMainSearch.addEventListener('click', () => this.clearMainSearch());
         }
 
         // Filter functionality DOM events  
@@ -98,6 +119,10 @@ class SearchManager {
     // Search Page Initialization
     initializeSearchPage() {
         console.log('Search page initialized');
+        
+        // Bind DOM event listeners now that the page is loaded
+        this.bindDOMEventListeners();
+        
         this.populateAlbumFilter();
     }
     
@@ -285,32 +310,26 @@ class SearchManager {
             return;
         }
         
-        // Build photo gallery for chat
-        const photosHtml = photos.slice(0, 6).map(photo => {
-            const confidence = photo.ai_metadata?.confidence_score || photo.confidence_score || 0;
-            return `
-                <div class="inline-block w-20 h-20 mr-2 mb-2 relative cursor-pointer hover:scale-105 transition-transform" 
-                     onclick="eventBus.emit('photo:show-modal', {photo: ${JSON.stringify(photo).replace(/"/g, '&quot;')}})">
-                    <img src="${photo.thumbnail_url}" alt="${photo.title || 'Photo'}" 
-                         class="w-full h-full object-cover rounded-lg border-2 border-transparent hover:border-blue-400" />
-                    <div class="absolute top-0 right-0 bg-blue-600 text-white text-xs px-1 rounded-bl-lg">
-                        ${Math.round(confidence * 100)}%
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        let responseMessage = `Found ${photos.length} photos matching "${searchQuery}":`;
-        
+        // Add success message
+        let responseMessage = `Found ${photos.length} photos matching "${searchQuery}"`;
         if (photos.length > 6) {
             responseMessage += ` (showing first 6)`;
         }
         
         eventBus.emit('chat:add-message', {
             type: 'system',
-            message: responseMessage + '<div class="mt-2">' + photosHtml + '</div>'
+            message: responseMessage
         });
         
+        // Use ChatManager's addPhotoResults method for proper photo display
+        const photosToShow = photos.slice(0, 6).map(photo => ({
+            photo: photo.photo, // Extract the nested photo object from search results
+            score: photo.search_score || photo.ai_metadata?.confidence_score || photo.confidence_score || 0
+        }));
+        
+        eventBus.emit('chat:add-photo-results', { photos: photosToShow });
+        
+        // Add "view all results" link if there are more photos
         if (photos.length > 6) {
             eventBus.emit('chat:add-message', {
                 type: 'system',
@@ -321,11 +340,18 @@ class SearchManager {
 
     // Main Search Functionality  
     async performMainSearch() {
+        console.log('performMainSearch called');
+        
         const input = document.getElementById('search-main-input');
         const query = input.value.trim();
         const searchType = document.getElementById('search-main-type').value;
         
-        if (!query) return;
+        console.log('Search query:', query, 'type:', searchType);
+        
+        if (!query) {
+            console.log('No query provided, returning');
+            return;
+        }
         
         eventBus.emit('search:loading:show');
         
@@ -351,11 +377,19 @@ class SearchManager {
                 params.append('date_to', this.searchFilters.dateTo);
             }
             
-            const response = await fetch(`${this.apiBase}/search?${params}`);
+            const searchUrl = `${this.apiBase}/search?${params}`;
+            console.log('Search URL:', searchUrl);
+            
+            const response = await fetch(searchUrl);
+            console.log('Search response status:', response.status);
+            
             if (!response.ok) throw new Error(`Search failed: ${response.status}`);
             
             const results = await response.json();
+            console.log('Search results:', results);
+            
             this.searchResults = results.photos || [];
+            console.log('Processed search results count:', this.searchResults.length);
             
             this.displaySearchResults(query, results);
             eventBus.emit('search:loading:hide');
@@ -415,10 +449,11 @@ class SearchManager {
         div.innerHTML = `
             <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
                 <img 
-                    src="${photo.thumbnail_url}" 
+                    src="${photo.thumbnail_url || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuNGVtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+'}" 
                     alt="${photo.title || 'Search result'}"
                     class="w-full h-full object-cover"
                     loading="lazy"
+                    onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuNGVtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+'"
                 />
                 
                 <!-- AI Confidence score -->

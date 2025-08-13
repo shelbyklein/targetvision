@@ -35,11 +35,9 @@ class ChatManager {
         
         // Photo modal events
         eventBus.on('chat:show-photo-modal', (data) => {
+            // data.photo should already be the photo object
             eventBus.emit('photo:show-modal', { photo: data.photo });
         });
-
-        // DOM event listeners for chat functionality (moved from app.js)
-        this.bindDOMEventListeners();
     }
 
     bindDOMEventListeners() {
@@ -48,13 +46,27 @@ class ChatManager {
         const chatInput = document.getElementById('chat-input');
         const clearChatButton = document.getElementById('clear-chat');
 
+        console.log('ChatManager bindDOMEventListeners:', {
+            chatSendButton: !!chatSendButton,
+            chatInput: !!chatInput,
+            clearChatButton: !!clearChatButton
+        });
+
         if (chatSendButton) {
-            chatSendButton.addEventListener('click', () => eventBus.emit('chat:send-message'));
+            chatSendButton.addEventListener('click', () => {
+                console.log('Chat send button clicked');
+                this.sendChatMessage();
+            });
+        } else {
+            console.warn('Chat send button not found');
         }
 
         if (chatInput) {
             chatInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') eventBus.emit('chat:send-message');
+                if (e.key === 'Enter') {
+                    console.log('Chat input Enter pressed');
+                    this.sendChatMessage();
+                }
             });
             
             chatInput.addEventListener('input', (e) => {
@@ -63,10 +75,14 @@ class ChatManager {
                     chatSendBtn.disabled = !e.target.value.trim();
                 }
             });
+        } else {
+            console.warn('Chat input not found');
         }
 
         if (clearChatButton) {
-            clearChatButton.addEventListener('click', () => eventBus.emit('chat:clear'));
+            clearChatButton.addEventListener('click', () => this.clearChat());
+        } else {
+            console.warn('Clear chat button not found');
         }
     }
 
@@ -74,14 +90,24 @@ class ChatManager {
     initializeChatPage() {
         // Chat page is ready by default with welcome message
         console.log('Chat page initialized');
+        
+        // Bind DOM event listeners now that the page is loaded
+        this.bindDOMEventListeners();
     }
 
     // Chat Functionality
     async sendChatMessage() {
+        console.log('sendChatMessage called');
+        
         const input = document.getElementById('chat-input');
         const message = input.value.trim();
         
-        if (!message) return;
+        console.log('Chat message:', message, 'input element:', !!input);
+        
+        if (!message) {
+            console.log('No message provided, returning');
+            return;
+        }
         
         // Add user message to UI
         this.addChatMessage('user', message);
@@ -208,8 +234,17 @@ You can also ask for help with syncing albums or processing photos with AI. What
             <div class="max-w-4xl">
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg">
                     ${photos.map(photo => {
+                        // Ensure we extract the actual photo object from search results
+                        // Search results have structure: {photo: actualPhoto, score: ...}
                         const photoData = photo.photo || photo;
                         const score = photo.score ? Math.round(photo.score * 100) : 0;
+                        
+                        // Validate that we have a proper photo object with id and smugmug_id
+                        if (!photoData.id && !photoData.smugmug_id) {
+                            console.warn('ChatManager: Invalid photo data structure:', photoData);
+                            return ''; // Skip invalid photos
+                        }
+                        
                         return `
                             <div class="chat-photo-result relative group cursor-pointer" 
                                  data-photo='${JSON.stringify(photoData).replace(/'/g, '&apos;')}'>
@@ -256,6 +291,13 @@ You can also ask for help with syncing albums or processing photos with AI. What
             photoDiv.addEventListener('click', () => {
                 try {
                     const photoData = JSON.parse(photoDiv.dataset.photo.replace(/&apos;/g, "'"));
+                    
+                    // Validate photo data before emitting
+                    if (!photoData.id && !photoData.smugmug_id) {
+                        console.error('ChatManager: Cannot open modal for invalid photo data:', photoData);
+                        return;
+                    }
+                    
                     eventBus.emit('chat:show-photo-modal', { photo: photoData });
                 } catch (error) {
                     console.error('Error parsing photo data:', error);

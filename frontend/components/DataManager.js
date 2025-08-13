@@ -122,10 +122,22 @@ class DataManager {
             eventBus.emit('photos:display', { photos: app.currentPhotos });
             eventBus.emit('photos:loading:hide');
             
+            // Clear album item loading indicator if it exists
+            if (app.currentAlbum) {
+                const albumId = app.currentAlbum.album_key || app.currentAlbum.node_id;
+                eventBus.emit('progress:hide-item-loading', { itemId: albumId });
+            }
+            
         } catch (error) {
             console.error('Failed to load photos:', error);
             eventBus.emit('toast:error', { title: 'Failed to Load Photos', message: `Could not fetch photos from this album. ${error.message}` });
             eventBus.emit('photos:loading:hide');
+            
+            // Clear album item loading indicator on error
+            if (app.currentAlbum) {
+                const albumId = app.currentAlbum.album_key || app.currentAlbum.node_id;
+                eventBus.emit('progress:hide-item-loading', { itemId: albumId });
+            }
         }
     }
     

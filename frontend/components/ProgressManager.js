@@ -28,6 +28,12 @@ class ProgressManager {
         eventBus.on('photos:loading:hide', () => this.hidePhotosLoading());
         eventBus.on('search:loading:show', () => this.showSearchLoading());
         eventBus.on('search:loading:hide', () => this.hideSearchLoading());
+        eventBus.on('folders:loading:show', () => this.showFoldersLoading());
+        eventBus.on('folders:loading:hide', () => this.hideFoldersLoading());
+        
+        // Item loading events
+        eventBus.on('progress:show-item-loading', (data) => this.showItemLoading(data.itemId, data.itemType));
+        eventBus.on('progress:hide-item-loading', (data) => this.hideItemLoading(data.itemId));
         
         // Image loading events
         eventBus.on('image:fallback:load', (data) => this.loadFallbackImage(data.photo, data.fullscreenImage, data.loadingDiv));
@@ -95,6 +101,86 @@ class ProgressManager {
             }, 150);
         } else {
             loadingDiv.innerHTML = '<div class="text-center text-red-500 transform transition-all duration-300 ease-out">No image available</div>';
+        }
+    }
+
+    // Folders Loading States
+    showFoldersLoading() {
+        const folderGrid = document.getElementById('folder-grid');
+        if (folderGrid) {
+            // Create overlay for folder grid
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'folder-grid-loading';
+            loadingOverlay.className = 'absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center z-10';
+            loadingOverlay.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                <p class="text-gray-600 text-sm">Loading folders...</p>
+            `;
+            
+            // Make sure parent has relative positioning
+            if (folderGrid.style.position !== 'relative') {
+                folderGrid.style.position = 'relative';
+            }
+            
+            // Remove existing loading overlay if any
+            const existingOverlay = document.getElementById('folder-grid-loading');
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+            
+            folderGrid.appendChild(loadingOverlay);
+        }
+    }
+
+    hideFoldersLoading() {
+        const loadingOverlay = document.getElementById('folder-grid-loading');
+        if (loadingOverlay) {
+            loadingOverlay.remove();
+        }
+    }
+
+    // Item-specific loading states for navigation feedback
+    showItemLoading(itemId, itemType = 'folder') {
+        let selector;
+        
+        // Handle different item types
+        if (itemType === 'folder-tree') {
+            selector = `[data-folder-id="${itemId}"] .folder-item`;
+        } else if (itemType === 'album-tree') {
+            selector = `[data-album-id="${itemId}"] .album-item`;
+        } else if (itemType === 'folder') {
+            selector = `[data-folder-id="${itemId}"]`;
+        } else if (itemType === 'album') {
+            selector = `[data-album-id="${itemId}"]`;
+        } else {
+            selector = `[data-folder-id="${itemId}"], [data-album-id="${itemId}"]`;
+        }
+        
+        const item = document.querySelector(selector);
+        
+        if (item) {
+            // Remove any existing spinner for this item
+            this.hideItemLoading(itemId);
+            
+            // Add loading spinner to the item
+            const spinner = document.createElement('div');
+            spinner.className = 'absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10';
+            spinner.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>';
+            spinner.setAttribute('data-loading-spinner', itemId);
+            
+            // Make sure item has relative positioning
+            if (getComputedStyle(item).position === 'static') {
+                item.style.position = 'relative';
+            }
+            
+            item.appendChild(spinner);
+        }
+    }
+
+    hideItemLoading(itemId) {
+        const spinner = document.querySelector(`[data-loading-spinner="${itemId}"]`);
+        if (spinner) {
+            spinner.remove();
         }
     }
 

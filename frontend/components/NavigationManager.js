@@ -54,7 +54,10 @@ class NavigationManager {
             }
             
             if (navCollections) {
-                navCollections.addEventListener('click', () => this.showPage('collections'));
+                navCollections.addEventListener('click', () => {
+                    console.log('Collections button clicked!');
+                    this.showPage('collections');
+                });
                 console.log('Collections navigation bound');
             }
             
@@ -120,8 +123,8 @@ class NavigationManager {
             
             this.currentPage = pageName;
             
-            // Save state after page change
-            stateManager.saveAppState();
+            // Update StateManager with current page and save state
+            eventBus.emit('state:page-changed', { currentPage: pageName });
             
             // Initialize page if needed
             if (pageName === 'albums') {

@@ -76,11 +76,22 @@ class TargetVisionApp {
         
         // If no state was restored, show the default albums page
         if (!restoredState) {
-            console.log('No state restored, showing default albums page');
-            eventBus.emit('navigation:show-page', { pageName: 'albums' });
+            // Only default to albums if user hasn't manually navigated elsewhere
+            const currentPage = navigationManager.getCurrentPage();
+            if (currentPage === 'albums') {
+                console.log('No state restored, showing default albums page');
+                eventBus.emit('navigation:show-page', { pageName: 'albums' });
+            } else {
+                console.log(`No state restored but user has navigated to: ${currentPage}, not overriding`);
+            }
         }
         
         this.isInitializing = false;
+        
+        // Notify StateManager that initialization is complete
+        console.log('Setting StateManager isInitializing to false');
+        stateManager.setInitializingFlag(false);
+        console.log('App initialization completed');
     }
     
 
@@ -258,7 +269,18 @@ class TargetVisionApp {
         eventBus.on('folder:navigate', async (data) => {
             // Handle folder navigation from grid view
             console.log('Navigating to folder from grid:', data.folder.name);
-            await smugMugAPI.loadFolderContents(data.folder.node_uri);
+            try {
+                await smugMugAPI.loadFolderContents(data.folder.node_uri);
+            } catch (error) {
+                console.error('Error navigating to folder:', error);
+                eventBus.emit('toast:error', {
+                    title: 'Navigation Error',
+                    message: `Failed to load folder: ${error.message}`
+                });
+            } finally {
+                // Clear any item loading indicators
+                eventBus.emit('progress:hide-item-loading', { itemId: data.folder.node_id });
+            }
         });
 
         // PhotoGrid events
@@ -448,6 +470,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing TargetVisionApp...');
     try {
         window.app = new TargetVisionApp();
+        // Make eventBus globally available for onclick handlers
+        window.eventBus = eventBus;
         console.log('TargetVisionApp initialized successfully');
         
         // Make emergency stop globally accessible from browser console

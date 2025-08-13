@@ -193,6 +193,15 @@ class FolderGrid {
         // Add visual feedback
         this.highlightCard('folder', folder.node_id);
         
+        // Show loading indicator on clicked folder card
+        eventBus.emit('progress:show-item-loading', { 
+            itemId: folder.node_id, 
+            itemType: 'folder' 
+        });
+        
+        // Show folder grid loading overlay
+        eventBus.emit('folders:loading:show');
+        
         // Emit event to navigate to folder (this will update left sidebar and right column)
         eventBus.emit('folder:navigate', { folder });
     }
@@ -203,7 +212,13 @@ class FolderGrid {
         // Add visual feedback
         this.highlightCard('album', album.album_key || album.node_id);
         
-        // Emit event to select album (this will show photos)
+        // Show loading indicator on clicked album card
+        eventBus.emit('progress:show-item-loading', { 
+            itemId: album.album_key || album.node_id, 
+            itemType: 'album' 
+        });
+        
+        // Emit event to select album (this will show photos, loading handled by DataManager)
         eventBus.emit('album:selected', { album });
     }
     

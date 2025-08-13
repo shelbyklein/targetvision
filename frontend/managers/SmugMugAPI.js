@@ -94,6 +94,7 @@ class SmugMugAPI {
         
         // No cache, show loading and fetch fresh data
         eventBus.emit('smugmug:loading-start', { nodeUri });
+        eventBus.emit('folders:loading:show');
         return await this.fetchFolderContents(nodeUri);
     }
     
@@ -125,11 +126,16 @@ class SmugMugAPI {
                 fromCache: false
             });
             
+            // Hide loading state
+            eventBus.emit('folders:loading:hide');
+            
             return this.smugmugAlbums;
             
         } catch (error) {
             console.error('Error fetching folder contents:', error);
             eventBus.emit('smugmug:folder-error', { nodeUri, error });
+            // Hide loading state on error
+            eventBus.emit('folders:loading:hide');
             throw error;
         }
     }

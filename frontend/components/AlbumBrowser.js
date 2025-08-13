@@ -218,8 +218,14 @@ class AlbumBrowser {
         const folderItem = element.querySelector('.folder-item');
         folderItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
         
+        // Show loading state immediately for visual feedback
+        eventBus.emit('progress:show-item-loading', { 
+            itemId: folder.node_id, 
+            itemType: 'folder-tree' 
+        });
+        
         // Navigate to folder contents instead of showing folder info
-        this.navigateToFolder(folder);
+        this.navigateToFolder(folder, element);
     }
     
     selectAlbumFromTree(album, element) {
@@ -232,22 +238,44 @@ class AlbumBrowser {
         const albumItem = element.querySelector('.album-item');
         albumItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
         
-        // Emit event to select album
+        // Show loading state for album selection
+        eventBus.emit('progress:show-item-loading', { 
+            itemId: album.album_key || album.node_id, 
+            itemType: 'album-tree' 
+        });
+        
+        // Emit event to select album (photos loading handled by DataManager)
         eventBus.emit('album:selected', { album });
     }
 
-    async navigateToFolder(folder) {
-        // Add current location to history for back navigation
-        this.nodeHistory.push({
-            nodeUri: this.currentNodeUri,
-            folderName: this.breadcrumbs.length > 0 ? this.breadcrumbs[this.breadcrumbs.length - 1].name : 'Root'
-        });
-        
-        // Load the folder contents using the node URI
-        await smugMugAPI.loadFolderContents(folder.node_uri);
-        
-        // Update right panel to show folder contents
-        this.displayFolderContentsInRightPanel(folder);
+    async navigateToFolder(folder, element = null) {
+        try {
+            // Show loading state for folder grid
+            eventBus.emit('folders:loading:show');
+            
+            // Add current location to history for back navigation
+            this.nodeHistory.push({
+                nodeUri: this.currentNodeUri,
+                folderName: this.breadcrumbs.length > 0 ? this.breadcrumbs[this.breadcrumbs.length - 1].name : 'Root'
+            });
+            
+            // Load the folder contents using the node URI
+            await smugMugAPI.loadFolderContents(folder.node_uri);
+            
+            // Update right panel to show folder contents
+            this.displayFolderContentsInRightPanel(folder);
+            
+        } catch (error) {
+            console.error('Error navigating to folder:', error);
+            eventBus.emit('toast:error', {
+                title: 'Navigation Error',
+                message: `Failed to load folder: ${error.message}`
+            });
+        } finally {
+            // Clear loading states
+            eventBus.emit('folders:loading:hide');
+            eventBus.emit('progress:hide-item-loading', { itemId: folder.node_id });
+        }
     }
     
     updateBreadcrumbs() {

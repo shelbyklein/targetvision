@@ -25,6 +25,10 @@ class CollectionsManager {
         this.apiBase = 'http://localhost:8000';
         
         this.setupEventListeners();
+        
+        // Load collections initially for modal functionality
+        this.loadCollections();
+        
         console.log('CollectionsManager initialized');
     }
 
@@ -654,33 +658,9 @@ class CollectionsManager {
         }
     }
     
-    async createCollectionFromModal() {
-        const name = prompt('Enter collection name:');
-        if (!name) return;
-        
-        try {
-            // Use query parameters as expected by backend
-            const params = new URLSearchParams({
-                name: name.trim(),
-                description: ''
-            });
-            
-            const result = await apiService.post(`/collections?${params.toString()}`);
-            
-            if (result && result.collection) {
-                const collection = result.collection;
-                eventBus.emit('toast:success', { title: 'Success', message: 'Collection created successfully' });
-                await this.loadCollections();
-                this.populateCollectionSelect();
-                const select = document.getElementById('modal-collection-select');
-                if (select) select.value = collection.id;
-            } else {
-                eventBus.emit('toast:error', { title: 'Error', message: 'Failed to create collection' });
-            }
-        } catch (error) {
-            console.error('Error creating collection:', error);
-            eventBus.emit('toast:error', { title: 'Error', message: 'Failed to create collection' });
-        }
+    createCollectionFromModal() {
+        // Show the collection creation modal instead of using a prompt dialog
+        this.showCreateCollectionModal();
     }
 
     // Utility methods for accessing collections data

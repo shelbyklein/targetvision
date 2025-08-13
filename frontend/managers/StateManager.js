@@ -47,6 +47,11 @@ class StateManager {
         eventBus.on('app:initialization-complete', () => {
             this.isInitializing = false;
         });
+        
+        eventBus.on('state:page-changed', (data) => {
+            this.state.currentPage = data.currentPage;
+            this.saveAppState();
+        });
     }
 
     saveAppState() {
