@@ -17,9 +17,17 @@ import cacheManager from '../managers/CacheManager.js';
 class NavigationManager {
     constructor() {
         this.currentPage = 'albums';
+        this.domReady = false;
         
         this.setupEventListeners();
-        this.setupDOMEventListeners();
+        
+        // Defer DOM event listener setup until DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.initializeDOMListeners());
+        } else {
+            // DOM is already ready
+            this.initializeDOMListeners();
+        }
         
         console.log('NavigationManager initialized');
     }
@@ -29,7 +37,9 @@ class NavigationManager {
         eventBus.on('navigation:show-page', (data) => this.showPage(data.pageName));
     }
 
-    setupDOMEventListeners() {
+    initializeDOMListeners() {
+        if (this.domReady) return; // Prevent double initialization
+        
         try {
             // Navigation tab listeners
             const navAlbums = document.getElementById('nav-albums');
@@ -67,8 +77,11 @@ class NavigationManager {
             }
             
             console.log('Navigation event listeners bound successfully');
+            this.domReady = true;
         } catch (error) {
             console.error('Error binding navigation event listeners:', error);
+            // Retry after a short delay if DOM elements weren't found
+            setTimeout(() => this.initializeDOMListeners(), 100);
         }
     }
 

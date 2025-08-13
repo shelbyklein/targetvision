@@ -120,7 +120,7 @@ class SettingsManager {
         await this.loadCurrentPrompt();
         this.loadApplicationSettings();
         this.loadApiKeySettings();
-        this.updateSystemInfo();
+        await this.updateSystemInfo();
         cacheManager.updateCacheStatus();
         
         // Add event listeners for key source toggle
@@ -368,23 +368,141 @@ Focus on:
     }
     
     // System Information
-    updateSystemInfo() {
-        document.getElementById('user-agent').textContent = navigator.userAgent;
-        document.getElementById('local-time').textContent = new Date().toLocaleString();
-        document.getElementById('timezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    async updateSystemInfo() {
+        // Safely update system information elements if they exist
+        const userAgentEl = document.getElementById('user-agent');
+        if (userAgentEl) {
+            userAgentEl.textContent = navigator.userAgent;
+        }
+        
+        const localTimeEl = document.getElementById('local-time');
+        if (localTimeEl) {
+            localTimeEl.textContent = new Date().toLocaleString();
+        }
+        
+        const timezoneEl = document.getElementById('timezone');
+        if (timezoneEl) {
+            timezoneEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        }
         
         // Memory info if available
         if (performance.memory) {
             const memInfo = performance.memory;
-            document.getElementById('js-heap-size').textContent = 
-                `${Math.round(memInfo.usedJSHeapSize / 1024 / 1024)} MB / ${Math.round(memInfo.jsHeapSizeLimit / 1024 / 1024)} MB`;
+            const jsHeapEl = document.getElementById('js-heap-size');
+            if (jsHeapEl) {
+                jsHeapEl.textContent = 
+                    `${Math.round(memInfo.usedJSHeapSize / 1024 / 1024)} MB / ${Math.round(memInfo.jsHeapSizeLimit / 1024 / 1024)} MB`;
+            }
         }
         
         // Connection info if available
         if (navigator.connection) {
             const conn = navigator.connection;
-            document.getElementById('connection-type').textContent = conn.effectiveType || 'Unknown';
+            const connectionEl = document.getElementById('connection-type');
+            if (connectionEl) {
+                connectionEl.textContent = conn.effectiveType || 'Unknown';
+            }
         }
+        
+        // Fetch and display photo statistics
+        await this.updatePhotoStatistics();
+    }
+    
+    async updatePhotoStatistics() {
+        try {
+            // Fetch basic photo statistics
+            const statsResponse = await fetch(`${this.apiBase}/photos?stats_only=true`);
+            const embeddingResponse = await fetch(`${this.apiBase}/photos/embedding-stats`);
+            
+            if (statsResponse.ok && embeddingResponse.ok) {
+                const basicStats = await statsResponse.json();
+                const embeddingStats = await embeddingResponse.json();
+                
+                // Update total photos count
+                const totalPhotosEl = document.getElementById('total-photos');
+                if (totalPhotosEl) {
+                    totalPhotosEl.textContent = basicStats.total || 0;
+                }
+                
+                // Update processed photos count
+                const processedPhotosEl = document.getElementById('processed-photos');
+                if (processedPhotosEl) {
+                    processedPhotosEl.textContent = basicStats.processed || 0;
+                }
+                
+                // Update unprocessed photos count
+                const unprocessedPhotosEl = document.getElementById('unprocessed-photos-count');
+                if (unprocessedPhotosEl) {
+                    const unprocessed = (basicStats.total || 0) - (basicStats.processed || 0);
+                    unprocessedPhotosEl.textContent = unprocessed;
+                }
+                
+                // Update AI processed photos count (with embeddings)
+                const aiProcessedPhotosEl = document.getElementById('ai-processed-photos-count');
+                if (aiProcessedPhotosEl) {
+                    aiProcessedPhotosEl.textContent = embeddingStats.photos_with_ai_metadata || 0;
+                }
+                
+                // Update processing completion percentage
+                const processingPercentageEl = document.getElementById('processing-percentage');
+                if (processingPercentageEl) {
+                    const total = basicStats.total || 0;
+                    const processed = basicStats.processed || 0;
+                    const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+                    processingPercentageEl.textContent = `${percentage}%`;
+                }
+                
+                // Update photos with embeddings count
+                const embeddingCountEl = document.getElementById('photos-with-embeddings-count');
+                if (embeddingCountEl) {
+                    embeddingCountEl.textContent = embeddingStats.photos_with_embeddings || 0;
+                }
+                
+                // Update processing queue status
+                const queueStatusEl = document.getElementById('queue-status');
+                if (queueStatusEl) {
+                    // For now, show idle since there's no active queue endpoint
+                    // In a full implementation, this would check a /queue/status endpoint
+                    const unprocessed = (basicStats.total || 0) - (basicStats.processed || 0);
+                    if (unprocessed > 0) {
+                        queueStatusEl.textContent = `${unprocessed} pending`;
+                        queueStatusEl.className = 'text-orange-600';
+                    } else {
+                        queueStatusEl.textContent = 'Idle';
+                        queueStatusEl.className = 'text-green-600';
+                    }
+                }
+                
+            } else {
+                console.error('Failed to fetch photo statistics');
+                // Set error states for statistics elements
+                this.setPhotoStatisticsError();
+            }
+        } catch (error) {
+            console.error('Error fetching photo statistics:', error);
+            this.setPhotoStatisticsError();
+        }
+    }
+    
+    setPhotoStatisticsError() {
+        // Set error states for all photo statistics elements
+        const statsElements = [
+            'total-photos',
+            'processed-photos',
+            'unprocessed-photos-count',
+            'ai-processed-photos-count',
+            'processing-percentage',
+            'photos-with-embeddings-count',
+            'queue-status'
+        ];
+        
+        statsElements.forEach(elementId => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = 'Error';
+                element.className += ' text-red-600';
+            }
+        });
     }
     
     // API Key Management Methods
@@ -704,6 +822,9 @@ Focus on:
             }
         }
         
+        // Update individual provider status indicators
+        this.updateProviderStatusIndicators(status);
+        
         // Update detailed status on settings page if visible
         const detailedStatus = document.getElementById('llm-detailed-status');
         if (detailedStatus) {
@@ -735,6 +856,50 @@ Focus on:
                 `;
             }
         }
+    }
+    
+    updateProviderStatusIndicators(status) {
+        // Update individual provider status indicators on settings page
+        const providers = ['anthropic', 'openai'];
+        
+        providers.forEach(provider => {
+            const indicator = document.getElementById(`${provider}-status-indicator`);
+            const text = document.getElementById(`${provider}-status-text`);
+            
+            if (indicator && text) {
+                if (status && status.providers && status.providers[provider]) {
+                    const providerInfo = status.providers[provider];
+                    const statusType = providerInfo.status;
+                    
+                    switch (statusType) {
+                        case 'available':
+                            indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                            text.textContent = 'Available';
+                            text.className = 'text-xs text-green-600';
+                            break;
+                        case 'no_key':
+                            indicator.className = 'w-3 h-3 rounded-full bg-gray-400';
+                            text.textContent = 'No key configured';
+                            text.className = 'text-xs text-gray-500';
+                            break;
+                        case 'error':
+                            indicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                            text.textContent = `Error: ${providerInfo.error || 'Unknown error'}`;
+                            text.className = 'text-xs text-red-600';
+                            break;
+                        default:
+                            indicator.className = 'w-3 h-3 rounded-full bg-yellow-400';
+                            text.textContent = 'Checking...';
+                            text.className = 'text-xs text-yellow-600';
+                    }
+                } else {
+                    // No status available
+                    indicator.className = 'w-3 h-3 rounded-full bg-gray-400';
+                    text.textContent = 'Unknown';
+                    text.className = 'text-xs text-gray-500';
+                }
+            }
+        });
     }
     
     startPeriodicStatusCheck() {

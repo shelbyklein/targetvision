@@ -374,39 +374,37 @@ class ModalManager {
             }, 10);
             
             // Try to load the largest available image
-            if (photo.smugmug_id) {
+            if (photo.id || photo.local_photo_id) {
                 try {
-                    console.log('Fetching largest image for full-screen lightbox:', photo.smugmug_id);
-                    const response = await fetch(`http://localhost:8000/smugmug/photos/${photo.smugmug_id}/largest`);
+                    const photoId = photo.id || photo.local_photo_id;
+                    console.log('Fetching largest image for full-screen lightbox:', photoId);
+                    const largestImageData = await apiService.get(`/photos/${photoId}/largest-image`);
                     
-                    if (response.ok) {
-                        const largestImageData = await response.json();
+                    if (largestImageData && largestImageData.url) {
                         console.log('Largest image data:', largestImageData);
                         
-                        if (largestImageData && largestImageData.url) {
-                            // Show loading state with animation
-                            loadingDiv.style.opacity = '1';
-                            loadingDiv.querySelector('.text-center').style.transform = 'translateY(0)';
-                            
-                            // Create image to test loading
-                            const img = new Image();
-                            img.onload = () => {
-                                // Image loaded successfully
-                                fullscreenImage.src = largestImageData.url;
-                                setTimeout(() => {
-                                    // Animate image in and loading out
-                                    loadingDiv.style.opacity = '0';
-                                    fullscreenImage.style.opacity = '1';
-                                    fullscreenImage.style.transform = 'scale(1)';
-                                }, 150);
-                            };
-                            img.onerror = () => {
-                                // Fallback to existing image
-                                eventBus.emit('image:fallback:load', { photo, fullscreenImage, loadingDiv });
-                            };
-                            img.src = largestImageData.url;
-                            return;
-                        }
+                        // Show loading state with animation
+                        loadingDiv.style.opacity = '1';
+                        loadingDiv.querySelector('.text-center').style.transform = 'translateY(0)';
+                        
+                        // Create image to test loading
+                        const img = new Image();
+                        img.onload = () => {
+                            // Image loaded successfully
+                            fullscreenImage.src = largestImageData.url;
+                            setTimeout(() => {
+                                // Animate image in and loading out
+                                loadingDiv.style.opacity = '0';
+                                fullscreenImage.style.opacity = '1';
+                                fullscreenImage.style.transform = 'scale(1)';
+                            }, 150);
+                        };
+                        img.onerror = () => {
+                            // Fallback to existing image
+                            eventBus.emit('image:fallback:load', { photo, fullscreenImage, loadingDiv });
+                        };
+                        img.src = largestImageData.url;
+                        return;
                     }
                 } catch (error) {
                     console.error('Error fetching largest image:', error);

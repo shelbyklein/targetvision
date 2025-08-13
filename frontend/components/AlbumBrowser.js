@@ -462,9 +462,10 @@ class AlbumBrowser {
     }
 
     displayFolderContentsInRightPanel(folder) {
-        // This method would update a right panel if it exists
-        // For now, we'll emit an event for other components to handle
-        eventBus.emit('folder:selected-for-preview', { folder });
+        // This method updates the right panel to show the folder's contents
+        // Since the folder contents have already been loaded and are in this.smugmugAlbums,
+        // we should trigger the grid display with the current folder contents
+        eventBus.emit('folders:display-grid', { items: this.smugmugAlbums });
     }
 
     // Public API methods

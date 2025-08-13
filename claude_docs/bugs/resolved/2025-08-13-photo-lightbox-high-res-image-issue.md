@@ -4,7 +4,7 @@
 **Reporter**: User  
 **Priority**: Medium  
 **Component**: ModalManager  
-**Status**: Open  
+**Status**: Resolved  
 
 ## Description
 The photo lightbox/modal is not using high-resolution images for the secondary lightbox view or download functionality. Users are getting lower quality images instead of the full-resolution versions available from SmugMug.
@@ -80,3 +80,19 @@ The photo lightbox/modal is not using high-resolution images for the secondary l
 - Download provides highest quality files available
 - Smooth progressive loading experience
 - Proper loading states and error handling
+
+## Resolution (2025-08-13)
+**Root Cause**: The fullscreen lightbox was using a non-existent API endpoint `/smugmug/photos/${smugmug_id}/largest` which was causing 404 errors and falling back to low-resolution images.
+
+**Fix Applied**:
+- Changed fullscreen lightbox to use the same working endpoint as the download functionality: `/photos/${photoId}/largest-image`
+- This endpoint returns SmugMug Original quality images (suffix `_O`) instead of Large quality (suffix `_L`)
+- Used existing `apiService` instead of raw `fetch()` for consistency
+
+**Technical Details**:
+- Before: Used non-existent `/smugmug/photos/${smugmug_id}/largest` endpoint
+- After: Uses working `/photos/${photoId}/largest-image` endpoint
+- Result: Fullscreen lightbox now loads high-resolution Original quality images from SmugMug
+- Fallback mechanism remains in place for error handling
+
+**Verification**: Tested endpoint `/photos/7/largest-image` returns Original resolution URLs (e.g., `i-xQgM53J-O.jpg` instead of `i-xQgM53J-L.jpg`)

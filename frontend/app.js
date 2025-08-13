@@ -431,7 +431,8 @@ class TargetVisionApp {
         eventBus.emit('photos:check-and-resume-batch-processing');
     }
     initializeStatusChecking() {
-        // Status checking initialization - basic setup only
+        // Trigger initial LLM status check
+        eventBus.emit('settings:check-llm-status');
     }
     
     stopStatusChecking() {

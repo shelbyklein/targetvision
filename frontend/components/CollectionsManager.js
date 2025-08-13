@@ -659,27 +659,23 @@ class CollectionsManager {
         if (!name) return;
         
         try {
-            const response = await fetch(`${this.apiBase}/collections`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: name,
-                    description: ''
-                })
+            // Use query parameters as expected by backend
+            const params = new URLSearchParams({
+                name: name.trim(),
+                description: ''
             });
             
-            if (response.ok) {
-                const collection = await response.json();
+            const result = await apiService.post(`/collections?${params.toString()}`);
+            
+            if (result && result.collection) {
+                const collection = result.collection;
                 eventBus.emit('toast:success', { title: 'Success', message: 'Collection created successfully' });
                 await this.loadCollections();
                 this.populateCollectionSelect();
                 const select = document.getElementById('modal-collection-select');
                 if (select) select.value = collection.id;
             } else {
-                const error = await response.json();
-                eventBus.emit('toast:error', { title: 'Error', message: error.detail || 'Failed to create collection' });
+                eventBus.emit('toast:error', { title: 'Error', message: 'Failed to create collection' });
             }
         } catch (error) {
             console.error('Error creating collection:', error);

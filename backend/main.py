@@ -126,7 +126,7 @@ async def api_status():
 async def llm_status():
     """Check LLM API status and key availability"""
     
-    status = {
+    provider_status = {
         "anthropic": {
             "env_key_available": bool(settings.ANTHROPIC_API_KEY),
             "status": "unknown",
@@ -145,25 +145,49 @@ async def llm_status():
             processor = AIProcessor(anthropic_api_key=settings.ANTHROPIC_API_KEY, openai_api_key=None)
             # Simple test - we can't easily test without processing an actual photo
             # For now, just check if the processor can be created
-            status["anthropic"]["status"] = "available"
+            provider_status["anthropic"]["status"] = "available"
         except Exception as e:
-            status["anthropic"]["status"] = "error"
-            status["anthropic"]["error"] = str(e)
+            provider_status["anthropic"]["status"] = "error"
+            provider_status["anthropic"]["error"] = str(e)
     else:
-        status["anthropic"]["status"] = "no_key"
+        provider_status["anthropic"]["status"] = "no_key"
         
     # Test OpenAI API if key is available  
     if settings.OPENAI_API_KEY:
         try:
             processor = AIProcessor(anthropic_api_key=None, openai_api_key=settings.OPENAI_API_KEY)
-            status["openai"]["status"] = "available"
+            provider_status["openai"]["status"] = "available"
         except Exception as e:
-            status["openai"]["status"] = "error"
-            status["openai"]["error"] = str(e)
+            provider_status["openai"]["status"] = "error"
+            provider_status["openai"]["error"] = str(e)
     else:
-        status["openai"]["status"] = "no_key"
+        provider_status["openai"]["status"] = "no_key"
     
-    return status
+    # Determine overall status and active provider
+    active_provider = None
+    overall_available = False
+    error_messages = []
+    
+    # Priority: Anthropic first, then OpenAI
+    for provider in ["anthropic", "openai"]:
+        provider_info = provider_status[provider]
+        if provider_info["status"] == "available":
+            active_provider = provider
+            overall_available = True
+            break
+        elif provider_info["error"]:
+            error_messages.append(f"{provider}: {provider_info['error']}")
+    
+    # If no provider is available, check if we have server keys configured
+    has_server_keys = bool(settings.ANTHROPIC_API_KEY or settings.OPENAI_API_KEY)
+    
+    return {
+        "available": overall_available,
+        "active_provider": active_provider,
+        "error": "; ".join(error_messages) if error_messages else None,
+        "has_server_keys": has_server_keys,
+        "providers": provider_status  # Keep detailed info for debugging
+    }
 
 # SmugMug OAuth Endpoints
 @app.post("/auth/smugmug/request")
@@ -369,6 +393,12 @@ async def list_smugmug_nodes(
                         func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed_count')
                     ).filter(Photo.album_id == local_album.id).first()
                     
+                    # Get first photo's thumbnail for album cover (if no highlight_image exists)
+                    thumbnail_url = None
+                    if not node_data.get('highlight_image'):
+                        first_photo = db.query(Photo).filter_by(album_id=local_album.id).first()
+                        thumbnail_url = first_photo.thumbnail_url if first_photo else None
+                    
                     node_data.update({
                         'local_album_id': local_album.id,
                         'synced_photo_count': int(stats.synced_photo_count or 0),
@@ -377,6 +407,9 @@ async def list_smugmug_nodes(
                         'processing_progress': round((int(stats.ai_processed_count or 0) / max(int(stats.synced_photo_count or 1), 1)) * 100, 1),
                         'is_synced': True
                     })
+                    
+                    if thumbnail_url:
+                        node_data['thumbnail_url'] = thumbnail_url
                 else:
                     node_data.update({
                         'local_album_id': None,
@@ -425,6 +458,12 @@ async def list_smugmug_nodes(
                             func.sum(case((Photo.ai_metadata != None, 1), else_=0)).label('ai_processed_count')
                         ).filter(Photo.album_id == local_album.id).first()
                         
+                        # Get first photo's thumbnail for album cover (if no highlight_image exists)
+                        thumbnail_url = None
+                        if not node_data.get('highlight_image'):
+                            first_photo = db.query(Photo).filter_by(album_id=local_album.id).first()
+                            thumbnail_url = first_photo.thumbnail_url if first_photo else None
+                        
                         node_data.update({
                             'local_album_id': local_album.id,
                             'synced_photo_count': int(stats.synced_photo_count or 0),
@@ -433,6 +472,9 @@ async def list_smugmug_nodes(
                             'processing_progress': round((int(stats.ai_processed_count or 0) / max(int(stats.synced_photo_count or 1), 1)) * 100, 1),
                             'is_synced': True
                         })
+                        
+                        if thumbnail_url:
+                            node_data['thumbnail_url'] = thumbnail_url
                     else:
                         node_data.update({
                             'local_album_id': None,
@@ -1075,11 +1117,17 @@ async def list_local_albums(db: Session = Depends(get_db)):
     result = []
     for album, photo_count, processed_count, ai_processed_count in albums_with_stats:
         album_dict = album.to_dict()
+        
+        # Get first photo's thumbnail for album cover
+        first_photo = db.query(Photo).filter_by(album_id=album.id).first()
+        thumbnail_url = first_photo.thumbnail_url if first_photo else None
+        
         album_dict.update({
             'actual_photo_count': int(photo_count or 0),
             'processed_count': int(processed_count or 0),
             'ai_processed_count': int(ai_processed_count or 0),
-            'processing_progress': round((int(ai_processed_count or 0) / max(int(photo_count or 1), 1)) * 100, 1)
+            'processing_progress': round((int(ai_processed_count or 0) / max(int(photo_count or 1), 1)) * 100, 1),
+            'thumbnail_url': thumbnail_url
         })
         result.append(album_dict)
     
@@ -1250,7 +1298,12 @@ async def get_embedding_stats(db: Session = Depends(get_db)):
         
         # Get a sample embedding for validation
         sample_embedding_record = db.query(AIMetadata).filter(AIMetadata.embedding.isnot(None)).first()
-        embedding_dimensions = len(sample_embedding_record.embedding) if sample_embedding_record and sample_embedding_record.embedding else None
+        embedding_dimensions = None
+        if sample_embedding_record and sample_embedding_record.embedding is not None:
+            try:
+                embedding_dimensions = len(sample_embedding_record.embedding)
+            except (TypeError, AttributeError):
+                embedding_dimensions = None
         
         return {
             "total_photos": total_photos,

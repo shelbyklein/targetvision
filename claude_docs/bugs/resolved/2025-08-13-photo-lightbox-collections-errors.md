@@ -4,7 +4,7 @@
 **Reporter**: User  
 **Priority**: Medium  
 **Component**: ModalManager, CollectionsManager  
-**Status**: Open  
+**Status**: Resolved  
 
 ## Description
 When users try to add photos to collections from the photo lightbox/modal, the system returns errors and the operation fails. This prevents users from organizing photos into collections through the photo detail view.
@@ -78,3 +78,41 @@ When users try to add photos to collections from the photo lightbox/modal, the s
 - Clear success/error feedback for collection operations
 - Collection changes immediately reflected in UI
 - No errors during collection management from photo modal
+
+## Resolution (2025-08-13)
+**Root Cause**: The `createCollectionFromModal()` method in CollectionsManager.js was sending collection data in the wrong format.
+
+**Issue Details**:
+- Frontend was sending `name` and `description` in JSON request body
+- Backend expects `name` and `description` as query parameters
+- This caused 422 (Unprocessable Content) errors
+
+**Fix Applied**:
+1. **Updated CollectionsManager.js**:
+   - Changed from JSON body to query parameters
+   - Used `URLSearchParams` to properly encode query string
+   - Switched from raw `fetch()` to `apiService.post()` for consistency
+   - Updated error handling for apiService response format
+
+**Technical Details**:
+```javascript
+// BEFORE (causing 422 error):
+body: JSON.stringify({
+    name: name,
+    description: ''
+})
+
+// AFTER (working):
+const params = new URLSearchParams({
+    name: name.trim(),
+    description: ''
+});
+await apiService.post(`/collections?${params.toString()}`);
+```
+
+**Verification**: 
+- Backend endpoint `/collections` expects query parameters: `name` (required) and `description` (optional)
+- Tested collection creation successfully returns 201 with collection data
+- Frontend now properly handles the API response format
+
+**Other Methods**: The `addPhotoToCollection()` method was already working correctly as it properly sends `photo_ids` array in JSON body as expected by the backend.

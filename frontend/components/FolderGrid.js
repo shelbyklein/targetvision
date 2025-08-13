@@ -86,13 +86,26 @@ class FolderGrid {
         card.className = 'folder-card bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer';
         card.setAttribute('data-folder-id', folder.node_id);
         
+        // Get thumbnail URL from highlight image if available
+        const thumbnailUrl = folder.highlight_image && folder.highlight_image.thumbnail_url;
+        
         card.innerHTML = `
             <div class="p-4 text-center">
-                <!-- Folder Icon -->
+                <!-- Folder Icon or Thumbnail -->
                 <div class="flex justify-center mb-3">
-                    <svg class="h-16 w-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                    </svg>
+                    ${thumbnailUrl ? `
+                        <img src="${thumbnailUrl}" 
+                             alt="${folder.name}" 
+                             class="h-16 w-16 object-cover rounded-lg border border-gray-200"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <svg class="h-16 w-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20" style="display: none;">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        </svg>
+                    ` : `
+                        <svg class="h-16 w-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        </svg>
+                    `}
                 </div>
                 
                 <!-- Folder Info -->
@@ -121,14 +134,21 @@ class FolderGrid {
         const imageCount = album.image_count || 0;
         const isSynced = album.is_synced;
         
+        // Get thumbnail URL from different possible locations
+        const thumbnailUrl = album.thumbnail_url || (album.highlight_image && album.highlight_image.thumbnail_url);
+        
         card.innerHTML = `
             <div class="p-4 text-center">
                 <!-- Album Icon or Thumbnail -->
                 <div class="flex justify-center mb-3">
-                    ${album.thumbnail_url ? `
-                        <img src="${album.thumbnail_url}" 
+                    ${thumbnailUrl ? `
+                        <img src="${thumbnailUrl}" 
                              alt="${album.name || album.title}" 
-                             class="h-16 w-16 object-cover rounded-lg border border-gray-200">
+                             class="h-16 w-16 object-cover rounded-lg border border-gray-200"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <svg class="h-16 w-16 text-green-500" fill="currentColor" viewBox="0 0 20 20" style="display: none;">
+                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                        </svg>
                     ` : `
                         <svg class="h-16 w-16 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
