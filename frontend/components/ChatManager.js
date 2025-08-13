@@ -13,7 +13,7 @@
  * - Chat page initialization
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 
 class ChatManager {
     constructor() {

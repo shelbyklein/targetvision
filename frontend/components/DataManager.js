@@ -10,7 +10,7 @@
  * - Background data operations
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 import cacheManager from '../managers/CacheManager.js';
 
 class DataManager {

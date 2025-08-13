@@ -12,7 +12,7 @@
  * - UI state management during async operations
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 
 class ProgressManager {
     constructor() {

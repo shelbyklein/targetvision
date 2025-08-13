@@ -12,7 +12,7 @@
  * - Modal animations and keyboard handling
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 
 class ModalManager {
     constructor() {

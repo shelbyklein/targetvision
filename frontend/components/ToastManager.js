@@ -12,7 +12,7 @@
  * - Success and error message shortcuts
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 
 class ToastManager {
     constructor() {

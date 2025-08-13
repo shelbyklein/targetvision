@@ -10,7 +10,7 @@
  * - URL state synchronization
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 import stateManager from '../managers/StateManager.js';
 import cacheManager from '../managers/CacheManager.js';
 

@@ -12,7 +12,7 @@
  * - Search state management and UI updates
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 
 class SearchManager {
     constructor() {

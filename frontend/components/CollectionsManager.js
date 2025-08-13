@@ -13,7 +13,7 @@
  * - Collection page initialization and management
  */
 
-import { eventBus } from '../services/EventBus.js';
+import eventBus from '../services/EventBus.js';
 import apiService from '../services/APIService.js';
 
 class CollectionsManager {
