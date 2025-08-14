@@ -60,7 +60,6 @@ class StateManager {
     saveAppState() {
         try {
             if (this.isInitializing) {
-                console.log('Skipping saveAppState during initialization');
                 return;
             }
             
@@ -69,11 +68,6 @@ class StateManager {
                 timestamp: Date.now()
             };
             
-            console.log('saveAppState called with:', {
-                currentPage: this.state.currentPage,
-                currentAlbum: this.state.currentAlbum?.title || this.state.currentAlbum?.smugmug_id,
-                currentNodeUri: this.state.currentNodeUri
-            });
             
             localStorage.setItem(CACHE_KEYS.APP_STATE, JSON.stringify(state));
             
@@ -153,7 +147,6 @@ class StateManager {
                 albumId: params.get('album'),
                 nodeUri: params.get('node') ? decodeURIComponent(params.get('node')) : null
             };
-            console.log('loadStateFromURL found:', state, 'from URL:', window.location.search);
             return state;
         } catch (error) {
             console.error('Error loading state from URL:', error);
@@ -193,7 +186,6 @@ class StateManager {
             
             // Emit restoration events for other components to handle
             if (stateData.currentPage && stateData.currentPage !== 'albums') {
-                console.log('Restoring page to:', stateData.currentPage);
                 eventBus.emit('state:restore-page', { page: stateData.currentPage });
                 restored = true;
             }
@@ -287,26 +279,15 @@ class StateManager {
 
     // Utility methods for state restoration
     async loadAndRestoreState() {
-        console.log('Loading and restoring application state...');
         
         let restoredState = false;
         const urlState = this.loadStateFromURL();
         const savedState = this.loadAppState();
         
-        console.log('State restoration check:', { urlState, savedState });
-        
         if (urlState && (urlState.albumId || urlState.nodeUri || urlState.currentPage !== 'albums')) {
-            console.log('Attempting to restore from URL state');
             restoredState = await this.restoreStateFromData(urlState);
         } else if (savedState) {
-            console.log('Attempting to restore from saved state');
             restoredState = await this.restoreStateFromData(savedState);
-        }
-        
-        if (!restoredState) {
-            console.log('No state restored, using defaults');
-        } else {
-            console.log('State restoration completed successfully');
         }
         
         return restoredState;
