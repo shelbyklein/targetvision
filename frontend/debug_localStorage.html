@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug localStorage</title>
+</head>
+<body>
+    <h1>Debug localStorage</h1>
+    <button onclick="checkLocalStorage()">Check localStorage</button>
+    <button onclick="clearAppState()">Clear App State</button>
+    <button onclick="setAlbumsDefault()">Set Albums as Default</button>
+    <button onclick="goBackToMain()">Go Back to Main App</button>
+    
+    <pre id="output"></pre>
+    
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.textContent += message + '\n';
+            console.log(message);
+        }
+        
+        function checkLocalStorage() {
+            document.getElementById('output').textContent = '';
+            log('=== localStorage DEBUG ===');
+            
+            // Check all localStorage keys
+            log('All localStorage keys:');
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                log(`  ${key}: ${localStorage.getItem(key)}`);
+            }
+            
+            // Check specific app state
+            const appState = localStorage.getItem('targetvision_app_state');
+            if (appState) {
+                log('\nApp state found:');
+                log(appState);
+                try {
+                    const parsed = JSON.parse(appState);
+                    log('\nParsed app state:');
+                    log(JSON.stringify(parsed, null, 2));
+                } catch (e) {
+                    log('Error parsing app state: ' + e.message);
+                }
+            } else {
+                log('\nNo app state found in localStorage');
+            }
+            
+            // Check URL parameters
+            log('\nURL parameters:');
+            const params = new URLSearchParams(window.location.search);
+            for (const [key, value] of params) {
+                log(`  ${key}: ${value}`);
+            }
+        }
+        
+        function clearAppState() {
+            localStorage.removeItem('targetvision_app_state');
+            log('Cleared targetvision_app_state');
+        }
+        
+        function setAlbumsDefault() {
+            const defaultState = {
+                currentPage: 'albums',
+                currentAlbum: null,
+                currentNodeUri: null,
+                breadcrumbs: [],
+                nodeHistory: [],
+                statusFilter: '',
+                showProcessedPhotos: true,
+                showUnprocessedPhotos: true,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('targetvision_app_state', JSON.stringify(defaultState));
+            log('Set default albums state');
+        }
+        
+        function goBackToMain() {
+            window.location.href = '/';
+        }
+        
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            checkLocalStorage();
+        });
+    </script>
+</body>
+</html>

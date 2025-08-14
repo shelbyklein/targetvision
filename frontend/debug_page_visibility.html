@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Page Visibility</title>
+</head>
+<body>
+    <h1>Debug Page Visibility</h1>
+    <button onclick="testNavigation()">Test Navigation Fix</button>
+    <button onclick="showConsoleInfo()">Show Console Info</button>
+    <button onclick="goBackToMain()">Go Back to Main App</button>
+    
+    <script>
+        function testNavigation() {
+            console.log('Testing navigation fix...');
+            window.location.href = '/';
+            
+            setTimeout(() => {
+                // Hide all pages
+                const pages = ['page-albums', 'page-collections', 'page-chat', 'page-search', 'page-settings'];
+                pages.forEach(pageId => {
+                    const element = document.getElementById(pageId);
+                    if (element) {
+                        element.classList.add('hidden');
+                        console.log(`Hidden ${pageId}:`, element);
+                    } else {
+                        console.log(`Could not find element: ${pageId}`);
+                    }
+                });
+                
+                // Show albums page
+                const albumsPage = document.getElementById('page-albums');
+                if (albumsPage) {
+                    albumsPage.classList.remove('hidden');
+                    console.log('Showed albums page:', albumsPage);
+                } else {
+                    console.log('Could not find albums page');
+                }
+                
+                // Update navigation state
+                const navElements = ['nav-albums', 'nav-collections', 'nav-chat', 'nav-search', 'nav-settings'];
+                navElements.forEach(navId => {
+                    const element = document.getElementById(navId);
+                    if (element) {
+                        element.classList.remove('nav-tab-active');
+                    }
+                });
+                
+                const albumsNav = document.getElementById('nav-albums');
+                if (albumsNav) {
+                    albumsNav.classList.add('nav-tab-active');
+                    console.log('Activated albums nav:', albumsNav);
+                }
+            }, 1000);
+        }
+        
+        function showConsoleInfo() {
+            console.log('=== DEBUG INFO ===');
+            console.log('Current URL:', window.location.href);
+            console.log('Document ready state:', document.readyState);
+        }
+        
+        function goBackToMain() {
+            window.location.href = '/';
+        }
+        
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            console.log('Debug page loaded');
+            showConsoleInfo();
+        });
+    </script>
+</body>
+</html>

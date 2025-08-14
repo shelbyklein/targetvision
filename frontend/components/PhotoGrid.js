@@ -133,7 +133,7 @@ class PhotoGrid {
         
         // Apply visibility toggles
         photosToShow = photosToShow.filter(photo => {
-            const isProcessed = photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
+            const isProcessed = photo.processing_status === 'processed' || photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
             const isUnprocessed = !isProcessed;
             
             if (isProcessed && !this.showProcessedPhotos) return false;
@@ -165,16 +165,16 @@ class PhotoGrid {
         let status = photo.processing_status || 'not_synced';
         const originalStatus = status;
         
-        // If photo has AI metadata, it should show as completed regardless of processing_status
+        // If photo has AI metadata, it should show as processed regardless of processing_status
         // Exception: respect 'failed' status even if AI metadata exists (edge case)
         if (photo.ai_metadata && photo.ai_metadata.length > 0) {
             if (photo.processing_status !== 'failed') {
-                status = 'completed';
+                status = 'processed';
             }
         }
         
         // DEBUG: Log status changes for debugging
-        if (status !== originalStatus || (photo.processing_status === 'completed' && photo.title)) {
+        if (status !== originalStatus || (photo.processing_status === 'processed' && photo.title)) {
             console.log('🔍 Status determination:', {
                 title: photo.title || photo.filename || 'Untitled',
                 originalStatus: photo.processing_status,
@@ -197,12 +197,19 @@ class PhotoGrid {
         const photoId = photo.smugmug_id || photo.image_key || photo.local_photo_id;
         div.setAttribute('data-photo-id', photoId);
         
-        // Status indicator styling
+        // Status indicator styling - supports both backend database values and frontend PHOTO_STATUS constants
         const statusConfig = {
+            // Frontend PHOTO_STATUS constants (used by PhotoProcessor)
+            'processed': { color: 'bg-green-500', icon: '✓', text: 'Processed' },
+            'unprocessed': { color: 'bg-orange-500', icon: '○', text: 'Not Processed' },
+            
+            // Backend database values (received from API)
             'completed': { color: 'bg-green-500', icon: '✓', text: 'Processed' },
+            'not_processed': { color: 'bg-orange-500', icon: '○', text: 'Not Processed' },
+            
+            // Common values that match between both systems
             'processing': { color: 'bg-yellow-500', icon: '⏳', text: 'Processing' },
             'failed': { color: 'bg-red-500', icon: '✗', text: 'Failed' },
-            'not_processed': { color: 'bg-orange-500', icon: '○', text: 'Not Processed' },
             'not_synced': { color: 'bg-gray-400', icon: '○', text: 'Not Synced' }
         };
         
@@ -338,10 +345,10 @@ class PhotoGrid {
             statusIndicator.style.cursor = 'pointer';
             
             // Add hover effect only for unprocessed photos
-            if (status === 'not_processed') {
+            if (status === 'unprocessed' || status === 'not_processed') {
                 statusIndicator.classList.add('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
                 statusIndicator.title = 'Click to process with AI';
-            } else if (status === 'completed') {
+            } else if (status === 'processed' || status === 'completed') {
                 statusIndicator.title = 'Processed - click to reprocess';
             } else if (status === 'failed') {
                 statusIndicator.title = 'Processing failed - click to retry';

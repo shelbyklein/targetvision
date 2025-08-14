@@ -37,6 +37,8 @@ class TargetVisionApp {
     async initializeApp() {
         console.log('Starting app initialization...');
         
+        // PhotoProcessor polling is now integrated - no separate initialization needed
+        
         // Phase 1: Immediate UI setup (non-blocking)
         this.bindEventListeners();
         console.log('Event listeners bound, checking connection...');
@@ -260,6 +262,17 @@ class TargetVisionApp {
             const album = smugMugAPI.findAlbum(data.albumId);
             if (album) {
                 this.selectAlbum(album);
+            } else {
+                // Album not found in current list, but preserve state for future restoration
+                console.log('Album not found in current list, preserving URL state:', data.albumId);
+                // Update StateManager with the album ID to preserve URL parameter
+                eventBus.emit('app:album-selected', { 
+                    album: { 
+                        smugmug_id: data.albumId,
+                        album_key: data.albumId,
+                        title: 'Loading...'
+                    } 
+                });
             }
         });
 
@@ -308,6 +321,8 @@ class TargetVisionApp {
             eventBus.emit('photo:set-current', { photo: data.photo });
         });
 
+        // Processing polling events are now handled directly in PhotoProcessor
+
     }
 
     // Authentication and Connection
@@ -338,7 +353,9 @@ class TargetVisionApp {
         
         this.currentAlbum = album;
         
-        stateManager.saveAppState();
+        // Notify StateManager about album selection for state persistence
+        eventBus.emit('app:album-selected', { album });
+        
         this.showPhotosView();
         const albumId = album.smugmug_id || album.album_key;
         if (albumId) {

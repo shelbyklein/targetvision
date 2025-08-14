@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Page Visibility</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-6">
+    <h1 class="text-2xl font-bold mb-4">Debug Page Visibility</h1>
+    
+    <div class="mb-4">
+        <button onclick="checkPageStates()" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">Check Page States</button>
+        <button onclick="forceShowAlbums()" class="bg-green-500 text-white px-4 py-2 rounded mr-2">Force Show Albums</button>
+        <button onclick="goToMainApp()" class="bg-gray-500 text-white px-4 py-2 rounded">Go to Main App</button>
+    </div>
+    
+    <div id="output" class="bg-gray-100 p-4 rounded font-mono text-sm whitespace-pre-wrap"></div>
+    
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.textContent += message + '\\n';
+            console.log(message);
+        }
+        
+        function checkPageStates() {
+            document.getElementById('output').textContent = '';
+            log('=== Page State Debug ===');
+            
+            // Try to access the main app window
+            const mainWindow = window.opener || window.parent || window;
+            
+            try {
+                const pages = ['page-albums', 'page-collections', 'page-chat', 'page-search', 'page-settings'];
+                
+                pages.forEach(pageId => {
+                    const element = mainWindow.document.getElementById(pageId);
+                    if (element) {
+                        const isHidden = element.classList.contains('hidden');
+                        const computedDisplay = mainWindow.getComputedStyle(element).display;
+                        const computedVisibility = mainWindow.getComputedStyle(element).visibility;
+                        
+                        log(`${pageId}:`);
+                        log(`  - exists: true`);
+                        log(`  - hasHiddenClass: ${isHidden}`);
+                        log(`  - computedDisplay: ${computedDisplay}`);
+                        log(`  - computedVisibility: ${computedVisibility}`);
+                        log(`  - classList: ${Array.from(element.classList).join(', ')}`);
+                        log('');
+                    } else {
+                        log(`${pageId}: NOT FOUND`);
+                    }
+                });
+                
+                // Check what's actually visible
+                log('=== What content is visible? ===');
+                const visibleElements = mainWindow.document.querySelectorAll('h2, h3');
+                visibleElements.forEach(el => {
+                    const computedDisplay = mainWindow.getComputedStyle(el).display;
+                    if (computedDisplay !== 'none') {
+                        log(`Visible heading: "${el.textContent.trim()}" (parent: ${el.parentElement?.id || 'no-id'})`);
+                    }
+                });
+                
+            } catch (error) {
+                log(`Error accessing main app: ${error.message}`);
+                log('This might be expected if opened in a different window');
+            }
+        }
+        
+        function forceShowAlbums() {
+            try {
+                const mainWindow = window.opener || window.parent || window;
+                
+                // Hide all pages
+                const pages = ['page-albums', 'page-collections', 'page-chat', 'page-search', 'page-settings'];
+                pages.forEach(pageId => {
+                    const element = mainWindow.document.getElementById(pageId);
+                    if (element) {
+                        element.classList.add('hidden');
+                    }
+                });
+                
+                // Show albums page
+                const albumsPage = mainWindow.document.getElementById('page-albums');
+                if (albumsPage) {
+                    albumsPage.classList.remove('hidden');
+                    log('Forced albums page to show');
+                } else {
+                    log('Could not find albums page');
+                }
+                
+                checkPageStates();
+                
+            } catch (error) {
+                log(`Error forcing albums view: ${error.message}`);
+            }
+        }
+        
+        function goToMainApp() {
+            window.open('/', '_blank');
+        }
+        
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkPageStates();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

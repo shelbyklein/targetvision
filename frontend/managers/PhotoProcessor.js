@@ -14,7 +14,16 @@ class PhotoProcessor {
             failed: 0
         };
         
+        // Polling state
+        this.pollingInterval = null;
+        this.isPolling = false;
+        this.pollIntervalMs = 3000; // Poll every 3 seconds
+        this.lastProcessingCount = 0;
+        this.lastPhotoIds = new Set();
+        this.batchTotalPhotos = 0; // Track original batch size for progress calculation
+        
         this.setupEventListeners();
+        console.log('🔄 PhotoProcessor initialized with polling capability');
     }
 
     setupEventListeners() {
@@ -36,6 +45,12 @@ class PhotoProcessor {
         
         eventBus.on('photos:refresh-album-status', (data) => {
             this.refreshAlbumStatus(data.album);
+        });
+        
+        // Handle manual status refresh for polling
+        eventBus.on('photos:refresh-status', () => {
+            console.log('🔄 PhotoProcessor: Manual refresh requested');
+            this.checkProcessingStatus();
         });
     }
 
@@ -80,6 +95,9 @@ class PhotoProcessor {
             success: 0,
             failed: 0
         };
+        
+        // Store original batch total for progress tracking
+        this.batchTotalPhotos = localPhotoIds.length;
         
         // Emit processing events
         eventBus.emit('photos:processing-start', {
@@ -126,6 +144,9 @@ class PhotoProcessor {
                 localPhotoIds,
                 message: `Processing ${localPhotoIds.length} photos in background. Results will appear when you refresh or navigate back to this album.`
             });
+            
+            // Start polling for processing status updates
+            this.startPolling();
             
             // Optional: Add delayed status check after 1 minute
             setTimeout(() => {
@@ -191,13 +212,14 @@ class PhotoProcessor {
             this.processingPhotos.delete(photo.local_photo_id);
             
             // Update UI status based on result
-            if (result.success) {
+            // Backend returns { message: "...", ai_metadata: ... } for success
+            if (result.ai_metadata) {
                 this.updatePhotoThumbnailStatus(displayId, PHOTO_STATUS.PROCESSED);
                 
                 eventBus.emit('photos:single-processing-success', {
                     photo,
                     result,
-                    message: SUCCESS_MESSAGES.PHOTO_PROCESSED
+                    message: result.message || SUCCESS_MESSAGES.PHOTO_PROCESSED
                 });
             } else {
                 this.updatePhotoThumbnailStatus(displayId, PHOTO_STATUS.FAILED);
@@ -477,6 +499,7 @@ class PhotoProcessor {
             success: 0,
             failed: 0
         };
+        this.batchTotalPhotos = 0; // Clear batch tracking
         this.hideBatchProgress();
         this.hideGlobalProgress();
     }
@@ -529,6 +552,113 @@ class PhotoProcessor {
             }
         } catch (error) {
             console.error('Error refreshing album status:', error);
+        }
+    }
+
+    // Polling Methods
+    startPolling() {
+        if (this.isPolling) {
+            console.log('🔄 PhotoProcessor: Already polling, skipping start');
+            return;
+        }
+
+        console.log('🔄 PhotoProcessor: Starting status polling every', this.pollIntervalMs, 'ms');
+        this.isPolling = true;
+        
+        // Immediate check
+        this.checkProcessingStatus();
+        
+        // Set up interval
+        this.pollingInterval = setInterval(() => {
+            this.checkProcessingStatus();
+        }, this.pollIntervalMs);
+    }
+
+    stopPolling() {
+        if (!this.isPolling) {
+            return;
+        }
+
+        console.log('🔄 PhotoProcessor: Stopping status polling');
+        this.isPolling = false;
+        
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+    }
+
+    async checkProcessingStatus() {
+        try {
+            const response = await fetch('http://localhost:8000/photos/batch/status');
+            if (!response.ok) {
+                console.error('🔄 PhotoProcessor: Failed to fetch status:', response.status);
+                return;
+            }
+
+            const status = await response.json();
+            this.handleStatusUpdate(status);
+
+        } catch (error) {
+            console.error('🔄 PhotoProcessor: Error checking processing status:', error);
+        }
+    }
+
+    handleStatusUpdate(status) {
+        const { is_processing, processing_count, photo_ids } = status;
+        
+        console.log(`🔄 PhotoProcessor: Status - Processing: ${is_processing}, Count: ${processing_count}, Photos: ${photo_ids.length}`);
+        
+        // Update global progress bar if we have batch processing active
+        if (this.batchTotalPhotos > 0 && processing_count >= 0) {
+            const processed = this.batchTotalPhotos - processing_count;
+            const progressDetails = processing_count > 0 
+                ? `Processing ${processing_count} remaining photos...`
+                : 'Finalizing results...';
+            
+            console.log(`🔄 PhotoProcessor: Updating progress - ${processed}/${this.batchTotalPhotos} (${processing_count} remaining)`);
+            this.updateGlobalProgress(processed, this.batchTotalPhotos, progressDetails);
+        }
+        
+        // Check for completion
+        if (this.lastProcessingCount > 0 && processing_count === 0) {
+            console.log('🔄 PhotoProcessor: Processing completed!');
+            eventBus.emit('toast:success', { 
+                title: 'Processing Complete', 
+                message: `Finished processing ${this.lastProcessingCount} photos. Results are now available.` 
+            });
+            // Clear batch tracking
+            this.batchTotalPhotos = 0;
+            // Refresh current album to show updated status
+            if (window.app && window.app.currentAlbum) {
+                eventBus.emit('photos:refresh-album-status', { album: window.app.currentAlbum });
+            }
+        }
+
+        // Check for newly completed photos
+        const currentPhotoIds = new Set(photo_ids);
+        const completedPhotoIds = Array.from(this.lastPhotoIds).filter(id => !currentPhotoIds.has(id));
+        
+        if (completedPhotoIds.length > 0) {
+            console.log('🔄 PhotoProcessor: Photos completed:', completedPhotoIds);
+            // Update individual photo statuses
+            completedPhotoIds.forEach(photoId => {
+                eventBus.emit('photos:status-updated', { 
+                    photoId, 
+                    newStatus: 'processed' 
+                });
+            });
+        }
+
+        // Update tracking variables
+        this.lastProcessingCount = processing_count;
+        this.lastPhotoIds = currentPhotoIds;
+
+        // Stop polling if no processing is active
+        if (!is_processing && processing_count === 0) {
+            this.stopPolling();
+            // Clear batch tracking when polling stops
+            this.batchTotalPhotos = 0;
         }
     }
 }

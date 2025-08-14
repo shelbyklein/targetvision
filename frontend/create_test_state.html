@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Test State</title>
+</head>
+<body>
+    <h1>Create Test State and Navigate</h1>
+    <button onclick="createValidState()">Create Valid State</button>
+    <button onclick="goToMain()">Go to Main App</button>
+    
+    <script>
+        function createValidState() {
+            // Create a state that simulates being in a folder
+            const testState = {
+                currentPage: 'albums',
+                currentAlbum: null,
+                currentNodeUri: 'test-node-uri-2025',
+                breadcrumbs: [
+                    { name: 'SmugMug Albums', nodeUri: null },
+                    { name: '2025', nodeUri: 'test-node-uri-2025' }
+                ],
+                nodeHistory: [],
+                statusFilter: '',
+                showProcessedPhotos: true,
+                showUnprocessedPhotos: true,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('targetvision_app_state', JSON.stringify(testState));
+            alert('Test state created! Now navigate to main app to test persistence.');
+        }
+        
+        function goToMain() {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

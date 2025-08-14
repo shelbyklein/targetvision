@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear State and Test</title>
+</head>
+<body>
+    <h1>Clear State and Test</h1>
+    <p>This page will clear localStorage and redirect to test the fix.</p>
+    
+    <script>
+        // Clear localStorage
+        localStorage.clear();
+        console.log('Cleared localStorage');
+        
+        // Wait a moment then redirect
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 1000);
+    </script>
+</body>
+</html>
