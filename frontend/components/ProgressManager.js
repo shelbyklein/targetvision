@@ -37,6 +37,8 @@ class ProgressManager {
         
         // Image loading events
         eventBus.on('image:fallback:load', (data) => this.loadFallbackImage(data.photo, data.fullscreenImage, data.loadingDiv));
+        
+        // Note: Batch loading events moved to PhotoGrid component for better separation of concerns
     }
 
     // Albums Loading States
@@ -231,6 +233,9 @@ class ProgressManager {
             duration
         });
     }
+
+    // Note: Batch loading methods moved to PhotoGrid component for better separation of concerns
+    // ProgressManager now focuses only on AI processing progress, sync operations, and general app loading states
 }
 
 // Create and export singleton instance

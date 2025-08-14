@@ -98,61 +98,169 @@ class DataManager {
 
     // Photo Loading Methods
     async loadAlbumPhotos(albumId, app) {
+        // Reset state for new album load
+        app.currentPhotos = [];
+        app.photosMetadata = { totalCount: 0, loadedCount: 0, hasMore: false };
+        
         // Check cache first
         const cachedPhotos = cacheManager.getCachedAlbumPhotos(albumId);
-        if (cachedPhotos) {
+        if (cachedPhotos && Array.isArray(cachedPhotos) && cachedPhotos.length > 0) {
+            // For cached photos, show immediately and load fresh data in background
             app.currentPhotos = cachedPhotos;
-            eventBus.emit('photos:display', { photos: app.currentPhotos });
+            app.photosMetadata = { 
+                totalCount: cachedPhotos.length, 
+                loadedCount: cachedPhotos.length, 
+                hasMore: false 
+            };
+            eventBus.emit('photos:display', { photos: app.currentPhotos, isInitialLoad: true });
             this.refreshAlbumPhotosInBackground(albumId, app);
             return;
         }
         
+        // Show loading state
         eventBus.emit('photos:loading:show');
-        await this.fetchAlbumPhotos(albumId, app);
+        
+        // Load first batch of photos (30 photos)
+        await this.fetchPhotoBatch(albumId, app, 0, 30, true);
     }
     
-    async fetchAlbumPhotos(albumId, app) {
+    // New method for batch loading with pagination
+    async fetchPhotoBatch(albumId, app, skip = 0, limit = 30, isInitialLoad = false) {
         try {
-            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos`);
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=${skip}&limit=${limit}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
-            app.currentPhotos = await response.json();
-            cacheManager.setCachedAlbumPhotos(albumId, app.currentPhotos);
+            const data = await response.json();
+            const { photos, total_count, returned_count, has_more } = data;
             
-            eventBus.emit('photos:display', { photos: app.currentPhotos });
-            eventBus.emit('photos:loading:hide');
+            console.log(`📸 DataManager: Loaded batch - skip: ${skip}, limit: ${limit}, returned: ${returned_count}, total: ${total_count}, hasMore: ${has_more}`);
             
-            // Clear album item loading indicator if it exists
+            // Update app state
+            if (isInitialLoad) {
+                // First batch - replace current photos
+                app.currentPhotos = photos;
+                app.photosMetadata = {
+                    totalCount: total_count,
+                    loadedCount: returned_count,
+                    hasMore: has_more
+                };
+                
+                // Cache the first batch
+                cacheManager.setCachedAlbumPhotos(albumId, photos);
+                
+                // Display first batch immediately
+                eventBus.emit('photos:display', { photos: app.currentPhotos, isInitialLoad: true });
+                eventBus.emit('photos:loading:hide');
+                
+                // Show loading progress for remaining photos
+                if (has_more) {
+                    eventBus.emit('photos:batch-loading:show', {
+                        loaded: returned_count,
+                        total: total_count,
+                        progress: Math.round((returned_count / total_count) * 100)
+                    });
+                    
+                    // Start loading remaining batches in background
+                    this.loadRemainingPhotos(albumId, app, returned_count, total_count);
+                }
+            } else {
+                // Subsequent batch - append to existing photos
+                app.currentPhotos = [...app.currentPhotos, ...photos];
+                app.photosMetadata.loadedCount += returned_count;
+                app.photosMetadata.hasMore = has_more;
+                
+                // Update cache with all photos
+                cacheManager.setCachedAlbumPhotos(albumId, app.currentPhotos);
+                
+                // Append new photos to display
+                eventBus.emit('photos:append', { photos: photos, allPhotos: app.currentPhotos });
+                
+                // Update progress
+                eventBus.emit('photos:batch-loading:progress', {
+                    loaded: app.photosMetadata.loadedCount,
+                    total: app.photosMetadata.totalCount,
+                    progress: Math.round((app.photosMetadata.loadedCount / app.photosMetadata.totalCount) * 100)
+                });
+                
+                if (!has_more) {
+                    eventBus.emit('photos:batch-loading:complete');
+                }
+            }
+            
+            // Clear album item loading indicator
             if (app.currentAlbum) {
-                const albumId = app.currentAlbum.album_key || app.currentAlbum.node_id;
-                eventBus.emit('progress:hide-item-loading', { itemId: albumId });
+                const albumIdForProgress = app.currentAlbum.album_key || app.currentAlbum.node_id;
+                eventBus.emit('progress:hide-item-loading', { itemId: albumIdForProgress });
             }
             
         } catch (error) {
-            console.error('Failed to load photos:', error);
-            eventBus.emit('toast:error', { title: 'Failed to Load Photos', message: `Could not fetch photos from this album. ${error.message}` });
+            console.error('Failed to load photo batch:', error);
+            eventBus.emit('toast:error', { 
+                title: 'Failed to Load Photos', 
+                message: `Could not fetch photos from this album. ${error.message}` 
+            });
             eventBus.emit('photos:loading:hide');
+            eventBus.emit('photos:batch-loading:error');
             
             // Clear album item loading indicator on error
             if (app.currentAlbum) {
-                const albumId = app.currentAlbum.album_key || app.currentAlbum.node_id;
-                eventBus.emit('progress:hide-item-loading', { itemId: albumId });
+                const albumIdForProgress = app.currentAlbum.album_key || app.currentAlbum.node_id;
+                eventBus.emit('progress:hide-item-loading', { itemId: albumIdForProgress });
             }
         }
     }
     
+    // Load remaining photos in background after initial batch
+    async loadRemainingPhotos(albumId, app, currentCount, totalCount) {
+        const batchSize = 30;
+        let skip = currentCount;
+        
+        while (skip < totalCount && app.photosMetadata.hasMore) {
+            // Small delay between batches to avoid overwhelming the system
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Check if we're still viewing the same album
+            const currentAlbumId = app.currentAlbum?.smugmug_id || app.currentAlbum?.album_key;
+            if (currentAlbumId !== albumId) {
+                console.log('📸 DataManager: Album changed, stopping background loading');
+                break;
+            }
+            
+            await this.fetchPhotoBatch(albumId, app, skip, batchSize, false);
+            skip += batchSize;
+        }
+        
+        console.log(`📸 DataManager: Background loading complete for album ${albumId}`);
+    }
+    
+    // Legacy method - redirect to batch loading for compatibility
+    async fetchAlbumPhotos(albumId, app) {
+        console.log('📸 DataManager: fetchAlbumPhotos called - redirecting to batch loading');
+        await this.fetchPhotoBatch(albumId, app, 0, 100, true); // Load larger first batch for legacy calls
+    }
+    
     async refreshAlbumPhotosInBackground(albumId, app) {
         try {
-            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos`);
+            console.log('📸 DataManager: Background refresh for album', albumId);
+            // For background refresh, load all photos to compare with cache
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=0&limit=100`);
             if (!response.ok) return;
             
-            const freshPhotos = await response.json();
+            const data = await response.json();
+            const freshPhotos = data.photos || data; // Handle both new and old API responses
+            
             cacheManager.setCachedAlbumPhotos(albumId, freshPhotos);
             
             if (app.currentAlbum && (app.currentAlbum.smugmug_id === albumId || app.currentAlbum.album_key === albumId)) {
                 if (JSON.stringify(app.currentPhotos) !== JSON.stringify(freshPhotos)) {
+                    console.log('📸 DataManager: Photos changed in background, updating display');
                     app.currentPhotos = freshPhotos;
-                    eventBus.emit('photos:display', { photos: app.currentPhotos });
+                    app.photosMetadata = {
+                        totalCount: data.total_count || freshPhotos.length,
+                        loadedCount: freshPhotos.length,
+                        hasMore: data.has_more || false
+                    };
+                    eventBus.emit('photos:display', { photos: app.currentPhotos, isRefresh: true });
                 }
             }
         } catch (error) {

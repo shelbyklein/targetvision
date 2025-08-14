@@ -9,6 +9,7 @@ class PhotoGrid {
         this.statusFilter = null;
         this.showProcessedPhotos = true;
         this.showUnprocessedPhotos = true;
+        this.isLoadingPhotos = false;
         
         this.setupEventListeners();
     }
@@ -17,7 +18,12 @@ class PhotoGrid {
         // Listen for photo display requests
         eventBus.on('photos:display', (data) => {
             this.currentPhotos = data.photos || [];
-            this.displayPhotos();
+            this.displayPhotos(data.isInitialLoad, data.isRefresh);
+        });
+        
+        // Listen for progressive photo loading
+        eventBus.on('photos:append', (data) => {
+            this.appendPhotos(data.photos, data.allPhotos);
         });
 
         // Listen for photo status updates
@@ -60,6 +66,12 @@ class PhotoGrid {
             this.displayPhotos();
         });
 
+        // Handle image loading progress (moved from ProgressManager)
+        eventBus.on('photos:batch-loading:show', (data) => this.showBatchLoading(data));
+        eventBus.on('photos:batch-loading:progress', (data) => this.updateBatchLoading(data));
+        eventBus.on('photos:batch-loading:complete', () => this.hideBatchLoading());
+        eventBus.on('photos:batch-loading:error', () => this.hideBatchLoading());
+
         // DOM event listeners for photo grid functionality (moved from app.js)
         this.bindDOMEventListeners();
     }
@@ -96,7 +108,7 @@ class PhotoGrid {
         }
     }
 
-    displayPhotos() {
+    displayPhotos(isInitialLoad = false, isRefresh = false) {
         const photoGrid = document.getElementById('photo-grid');
         const emptyState = document.getElementById('empty-photos');
         const welcomeState = document.getElementById('welcome-state');
@@ -108,11 +120,16 @@ class PhotoGrid {
         if (this.currentPhotos.length === 0) {
             photoGrid.classList.add('hidden');
             emptyState.classList.remove('hidden');
+            // Hide album actions when no photos
+            document.getElementById('album-actions').classList.add('hidden');
             return;
         }
         
         // Show photo controls
         document.getElementById('photo-controls').classList.remove('hidden');
+        
+        // Show album actions (includes Sync Album button)
+        document.getElementById('album-actions').classList.remove('hidden');
         
         // Filter photos if needed
         let photosToShow = this.currentPhotos;
@@ -143,15 +160,71 @@ class PhotoGrid {
         });
         
         photoGrid.classList.remove('hidden');
-        photoGrid.innerHTML = '';
+        
+        // Only clear grid for initial loads or refreshes, not for progressive updates
+        if (isInitialLoad || isRefresh) {
+            photoGrid.innerHTML = '';
+            console.log(`📸 PhotoGrid: ${isInitialLoad ? 'Initial load' : 'Refresh'} - rendering ${photosToShow.length} photos`);
+        }
         
         photosToShow.forEach(photo => {
             const photoElement = this.createPhotoCard(photo);
+            photoElement.classList.add('photo-fade-in'); // Add animation class
             photoGrid.appendChild(photoElement);
         });
         
         // Update toggle button styles to reflect current state
         this.updateToggleButtonStyles();
+    }
+    
+    // Progressive loading - append new photos without clearing existing ones
+    appendPhotos(newPhotos, allPhotos) {
+        console.log(`📸 PhotoGrid: Appending ${newPhotos.length} new photos`);
+        
+        // Update current photos reference
+        this.currentPhotos = allPhotos || [...this.currentPhotos, ...newPhotos];
+        
+        const photoGrid = document.getElementById('photo-grid');
+        if (!photoGrid) return;
+        
+        // Apply same filtering logic as displayPhotos
+        let photosToShow = newPhotos;
+        
+        // Apply status filter
+        if (this.statusFilter) {
+            if (this.statusFilter === 'processed') {
+                photosToShow = photosToShow.filter(photo => photo.ai_metadata && photo.ai_metadata.length > 0);
+            } else if (this.statusFilter === 'unprocessed') {
+                photosToShow = photosToShow.filter(photo => !photo.ai_metadata || photo.ai_metadata.length === 0);
+            } else {
+                photosToShow = photosToShow.filter(photo => photo.processing_status === this.statusFilter);
+            }
+        }
+        
+        // Apply visibility toggles
+        photosToShow = photosToShow.filter(photo => {
+            const isProcessed = photo.processing_status === 'processed' || photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
+            const isUnprocessed = !isProcessed;
+            
+            if (isProcessed && !this.showProcessedPhotos) return false;
+            if (isUnprocessed && !this.showUnprocessedPhotos) return false;
+            
+            return true;
+        });
+        
+        // Append filtered photos with fade-in animation
+        photosToShow.forEach((photo, index) => {
+            const photoElement = this.createPhotoCard(photo);
+            photoElement.classList.add('photo-fade-in');
+            
+            // Stagger the fade-in animation for smooth appearance
+            setTimeout(() => {
+                photoGrid.appendChild(photoElement);
+            }, index * 50); // 50ms delay between each photo
+        });
+        
+        // Update photo selection visuals after adding new photos
+        this.updatePhotoSelectionVisuals();
     }
 
     // Helper function to determine consistent photo processing status
@@ -338,23 +411,40 @@ class PhotoGrid {
         if (statusIndicator) {
             statusIndicator.addEventListener('click', (e) => {
                 e.stopPropagation();
+                
+                // Prevent processing if photos are still loading
+                if (this.isLoadingPhotos) {
+                    eventBus.emit('toast:warning', {
+                        title: 'Loading in Progress',
+                        message: 'Please wait for photos to finish loading before processing.'
+                    });
+                    return;
+                }
+                
                 eventBus.emit('photos:process-single', { photo });
             });
             
-            // Add cursor pointer and hover state for unprocessed photos
-            statusIndicator.style.cursor = 'pointer';
-            
-            // Add hover effect only for unprocessed photos
-            if (status === 'unprocessed' || status === 'not_processed') {
-                statusIndicator.classList.add('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
-                statusIndicator.title = 'Click to process with AI';
-            } else if (status === 'processed' || status === 'completed') {
-                statusIndicator.title = 'Processed - click to reprocess';
-            } else if (status === 'failed') {
-                statusIndicator.title = 'Processing failed - click to retry';
-            } else if (status === 'processing') {
-                statusIndicator.title = 'Processing in progress...';
-                statusIndicator.style.cursor = 'default';
+            // Update cursor and hover effects based on loading state
+            if (this.isLoadingPhotos) {
+                statusIndicator.style.cursor = 'not-allowed';
+                statusIndicator.title = 'Cannot process while photos are loading';
+                // Remove hover effects during loading
+                statusIndicator.classList.remove('hover:scale-110', 'hover:brightness-110');
+            } else {
+                statusIndicator.style.cursor = 'pointer';
+                
+                // Add hover effect only for unprocessed photos
+                if (status === 'unprocessed' || status === 'not_processed') {
+                    statusIndicator.classList.add('hover:scale-110', 'hover:brightness-110', 'transition-all', 'duration-200');
+                    statusIndicator.title = 'Click to process with AI';
+                } else if (status === 'processed' || status === 'completed') {
+                    statusIndicator.title = 'Processed - click to reprocess';
+                } else if (status === 'failed') {
+                    statusIndicator.title = 'Processing failed - click to retry';
+                } else if (status === 'processing') {
+                    statusIndicator.title = 'Processing in progress...';
+                    statusIndicator.style.cursor = 'default';
+                }
             }
         }
         
@@ -388,8 +478,26 @@ class PhotoGrid {
 
     updateSelectionUI() {
         const count = this.selectedPhotos.size;
+        const processButton = document.getElementById('process-selected');
+        
+        // Update selection count display
         document.getElementById('selection-count').textContent = `${count} selected`;
-        document.getElementById('process-selected').disabled = count === 0;
+        
+        // Disable button if no photos selected OR if photos are still loading
+        const shouldDisable = count === 0 || this.isLoadingPhotos;
+        processButton.disabled = shouldDisable;
+        
+        // Update button text/tooltip based on state
+        if (this.isLoadingPhotos) {
+            processButton.title = 'Cannot process photos while loading is in progress';
+            processButton.textContent = 'Loading Photos...';
+        } else if (count === 0) {
+            processButton.title = 'Select photos to process';
+            processButton.textContent = 'Process Selected';
+        } else {
+            processButton.title = `Process ${count} selected photo${count > 1 ? 's' : ''}`;
+            processButton.textContent = 'Process Selected';
+        }
         
         // Update visual indicators for all photos
         this.updatePhotoSelectionVisuals();
@@ -397,7 +505,8 @@ class PhotoGrid {
         // Emit selection change event for other components
         eventBus.emit('photos:selection-changed', {
             selectedPhotos: Array.from(this.selectedPhotos),
-            count: count
+            count: count,
+            isLoadingPhotos: this.isLoadingPhotos
         });
     }
     
@@ -410,7 +519,7 @@ class PhotoGrid {
             
             const isSelected = this.selectedPhotos.has(photoId);
             const imageContainer = photoCard.querySelector('.aspect-square');
-            console.log(`Photo ${photoId}: isSelected=${isSelected}, imageContainer exists=${!!imageContainer}`);
+            // console.log(`Photo ${photoId}: isSelected=${isSelected}, imageContainer exists=${!!imageContainer}`);
             
             // Update selection border
             if (isSelected) {
@@ -523,6 +632,75 @@ class PhotoGrid {
         this.showUnprocessedPhotos = showUnprocessed;
         this.updateToggleButtonStyles();
         this.displayPhotos();
+    }
+
+    // Image loading progress methods (moved from ProgressManager)
+    showBatchLoading(data) {
+        this.isLoadingPhotos = true;
+        
+        const indicator = document.getElementById('batch-loading-indicator');
+        const textElement = document.getElementById('batch-loading-text');
+        const fillElement = document.getElementById('batch-progress-fill');
+        
+        if (!indicator || !textElement || !fillElement) return;
+        
+        const { loaded, total, progress } = data;
+        
+        textElement.textContent = `Loading ${loaded} of ${total} photos...`;
+        fillElement.style.width = `${progress}%`;
+        
+        indicator.classList.remove('hidden');
+        
+        // Update UI to reflect loading state
+        this.updateLoadingState();
+        
+        console.log(`📸 PhotoGrid: Showing photo loading progress - ${loaded}/${total} (${progress}%)`);
+    }
+
+    updateBatchLoading(data) {
+        const textElement = document.getElementById('batch-loading-text');
+        const fillElement = document.getElementById('batch-progress-fill');
+        
+        if (!textElement || !fillElement) return;
+        
+        const { loaded, total, progress } = data;
+        
+        textElement.textContent = `Loading ${loaded} of ${total} photos...`;
+        fillElement.style.width = `${progress}%`;
+        
+        console.log(`📸 PhotoGrid: Updated photo loading progress - ${loaded}/${total} (${progress}%)`);
+    }
+
+    hideBatchLoading() {
+        this.isLoadingPhotos = false;
+        
+        const indicator = document.getElementById('batch-loading-indicator');
+        if (!indicator) return;
+        
+        // Update UI to reflect loading complete state
+        this.updateLoadingState();
+        
+        // Smooth fade out
+        setTimeout(() => {
+            indicator.classList.add('hidden');
+            console.log('📸 PhotoGrid: Photo loading complete - hiding indicator');
+        }, 1000); // Show completion for 1 second before hiding
+    }
+
+    // Check if photos are currently loading
+    isPhotoLoadingInProgress() {
+        return this.isLoadingPhotos;
+    }
+
+    // Update UI elements based on loading state
+    updateLoadingState() {
+        // Update selection UI to reflect loading state
+        this.updateSelectionUI();
+        
+        // Emit event for other components that might need to know about loading state
+        eventBus.emit('photos:loading-state-changed', { 
+            isLoading: this.isLoadingPhotos 
+        });
     }
 }
 

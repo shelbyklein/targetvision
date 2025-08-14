@@ -22,6 +22,9 @@ class PhotoProcessor {
         this.lastPhotoIds = new Set();
         this.batchTotalPhotos = 0; // Track original batch size for progress calculation
         
+        // Track photo loading state
+        this.photoLoadingInProgress = false;
+        
         this.setupEventListeners();
         console.log('🔄 PhotoProcessor initialized with polling capability');
     }
@@ -52,9 +55,24 @@ class PhotoProcessor {
             console.log('🔄 PhotoProcessor: Manual refresh requested');
             this.checkProcessingStatus();
         });
+        
+        // Track photo loading state
+        eventBus.on('photos:loading-state-changed', (data) => {
+            this.photoLoadingInProgress = data.isLoading;
+            console.log(`🔄 PhotoProcessor: Photo loading state changed - isLoading: ${data.isLoading}`);
+        });
     }
 
     async processSelectedPhotos(selectedPhotos, currentPhotos) {
+        // Check if photos are currently loading
+        if (this.isPhotoLoadingInProgress()) {
+            eventBus.emit('toast:warning', {
+                title: 'Loading in Progress',
+                message: 'Please wait for photos to finish loading before processing.'
+            });
+            return;
+        }
+        
         if (selectedPhotos.size === 0) {
             eventBus.emit('ui:show-error', {
                 title: 'No Photos Selected',
@@ -160,6 +178,15 @@ class PhotoProcessor {
     }
 
     async processSinglePhoto(photo) {
+        // Check if photos are currently loading
+        if (this.isPhotoLoadingInProgress()) {
+            eventBus.emit('toast:warning', {
+                title: 'Loading in Progress',
+                message: 'Please wait for photos to finish loading before processing.'
+            });
+            return;
+        }
+        
         // Check if photo is synced and has required data
         if (!photo.is_synced || !photo.local_photo_id) {
             eventBus.emit('ui:show-error', {
@@ -660,6 +687,11 @@ class PhotoProcessor {
             // Clear batch tracking when polling stops
             this.batchTotalPhotos = 0;
         }
+    }
+
+    // Helper method to check if photos are currently loading
+    isPhotoLoadingInProgress() {
+        return this.photoLoadingInProgress;
     }
 }
 

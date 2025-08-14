@@ -860,9 +860,11 @@ async def get_album_thumbnail(
         logger.error(f"Error getting album thumbnail for {album_key}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get album thumbnail: {str(e)}")
 
-@app.get("/smugmug/albums/{smugmug_album_key}/photos", response_model=List[Dict])
+@app.get("/smugmug/albums/{smugmug_album_key}/photos", response_model=Dict)
 async def list_smugmug_album_photos(
     smugmug_album_key: str,
+    skip: int = Query(default=0, ge=0, description="Number of photos to skip"),
+    limit: int = Query(default=30, le=100, description="Maximum number of photos to return"),
     db: Session = Depends(get_db)
 ):
     """Fetch photos from a specific SmugMug album with processing status"""
@@ -888,11 +890,31 @@ async def list_smugmug_album_photos(
         # Construct album URI from key
         album_uri = f"/api/v2/album/{smugmug_album_key}"
         
-        # Fetch ALL photos from SmugMug API using the album's total image count
-        smugmug_photos = await service.get_album_images(album_uri, limit=album_image_count)
+        # Fetch paginated photos from SmugMug API
+        # For pagination, we need to fetch more than requested to account for SmugMug's API behavior
+        # SmugMug API uses start/count rather than skip/limit
+        start_index = skip + 1  # SmugMug API is 1-indexed
+        fetch_limit = min(limit, album_image_count - skip)
+        
+        if fetch_limit <= 0:
+            return {
+                "photos": [],
+                "total_count": album_image_count,
+                "skip": skip,
+                "limit": limit,
+                "has_more": False
+            }
+        
+        smugmug_photos = await service.get_album_images(album_uri, limit=fetch_limit, start=start_index, count=fetch_limit)
         
         if not smugmug_photos:
-            return []
+            return {
+                "photos": [],
+                "total_count": album_image_count,
+                "skip": skip,
+                "limit": limit,
+                "has_more": False
+            }
         
         # Enhance with local processing status
         result = []
@@ -948,7 +970,17 @@ async def list_smugmug_album_photos(
             
             result.append(photo_data)
         
-        return result
+        # Return paginated response with metadata
+        has_more = (skip + len(result)) < album_image_count
+        
+        return {
+            "photos": result,
+            "total_count": album_image_count,
+            "skip": skip,
+            "limit": limit,
+            "returned_count": len(result),
+            "has_more": has_more
+        }
         
     except Exception as e:
         logger.error(f"Error fetching photos from SmugMug album {smugmug_album_key}: {e}")

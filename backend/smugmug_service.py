@@ -99,14 +99,18 @@ class SmugMugService:
                 
         return albums
     
-    async def get_album_images(self, album_uri: str, limit: int = 100, progress_callback=None) -> List[Dict]:
-        """Get images from a specific album"""
-        logger.info(f"Starting get_album_images with limit={limit} for album: {album_uri}")
+    async def get_album_images(self, album_uri: str, limit: int = 100, start: int = 1, count: int = None, progress_callback=None) -> List[Dict]:
+        """Get images from a specific album with pagination support"""
+        # Use count parameter if provided, otherwise use limit
+        page_count = count if count is not None else limit
+        logger.info(f"Starting get_album_images with limit={limit}, start={start}, count={page_count} for album: {album_uri}")
+        
         # Use full album URI (it already contains /api/v2)
         url = f"https://api.smugmug.com{album_uri}!images"
         params = {
             "_expand": "ImageSizes",  # Only expand ImageSizes to avoid comma issues
-            "count": str(limit)  # Request full album in one go if possible
+            "start": str(start),  # Starting index (1-based)
+            "count": str(page_count)  # Number of items to fetch
         }
         
         images = []

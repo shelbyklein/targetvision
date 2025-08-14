@@ -1418,5 +1418,18 @@
     </div>
 
     <script type="module" src="app.js"></script>
+
+    <!-- Batch Loading Progress Indicator -->
+    <div id="batch-loading-indicator" class="batch-loading-indicator hidden">
+        <div class="flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <div>
+                <div id="batch-loading-text" class="text-sm font-medium">Loading photos...</div>
+                <div class="batch-progress-bar">
+                    <div id="batch-progress-fill" class="batch-progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -123,6 +123,8 @@ class TargetVisionApp {
         // select-all, select-none, status-filter, toggle-processed, toggle-unprocessed
         
         document.getElementById('process-selected').addEventListener('click', () => {
+            // The PhotoProcessor will now check for loading state directly
+            // and the PhotoGrid will handle button state, so we can just emit the event
             eventBus.emit('photos:process-selected', { 
                 selectedPhotos: this.selectedPhotos, 
                 currentPhotos: this.currentPhotos 

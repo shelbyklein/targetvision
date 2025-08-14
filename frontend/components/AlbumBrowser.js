@@ -285,17 +285,11 @@ class AlbumBrowser {
         // Clear existing breadcrumbs
         breadcrumbContainer.innerHTML = '';
         
-        // Create Albums root breadcrumb with dropdown
-        const rootDropdown = this.createBreadcrumbDropdown('root', {
-            name: 'SmugMug Albums',
-            node_uri: null,
-            icon: `<svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
-            </svg>`
-        }, true);
-        breadcrumbContainer.appendChild(rootDropdown);
+        // Create Albums root breadcrumb (simple clickable)
+        const rootButton = this.createBreadcrumbLink('SmugMug Albums', null, true);
+        breadcrumbContainer.appendChild(rootButton);
         
-        // Add breadcrumbs for each folder in the path with dropdowns
+        // Add breadcrumbs for each folder in the path (simple clickable)
         this.breadcrumbs.forEach((breadcrumb, index) => {
             // Add separator
             const separator = document.createElement('span');
@@ -303,80 +297,42 @@ class AlbumBrowser {
             separator.textContent = '/';
             breadcrumbContainer.appendChild(separator);
             
-            // Create dropdown for each breadcrumb level
+            // Create simple clickable link for each breadcrumb
             const isLast = index === this.breadcrumbs.length - 1;
-            const dropdown = this.createBreadcrumbDropdown(
-                `level-${index}`,
-                breadcrumb,
+            const link = this.createBreadcrumbLink(
+                breadcrumb.name || 'Folder',
+                breadcrumb.node_uri,
                 false,
                 isLast
             );
-            breadcrumbContainer.appendChild(dropdown);
+            breadcrumbContainer.appendChild(link);
         });
     }
     
-    createBreadcrumbDropdown(id, item, isRoot = false, isLast = false) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'relative inline-block';
-        wrapper.setAttribute('data-dropdown-id', id);
-        
-        // Create main button
+    createBreadcrumbLink(name, nodeUri, isRoot = false, isLast = false) {
         const button = document.createElement('button');
         button.className = isLast 
             ? 'text-gray-700 text-sm font-medium flex items-center' 
-            : 'text-blue-600 hover:text-blue-800 text-sm flex items-center hover:bg-blue-50 rounded px-1 py-1';
+            : 'text-blue-600 hover:text-blue-800 text-sm flex items-center hover:bg-blue-50 rounded px-1 py-1 transition-colors';
         
-        button.innerHTML = `
-            ${item.icon || ''}
-            <span class="ml-1">${item.name || 'Root'}</span>
-            ${!isLast ? `
-                <svg class="ml-1 h-3 w-3 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            ` : ''}
-        `;
+        // Add folder icon for root
+        const icon = isRoot ? `
+            <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002 2z"/>
+            </svg>
+        ` : '';
         
-        // Create dropdown menu
-        const dropdown = document.createElement('div');
-        dropdown.className = 'absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 hidden';
-        dropdown.innerHTML = '<div class="p-2 text-sm text-gray-500">Loading...</div>';
+        button.innerHTML = `${icon}<span>${name}</span>`;
         
-        // Add hover handlers for dropdown
+        // Add click handler for navigation (except for last breadcrumb)
         if (!isLast) {
-            let timeoutId;
-            
-            // Show dropdown on hover (with delay)
-            button.addEventListener('mouseenter', () => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => {
-                    this.showBreadcrumbDropdown(id, item, dropdown);
-                }, 300);
-            });
-            
-            // Hide dropdown when leaving both button and dropdown
-            wrapper.addEventListener('mouseleave', () => {
-                clearTimeout(timeoutId);
-                setTimeout(() => {
-                    dropdown.classList.add('hidden');
-                    // Reset arrow rotation
-                    const arrow = wrapper.querySelector('button svg:last-child');
-                    if (arrow) arrow.style.transform = 'rotate(0deg)';
-                }, 100);
-            });
-            
-            // Navigate on click
             button.addEventListener('click', () => {
-                const nodeUri = isRoot ? null : item.node_uri;
-                console.log('Breadcrumb clicked:', { 
-                    item: item.name || 'Root', 
-                    nodeUri, 
-                    isRoot 
-                });
+                console.log('Breadcrumb clicked:', { name, nodeUri, isRoot });
                 try {
                     smugMugAPI.loadFolderContents(nodeUri);
                 } catch (error) {
                     console.error('Error loading folder contents:', error);
-                    eventBus.emit('ui:show-error', {
+                    eventBus.emit('toast:error', {
                         title: 'Navigation Error',
                         message: `Failed to load folder: ${error.message}`
                     });
@@ -384,92 +340,9 @@ class AlbumBrowser {
             });
         }
         
-        wrapper.appendChild(button);
-        wrapper.appendChild(dropdown);
-        
-        return wrapper;
+        return button;
     }
     
-    async showBreadcrumbDropdown(id, item, dropdownElement) {
-        const dropdown = dropdownElement;
-        dropdown.classList.remove('hidden');
-        
-        // Rotate arrow
-        const wrapper = dropdown.parentElement;
-        const arrow = wrapper.querySelector('button svg:last-child');
-        if (arrow) arrow.style.transform = 'rotate(180deg)';
-        
-        // Load folder contents for dropdown
-        try {
-            const nodeUri = item.node_uri;
-            const response = await fetch(`http://localhost:8000/smugmug/nodes${nodeUri ? `?node_uri=${encodeURIComponent(nodeUri)}` : ''}`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            const contents = data.nodes || [];
-            
-            if (contents.length === 0) {
-                dropdown.innerHTML = '<div class="p-2 text-sm text-gray-500">No items found</div>';
-                return;
-            }
-            
-            // Create dropdown content
-            const folders = contents.filter(node => node.type === 'folder');
-            const albums = contents.filter(node => node.type === 'album');
-            
-            let html = '';
-            
-            if (folders.length > 0) {
-                html += '<div class="border-b border-gray-100 pb-1 mb-1">';
-                folders.slice(0, 8).forEach(folder => {
-                    html += `
-                        <div class="px-2 py-1 hover:bg-gray-100 cursor-pointer rounded text-xs" 
-                             onclick="albumBrowser.navigateFromDropdown('${folder.node_uri}', '${folder.name}')">
-                            📁 ${folder.name}
-                        </div>
-                    `;
-                });
-                if (folders.length > 8) {
-                    html += '<div class="px-2 py-1 text-xs text-gray-400">...and ' + (folders.length - 8) + ' more folders</div>';
-                }
-                html += '</div>';
-            }
-            
-            if (albums.length > 0) {
-                albums.slice(0, 5).forEach(album => {
-                    html += `
-                        <div class="px-2 py-1 hover:bg-gray-100 cursor-pointer rounded text-xs" 
-                             onclick="albumBrowser.selectAlbumFromDropdown('${album.album_key || album.node_id}', '${album.name || album.title}')">
-                            📷 ${album.name || album.title}
-                        </div>
-                    `;
-                });
-                if (albums.length > 5) {
-                    html += '<div class="px-2 py-1 text-xs text-gray-400">...and ' + (albums.length - 5) + ' more albums</div>';
-                }
-            }
-            
-            dropdown.innerHTML = html;
-            
-        } catch (error) {
-            console.error('Error loading dropdown contents:', error);
-            dropdown.innerHTML = '<div class="p-2 text-sm text-red-500">Failed to load</div>';
-        }
-    }
-
-    navigateFromDropdown(nodeUri, name) {
-        smugMugAPI.loadFolderContents(nodeUri);
-    }
-
-    selectAlbumFromDropdown(albumId, name) {
-        const album = this.smugmugAlbums.find(a => 
-            (a.album_key && a.album_key === albumId) ||
-            (a.node_id && a.node_id === albumId)
-        );
-        if (album) {
-            eventBus.emit('album:selected', { album });
-        }
-    }
 
     toggleFolderExpansion(folder, folderElement, toggleButton) {
         const childrenContainer = document.querySelector(`[data-folder-children="${folder.node_id}"]`);
