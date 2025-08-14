@@ -19,7 +19,7 @@ class FolderGrid {
         this.currentItems = [];
         this.setupEventListeners();
         
-        console.log('FolderGrid initialized');
+        // FolderGrid initialized
     }
 
     setupEventListeners() {
@@ -28,6 +28,10 @@ class FolderGrid {
             this.currentItems = data.items || [];
             this.displayFolderGrid();
         });
+
+        // Note: Removed duplicate smugmug:folder-loaded listener
+        // The AlbumBrowser handles this event and emits folders:display-grid
+        // This prevents duplicate calls to displayFolderGrid()
     }
 
     displayFolderGrid() {

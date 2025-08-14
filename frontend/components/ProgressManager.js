@@ -17,7 +17,7 @@ import eventBus from '../services/EventBus.js';
 class ProgressManager {
     constructor() {
         this.setupEventListeners();
-        console.log('ProgressManager initialized');
+        // ProgressManager initialized
     }
 
     setupEventListeners() {

@@ -20,7 +20,7 @@ class ChatManager {
         this.chatMessages = [];
         
         this.setupEventListeners();
-        console.log('ChatManager initialized');
+        // Component initialized
     }
 
     setupEventListeners() {
@@ -89,7 +89,7 @@ class ChatManager {
     // Chat Page Initialization
     initializeChatPage() {
         // Chat page is ready by default with welcome message
-        console.log('Chat page initialized');
+        // Component initialized
         
         // Bind DOM event listeners now that the page is loaded
         this.bindDOMEventListeners();

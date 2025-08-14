@@ -27,7 +27,7 @@ class SearchManager {
         this.smugmugAlbums = []; // Will be populated from app state
         
         this.setupEventListeners();
-        console.log('SearchManager initialized');
+        // Component initialized
     }
 
     setupEventListeners() {
@@ -118,7 +118,7 @@ class SearchManager {
 
     // Search Page Initialization
     initializeSearchPage() {
-        console.log('Search page initialized');
+        // Component initialized
         
         // Bind DOM event listeners now that the page is loaded
         this.bindDOMEventListeners();

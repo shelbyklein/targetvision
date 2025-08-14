@@ -159,12 +159,26 @@ class PhotoGrid {
             return true;
         });
         
+        // Check if we're still in album view mode before showing photo grid
+        if (window.app && window.app.getCurrentViewMode() !== 'album') {
+            // Not in album view mode, ensure photo grid stays hidden
+            photoGrid.classList.add('hidden');
+            return;
+        }
+        
+        // Double-check: only show photo grid if we actually have a current album
+        if (!window.app || !window.app.currentAlbum) {
+            // No current album selected, keep photo grid hidden
+            photoGrid.classList.add('hidden');
+            return;
+        }
+        
         photoGrid.classList.remove('hidden');
         
         // Only clear grid for initial loads or refreshes, not for progressive updates
         if (isInitialLoad || isRefresh) {
             photoGrid.innerHTML = '';
-            console.log(`📸 PhotoGrid: ${isInitialLoad ? 'Initial load' : 'Refresh'} - rendering ${photosToShow.length} photos`);
+            // Rendering photos
         }
         
         photosToShow.forEach(photo => {
@@ -179,7 +193,7 @@ class PhotoGrid {
     
     // Progressive loading - append new photos without clearing existing ones
     appendPhotos(newPhotos, allPhotos) {
-        console.log(`📸 PhotoGrid: Appending ${newPhotos.length} new photos`);
+        // Appending new photos
         
         // Update current photos reference
         this.currentPhotos = allPhotos || [...this.currentPhotos, ...newPhotos];

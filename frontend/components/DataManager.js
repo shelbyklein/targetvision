@@ -16,15 +16,19 @@ import cacheManager from '../managers/CacheManager.js';
 class DataManager {
     constructor() {
         this.apiBase = 'http://localhost:8000';
+        this.currentLoadingController = null; // AbortController for cancelling photo loading
         
         this.setupEventListeners();
-        console.log('DataManager initialized');
+        // Component initialized
     }
 
     setupEventListeners() {
         // Data management events
         eventBus.on('data:confirm-processing-status', () => this.confirmProcessingStatus());
         eventBus.on('data:load-album-photos', (data) => this.loadAlbumPhotos(data.albumId, data.app));
+        
+        // Photo loading cancellation
+        eventBus.on('data:cancel-photo-loading', () => this.cancelPhotoLoading());
     }
 
     // Processing Status Confirmation
@@ -96,8 +100,23 @@ class DataManager {
         }
     }
 
+    // Photo Loading Cancellation
+    cancelPhotoLoading() {
+        if (this.currentLoadingController) {
+            // Cancelling photo loading
+            this.currentLoadingController.abort();
+            this.currentLoadingController = null;
+            eventBus.emit('photos:loading:cancelled');
+        }
+    }
+
     // Photo Loading Methods
     async loadAlbumPhotos(albumId, app) {
+        // Cancel any existing photo loading
+        this.cancelPhotoLoading();
+        
+        // Create new AbortController for this loading operation
+        this.currentLoadingController = new AbortController();
         // Reset state for new album load
         app.currentPhotos = [];
         app.photosMetadata = { totalCount: 0, loadedCount: 0, hasMore: false };
@@ -127,13 +146,21 @@ class DataManager {
     // New method for batch loading with pagination
     async fetchPhotoBatch(albumId, app, skip = 0, limit = 30, isInitialLoad = false) {
         try {
-            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=${skip}&limit=${limit}`);
+            // Check if loading was cancelled before making request
+            if (!this.currentLoadingController) {
+                // Photo loading cancelled
+                return;
+            }
+
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=${skip}&limit=${limit}`, {
+                signal: this.currentLoadingController.signal
+            });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
             const data = await response.json();
             const { photos, total_count, returned_count, has_more } = data;
             
-            console.log(`📸 DataManager: Loaded batch - skip: ${skip}, limit: ${limit}, returned: ${returned_count}, total: ${total_count}, hasMore: ${has_more}`);
+            // Photo batch loaded
             
             // Update app state
             if (isInitialLoad) {
@@ -194,6 +221,12 @@ class DataManager {
             }
             
         } catch (error) {
+            // Handle abort errors gracefully (user navigated away)
+            if (error.name === 'AbortError') {
+                // Photo batch loading cancelled
+                return; // Don't show error messages for user-initiated cancellation
+            }
+            
             console.error('Failed to load photo batch:', error);
             eventBus.emit('toast:error', { 
                 title: 'Failed to Load Photos', 
@@ -222,7 +255,7 @@ class DataManager {
             // Check if we're still viewing the same album
             const currentAlbumId = app.currentAlbum?.smugmug_id || app.currentAlbum?.album_key;
             if (currentAlbumId !== albumId) {
-                console.log('📸 DataManager: Album changed, stopping background loading');
+                // Album changed, stopping background loading
                 break;
             }
             
@@ -230,18 +263,18 @@ class DataManager {
             skip += batchSize;
         }
         
-        console.log(`📸 DataManager: Background loading complete for album ${albumId}`);
+        // Background loading complete
     }
     
     // Legacy method - redirect to batch loading for compatibility
     async fetchAlbumPhotos(albumId, app) {
-        console.log('📸 DataManager: fetchAlbumPhotos called - redirecting to batch loading');
+        // Redirecting to batch loading
         await this.fetchPhotoBatch(albumId, app, 0, 100, true); // Load larger first batch for legacy calls
     }
     
     async refreshAlbumPhotosInBackground(albumId, app) {
         try {
-            console.log('📸 DataManager: Background refresh for album', albumId);
+            // Background refresh
             // For background refresh, load all photos to compare with cache
             const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=0&limit=100`);
             if (!response.ok) return;
@@ -253,7 +286,7 @@ class DataManager {
             
             if (app.currentAlbum && (app.currentAlbum.smugmug_id === albumId || app.currentAlbum.album_key === albumId)) {
                 if (JSON.stringify(app.currentPhotos) !== JSON.stringify(freshPhotos)) {
-                    console.log('📸 DataManager: Photos changed in background, updating display');
+                    // Photos updated from background refresh
                     app.currentPhotos = freshPhotos;
                     app.photosMetadata = {
                         totalCount: data.total_count || freshPhotos.length,

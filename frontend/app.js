@@ -27,6 +27,7 @@ class TargetVisionApp {
         this.currentAlbum = null;
         this.currentPhotos = [];
         this.currentPage = 'albums';
+        this.currentViewMode = 'folder'; // 'folder' or 'album'
         this.isInitializing = true;
         
         this.initializeApp();
@@ -35,7 +36,7 @@ class TargetVisionApp {
     // Cache and State Management handled by respective managers
 
     async initializeApp() {
-        console.log('Starting app initialization...');
+        // Starting app initialization
         
         // PhotoProcessor polling is now integrated - no separate initialization needed
         
@@ -59,54 +60,32 @@ class TargetVisionApp {
             eventBus.emit('toast:error', { title: 'Initialization Error', message: 'Failed to load application data. Please refresh the page.' });
         });
         
-        console.log('Phase 1 initialization complete - UI is ready');
+        // Phase 1 complete
     }
     
     async loadApplicationData() {
+        // Load SmugMug albums
         await smugMugAPI.loadSmugMugAlbums();
         
-        // Try to restore state from URL first, then localStorage
-        const urlState = stateManager.loadStateFromURL();
+        // Get state from localStorage
         const savedState = stateManager.loadAppState();
         
-        console.log('State restoration - URL state:', urlState);
-        console.log('State restoration - Saved state:', savedState);
+        // Get URL parameters (these override saved state)
+        const urlState = stateManager.loadStateFromURL();
         
-        let restoredState = false;
+        // Merge states: savedState as base, urlState overrides
+        const finalState = { ...savedState, ...urlState };
         
-        // Priority 1: URL state with specific content (album, node, or non-albums page)
-        if (urlState && (urlState.albumId || urlState.nodeUri || urlState.currentPage !== 'albums')) {
-            console.log('Restoring from URL state with specific content');
-            restoredState = await stateManager.restoreStateFromData(urlState);
-        }
-        // Priority 2: URL state specifically requesting albums page with no other parameters
-        else if (urlState && urlState.currentPage === 'albums' && !urlState.nodeUri && !urlState.albumId) {
-            console.log('URL explicitly requests albums page only, ignoring saved state');
-            // Update StateManager with the URL state before triggering navigation
-            if (urlState) {
-                await stateManager.restoreStateFromData(urlState);
-            }
-            eventBus.emit('navigation:show-page', { pageName: 'albums' });
-            restoredState = true;
-        }
-        // Priority 3: Saved state from localStorage
-        else if (savedState && savedState.currentPage && savedState.currentPage !== 'albums') {
-            console.log('Restoring from saved state with non-albums page');
-            restoredState = await stateManager.restoreStateFromData(savedState);
-        }
-        
-        // Default fallback: show albums page
-        if (!restoredState) {
-            console.log('No valid state to restore, defaulting to albums page');
+        // Restore the state or default to albums page
+        if (finalState && (finalState.albumId || finalState.nodeUri || (finalState.currentPage && finalState.currentPage !== 'albums'))) {
+            await stateManager.restoreStateFromData(finalState);
+        } else {
             eventBus.emit('navigation:show-page', { pageName: 'albums' });
         }
         
+        // Mark initialization complete
         this.isInitializing = false;
-        
-        // Notify StateManager that initialization is complete
-        console.log('Setting StateManager isInitializing to false');
         stateManager.setInitializingFlag(false);
-        console.log('App initialization completed');
     }
     
 
@@ -114,6 +93,15 @@ class TargetVisionApp {
     bindEventListeners() {
         // Album actions
         document.getElementById('sync-album').addEventListener('click', () => {
+            // Check if photos are still loading before allowing sync
+            const syncButton = document.getElementById('sync-album');
+            if (syncButton.disabled) {
+                eventBus.emit('toast:warning', {
+                    title: 'Loading in Progress',
+                    message: 'Please wait for all photos to finish loading before syncing the album.'
+                });
+                return;
+            }
             eventBus.emit('app:sync-album', { album: this.currentAlbum });
         });
         document.getElementById('refresh-photos').addEventListener('click', () => this.refreshCurrentPhotos());
@@ -167,7 +155,7 @@ class TargetVisionApp {
         // Batch processing - delegate to PhotoProcessor
         const cancelButton = document.getElementById('cancel-batch-processing');
         if (cancelButton) {
-            console.log('Cancel batch processing button found, adding event listener');
+            //console.log('Cancel batch processing button found, adding event listener');
             cancelButton.addEventListener('click', () => {
                 console.log('Cancel batch processing button clicked');
                 eventBus.emit('photos:cancel-batch-processing');
@@ -178,7 +166,7 @@ class TargetVisionApp {
         
         const clearQueueButton = document.getElementById('clear-batch-queue');
         if (clearQueueButton) {
-            console.log('Clear batch queue button found, adding event listener');
+            //console.log('Clear batch queue button found, adding event listener');
             clearQueueButton.addEventListener('click', () => {
                 console.log('Clear batch queue button clicked');
                 eventBus.emit('photos:clear-batch-queue');
@@ -261,6 +249,13 @@ class TargetVisionApp {
         });
 
         eventBus.on('state:restore-album', (data) => {
+            // Only restore album if we're not currently in folder view
+            // This prevents album from being selected when navigating folders
+            if (this.currentViewMode === 'folder') {
+                console.log('Skipping album restoration while in folder view mode');
+                return;
+            }
+            
             const album = smugMugAPI.findAlbum(data.albumId);
             if (album) {
                 this.selectAlbum(album);
@@ -280,7 +275,7 @@ class TargetVisionApp {
 
         // Cache events
         eventBus.on('cache:updated', (data) => {
-            console.log('Cache updated:', data.action);
+            // Cache updated
         });
 
 
@@ -315,6 +310,11 @@ class TargetVisionApp {
         eventBus.on('photos:selection-changed', (data) => {
             // Update main app state when photo selection changes
             this.selectedPhotos = new Set(data.selectedPhotos);
+        });
+
+        // Photo loading state events
+        eventBus.on('photos:loading-state-changed', (data) => {
+            this.updateSyncAlbumButtonState(data.isLoading);
         });
 
         // Photo modal events are now handled by ModalManager
@@ -354,6 +354,7 @@ class TargetVisionApp {
         // Debug logging removed
         
         this.currentAlbum = album;
+        this.currentViewMode = 'album';
         
         // Notify StateManager about album selection for state persistence
         eventBus.emit('app:album-selected', { album });
@@ -390,11 +391,44 @@ class TargetVisionApp {
         eventBus.emit('photos:refresh-album-status', { album: this.currentAlbum });
     }
 
+    updateSyncAlbumButtonState(isLoading) {
+        const syncButton = document.getElementById('sync-album');
+        if (!syncButton) return;
+
+        if (isLoading) {
+            // Disable button and update appearance for loading state
+            syncButton.disabled = true;
+            syncButton.textContent = 'Loading Photos...';
+            syncButton.title = 'Please wait for all photos to finish loading before syncing the album';
+            syncButton.classList.add('opacity-50', 'cursor-not-allowed');
+            syncButton.classList.remove('hover:bg-green-700');
+            
+            console.log('🔒 [SYNC-BUTTON] Disabled sync button - photos still loading');
+        } else {
+            // Enable button and restore normal appearance
+            syncButton.disabled = false;
+            syncButton.textContent = 'Sync Album';
+            syncButton.title = 'Sync this album with the database';
+            syncButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            syncButton.classList.add('hover:bg-green-700');
+            
+            console.log('🔓 [SYNC-BUTTON] Enabled sync button - photos finished loading');
+        }
+    }
+
 
     // UI State Management
     async showAlbumsView() {
-        console.log('Showing albums view');
+        // Showing albums view
         this.currentAlbum = null;
+        this.currentViewMode = 'folder';
+        
+        // Cancel any ongoing photo loading operations
+        eventBus.emit('data:cancel-photo-loading');
+        
+        // Immediately hide photo grid to ensure UI updates correctly
+        document.getElementById('photo-grid').classList.add('hidden');
+        
         eventBus.emit('photos:clear-selection');
         eventBus.emit('navigation:show-albums-view');
         
@@ -438,6 +472,11 @@ class TargetVisionApp {
             const currentAlbumId = this.currentAlbum.smugmug_id || this.currentAlbum.album_key;
             await this.loadAlbumPhotos(currentAlbumId);
         }
+    }
+
+    // Public API for view mode access
+    getCurrentViewMode() {
+        return this.currentViewMode;
     }
 
     // Legacy toast methods removed - now handled by ToastManager via EventBus
@@ -504,11 +543,11 @@ document.addEventListener('DOMContentLoaded', () => {
         window.app = new TargetVisionApp();
         // Make eventBus globally available for onclick handlers
         window.eventBus = eventBus;
-        console.log('TargetVisionApp initialized successfully');
+        // Component initialized
         
         // Make emergency stop globally accessible from browser console
         // Application initialized successfully
-        console.log('TargetVision application initialized successfully');
+        // Component initialized
     } catch (error) {
         console.error('Error initializing TargetVisionApp:', error);
     }

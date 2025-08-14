@@ -29,7 +29,7 @@ class NavigationManager {
             this.initializeDOMListeners();
         }
         
-        console.log('NavigationManager initialized');
+        // Component initialized
     }
 
     setupEventListeners() {
@@ -50,33 +50,33 @@ class NavigationManager {
             
             if (navAlbums) {
                 navAlbums.addEventListener('click', () => this.showPage('albums'));
-                console.log('Albums navigation bound');
+                //console.log('Albums navigation bound');
             }
             
             if (navCollections) {
                 navCollections.addEventListener('click', () => {
-                    console.log('Collections button clicked!');
+                    //console.log('Collections button clicked!');
                     this.showPage('collections');
                 });
-                console.log('Collections navigation bound');
+                //  console.log('Collections navigation bound');
             }
             
             if (navChat) {
                 navChat.addEventListener('click', () => this.showPage('chat'));
-                console.log('Chat navigation bound');
+                //console.log('Chat navigation bound');
             }
             
             if (navSearch) {
                 navSearch.addEventListener('click', () => this.showPage('search'));
-                console.log('Search navigation bound');
+                //console.log('Search navigation bound');
             }
             
             if (navSettings) {
                 navSettings.addEventListener('click', () => {
-                    console.log('Settings button clicked!');
+                    //console.log('Settings button clicked!');
                     this.showPage('settings');
                 });
-                console.log('Settings navigation bound');
+                //console.log('Settings navigation bound');
             }
             
             console.log('Navigation event listeners bound successfully');

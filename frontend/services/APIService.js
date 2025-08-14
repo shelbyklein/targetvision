@@ -47,7 +47,7 @@ class APIService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
-        console.log('APIService making request to:', url);
+        // API request
         
         try {
             const response = await fetch(url, {

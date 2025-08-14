@@ -20,7 +20,7 @@ class ModalManager {
         this.currentPhoto = null;
         this.setupEventListeners();
         this.setupModalEventHandlers();
-        console.log('ModalManager initialized');
+        // Component initialized
     }
 
     setupEventListeners() {

@@ -42,10 +42,7 @@ class CacheManager {
                 this.cache.folders = new Map(Object.entries(parsed));
             }
             
-            console.log('Cache loaded:', {
-                albums: this.cache.albums.size,
-                folders: this.cache.folders.size
-            });
+            // Cache loaded silently
 
             eventBus.emit(EVENTS.CACHE_UPDATED, {
                 type: 'loaded',
@@ -88,7 +85,7 @@ class CacheManager {
     getCachedAlbumPhotos(albumId) {
         const cached = this.cache.albums.get(albumId);
         if (cached && this.isCacheValid(cached.timestamp, 'photos')) {
-            console.log('Using cached photos for album:', albumId);
+            // Using cached photos
             return cached.photos;
         }
         return null;
@@ -101,7 +98,7 @@ class CacheManager {
             timestamp: Date.now()
         });
         this.saveCache();
-        console.log('Cached photos for album:', albumId, `(${photos.length} photos)`);
+        // Photos cached
 
         eventBus.emit(EVENTS.CACHE_UPDATED, {
             type: 'album_photos_set',
@@ -114,7 +111,7 @@ class CacheManager {
         const key = nodeUri || 'root';
         const cached = this.cache.folders.get(key);
         if (cached && this.isCacheValid(cached.timestamp, 'folders')) {
-            console.log('Using cached folder contents for:', key);
+            // Using cached folder contents
             return cached.contents;
         }
         return null;
@@ -127,7 +124,7 @@ class CacheManager {
             timestamp: Date.now()
         });
         this.saveCache();
-        console.log('Cached folder contents for:', key);
+        // Folder contents cached
 
         eventBus.emit(EVENTS.CACHE_UPDATED, {
             type: 'folder_contents_set',
@@ -141,7 +138,7 @@ class CacheManager {
         this.cache.folders.clear();
         localStorage.removeItem(CACHE_KEYS.ALBUM_PHOTOS);
         localStorage.removeItem(CACHE_KEYS.FOLDER_CONTENTS);
-        console.log('🔍 DEBUG: Cache cleared');
+        // Cache cleared
 
         eventBus.emit(EVENTS.CACHE_UPDATED, {
             type: 'cleared',
@@ -219,7 +216,7 @@ class CacheManager {
     setExpiryTime(type, milliseconds) {
         if (this.cache.expiry.hasOwnProperty(type)) {
             this.cache.expiry[type] = milliseconds;
-            console.log(`Cache expiry for ${type} set to ${milliseconds}ms`);
+            // Cache expiry updated
         }
     }
 }

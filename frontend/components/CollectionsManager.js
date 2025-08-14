@@ -34,7 +34,7 @@ class CollectionsManager {
         // Load collections initially for modal functionality
         this.loadCollections();
         
-        console.log('CollectionsManager initialized');
+        // Component initialized
     }
 
     ensureDOMEventListeners() {

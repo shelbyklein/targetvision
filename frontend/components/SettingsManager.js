@@ -22,7 +22,7 @@ class SettingsManager {
         this.statusInterval = null;
         
         this.setupEventListeners();
-        console.log('SettingsManager initialized');
+        // Component initialized
     }
 
     setupEventListeners() {
@@ -116,7 +116,7 @@ class SettingsManager {
 
     // Settings Page Initialization
     async initializeSettingsPage() {
-        console.log('Settings page initialized');
+        // Component initialized
         await this.loadCurrentPrompt();
         this.loadApplicationSettings();
         this.loadApiKeySettings();

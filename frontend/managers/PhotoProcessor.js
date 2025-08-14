@@ -26,7 +26,7 @@ class PhotoProcessor {
         this.photoLoadingInProgress = false;
         
         this.setupEventListeners();
-        console.log('🔄 PhotoProcessor initialized with polling capability');
+        // Component initialized
     }
 
     setupEventListeners() {

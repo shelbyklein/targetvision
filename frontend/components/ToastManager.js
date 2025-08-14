@@ -19,7 +19,7 @@ class ToastManager {
         this.toastQueue = [];
         this.maxToasts = 5; // Maximum number of toasts to show at once
         this.setupEventListeners();
-        console.log('ToastManager initialized');
+        // Component initialized
     }
 
     setupEventListeners() {
@@ -30,6 +30,13 @@ class ToastManager {
         eventBus.on('toast:error', (data) => this.showErrorMessage(data.title, data.message, data.details));
         eventBus.on('toast:warning', (data) => this.showToast(data.title, data.message, 'warning', data.duration));
         eventBus.on('toast:info', (data) => this.showToast(data.title, data.message, 'info', data.duration));
+        
+        // Progress toast events
+        eventBus.on('toast:progress', (data) => {
+            const toastId = this.showProgressToast(data.title, data.message);
+            eventBus.emit('toast:progress-created', { toastId });
+        });
+        eventBus.on('toast:progress-complete', (data) => this.completeProgressToast(data.toastId, data.title, data.message));
         
         // Listen for feedback events from other components
         eventBus.on('feedback:show', (data) => this.showToast('Info', data.message, data.type || 'info', data.duration));

@@ -8,6 +8,7 @@ class AlbumBrowser {
         this.currentNodeUri = null;
         this.breadcrumbs = [];
         this.nodeHistory = [];
+        this.currentAlbum = null; // Track currently selected album
         
         this.setupEventListeners();
     }
@@ -30,12 +31,56 @@ class AlbumBrowser {
         eventBus.on('folders:display', () => {
             this.displayFolderContents();
         });
+
+        // Listen for album selection events to update breadcrumbs
+        eventBus.on('app:album-selected', (data) => {
+            this.handleAlbumSelected(data.album);
+        });
+
+        // Listen for individual album sync completion to update status without folder refresh
+        eventBus.on('smugmug:album-sync-complete', (data) => {
+            this.handleAlbumSyncComplete(data);
+        });
     }
 
     handleFolderLoaded(data) {
+        // Check if we're currently in album view using the app's view mode
+        const wasInAlbumView = window.app && window.app.getCurrentViewMode() === 'album';
+        
         this.currentNodeUri = data.nodeUri;
         this.breadcrumbs = data.breadcrumbs || [];
         this.smugmugAlbums = data.albums;
+        
+        // Clear current album when navigating to folder view
+        this.currentAlbum = null;
+        
+        // Clear any selected album in app state to prevent photo grid display
+        if (window.app) {
+            window.app.currentAlbum = null;
+        }
+        
+        // Always ensure photo grid is hidden when loading folder contents
+        // This prevents the photo grid from remaining visible after album-to-folder navigation
+        const photoGrid = document.getElementById('photo-grid');
+        if (photoGrid) {
+            photoGrid.classList.add('hidden');
+        }
+        
+        // Clear photo selection and hide photo controls
+        eventBus.emit('photos:clear-selection');
+        const photoControls = document.getElementById('photo-controls');
+        const albumActions = document.getElementById('album-actions');
+        if (photoControls) photoControls.classList.add('hidden');
+        if (albumActions) albumActions.classList.add('hidden');
+        
+        // If we were in album view and now loading folder contents,
+        // we need to switch back to albums/folder view mode
+        if (wasInAlbumView) {
+            // Switching from album to folder view
+            eventBus.emit('app:show-albums-view');
+            // Note: displayFolderContents() will be called via the albums:display event
+            return;
+        }
         
         this.displayFolderContents();
     }
@@ -262,8 +307,11 @@ class AlbumBrowser {
             // Load the folder contents using the node URI
             await smugMugAPI.loadFolderContents(folder.node_uri);
             
-            // Update right panel to show folder contents
-            this.displayFolderContentsInRightPanel(folder);
+            // Note: No need to manually trigger grid update here because:
+            // 1. smugMugAPI.loadFolderContents() will emit 'smugmug:folder-loaded'
+            // 2. This triggers handleFolderLoaded() which updates this.smugmugAlbums
+            // 3. handleFolderLoaded() calls displayFolderContents() which emits 'folders:display-grid'
+            // 4. FolderGrid listens for 'folders:display-grid' and updates accordingly
             
         } catch (error) {
             console.error('Error navigating to folder:', error);
@@ -289,8 +337,13 @@ class AlbumBrowser {
         const rootButton = this.createBreadcrumbLink('SmugMug Albums', null, true);
         breadcrumbContainer.appendChild(rootButton);
         
-        // Add breadcrumbs for each folder in the path (simple clickable)
+        // Add breadcrumbs for each folder in the path (skip first one as it's the root)
         this.breadcrumbs.forEach((breadcrumb, index) => {
+            // Skip the first breadcrumb as it's the root (already showing "SmugMug Albums")
+            if (index === 0 && !breadcrumb.name) {
+                return;
+            }
+            
             // Add separator
             const separator = document.createElement('span');
             separator.className = 'mx-2 text-gray-400';
@@ -298,7 +351,8 @@ class AlbumBrowser {
             breadcrumbContainer.appendChild(separator);
             
             // Create simple clickable link for each breadcrumb
-            const isLast = index === this.breadcrumbs.length - 1;
+            // If we have a current album and this is the last breadcrumb, it's not the final one
+            const isLast = index === this.breadcrumbs.length - 1 && !this.currentAlbum;
             const link = this.createBreadcrumbLink(
                 breadcrumb.name || 'Folder',
                 breadcrumb.node_uri,
@@ -307,6 +361,24 @@ class AlbumBrowser {
             );
             breadcrumbContainer.appendChild(link);
         });
+
+        // Add album breadcrumb if we have a currently selected album
+        if (this.currentAlbum) {
+            // Add separator
+            const separator = document.createElement('span');
+            separator.className = 'mx-2 text-gray-400';
+            separator.textContent = '/';
+            breadcrumbContainer.appendChild(separator);
+            
+            // Create album breadcrumb (non-clickable as it's the current page)
+            const albumLink = this.createBreadcrumbLink(
+                this.currentAlbum.name || this.currentAlbum.title || 'Album',
+                null,
+                false,
+                true // This is the last breadcrumb
+            );
+            breadcrumbContainer.appendChild(albumLink);
+        }
     }
     
     createBreadcrumbLink(name, nodeUri, isRoot = false, isLast = false) {
@@ -326,16 +398,43 @@ class AlbumBrowser {
         
         // Add click handler for navigation (except for last breadcrumb)
         if (!isLast) {
-            button.addEventListener('click', () => {
-                console.log('Breadcrumb clicked:', { name, nodeUri, isRoot });
+            button.addEventListener('click', async () => {
+                // Breadcrumb navigation - always navigating to a folder
                 try {
-                    smugMugAPI.loadFolderContents(nodeUri);
+                    // Immediately hide photo grid since breadcrumb navigation is always to folders
+                    const photoGrid = document.getElementById('photo-grid');
+                    if (photoGrid) {
+                        photoGrid.classList.add('hidden');
+                    }
+                    
+                    // Clear album state and hide photo-related UI elements
+                    if (window.app) {
+                        window.app.currentAlbum = null;
+                    }
+                    const photoControls = document.getElementById('photo-controls');
+                    const albumActions = document.getElementById('album-actions');
+                    if (photoControls) photoControls.classList.add('hidden');
+                    if (albumActions) albumActions.classList.add('hidden');
+                    
+                    // Clear photo selection
+                    eventBus.emit('photos:clear-selection');
+                    
+                    // Show loading states
+                    eventBus.emit('folders:loading:show');
+                    
+                    // Use consistent navigation flow - let smugMugAPI handle the loading
+                    // This will emit 'smugmug:folder-loaded' which triggers proper updates
+                    await smugMugAPI.loadFolderContents(nodeUri);
+                    
                 } catch (error) {
                     console.error('Error loading folder contents:', error);
                     eventBus.emit('toast:error', {
                         title: 'Navigation Error',
                         message: `Failed to load folder: ${error.message}`
                     });
+                } finally {
+                    // Clear loading states
+                    eventBus.emit('folders:loading:hide');
                 }
             });
         }
@@ -362,11 +461,75 @@ class AlbumBrowser {
         }
     }
 
-    displayFolderContentsInRightPanel(folder) {
-        // This method updates the right panel to show the folder's contents
-        // Since the folder contents have already been loaded and are in this.smugmugAlbums,
-        // we should trigger the grid display with the current folder contents
-        eventBus.emit('folders:display-grid', { items: this.smugmugAlbums });
+
+    handleAlbumSelected(album) {
+        // Store the currently selected album
+        this.currentAlbum = album;
+        
+        // Update breadcrumbs to include the album name
+        this.updateBreadcrumbs();
+    }
+
+    handleAlbumSyncComplete(data) {
+        const { album, result, albumId } = data;
+        
+        console.log(`🔄 [ALBUM-BROWSER] Handling sync completion for album: ${album.name || albumId}`);
+        
+        // Update the album in our local cache
+        const albumIndex = this.smugmugAlbums.findIndex(a => 
+            (a.smugmug_id && a.smugmug_id === albumId) ||
+            (a.album_key && a.album_key === albumId)
+        );
+        
+        if (albumIndex !== -1) {
+            // Update the album object with new sync status
+            this.smugmugAlbums[albumIndex] = {
+                ...this.smugmugAlbums[albumIndex],
+                sync_status: 'synced',
+                synced_photos: result.synced_photos,
+                last_sync: new Date().toISOString()
+            };
+            
+            console.log(`✅ [ALBUM-BROWSER] Updated album sync status in cache`);
+        }
+        
+        // Update any visible album status indicators in the sidebar
+        const albumElements = document.querySelectorAll(`[data-album-id="${albumId}"]`);
+        albumElements.forEach(element => {
+            const statusElement = element.querySelector('.album-sync-status');
+            if (statusElement) {
+                statusElement.innerHTML = `
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 13l4 4L19 7'%3E%3C/path%3E%3C/svg%3E" class="w-4 h-4 text-green-600">
+                    <span class="text-green-600">Synced</span>
+                `;
+                console.log(`✅ [ALBUM-BROWSER] Updated UI status indicator for album ${albumId}`);
+            }
+            
+            // Update photo count if visible
+            const photoCountElement = element.querySelector('.album-photo-count');
+            if (photoCountElement && result.synced_photos) {
+                const currentText = photoCountElement.textContent;
+                if (currentText.includes('photos')) {
+                    photoCountElement.textContent = `${result.synced_photos} photos`;
+                    console.log(`✅ [ALBUM-BROWSER] Updated photo count to ${result.synced_photos}`);
+                }
+            }
+        });
+        
+        // If this was the currently selected album, update the current album reference
+        if (this.currentAlbum && 
+            ((this.currentAlbum.smugmug_id && this.currentAlbum.smugmug_id === albumId) ||
+             (this.currentAlbum.album_key && this.currentAlbum.album_key === albumId))) {
+            this.currentAlbum = {
+                ...this.currentAlbum,
+                sync_status: 'synced',
+                synced_photos: result.synced_photos,
+                last_sync: new Date().toISOString()
+            };
+            console.log(`✅ [ALBUM-BROWSER] Updated current album reference`);
+        }
+        
+        console.log(`🎉 [ALBUM-BROWSER] Album sync UI update complete - staying in album view`);
     }
 
     // Public API methods

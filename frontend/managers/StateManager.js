@@ -196,11 +196,16 @@ class StateManager {
                 if (nodeUri) {
                     eventBus.emit('state:restore-folder', { nodeUri });
                     restored = true;
+                    
+                    // Clear any album state when restoring folder state to prevent conflicts
+                    this.state.currentAlbum = null;
+                    this.updateURL();
                 }
             }
             
-            // Then restore album selection AFTER folder context is set
-            if (stateData.albumId || stateData.currentAlbum) {
+            // Only restore album selection if NOT restoring folder state
+            // This prevents both folder and album views from displaying simultaneously
+            else if (stateData.albumId || stateData.currentAlbum) {
                 const albumId = stateData.albumId || (stateData.currentAlbum ? 
                     stateData.currentAlbum.smugmug_id || stateData.currentAlbum.album_key : null);
                 

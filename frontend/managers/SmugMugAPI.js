@@ -20,6 +20,10 @@ class SmugMugAPI {
             this.syncCurrentAlbum(data.album);
         });
 
+        eventBus.on('albums:sync-all', () => {
+            this.syncAllAlbums();
+        });
+
         eventBus.on('state:restore-folder', async (data) => {
             await this.loadFolderContents(data.nodeUri);
         });
@@ -196,15 +200,34 @@ class SmugMugAPI {
 
     async syncCurrentAlbum(album) {
         if (!album) {
-            console.error('No album provided for sync');
+            console.error('❌ [SYNC-ALBUM] No album provided for sync');
             return;
         }
         
         const albumId = album.smugmug_id || album.album_key;
+        const albumName = album.name || album.title || 'Unknown Album';
+        
         if (!albumId) {
-            console.error('Album missing required ID');
+            console.error('❌ [SYNC-ALBUM] Album missing required ID:', album);
             return;
         }
+        
+        const startTime = performance.now();
+        console.log(`🔄 [SYNC-ALBUM] Starting sync for album: "${albumName}" (ID: ${albumId})`);
+        console.log(`🔄 [SYNC-ALBUM] Timestamp: ${new Date().toISOString()}`);
+        
+        // Show progress toast for single album
+        let progressToastId = null;
+        const toastCreatedHandler = (data) => {
+            progressToastId = data.toastId;
+            eventBus.off('toast:progress-created', toastCreatedHandler);
+        };
+        eventBus.on('toast:progress-created', toastCreatedHandler);
+        
+        eventBus.emit('toast:progress', {
+            title: `Syncing Album`,
+            message: `Synchronizing "${albumName}"...`
+        });
         
         eventBus.emit('smugmug:sync-start', { album });
         
@@ -217,22 +240,90 @@ class SmugMugAPI {
                 selectedAlbumId: albumId
             };
             
+            console.log(`🔄 [SYNC-ALBUM] Calling POST /smugmug/albums/${albumId}/sync`);
             const result = await apiService.post(`/smugmug/albums/${albumId}/sync`);
             
-            // Context-preserving refresh: only update current folder and album data
-            await this.refreshCurrentContext(savedState);
+            const endTime = performance.now();
+            const durationMs = endTime - startTime;
+            const durationSeconds = (durationMs / 1000).toFixed(2);
+            
+            // Log detailed results
+            console.log(`✅ [SYNC-ALBUM] Album "${albumName}" sync completed successfully`);
+            console.log(`✅ [SYNC-ALBUM] Duration: ${durationSeconds} seconds`);
+            console.log(`✅ [SYNC-ALBUM] Photos synced: ${result.synced_photos || 'unknown'}`);
+            console.log(`✅ [SYNC-ALBUM] Album name: ${result.album_name || albumName}`);
+            console.log(`✅ [SYNC-ALBUM] Performance: ${result.synced_photos ? (result.synced_photos / parseFloat(durationSeconds)).toFixed(1) : 'N/A'} photos/second`);
+            console.log(`✅ [SYNC-ALBUM] End timestamp: ${new Date().toISOString()}`);
+            
+            // Update progress toast to completion
+            if (progressToastId) {
+                eventBus.emit('toast:progress-complete', {
+                    toastId: progressToastId,
+                    title: 'Album Synced',
+                    message: `"${result.album_name || albumName}" synced: ${result.synced_photos || 0} photos in ${durationSeconds}s`
+                });
+            }
+            
+            // For single album sync, just emit update events instead of refreshing folder contents
+            // This preserves the current album view instead of backing out to parent folder
+            eventBus.emit('smugmug:album-sync-complete', {
+                album: {
+                    ...album,
+                    sync_status: 'synced',
+                    synced_photos: result.synced_photos,
+                    last_sync: new Date().toISOString()
+                },
+                result,
+                albumId,
+                savedState
+            });
             
             eventBus.emit('smugmug:sync-success', { 
                 album, 
                 result,
+                duration: durationSeconds,
                 message: `Successfully synced ${result.synced_photos} photos from "${result.album_name}"`
+            });
+            
+            // Show success toast
+            eventBus.emit('toast:success', {
+                title: 'Album Synced',
+                message: `Successfully synced ${result.synced_photos || 0} photos from "${result.album_name || albumName}" in ${durationSeconds} seconds`
             });
             
             return result;
             
         } catch (error) {
-            console.error('Album sync failed:', error);
-            eventBus.emit('smugmug:sync-error', { album, error });
+            const endTime = performance.now();
+            const durationMs = endTime - startTime;
+            const durationSeconds = (durationMs / 1000).toFixed(2);
+            
+            // Log detailed error information
+            console.error(`❌ [SYNC-ALBUM] Sync failed for album "${albumName}"`);
+            console.error(`❌ [SYNC-ALBUM] Error after ${durationSeconds} seconds`);
+            console.error(`❌ [SYNC-ALBUM] Error details:`, error);
+            console.error(`❌ [SYNC-ALBUM] Error stack trace:`, error.stack);
+            console.error(`❌ [SYNC-ALBUM] Failure timestamp: ${new Date().toISOString()}`);
+            
+            // Remove progress toast and show error
+            if (progressToastId) {
+                eventBus.emit('toast:remove', { toastId: progressToastId });
+            }
+            
+            eventBus.emit('smugmug:sync-error', { 
+                album, 
+                error,
+                duration: durationSeconds,
+                message: error.message || 'Unknown sync error'
+            });
+            
+            // Show error toast with no auto-dismiss
+            eventBus.emit('toast:error', {
+                title: 'Album Sync Failed',
+                message: `Sync failed for "${albumName}" after ${durationSeconds} seconds: ${error.message || 'Unknown error'}`,
+                details: error.response ? JSON.stringify(error.response.data, null, 2) : error.stack
+            });
+            
             throw error;
         }
     }
@@ -269,6 +360,113 @@ class SmugMugAPI {
                 savedState, 
                 error 
             });
+        }
+    }
+
+    async syncAllAlbums() {
+        const startTime = performance.now();
+        console.log('🔄 [SYNC-ALL] Starting sync of all albums');
+        console.log(`🔄 [SYNC-ALL] Timestamp: ${new Date().toISOString()}`);
+        
+        // Show progress toast
+        let progressToastId = null;
+        const toastCreatedHandler = (data) => {
+            progressToastId = data.toastId;
+            eventBus.off('toast:progress-created', toastCreatedHandler);
+        };
+        eventBus.on('toast:progress-created', toastCreatedHandler);
+        
+        eventBus.emit('toast:progress', {
+            title: 'Syncing All Albums',
+            message: 'Synchronizing all albums and photos...'
+        });
+
+        try {
+            // Get album stats for logging
+            const albums = this.getAlbums();
+            const albumCount = albums.length;
+            console.log(`🔄 [SYNC-ALL] Found ${albumCount} albums to sync`);
+            
+            eventBus.emit('smugmug:sync-all-start', { 
+                albumCount,
+                startTime: Date.now()
+            });
+            
+            // Call the backend sync endpoint
+            console.log('🔄 [SYNC-ALL] Calling POST /photos/sync endpoint');
+            const result = await apiService.post('/photos/sync', { limit: 1000 });
+            
+            const endTime = performance.now();
+            const durationMs = endTime - startTime;
+            const durationSeconds = (durationMs / 1000).toFixed(2);
+            
+            // Log detailed results
+            console.log('✅ [SYNC-ALL] Sync completed successfully');
+            console.log(`✅ [SYNC-ALL] Duration: ${durationSeconds} seconds`);
+            console.log(`✅ [SYNC-ALL] Photos synced: ${result.synced_photos || 'unknown'}`);
+            console.log(`✅ [SYNC-ALL] Albums processed: ${result.albums_processed || 'unknown'}`);
+            console.log(`✅ [SYNC-ALL] Performance: ${result.synced_photos ? (result.synced_photos / parseFloat(durationSeconds)).toFixed(1) : 'N/A'} photos/second`);
+            console.log(`✅ [SYNC-ALL] End timestamp: ${new Date().toISOString()}`);
+            
+            // Update progress toast to completion
+            eventBus.emit('toast:progress-complete', {
+                toastId: progressToastId,
+                title: 'Sync Complete',
+                message: `Successfully synced ${result.synced_photos || 'all'} photos in ${durationSeconds}s`
+            });
+            
+            // Refresh current context to show updated sync statuses
+            await this.refreshCurrentContext({
+                currentNodeUri: this.currentNodeUri,
+                breadcrumbs: [...this.breadcrumbs],
+                nodeHistory: [...this.nodeHistory]
+            });
+            
+            // Emit success event for other components
+            eventBus.emit('smugmug:sync-all-success', { 
+                result,
+                duration: durationSeconds,
+                albumsProcessed: result.albums_processed,
+                photosSync: result.synced_photos
+            });
+            
+            // Show success toast
+            eventBus.emit('toast:success', {
+                title: 'All Albums Synced',
+                message: `Successfully synced ${result.synced_photos || 'all'} photos from ${result.albums_processed || albumCount} albums in ${durationSeconds} seconds`
+            });
+            
+            return result;
+            
+        } catch (error) {
+            const endTime = performance.now();
+            const durationMs = endTime - startTime;
+            const durationSeconds = (durationMs / 1000).toFixed(2);
+            
+            // Log detailed error information
+            console.error('❌ [SYNC-ALL] Sync failed');
+            console.error(`❌ [SYNC-ALL] Error after ${durationSeconds} seconds`);
+            console.error(`❌ [SYNC-ALL] Error details:`, error);
+            console.error(`❌ [SYNC-ALL] Error stack trace:`, error.stack);
+            console.error(`❌ [SYNC-ALL] Failure timestamp: ${new Date().toISOString()}`);
+            
+            // Remove progress toast and show error
+            eventBus.emit('toast:remove', { toastId: progressToastId });
+            
+            eventBus.emit('smugmug:sync-all-error', { 
+                error, 
+                duration: durationSeconds,
+                message: error.message || 'Unknown sync error'
+            });
+            
+            // Show error toast with no auto-dismiss
+            eventBus.emit('toast:error', {
+                title: 'Sync All Failed',
+                message: `Album sync failed after ${durationSeconds} seconds: ${error.message || 'Unknown error'}`,
+                details: error.response ? JSON.stringify(error.response.data, null, 2) : error.stack
+            });
+            
+            throw error;
         }
     }
 
