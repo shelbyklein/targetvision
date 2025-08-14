@@ -9,6 +9,7 @@ class AlbumBrowser {
         this.breadcrumbs = [];
         this.nodeHistory = [];
         this.currentAlbum = null; // Track currently selected album
+        this.navigationFrozen = false; // Track if navigation is frozen
         
         this.setupEventListeners();
     }
@@ -40,6 +41,15 @@ class AlbumBrowser {
         // Listen for individual album sync completion to update status without folder refresh
         eventBus.on('smugmug:album-sync-complete', (data) => {
             this.handleAlbumSyncComplete(data);
+        });
+
+        // Listen for navigation freeze/unfreeze events
+        eventBus.on('ui:freeze-navigation', (data) => {
+            this.freezeNavigation(data.reason);
+        });
+
+        eventBus.on('ui:unfreeze-navigation', () => {
+            this.unfreezeNavigation();
         });
     }
 
@@ -235,9 +245,17 @@ class AlbumBrowser {
                     
                     <div class="flex-1">
                         <h3 class="text-sm font-medium text-gray-900">${album.name || album.title}</h3>
-                        <p class="text-xs text-gray-500">
-                            ${album.image_count || 0} photos
-                            ${album.is_synced ? '• Synced' : '• Not synced'}
+                        <p class="text-xs text-gray-500 flex items-center">
+                            <span class="mr-2">${album.image_count || 0} photos</span>
+                            ${album.is_synced ? `
+                                <svg class="h-3 w-3 text-green-500" fill="currentColor" viewBox="0 0 20 20" title="Synced">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                            ` : `
+                                <svg class="h-3 w-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20" title="Not synced">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z" clip-rule="evenodd"/>
+                                </svg>
+                            `}
                         </p>
                     </div>
                 </div>
@@ -274,6 +292,15 @@ class AlbumBrowser {
     }
     
     selectAlbumFromTree(album, element) {
+        // Check if navigation is frozen
+        if (this.navigationFrozen) {
+            eventBus.emit('toast:warning', { 
+                title: 'Navigation Blocked', 
+                message: 'Please wait for current operation to complete' 
+            });
+            return;
+        }
+
         // Remove selection from other items
         document.querySelectorAll('.folder-item, .album-item').forEach(item => {
             item.classList.remove('bg-blue-100', 'border-l-4', 'border-blue-500');
@@ -294,6 +321,15 @@ class AlbumBrowser {
     }
 
     async navigateToFolder(folder, element = null) {
+        // Check if navigation is frozen
+        if (this.navigationFrozen) {
+            eventBus.emit('toast:warning', { 
+                title: 'Navigation Blocked', 
+                message: 'Please wait for current operation to complete' 
+            });
+            return;
+        }
+
         try {
             // Show loading state for folder grid
             eventBus.emit('folders:loading:show');
@@ -561,6 +597,56 @@ class AlbumBrowser {
 
     getAlbums() {
         return this.smugmugAlbums.filter(item => item.type === 'album');
+    }
+
+    // Navigation Freeze/Unfreeze Methods
+    freezeNavigation(reason = 'Operation in progress...') {
+        this.navigationFrozen = true;
+        
+        // Add visual indicators to show navigation is frozen
+        const navigationItems = document.querySelectorAll('.folder-item, .album-item, .breadcrumb-button, .folder-toggle');
+        navigationItems.forEach(item => {
+            item.classList.add('opacity-50', 'cursor-not-allowed');
+            item.setAttribute('data-frozen', 'true');
+        });
+
+        // Show loading overlay or message
+        const albumsList = document.getElementById('albums-list');
+        if (albumsList) {
+            const existingOverlay = albumsList.querySelector('.navigation-frozen-overlay');
+            if (!existingOverlay) {
+                const overlay = document.createElement('div');
+                overlay.className = 'navigation-frozen-overlay absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10';
+                overlay.innerHTML = `
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <div class="text-sm text-gray-600">${reason}</div>
+                    </div>
+                `;
+                // Make sure the parent has relative positioning
+                if (albumsList.style.position !== 'relative') {
+                    albumsList.style.position = 'relative';
+                }
+                albumsList.appendChild(overlay);
+            }
+        }
+    }
+
+    unfreezeNavigation() {
+        this.navigationFrozen = false;
+        
+        // Remove visual indicators
+        const navigationItems = document.querySelectorAll('[data-frozen="true"]');
+        navigationItems.forEach(item => {
+            item.classList.remove('opacity-50', 'cursor-not-allowed');
+            item.removeAttribute('data-frozen');
+        });
+
+        // Remove loading overlay
+        const overlay = document.querySelector('.navigation-frozen-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
     }
 }
 

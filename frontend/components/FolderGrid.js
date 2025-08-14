@@ -13,10 +13,12 @@
 
 import eventBus from '../services/EventBus.js';
 import UIUtils from '../utils/UIUtils.js';
+import apiService from '../services/APIService.js';
 
 class FolderGrid {
     constructor() {
         this.currentItems = [];
+        this.navigationFrozen = false;
         this.setupEventListeners();
         
         // FolderGrid initialized
@@ -32,6 +34,15 @@ class FolderGrid {
         // Note: Removed duplicate smugmug:folder-loaded listener
         // The AlbumBrowser handles this event and emits folders:display-grid
         // This prevents duplicate calls to displayFolderGrid()
+
+        // Listen for navigation freeze/unfreeze events
+        eventBus.on('ui:freeze-navigation', (data) => {
+            this.freezeNavigation(data.reason);
+        });
+
+        eventBus.on('ui:unfreeze-navigation', () => {
+            this.unfreezeNavigation();
+        });
     }
 
     displayFolderGrid() {
@@ -95,30 +106,36 @@ class FolderGrid {
         
         card.innerHTML = `
             <div class="p-4 text-center">
-                <!-- Folder Icon or Thumbnail -->
-                <div class="flex justify-center mb-3">
+                <!-- Folder Thumbnail Container - 1:1 aspect ratio -->
+                <div class="aspect-square w-full bg-gray-100 rounded-lg overflow-hidden relative mb-3 mx-auto">
                     ${thumbnailUrl ? `
                         <img src="${thumbnailUrl}" 
                              alt="${folder.name}" 
-                             class="h-16 w-16 object-cover rounded-lg border border-gray-200"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        <svg class="h-16 w-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20" style="display: none;">
-                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                        </svg>
+                             class="w-full h-full object-cover"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="absolute inset-0 flex items-center justify-center bg-gray-100" style="display: none;">
+                            <svg class="h-8 w-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                            </svg>
+                        </div>
                     ` : `
-                        <svg class="h-16 w-16 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                        </svg>
+                        <div class="w-full h-full flex items-center justify-center">
+                            <svg class="h-8 w-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                            </svg>
+                        </div>
                     `}
                 </div>
                 
-                <!-- Folder Info -->
-                <h3 class="text-sm font-medium text-gray-900 mb-1 truncate" title="${folder.name}">
-                    ${folder.name}
-                </h3>
-                <p class="text-xs text-gray-500">
-                    ${folder.has_children ? 'Folder' : 'Empty Folder'}
-                </p>
+                <!-- Folder Info - Below thumbnail -->
+                <div class="text-center">
+                    <h3 class="text-sm font-medium text-gray-900 mb-1 truncate" title="${folder.name}">
+                        ${folder.name}
+                    </h3>
+                    <p class="text-xs text-gray-500">
+                        ${folder.has_children ? 'Folder' : 'Empty Folder'}
+                    </p>
+                </div>
             </div>
         `;
         
@@ -139,46 +156,57 @@ class FolderGrid {
         const isSynced = album.is_synced;
         
         // Get thumbnail URL from different possible locations
-        const thumbnailUrl = album.thumbnail_url || (album.highlight_image && album.highlight_image.thumbnail_url);
+        let thumbnailUrl = album.thumbnail_url || (album.highlight_image && album.highlight_image.thumbnail_url);
+        
+        // If no thumbnail URL and it's not synced, we'll try to fetch it from the API
+        const needsThumbnailFetch = !thumbnailUrl && !isSynced && (album.album_key || album.smugmug_id);
         
         card.innerHTML = `
             <div class="p-4 text-center">
-                <!-- Album Icon or Thumbnail -->
-                <div class="flex justify-center mb-3">
+                <!-- Album Thumbnail Container - 1:1 aspect ratio -->
+                <div class="aspect-square w-full bg-gray-100 rounded-lg overflow-hidden relative mb-3 mx-auto" data-thumbnail-container>
                     ${thumbnailUrl ? `
                         <img src="${thumbnailUrl}" 
                              alt="${album.name || album.title}" 
-                             class="h-16 w-16 object-cover rounded-lg border border-gray-200"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        <svg class="h-16 w-16 text-green-500" fill="currentColor" viewBox="0 0 20 20" style="display: none;">
-                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
-                        </svg>
+                             class="w-full h-full object-cover"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="absolute inset-0 flex items-center justify-center bg-gray-100" style="display: none;">
+                            <svg class="h-8 w-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                    ` : needsThumbnailFetch ? `
+                        <div class="w-full h-full flex items-center justify-center" data-loading-thumbnail>
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+                        </div>
                     ` : `
-                        <svg class="h-16 w-16 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
-                        </svg>
+                        <div class="w-full h-full flex items-center justify-center">
+                            <svg class="h-8 w-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
                     `}
                 </div>
                 
-                <!-- Album Info -->
-                <h3 class="text-sm font-medium text-gray-900 mb-1 truncate" title="${album.name || album.title}">
-                    ${album.name || album.title}
-                </h3>
-                <div class="text-xs text-gray-500">
-                    <p>${imageCount} photo${imageCount !== 1 ? 's' : ''}</p>
-                    <p class="flex items-center justify-center mt-1">
-                        ${isSynced ? `
-                            <svg class="h-3 w-3 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                            </svg>
-                            Synced
-                        ` : `
-                            <svg class="h-3 w-3 mr-1 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-5a1 1 0 011-1h1a1 1 0 110 2H9a1 1 0 01-1-1zm1-9a1 1 0 011 1v6a1 1 0 11-2 0V5a1 1 0 011-1z" clip-rule="evenodd"/>
-                            </svg>
-                            Not synced
-                        `}
-                    </p>
+                <!-- Album Info - Below thumbnail -->
+                <div class="text-center">
+                    <h3 class="text-sm font-medium text-gray-900 mb-2 truncate" title="${album.name || album.title}">
+                        ${album.name || album.title}
+                    </h3>
+                    <div class="text-xs text-gray-500">
+                        <p class="mb-1">${imageCount} photo${imageCount !== 1 ? 's' : ''}</p>
+                        <div class="flex items-center justify-center">
+                            ${isSynced ? `
+                                <svg class="h-3 w-3 text-green-500" fill="currentColor" viewBox="0 0 20 20" title="Synced">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                            ` : `
+                                <svg class="h-3 w-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20" title="Not synced">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z" clip-rule="evenodd"/>
+                                </svg>
+                            `}
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -188,7 +216,66 @@ class FolderGrid {
             this.selectAlbum(album);
         });
         
+        // Fetch thumbnail if needed
+        if (needsThumbnailFetch) {
+            this.fetchAlbumThumbnail(album, card);
+        }
+        
         return card;
+    }
+    
+    async fetchAlbumThumbnail(album, cardElement) {
+        const albumKey = album.album_key || album.smugmug_id;
+        if (!albumKey) return;
+        
+        try {
+            const thumbnailContainer = cardElement.querySelector('[data-thumbnail-container]');
+            if (!thumbnailContainer) return;
+            
+            // Fetch thumbnail from API
+            const response = await apiService.get(`/smugmug/album/${albumKey}/thumbnail`);
+            
+            if (response && response.thumbnail_url) {
+                // Replace loading spinner with actual image
+                thumbnailContainer.innerHTML = `
+                    <img src="${response.thumbnail_url}" 
+                         alt="${album.name || album.title}" 
+                         class="w-full h-full object-cover"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="absolute inset-0 flex items-center justify-center bg-gray-100" style="display: none;">
+                        <svg class="h-8 w-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                `;
+            } else {
+                // Fallback to album icon if no thumbnail available
+                thumbnailContainer.innerHTML = `
+                    <div class="w-full h-full flex items-center justify-center">
+                        <svg class="h-8 w-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            // Only log non-404 errors to reduce console spam
+            if (error.status !== 404) {
+                console.warn('Failed to fetch album thumbnail:', error);
+            }
+            
+            // Fallback to album icon on error
+            const thumbnailContainer = cardElement.querySelector('[data-thumbnail-container]');
+            if (thumbnailContainer) {
+                thumbnailContainer.innerHTML = `
+                    <div class="w-full h-full flex items-center justify-center">
+                        <svg class="h-8 w-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                `;
+            }
+        }
     }
     
     selectFolder(folder) {
@@ -211,6 +298,15 @@ class FolderGrid {
     }
     
     selectAlbum(album) {
+        // Check if navigation is frozen
+        if (this.navigationFrozen) {
+            eventBus.emit('toast:warning', { 
+                title: 'Navigation Blocked', 
+                message: 'Please wait for current operation to complete' 
+            });
+            return;
+        }
+
         console.log('Album selected from grid:', album.name || album.title);
         
         // Add visual feedback
@@ -254,6 +350,56 @@ class FolderGrid {
     // Public API methods
     getCurrentItems() {
         return [...this.currentItems];
+    }
+
+    // Navigation Freeze/Unfreeze Methods
+    freezeNavigation(reason = 'Operation in progress...') {
+        this.navigationFrozen = true;
+        
+        // Add visual indicators to show navigation is frozen
+        const folderCards = document.querySelectorAll('.folder-card, .album-card');
+        folderCards.forEach(card => {
+            card.classList.add('opacity-50', 'cursor-not-allowed');
+            card.setAttribute('data-frozen', 'true');
+        });
+
+        // Show loading overlay on grid
+        const folderGrid = document.getElementById('folder-grid');
+        if (folderGrid) {
+            const existingOverlay = folderGrid.querySelector('.navigation-frozen-overlay');
+            if (!existingOverlay) {
+                const overlay = document.createElement('div');
+                overlay.className = 'navigation-frozen-overlay absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10';
+                overlay.innerHTML = `
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <div class="text-sm text-gray-600">${reason}</div>
+                    </div>
+                `;
+                // Make sure the parent has relative positioning
+                if (folderGrid.style.position !== 'relative') {
+                    folderGrid.style.position = 'relative';
+                }
+                folderGrid.appendChild(overlay);
+            }
+        }
+    }
+
+    unfreezeNavigation() {
+        this.navigationFrozen = false;
+        
+        // Remove visual indicators
+        const frozenCards = document.querySelectorAll('[data-frozen="true"]');
+        frozenCards.forEach(card => {
+            card.classList.remove('opacity-50', 'cursor-not-allowed');
+            card.removeAttribute('data-frozen');
+        });
+
+        // Remove loading overlay
+        const overlay = document.querySelector('.navigation-frozen-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
     }
 }
 

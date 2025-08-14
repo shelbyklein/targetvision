@@ -110,7 +110,6 @@ class ModalManager {
         const modalNoAi = document.getElementById('modal-no-ai');
         const modalAiDescription = document.getElementById('modal-ai-description');
         const modalAiKeywords = document.getElementById('modal-ai-keywords');
-        const modalAiConfidence = document.getElementById('modal-ai-confidence');
         const modalAiTimestamp = document.getElementById('modal-ai-timestamp');
         
         // Set initial image - use image_url if available, otherwise thumbnail_url
@@ -156,7 +155,6 @@ class ModalManager {
         const modalNoAi = document.getElementById('modal-no-ai');
         const modalAiDescription = document.getElementById('modal-ai-description');
         const modalAiKeywords = document.getElementById('modal-ai-keywords');
-        const modalAiConfidence = document.getElementById('modal-ai-confidence');
         const modalAiTimestamp = document.getElementById('modal-ai-timestamp');
         
         // Check if there's AI metadata (it's an object, not an array)
@@ -184,12 +182,6 @@ class ModalManager {
                 modalAiKeywords.innerHTML = '<span class="text-blue-400">No AI keywords</span>';
             }
             
-            // Populate confidence score
-            if (aiData.confidence_score !== undefined && aiData.confidence_score !== null) {
-                modalAiConfidence.textContent = `${Math.round(aiData.confidence_score * 100)}% confidence`;
-            } else {
-                modalAiConfidence.textContent = '';
-            }
             
             // Populate timestamp
             if (aiData.processed_at) {
@@ -367,11 +359,8 @@ class ModalManager {
             const fullscreenImage = document.getElementById('fullscreen-image');
             const loadingDiv = document.getElementById('fullscreen-loading');
             
-            // Show lightbox with animation
+            // Don't show lightbox until image is loaded - start with pointer events enabled but opacity 0
             lightbox.style.pointerEvents = 'auto';
-            setTimeout(() => {
-                lightbox.style.opacity = '1';
-            }, 10);
             
             // Try to load the largest available image
             if (photo.id || photo.local_photo_id) {
@@ -383,14 +372,19 @@ class ModalManager {
                     if (largestImageData && largestImageData.url) {
                         console.log('Largest image data:', largestImageData);
                         
-                        // Show loading state with animation
+                        // Show loading state first
                         loadingDiv.style.opacity = '1';
                         loadingDiv.querySelector('.text-center').style.transform = 'translateY(0)';
+                        
+                        // Show lightbox with loading state
+                        setTimeout(() => {
+                            lightbox.style.opacity = '1';
+                        }, 10);
                         
                         // Create image to test loading
                         const img = new Image();
                         img.onload = () => {
-                            // Image loaded successfully
+                            // Image loaded successfully - now show it
                             fullscreenImage.src = largestImageData.url;
                             setTimeout(() => {
                                 // Animate image in and loading out

@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS ai_metadata (
     description TEXT,
     ai_keywords TEXT[],
     embedding vector(512), -- CLIP ViT-B/32 embeddings
-    confidence_score FLOAT,
     processing_time FLOAT,
     model_version VARCHAR(100),
     processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

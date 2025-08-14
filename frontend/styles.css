@@ -437,16 +437,14 @@ img[loading="lazy"] {
     justify-content: center !important;
 }
 
-/* Folder card aspect ratio styling */
+/* Folder card styling - removed aspect-ratio constraint */
 .folder-card {
-    aspect-ratio: 1 / 1;
     width: 100%; /* Full width, height will be automatically calculated */
     min-height: 0; /* Allow flex items to shrink below content size */
 }
 
-/* Album card aspect ratio styling */
+/* Album card styling - removed aspect-ratio constraint */
 .album-card {
-    aspect-ratio: 1 / 1;
     width: 100%; /* Full width, height will be automatically calculated */
     min-height: 0; /* Allow flex items to shrink below content size */
 }

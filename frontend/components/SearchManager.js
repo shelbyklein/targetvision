@@ -324,7 +324,7 @@ class SearchManager {
         // Use ChatManager's addPhotoResults method for proper photo display
         const photosToShow = photos.slice(0, 6).map(photo => ({
             photo: photo.photo, // Extract the nested photo object from search results
-            score: photo.search_score || photo.ai_metadata?.confidence_score || photo.confidence_score || 0
+            score: photo.search_score || 0
         }));
         
         eventBus.emit('chat:add-photo-results', { photos: photosToShow });
@@ -442,9 +442,6 @@ class SearchManager {
         const photo = result.photo || result;
         const searchScore = result.search_score || 0;
         
-        // Get AI confidence score from AI metadata
-        const aiConfidence = photo.ai_metadata?.confidence_score || 
-                           (photo.confidence_score ? photo.confidence_score : 0);
         
         div.innerHTML = `
             <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
@@ -456,10 +453,6 @@ class SearchManager {
                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuNGVtIj5JbWFnZSBOb3QgRm91bmQ8L3RleHQ+PC9zdmc+'"
                 />
                 
-                <!-- AI Confidence score -->
-                <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full z-20">
-                    ${Math.round(aiConfidence * 100)}%
-                </div>
                 
                 <!-- Download button -->
                 <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">

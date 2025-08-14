@@ -450,7 +450,6 @@ class TestDatabaseIntegrity:
             metadata = AIMetadata(
                 photo_id=photo.id,
                 description="Transaction test",
-                confidence_score=999.0  # Invalid score > 1.0 (if we had constraints)
             )
             test_db.add(metadata)
             test_db.commit()

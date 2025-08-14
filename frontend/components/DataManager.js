@@ -17,6 +17,7 @@ class DataManager {
     constructor() {
         this.apiBase = 'http://localhost:8000';
         this.currentLoadingController = null; // AbortController for cancelling photo loading
+        this.isLoadingPhotos = false; // Flag to freeze operations during loading
         
         this.setupEventListeners();
         // Component initialized
@@ -29,6 +30,25 @@ class DataManager {
         
         // Photo loading cancellation
         eventBus.on('data:cancel-photo-loading', () => this.cancelPhotoLoading());
+        
+        // Check if operations should be blocked
+        eventBus.on('data:check-loading-state', (callback) => {
+            if (typeof callback === 'function') {
+                callback(this.isLoadingPhotos);
+            }
+        });
+    }
+
+    // Method to set loading state and emit events
+    setLoadingState(isLoading) {
+        this.isLoadingPhotos = isLoading;
+        eventBus.emit('data:loading-state-changed', { isLoading });
+        
+        if (isLoading) {
+            eventBus.emit('ui:freeze-navigation', { reason: 'Loading photos...' });
+        } else {
+            eventBus.emit('ui:unfreeze-navigation');
+        }
     }
 
     // Processing Status Confirmation
@@ -108,10 +128,24 @@ class DataManager {
             this.currentLoadingController = null;
             eventBus.emit('photos:loading:cancelled');
         }
+        // Always unfreeze operations when cancelling
+        this.setLoadingState(false);
     }
 
     // Photo Loading Methods
     async loadAlbumPhotos(albumId, app) {
+        // Check if already loading - if so, ignore new requests
+        if (this.isLoadingPhotos) {
+            eventBus.emit('toast:warning', { 
+                title: 'Loading in Progress', 
+                message: 'Please wait for current photos to finish loading' 
+            });
+            return;
+        }
+
+        // Set loading state to freeze operations
+        this.setLoadingState(true);
+        
         // Cancel any existing photo loading
         this.cancelPhotoLoading();
         
@@ -124,7 +158,7 @@ class DataManager {
         // Check cache first
         const cachedPhotos = cacheManager.getCachedAlbumPhotos(albumId);
         if (cachedPhotos && Array.isArray(cachedPhotos) && cachedPhotos.length > 0) {
-            // For cached photos, show immediately and load fresh data in background
+            // For cached photos, show immediately but still freeze during background refresh
             app.currentPhotos = cachedPhotos;
             app.photosMetadata = { 
                 totalCount: cachedPhotos.length, 
@@ -132,15 +166,21 @@ class DataManager {
                 hasMore: false 
             };
             eventBus.emit('photos:display', { photos: app.currentPhotos, isInitialLoad: true });
-            this.refreshAlbumPhotosInBackground(albumId, app);
+            await this.refreshAlbumPhotosInBackground(albumId, app);
+            this.setLoadingState(false); // Unfreeze after background refresh
             return;
         }
         
         // Show loading state
         eventBus.emit('photos:loading:show');
         
-        // Load first batch of photos (30 photos)
-        await this.fetchPhotoBatch(albumId, app, 0, 30, true);
+        try {
+            // Load first batch of photos (30 photos)
+            await this.fetchPhotoBatch(albumId, app, 0, 30, true);
+        } finally {
+            // Always unfreeze operations when loading completes or fails
+            this.setLoadingState(false);
+        }
     }
     
     // New method for batch loading with pagination
@@ -274,9 +314,16 @@ class DataManager {
     
     async refreshAlbumPhotosInBackground(albumId, app) {
         try {
+            // Check if this background refresh is still relevant (loading not cancelled)
+            if (!this.currentLoadingController) {
+                return; // Loading was cancelled, don't continue with background refresh
+            }
+
             // Background refresh
             // For background refresh, load all photos to compare with cache
-            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=0&limit=100`);
+            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=0&limit=100`, {
+                signal: this.currentLoadingController.signal
+            });
             if (!response.ok) return;
             
             const data = await response.json();
@@ -284,7 +331,8 @@ class DataManager {
             
             cacheManager.setCachedAlbumPhotos(albumId, freshPhotos);
             
-            if (app.currentAlbum && (app.currentAlbum.smugmug_id === albumId || app.currentAlbum.album_key === albumId)) {
+            // Double-check that this album is still the current album before updating UI
+            if (app.currentAlbum && (app.currentAlbum.smugmug_id === albumId || app.currentAlbum.album_key === albumId) && this.currentLoadingController) {
                 if (JSON.stringify(app.currentPhotos) !== JSON.stringify(freshPhotos)) {
                     // Photos updated from background refresh
                     app.currentPhotos = freshPhotos;
@@ -297,6 +345,10 @@ class DataManager {
                 }
             }
         } catch (error) {
+            if (error.name === 'AbortError') {
+                // Background refresh cancelled - this is normal
+                return;
+            }
             console.log('Background refresh failed (ignoring):', error.message);
         }
     }

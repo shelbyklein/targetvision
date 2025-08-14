@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS ai_metadata (
     description TEXT,
     ai_keywords TEXT[],
     -- embedding will be added when pgvector is configured
-    confidence_score FLOAT,
     processing_time FLOAT,
     model_version VARCHAR(100),
     processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

@@ -116,7 +116,6 @@ def test_embedding_creation():
             description="Test embedding for verification",
             ai_keywords=["test", "embedding", "verification"],
             embedding=embedding,  # This should work with Vector(512)
-            confidence_score=0.95,
             processing_time=processing_time,
             model_version="clip-vit-b-32",
             approved=False

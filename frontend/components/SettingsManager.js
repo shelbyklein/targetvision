@@ -208,7 +208,6 @@ Do not include speculation about metadata like camera settings, date, or photogr
         document.getElementById('auto-approve').checked = settings.autoApprove || false;
         document.getElementById('batch-processing').checked = settings.batchProcessing !== false; // default true
         document.getElementById('retry-failed').checked = settings.retryFailed || false;
-        document.getElementById('show-confidence').checked = settings.showConfidence !== false; // default true
         document.getElementById('advanced-filters-default').checked = settings.advancedFiltersDefault || false;
         document.getElementById('compact-view').checked = settings.compactView || false;
     }

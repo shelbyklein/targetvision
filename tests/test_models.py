@@ -95,7 +95,6 @@ class TestAIMetadataModel:
             photo_id=sample_photo.id,
             description="AI generated description",
             ai_keywords=["ai", "generated", "test"],
-            confidence_score=0.85,
             processing_time=2.5,
             model_version="claude-3-5-sonnet-20241022"
         )
@@ -104,7 +103,6 @@ class TestAIMetadataModel:
         
         assert metadata.id is not None
         assert metadata.photo_id == sample_photo.id
-        assert metadata.confidence_score == 0.85
         assert metadata.processed_at is not None
         assert metadata.approved is False  # Default value
     
@@ -114,7 +112,6 @@ class TestAIMetadataModel:
             photo_id=sample_photo.id,
             description="Dict test description",
             ai_keywords=["dict", "test"],
-            confidence_score=0.9
         )
         test_db.add(metadata)
         test_db.commit()
@@ -126,7 +123,6 @@ class TestAIMetadataModel:
         assert metadata_dict["photo_id"] == sample_photo.id
         assert metadata_dict["description"] == "Dict test description"
         assert metadata_dict["ai_keywords"] == ["dict", "test"]
-        assert metadata_dict["confidence_score"] == 0.9
         assert metadata_dict["approved"] is False
     
     def test_ai_metadata_approval_workflow(self, test_db, sample_photo):
@@ -379,7 +375,6 @@ class TestModelInteractions:
             photo_id=photo.id,
             description="Complete lifecycle test photo",
             ai_keywords=["lifecycle", "test", "complete"],
-            confidence_score=0.88,
             processing_time=3.2
         )
         test_db.add(metadata)

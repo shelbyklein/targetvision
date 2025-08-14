@@ -496,7 +496,6 @@ Do not include speculation about metadata like camera settings, date, or photogr
                 description=description,
                 ai_keywords=keywords,
                 embedding=embedding.tolist() if embedding is not None else None,  # Convert numpy array to list
-                confidence_score=0.85,  # Default confidence - could be enhanced
                 processing_time=processing_time + embedding_time,  # Include embedding generation time
                 model_version=f"{provider}-{datetime.now().strftime('%Y-%m-%d')}",
                 processed_at=datetime.now()

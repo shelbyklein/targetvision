@@ -123,7 +123,6 @@ class AIMetadata(Base):
     description = Column(Text)
     ai_keywords = Column(ARRAY(Text), default=[])
     embedding = Column(Vector(512), nullable=True)  # CLIP ViT-B/32 embeddings (512 dimensions)
-    confidence_score = Column(Float)
     processing_time = Column(Float)  # Time taken to process in seconds
     model_version = Column(String(100))  # Track which model generated this
     processed_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -139,7 +138,6 @@ class AIMetadata(Base):
             "photo_id": self.photo_id,
             "description": self.description,
             "ai_keywords": self.ai_keywords,
-            "confidence_score": self.confidence_score,
             "model_version": self.model_version,
             "processing_time": self.processing_time,
             "approved": self.approved,
