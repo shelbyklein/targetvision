@@ -151,24 +151,35 @@ class SettingsManager {
             const response = await fetch(`${this.apiBase}/settings/prompt`);
             if (response.ok) {
                 const data = await response.json();
-                document.getElementById('current-prompt').textContent = data.prompt || this.getDefaultPrompt();
+                const currentPromptEl = document.getElementById('current-prompt');
+                if (currentPromptEl) {
+                    currentPromptEl.textContent = data.prompt || this.getDefaultPrompt();
+                }
                 
                 // Update status indicator
                 const statusSpan = document.getElementById('prompt-status');
-                if (data.is_custom) {
-                    statusSpan.textContent = 'Custom';
-                    statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
-                } else {
-                    statusSpan.textContent = 'Default';
-                    statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+                if (statusSpan) {
+                    if (data.is_custom) {
+                        statusSpan.textContent = 'Custom';
+                        statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
+                    } else {
+                        statusSpan.textContent = 'Default';
+                        statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+                    }
                 }
             } else {
                 // Fallback to default prompt
-                document.getElementById('current-prompt').textContent = this.getDefaultPrompt();
+                const currentPromptEl = document.getElementById('current-prompt');
+                if (currentPromptEl) {
+                    currentPromptEl.textContent = this.getDefaultPrompt();
+                }
             }
         } catch (error) {
             console.error('Error loading current prompt:', error);
-            document.getElementById('current-prompt').textContent = this.getDefaultPrompt();
+            const currentPromptEl = document.getElementById('current-prompt');
+            if (currentPromptEl) {
+                currentPromptEl.textContent = this.getDefaultPrompt();
+            }
         }
     }
     
@@ -245,12 +256,17 @@ Do not include speculation about metadata like camera settings, date, or photogr
             
             if (response.ok) {
                 // Update display
-                document.getElementById('current-prompt').textContent = prompt;
+                const currentPromptEl = document.getElementById('current-prompt');
+                if (currentPromptEl) {
+                    currentPromptEl.textContent = prompt;
+                }
                 
                 // Update status to custom
                 const statusSpan = document.getElementById('prompt-status');
-                statusSpan.textContent = 'Custom';
-                statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
+                if (statusSpan) {
+                    statusSpan.textContent = 'Custom';
+                    statusSpan.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded';
+                }
                 
                 // Switch back to view mode
                 this.cancelPromptEdit();
@@ -275,13 +291,21 @@ Do not include speculation about metadata like camera settings, date, or photogr
             if (response.ok) {
                 // Reset to default
                 const defaultPrompt = this.getDefaultPrompt();
-                document.getElementById('current-prompt').textContent = defaultPrompt;
-                document.getElementById('prompt-textarea').value = defaultPrompt;
+                const currentPromptEl = document.getElementById('current-prompt');
+                const promptTextareaEl = document.getElementById('prompt-textarea');
+                if (currentPromptEl) {
+                    currentPromptEl.textContent = defaultPrompt;
+                }
+                if (promptTextareaEl) {
+                    promptTextareaEl.value = defaultPrompt;
+                }
                 
                 // Update status to default
                 const statusSpan = document.getElementById('prompt-status');
-                statusSpan.textContent = 'Default';
-                statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+                if (statusSpan) {
+                    statusSpan.textContent = 'Default';
+                    statusSpan.className = 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded';
+                }
                 
                 this.updateCharCount();
                 eventBus.emit('toast:success', { title: 'Success', message: 'Prompt reset to default' });
@@ -583,7 +607,9 @@ Focus on:
         
         // Update button state
         button.disabled = true;
-        button.textContent = 'Testing...';
+        if (button) {
+            button.textContent = 'Testing...';
+        }
         statusDiv.classList.remove('hidden');
         this.showKeyStatus(statusDiv, 'info', 'Testing API key...');
         
@@ -613,14 +639,18 @@ Focus on:
             console.error('API key test error:', error);
         } finally {
             button.disabled = false;
-            button.textContent = 'Test';
+            if (button) {
+                button.textContent = 'Test';
+            }
         }
     }
     
     showKeyStatus(statusDiv, type, message) {
-        statusDiv.className = `mt-1 text-xs ${type === 'success' ? 'text-green-600' : type === 'error' ? 'text-red-600' : 'text-blue-600'}`;
-        statusDiv.textContent = message;
-        statusDiv.classList.remove('hidden');
+        if (statusDiv) {
+            statusDiv.className = `mt-1 text-xs ${type === 'success' ? 'text-green-600' : type === 'error' ? 'text-red-600' : 'text-blue-600'}`;
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden');
+        }
     }
     
     // Test Image Analysis
@@ -679,7 +709,9 @@ Focus on:
         
         // Update UI
         analyzeButton.disabled = true;
-        analyzeButton.textContent = 'Analyzing...';
+        if (analyzeButton) {
+            analyzeButton.textContent = 'Analyzing...';
+        }
         resultDiv.classList.remove('hidden');
         resultDiv.innerHTML = '<div class="text-gray-600">Processing image...</div>';
         
@@ -750,7 +782,9 @@ Focus on:
             eventBus.emit('toast:error', { title: 'Analysis Failed', message: 'Network error or server unavailable' });
         } finally {
             analyzeButton.disabled = false;
-            analyzeButton.textContent = 'Analyze Image';
+            if (analyzeButton) {
+                analyzeButton.textContent = 'Analyze Image';
+            }
         }
     }
     

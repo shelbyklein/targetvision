@@ -23,13 +23,28 @@ class CollectionsManager {
         this.currentCollectionPhotos = [];
         this.currentPhoto = null; // For modal operations
         this.apiBase = 'http://localhost:8000';
+        this.domListenersBound = false; // Prevent double-binding DOM listeners
+        this.modalListenersBound = false; // Prevent double-binding modal listeners
         
         this.setupEventListeners();
+        
+        // Bind DOM event listeners immediately (for direct page loads)
+        this.ensureDOMEventListeners();
         
         // Load collections initially for modal functionality
         this.loadCollections();
         
         console.log('CollectionsManager initialized');
+    }
+
+    ensureDOMEventListeners() {
+        // Bind DOM event listeners immediately if DOM is ready, otherwise wait
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.bindCollectionEventListeners());
+        } else {
+            // DOM is already loaded, bind immediately
+            this.bindCollectionEventListeners();
+        }
     }
 
     setupEventListeners() {
@@ -81,14 +96,31 @@ class CollectionsManager {
     }
 
     bindCollectionEventListeners() {
+        // Prevent double-binding
+        if (this.domListenersBound) return;
+        
         // Create collection button
         const createBtn = document.getElementById('create-collection');
         if (createBtn) {
             createBtn.addEventListener('click', () => this.showCreateCollectionModal());
         }
 
+        // Collection action buttons (these exist on page load)
+        const editBtn = document.getElementById('edit-collection');
+        const deleteBtn = document.getElementById('delete-collection');
+
+        if (editBtn) editBtn.addEventListener('click', () => this.showEditCollectionModal());
+        if (deleteBtn) deleteBtn.addEventListener('click', () => this.handleDeleteCollection());
+        
+        // Mark DOM listeners as bound
+        this.domListenersBound = true;
+    }
+
+    bindModalEventListeners() {
+        // Prevent double-binding modal listeners
+        if (this.modalListenersBound) return;
+
         // Create collection modal events
-        const createModal = document.getElementById('create-collection-modal');
         const createForm = document.getElementById('create-collection-form');
         const createCloseBtn = document.getElementById('create-collection-close');
         const createCancelBtn = document.getElementById('create-collection-cancel');
@@ -106,13 +138,9 @@ class CollectionsManager {
         if (editCloseBtn) editCloseBtn.addEventListener('click', () => this.hideEditCollectionModal());
         if (editCancelBtn) editCancelBtn.addEventListener('click', () => this.hideEditCollectionModal());
         if (editForm) editForm.addEventListener('submit', (e) => this.handleEditCollection(e));
-
-        // Collection action buttons
-        const editBtn = document.getElementById('edit-collection');
-        const deleteBtn = document.getElementById('delete-collection');
-
-        if (editBtn) editBtn.addEventListener('click', () => this.showEditCollectionModal());
-        if (deleteBtn) deleteBtn.addEventListener('click', () => this.handleDeleteCollection());
+        
+        // Mark modal listeners as bound
+        this.modalListenersBound = true;
     }
 
     // Collection Loading and Rendering
@@ -313,6 +341,9 @@ class CollectionsManager {
                 nameInput.focus();
             }
             if (descInput) descInput.value = '';
+            
+            // Bind modal event listeners when modal is shown
+            this.bindModalEventListeners();
         }
     }
 

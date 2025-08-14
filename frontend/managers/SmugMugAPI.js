@@ -87,6 +87,13 @@ class SmugMugAPI {
                 fromCache: true
             });
             
+            // Emit folder change for state management
+            eventBus.emit('app:folder-changed', {
+                nodeUri,
+                breadcrumbs: this.breadcrumbs,
+                nodeHistory: this.nodeHistory || []
+            });
+            
             // Refresh in background to ensure cache is up to date
             this.refreshFolderContentsInBackground(nodeUri);
             return this.smugmugAlbums;
@@ -124,6 +131,13 @@ class SmugMugAPI {
                 albums: this.smugmugAlbums,
                 breadcrumbs: this.breadcrumbs,
                 fromCache: false
+            });
+            
+            // Emit folder change for state management
+            eventBus.emit('app:folder-changed', {
+                nodeUri,
+                breadcrumbs: this.breadcrumbs,
+                nodeHistory: this.nodeHistory || []
             });
             
             // Hide loading state

@@ -28,6 +28,7 @@ class StateManager {
         eventBus.on('app:album-selected', (data) => {
             this.state.currentAlbum = data.album;
             this.saveAppState();
+            this.updateURL();
         });
 
         eventBus.on('app:folder-changed', (data) => {
@@ -35,6 +36,7 @@ class StateManager {
             this.state.breadcrumbs = data.breadcrumbs || this.state.breadcrumbs;
             this.state.nodeHistory = data.nodeHistory || this.state.nodeHistory;
             this.saveAppState();
+            this.updateURL();
         });
 
         eventBus.on('app:filter-changed', (data) => {
@@ -51,6 +53,7 @@ class StateManager {
         eventBus.on('state:page-changed', (data) => {
             this.state.currentPage = data.currentPage;
             this.saveAppState();
+            this.updateURL();
         });
     }
 
@@ -115,13 +118,11 @@ class StateManager {
     
     updateURL() {
         try {
-            const params = new URLSearchParams();
+            if (this.isInitializing) {
+                return;
+            }
             
-            console.log('updateURL called with state:', {
-                currentPage: this.state.currentPage,
-                currentAlbum: this.state.currentAlbum?.title || this.state.currentAlbum?.smugmug_id,
-                currentNodeUri: this.state.currentNodeUri
-            });
+            const params = new URLSearchParams();
             
             if (this.state.currentPage !== 'albums') {
                 params.set('page', this.state.currentPage);
@@ -137,7 +138,6 @@ class StateManager {
             
             // Update URL without page reload
             const newURL = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-            console.log('Setting URL to:', newURL);
             window.history.replaceState(null, '', newURL);
             
         } catch (error) {
@@ -280,6 +280,8 @@ class StateManager {
         this.isInitializing = isInitializing;
         if (!isInitializing) {
             eventBus.emit('app:initialization-complete');
+            // After initialization is complete, update URL to reflect current state
+            this.updateURL();
         }
     }
 

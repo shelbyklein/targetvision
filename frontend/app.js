@@ -67,23 +67,36 @@ class TargetVisionApp {
         const urlState = stateManager.loadStateFromURL();
         const savedState = stateManager.loadAppState();
         
+        console.log('State restoration - URL state:', urlState);
+        console.log('State restoration - Saved state:', savedState);
+        
         let restoredState = false;
+        
+        // Priority 1: URL state with specific content (album, node, or non-albums page)
         if (urlState && (urlState.albumId || urlState.nodeUri || urlState.currentPage !== 'albums')) {
+            console.log('Restoring from URL state with specific content');
             restoredState = await stateManager.restoreStateFromData(urlState);
-        } else if (savedState) {
+        }
+        // Priority 2: URL state specifically requesting albums page with no other parameters
+        else if (urlState && urlState.currentPage === 'albums' && !urlState.nodeUri && !urlState.albumId) {
+            console.log('URL explicitly requests albums page only, ignoring saved state');
+            // Update StateManager with the URL state before triggering navigation
+            if (urlState) {
+                await stateManager.restoreStateFromData(urlState);
+            }
+            eventBus.emit('navigation:show-page', { pageName: 'albums' });
+            restoredState = true;
+        }
+        // Priority 3: Saved state from localStorage
+        else if (savedState && savedState.currentPage && savedState.currentPage !== 'albums') {
+            console.log('Restoring from saved state with non-albums page');
             restoredState = await stateManager.restoreStateFromData(savedState);
         }
         
-        // If no state was restored, show the default albums page
+        // Default fallback: show albums page
         if (!restoredState) {
-            // Only default to albums if user hasn't manually navigated elsewhere
-            const currentPage = navigationManager.getCurrentPage();
-            if (currentPage === 'albums') {
-                console.log('No state restored, showing default albums page');
-                eventBus.emit('navigation:show-page', { pageName: 'albums' });
-            } else {
-                console.log(`No state restored but user has navigated to: ${currentPage}, not overriding`);
-            }
+            console.log('No valid state to restore, defaulting to albums page');
+            eventBus.emit('navigation:show-page', { pageName: 'albums' });
         }
         
         this.isInitializing = false;
