@@ -45,6 +45,10 @@ class PhotoProcessor {
         eventBus.on('photos:check-and-resume-batch-processing', () => {
             this.checkAndResumeBatchProcessing();
         });
+
+        eventBus.on('photos:cancel-batch-processing', () => {
+            this.cancelBatchProcessing();
+        });
         
         eventBus.on('photos:refresh-album-status', (data) => {
             this.refreshAlbumStatus(data.album);
@@ -621,6 +625,55 @@ class PhotoProcessor {
         if (this.pollingInterval) {
             clearInterval(this.pollingInterval);
             this.pollingInterval = null;
+        }
+    }
+
+    async cancelBatchProcessing() {
+        console.log('🚫 PhotoProcessor: Canceling all batch processing operations...');
+        
+        try {
+            // Call backend API to cancel batch processing
+            const result = await apiService.post('/photos/batch/cancel');
+            
+            // Since apiService.post() returns parsed JSON data (not raw response),
+            // we assume success if no exception was thrown
+            console.log('🚫 PhotoProcessor: Cancel request successful:', result);
+            
+            // Stop local polling
+            this.stopPolling();
+            
+            // Clear local processing state
+            this.processingPhotos.clear();
+            this.batchTotalPhotos = 0;
+            this.batchProcessingStatus = {
+                isActive: false,
+                processed: 0,
+                total: 0,
+                success: 0,
+                failed: 0
+            };
+            
+            // Emit success event
+            eventBus.emit('photos:batch-processing-cancelled');
+            eventBus.emit('toast:success', { 
+                title: 'Cancelled', 
+                message: 'All batch processing operations have been cancelled' 
+            });
+            
+            // Refresh the UI to show updated status
+            eventBus.emit('photos:refresh-current-view');
+            
+        } catch (error) {
+            console.error('Error canceling batch processing:', error);
+            
+            // Still try to stop local polling even if server call fails
+            this.stopPolling();
+            this.processingPhotos.clear();
+            
+            eventBus.emit('toast:error', { 
+                title: 'Cancel Failed', 
+                message: 'Could not cancel all operations, but local processing stopped' 
+            });
         }
     }
 

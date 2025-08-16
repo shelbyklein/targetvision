@@ -77,6 +77,20 @@ class CollectionsManager {
         eventBus.on('photo:set-current', (data) => {
             this.currentPhoto = data.photo;
         });
+
+        // Listen for collection creation to refresh displays
+        eventBus.on('collections:created', (data) => {
+            this.handleCollectionCreated(data);
+        });
+        
+        // Listen for requests to refresh modal dropdown
+        eventBus.on('collections:refresh-modal-dropdown', () => {
+            console.log('Received request to refresh modal dropdown');
+            // Add a small delay to ensure any modal state changes have processed
+            setTimeout(() => {
+                this.populateCollectionSelect();
+            }, 50);
+        });
     }
 
     // Collections Page Management
@@ -379,6 +393,18 @@ class CollectionsManager {
             this.hideCreateCollectionModal();
             await this.loadCollections();
             
+            // Emit event to refresh collections display in other components
+            eventBus.emit('collections:created', { 
+                collection: result,
+                message: `Collection "${name}" created successfully` 
+            });
+            
+            // Update the collection dropdown in photo modal if it exists
+            // Add a small delay to ensure modal events have processed
+            setTimeout(() => {
+                this.populateCollectionSelect();
+            }, 100);
+            
             eventBus.emit('toast:success', { title: 'Success', message: `Collection "${name}" created successfully` });
 
         } catch (error) {
@@ -577,7 +603,12 @@ class CollectionsManager {
     
     populateCollectionSelect() {
         const select = document.getElementById('modal-collection-select');
-        if (!select) return;
+        if (!select) {
+            console.log('Collection dropdown not found - modal may not be open');
+            return;
+        }
+        
+        console.log('Populating collection dropdown with', this.collections.length, 'collections');
         
         select.innerHTML = '<option value="">Choose a collection...</option>';
         
@@ -587,6 +618,8 @@ class CollectionsManager {
             option.textContent = collection.name;
             select.appendChild(option);
         });
+        
+        console.log('Collection dropdown populated successfully');
     }
     
     showCollectionInterface() {
@@ -692,6 +725,23 @@ class CollectionsManager {
     createCollectionFromModal() {
         // Show the collection creation modal instead of using a prompt dialog
         this.showCreateCollectionModal();
+    }
+
+    handleCollectionCreated(data) {
+        // Refresh the collections list display if we're on the collections page
+        const collectionsGrid = document.getElementById('collections-grid');
+        if (collectionsGrid && !collectionsGrid.classList.contains('hidden')) {
+            // We're on the collections page, refresh the display
+            this.renderCollections();
+        }
+        
+        // Also refresh modal dropdown to ensure new collection appears
+        setTimeout(() => {
+            this.populateCollectionSelect();
+        }, 150);
+        
+        // Log the event for debugging
+        console.log('Collection created:', data.collection);
     }
 
     // Utility methods for accessing collections data

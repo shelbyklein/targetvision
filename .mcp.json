@@ -18,10 +18,6 @@
         "-y",
         "@upstash/context7-mcp"
         ]
-      },
-    "browsermcp": {
-      "command": "npx",
-      "args": ["@browsermcp/mcp@latest"]
-    }
+      }
     }
 }

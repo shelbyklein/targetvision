@@ -152,17 +152,7 @@ class TargetVisionApp {
         
         // Settings functionality - moved to SettingsManager component
         // edit-prompt, save-prompt, cancel-prompt-edit, reset-prompt, test-prompt, save-settings
-        // Batch processing - delegate to PhotoProcessor
-        const cancelButton = document.getElementById('cancel-batch-processing');
-        if (cancelButton) {
-            //console.log('Cancel batch processing button found, adding event listener');
-            cancelButton.addEventListener('click', () => {
-                console.log('Cancel batch processing button clicked');
-                eventBus.emit('photos:cancel-batch-processing');
-            });
-        } else {
-            console.error('Cancel batch processing button NOT found in DOM');
-        }
+        // Batch processing - now handled by SettingsManager component (removed duplicate event listener)
         
         const clearQueueButton = document.getElementById('clear-batch-queue');
         if (clearQueueButton) {

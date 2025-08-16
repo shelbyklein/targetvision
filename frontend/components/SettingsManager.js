@@ -20,6 +20,7 @@ class SettingsManager {
     constructor() {
         this.apiBase = 'http://localhost:8000';
         this.statusInterval = null;
+        this.domListenersBound = false; // Prevent double-binding
         
         this.setupEventListeners();
         // Component initialized
@@ -34,6 +35,17 @@ class SettingsManager {
         eventBus.on('settings:update-char-count', () => this.updateCharCount());
         eventBus.on('settings:select-template', (data) => this.selectTemplate(data.template));
         
+        // Application settings events
+        eventBus.on('settings:save-application-settings', () => this.saveApplicationSettings());
+        eventBus.on('settings:cancel-batch-processing', () => this.cancelBatchProcessing());
+        
+        // Prompt editing events
+        eventBus.on('settings:edit-prompt', () => this.editPrompt());
+        eventBus.on('settings:save-prompt', () => this.savePrompt());
+        eventBus.on('settings:cancel-prompt-edit', () => this.cancelPromptEdit());
+        eventBus.on('settings:reset-prompt', () => this.resetPrompt());
+        eventBus.on('settings:test-prompt', () => this.testPrompt());
+        
         // LLM status events
         eventBus.on('settings:check-llm-status', () => this.checkLLMStatus());
         
@@ -44,10 +56,18 @@ class SettingsManager {
         });
 
         // DOM event listeners for settings functionality (moved from app.js)
-        this.bindDOMEventListeners();
+        // Delay binding to ensure DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.bindDOMEventListeners());
+        } else {
+            this.bindDOMEventListeners();
+        }
     }
 
     bindDOMEventListeners() {
+        // Prevent double-binding
+        if (this.domListenersBound) return;
+        
         // Settings functionality DOM events
         const editPrompt = document.getElementById('edit-prompt');
         const savePrompt = document.getElementById('save-prompt');
@@ -78,6 +98,12 @@ class SettingsManager {
 
         if (saveSettings) {
             saveSettings.addEventListener('click', () => eventBus.emit('settings:save-application-settings'));
+        }
+
+        // Cancel batch processing button
+        const cancelBatchProcessing = document.getElementById('cancel-batch-processing');
+        if (cancelBatchProcessing) {
+            cancelBatchProcessing.addEventListener('click', () => eventBus.emit('settings:cancel-batch-processing'));
         }
 
         // API Key management DOM events
@@ -112,11 +138,19 @@ class SettingsManager {
         document.querySelectorAll('[data-template]').forEach(template => {
             template.addEventListener('click', () => eventBus.emit('settings:select-template', { template: template.dataset.template }));
         });
+        
+        // Mark DOM listeners as bound
+        this.domListenersBound = true;
+        console.log('SettingsManager: DOM event listeners bound successfully');
     }
 
     // Settings Page Initialization
     async initializeSettingsPage() {
         // Component initialized
+        
+        // Ensure DOM event listeners are bound
+        this.bindDOMEventListeners();
+        
         await this.loadCurrentPrompt();
         this.loadApplicationSettings();
         this.loadApiKeySettings();
@@ -143,6 +177,9 @@ class SettingsManager {
         
         // Auto-save the setting
         this.saveApiKeySettings();
+        
+        // Refresh LLM status to update indicator colors based on new key source
+        this.checkLLMStatus();
     }
     
     // Prompt Management
@@ -205,11 +242,58 @@ Do not include speculation about metadata like camera settings, date, or photogr
         // Load settings from localStorage or set defaults
         const settings = JSON.parse(localStorage.getItem('targetvision_settings') || '{}');
         
-        document.getElementById('auto-approve').checked = settings.autoApprove || false;
-        document.getElementById('batch-processing').checked = settings.batchProcessing !== false; // default true
-        document.getElementById('retry-failed').checked = settings.retryFailed || false;
-        document.getElementById('advanced-filters-default').checked = settings.advancedFiltersDefault || false;
-        document.getElementById('compact-view').checked = settings.compactView || false;
+        // Use safe element lookup with existence check
+        const autoApprove = document.getElementById('auto-approve');
+        const batchProcessing = document.getElementById('batch-processing');
+        const retryFailed = document.getElementById('retry-failed');
+        const advancedFiltersDefault = document.getElementById('advanced-filters-default');
+        const compactView = document.getElementById('compact-view');
+        
+        if (autoApprove) autoApprove.checked = settings.autoApprove || false;
+        if (batchProcessing) batchProcessing.checked = settings.batchProcessing !== false; // default true
+        if (retryFailed) retryFailed.checked = settings.retryFailed || false;
+        if (advancedFiltersDefault) advancedFiltersDefault.checked = settings.advancedFiltersDefault || false;
+        if (compactView) compactView.checked = settings.compactView || false;
+    }
+
+    saveApplicationSettings() {
+        // Collect settings from form elements
+        const settings = {};
+        
+        const autoApprove = document.getElementById('auto-approve');
+        const batchProcessing = document.getElementById('batch-processing');
+        const retryFailed = document.getElementById('retry-failed');
+        const advancedFiltersDefault = document.getElementById('advanced-filters-default');
+        const compactView = document.getElementById('compact-view');
+        
+        if (autoApprove) settings.autoApprove = autoApprove.checked;
+        if (batchProcessing) settings.batchProcessing = batchProcessing.checked;
+        if (retryFailed) settings.retryFailed = retryFailed.checked;
+        if (advancedFiltersDefault) settings.advancedFiltersDefault = advancedFiltersDefault.checked;
+        if (compactView) settings.compactView = compactView.checked;
+        
+        // Save to localStorage
+        localStorage.setItem('targetvision_settings', JSON.stringify(settings));
+        
+        // Show success message
+        eventBus.emit('toast:success', { title: 'Success', message: 'Settings saved successfully' });
+        
+        // Also save API key settings when application settings are saved
+        this.saveApiKeySettings();
+    }
+
+    async cancelBatchProcessing() {
+        // Emit event to PhotoProcessor to cancel all batch operations
+        eventBus.emit('photos:cancel-batch-processing');
+        
+        // Show user feedback
+        eventBus.emit('toast:info', { title: 'Processing', message: 'Canceling all batch processing operations...' });
+    }
+
+    async testPrompt() {
+        // This would test the current prompt configuration
+        // For now, just show that it's working
+        eventBus.emit('toast:info', { title: 'Prompt Test', message: 'Prompt testing functionality would be implemented here' });
     }
     
     editPrompt() {
@@ -810,9 +894,17 @@ Focus on:
         
         if (navIndicator && navText) {
             if (status && status.available) {
-                navIndicator.className = 'h-2 w-2 bg-green-500 rounded-full';
+                // Get current key source to determine color
+                const apiSettings = this.getApiSettings();
+                const isUsingCustomKeys = apiSettings.key_source === 'custom';
+                
+                // Green for custom user keys, yellow for server keys
+                const colorClass = isUsingCustomKeys ? 'bg-green-500' : 'bg-yellow-500';
+                const textColorClass = isUsingCustomKeys ? 'text-green-600' : 'text-yellow-600';
+                
+                navIndicator.className = `h-2 w-2 ${colorClass} rounded-full`;
                 navText.textContent = 'LLM Available';
-                navText.className = 'text-xs text-green-600';
+                navText.className = `text-xs ${textColorClass}`;
             } else {
                 navIndicator.className = 'h-2 w-2 bg-red-500 rounded-full';
                 navText.textContent = 'LLM Unavailable';
@@ -860,6 +952,10 @@ Focus on:
         // Update individual provider status indicators on settings page
         const providers = ['anthropic', 'openai'];
         
+        // Get current key source to determine color
+        const apiSettings = this.getApiSettings();
+        const isUsingCustomKeys = apiSettings.key_source === 'custom';
+        
         providers.forEach(provider => {
             const indicator = document.getElementById(`${provider}-status-indicator`);
             const text = document.getElementById(`${provider}-status-text`);
@@ -871,9 +967,13 @@ Focus on:
                     
                     switch (statusType) {
                         case 'available':
-                            indicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                            // Green for custom user keys, yellow for server keys
+                            const colorClass = isUsingCustomKeys ? 'bg-green-500' : 'bg-yellow-500';
+                            const textColorClass = isUsingCustomKeys ? 'text-green-600' : 'text-yellow-600';
+                            
+                            indicator.className = `w-3 h-3 rounded-full ${colorClass}`;
                             text.textContent = 'Available';
-                            text.className = 'text-xs text-green-600';
+                            text.className = `text-xs ${textColorClass}`;
                             break;
                         case 'no_key':
                             indicator.className = 'w-3 h-3 rounded-full bg-gray-400';

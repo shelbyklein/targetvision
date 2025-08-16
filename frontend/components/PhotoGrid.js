@@ -50,7 +50,7 @@ class PhotoGrid {
         });
 
         // Listen for filter changes
-        eventBus.on('photos:filter-changed', (data) => {
+        eventBus.on('photos:set-filter', (data) => {
             this.statusFilter = data.filter;
             this.displayPhotos();
         });
@@ -131,33 +131,8 @@ class PhotoGrid {
         // Show album actions (includes Sync Album button)
         document.getElementById('album-actions').classList.remove('hidden');
         
-        // Filter photos if needed
-        let photosToShow = this.currentPhotos;
-        
-        // Apply status filter first
-        if (this.statusFilter) {
-            if (this.statusFilter === 'processed') {
-                // Show photos that have AI metadata
-                photosToShow = photosToShow.filter(photo => photo.ai_metadata && photo.ai_metadata.length > 0);
-            } else if (this.statusFilter === 'unprocessed') {
-                // Show photos that don't have AI metadata
-                photosToShow = photosToShow.filter(photo => !photo.ai_metadata || photo.ai_metadata.length === 0);
-            } else {
-                // Standard status filtering
-                photosToShow = photosToShow.filter(photo => photo.processing_status === this.statusFilter);
-            }
-        }
-        
-        // Apply visibility toggles
-        photosToShow = photosToShow.filter(photo => {
-            const isProcessed = photo.processing_status === 'processed' || photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
-            const isUnprocessed = !isProcessed;
-            
-            if (isProcessed && !this.showProcessedPhotos) return false;
-            if (isUnprocessed && !this.showUnprocessedPhotos) return false;
-            
-            return true;
-        });
+        // Get filtered photos using centralized filtering logic
+        let photosToShow = this.getFilteredPhotos();
         
         // Check if we're still in album view mode before showing photo grid
         if (window.app && window.app.getCurrentViewMode() !== 'album') {
@@ -198,30 +173,11 @@ class PhotoGrid {
         const photoGrid = document.getElementById('photo-grid');
         if (!photoGrid) return;
         
-        // Apply same filtering logic as displayPhotos
-        let photosToShow = newPhotos;
-        
-        // Apply status filter
-        if (this.statusFilter) {
-            if (this.statusFilter === 'processed') {
-                photosToShow = photosToShow.filter(photo => photo.ai_metadata && photo.ai_metadata.length > 0);
-            } else if (this.statusFilter === 'unprocessed') {
-                photosToShow = photosToShow.filter(photo => !photo.ai_metadata || photo.ai_metadata.length === 0);
-            } else {
-                photosToShow = photosToShow.filter(photo => photo.processing_status === this.statusFilter);
-            }
-        }
-        
-        // Apply visibility toggles
-        photosToShow = photosToShow.filter(photo => {
-            const isProcessed = photo.processing_status === 'processed' || photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
-            const isUnprocessed = !isProcessed;
-            
-            if (isProcessed && !this.showProcessedPhotos) return false;
-            if (isUnprocessed && !this.showUnprocessedPhotos) return false;
-            
-            return true;
-        });
+        // Apply same filtering logic - temporarily set currentPhotos to newPhotos for filtering
+        const originalPhotos = this.currentPhotos;
+        this.currentPhotos = newPhotos;
+        let photosToShow = this.getFilteredPhotos();
+        this.currentPhotos = originalPhotos;
         
         // Append filtered photos with fade-in animation
         photosToShow.forEach((photo, index) => {
@@ -462,6 +418,38 @@ class PhotoGrid {
         return div;
     }
 
+    // Get filtered photos based on current filter settings
+    getFilteredPhotos() {
+        let photosToShow = this.currentPhotos;
+        
+        // Apply status filter first
+        if (this.statusFilter) {
+            if (this.statusFilter === 'processed') {
+                // Show photos that have AI metadata
+                photosToShow = photosToShow.filter(photo => photo.ai_metadata && photo.ai_metadata.length > 0);
+            } else if (this.statusFilter === 'unprocessed') {
+                // Show photos that don't have AI metadata
+                photosToShow = photosToShow.filter(photo => !photo.ai_metadata || photo.ai_metadata.length === 0);
+            } else {
+                // Standard status filtering
+                photosToShow = photosToShow.filter(photo => photo.processing_status === this.statusFilter);
+            }
+        }
+        
+        // Apply visibility toggles
+        photosToShow = photosToShow.filter(photo => {
+            const isProcessed = photo.processing_status === 'processed' || photo.processing_status === 'completed' || (photo.ai_metadata && photo.ai_metadata.length > 0);
+            const isUnprocessed = !isProcessed;
+            
+            if (isProcessed && !this.showProcessedPhotos) return false;
+            if (isUnprocessed && !this.showUnprocessedPhotos) return false;
+            
+            return true;
+        });
+        
+        return photosToShow;
+    }
+
     // Selection Management
     togglePhotoSelection(photoId, isSelected) {
         console.log('togglePhotoSelection called:', { photoId, isSelected, selectedCount: this.selectedPhotos.size });
@@ -475,8 +463,16 @@ class PhotoGrid {
     }
 
     selectAllPhotos() {
-        const syncedPhotos = this.currentPhotos.filter(p => p.is_synced);
-        syncedPhotos.forEach(photo => {
+        // Select all UNPROCESSED photos that are loaded and synced
+        const unprocessedPhotos = this.currentPhotos.filter(photo => {
+            if (!photo.is_synced) return false;
+            
+            // Check if photo is unprocessed (no AI metadata)
+            const isUnprocessed = !photo.ai_metadata || photo.ai_metadata.length === 0;
+            return isUnprocessed;
+        });
+        
+        unprocessedPhotos.forEach(photo => {
             this.selectedPhotos.add(photo.smugmug_id);
         });
         this.updateSelectionUI();

@@ -45,6 +45,11 @@ class ModalManager {
         
         // Additional modal events
         eventBus.on('modal:process-photo', () => this.processPhotoWithAI());
+        
+        // Collection update events
+        eventBus.on('collections:created', () => this.refreshCollectionDropdown());
+        eventBus.on('collections:updated', () => this.refreshCollectionDropdown());
+        eventBus.on('collections:deleted', () => this.refreshCollectionDropdown());
     }
 
     setupModalEventHandlers() {
@@ -591,23 +596,28 @@ class ModalManager {
 
 
     showCollectionInterface() {
-        // Show collection interface implementation
-        console.log('Show collection interface');
+        // Delegate to CollectionsManager
+        eventBus.emit('collections:show-interface');
     }
 
     hideCollectionInterface() {
-        // Hide collection interface implementation
-        console.log('Hide collection interface');
+        // Delegate to CollectionsManager
+        eventBus.emit('collections:hide-interface');
     }
 
     addPhotoToCollection() {
-        // Add photo to collection implementation
-        console.log('Add photo to collection');
+        // Delegate to CollectionsManager
+        eventBus.emit('collections:add-photo');
     }
 
     createCollectionFromModal() {
-        // Create collection from modal implementation
-        console.log('Create collection from modal');
+        // Delegate to CollectionsManager
+        eventBus.emit('collections:create-from-modal');
+    }
+
+    refreshCollectionDropdown() {
+        // Request CollectionsManager to refresh the dropdown in the modal
+        eventBus.emit('collections:refresh-modal-dropdown');
     }
 }
 
