@@ -7,7 +7,7 @@
 
 ## Bug Description
 
-On smaller screens (mobile devices), the navigation buttons and connection status text are overlapping, making the interface difficult to use and read.
+On smaller screens (mobile devices), the navigation buttons and connection status text are overlapping, making the interface difficult to use and read in the header.
 
 ## Affected Elements
 

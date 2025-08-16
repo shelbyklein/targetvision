@@ -31,7 +31,14 @@ class EventBus {
         
         this.events.get(eventName).forEach(callback => {
             try {
-                callback(data);
+                const result = callback(data);
+                
+                // Handle async functions that return promises
+                if (result && typeof result.then === 'function') {
+                    result.catch(error => {
+                        console.error(`Error in async event listener for "${eventName}":`, error);
+                    });
+                }
             } catch (error) {
                 console.error(`Error in event listener for "${eventName}":`, error);
             }

@@ -25,7 +25,15 @@ class SmugMugAPI {
         });
 
         eventBus.on('state:restore-folder', async (data) => {
-            await this.loadFolderContents(data.nodeUri);
+            try {
+                await this.loadFolderContents(data.nodeUri);
+            } catch (error) {
+                console.error('Error restoring folder in SmugMugAPI:', error);
+                eventBus.emit('toast:error', {
+                    title: 'Navigation Error',
+                    message: 'Failed to restore folder state. Please try navigating manually.'
+                });
+            }
         });
     }
 

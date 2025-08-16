@@ -21,6 +21,31 @@ import dataManager from './components/DataManager.js';
 import folderGrid from './components/FolderGrid.js';
 import { EVENTS, PHOTO_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from './utils/Constants.js';
 import UIUtils from './utils/UIUtils.js';
+
+// Global error handling for unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    
+    // Prevent the default behavior (console error) for browser extension related errors
+    if (event.reason && 
+        (event.reason.message?.includes('message channel closed') ||
+         event.reason.message?.includes('Extension context invalidated') ||
+         event.reason.toString().includes('message channel'))) {
+        console.log('Suppressing browser extension related promise rejection');
+        event.preventDefault();
+        return;
+    }
+    
+    // For application errors, show a user-friendly message
+    if (event.reason && event.reason.message) {
+        eventBus.emit('toast:error', {
+            title: 'Application Error',
+            message: 'An unexpected error occurred. Please check the console for details.',
+            details: event.reason.message
+        });
+    }
+});
+
 class TargetVisionApp {
     constructor() {
         this.apiBase = 'http://localhost:8000';
@@ -235,7 +260,15 @@ class TargetVisionApp {
         eventBus.on('app:show-albums-view', () => this.showAlbumsView());
 
         eventBus.on('state:restore-folder', async (data) => {
-            await smugMugAPI.loadFolderContents(data.nodeUri);
+            try {
+                await smugMugAPI.loadFolderContents(data.nodeUri);
+            } catch (error) {
+                console.error('Error restoring folder in App:', error);
+                eventBus.emit('toast:error', {
+                    title: 'Navigation Error',
+                    message: 'Failed to restore folder state. Please try navigating manually.'
+                });
+            }
         });
 
         eventBus.on('state:restore-album', (data) => {

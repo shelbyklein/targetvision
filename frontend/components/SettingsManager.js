@@ -903,7 +903,7 @@ Focus on:
                 const textColorClass = isUsingCustomKeys ? 'text-green-600' : 'text-yellow-600';
                 
                 navIndicator.className = `h-2 w-2 ${colorClass} rounded-full`;
-                navText.textContent = 'LLM Available';
+                navText.textContent = '';
                 navText.className = `text-xs ${textColorClass}`;
             } else {
                 navIndicator.className = 'h-2 w-2 bg-red-500 rounded-full';

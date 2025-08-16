@@ -241,6 +241,87 @@ img[loading="lazy"] {
     }
     
     /* Mobile flexbox layout is handled above */
+    
+    /* Mobile header responsive design */
+    header .flex.justify-between.items-center {
+        flex-direction: column;
+        height: auto;
+        padding: 0.75rem 0;
+        gap: 0.75rem;
+    }
+    
+    /* Logo/title row */
+    header .flex.items-center:first-child {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* Navigation - mobile layout adjustments */
+    header nav {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    
+    /* Navigation buttons - smaller on mobile */
+    .nav-tab {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+    }
+    
+    /* Status indicators - compact layout */
+    #status-indicators {
+        width: 100%;
+        justify-content: center;
+        gap: 1rem;
+    }
+    
+    /* Truncate status text on mobile */
+    #auth-success span:not(.text-gray-500) {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    /* Hide username on very small screens */
+    #auth-username {
+        display: none;
+    }
+    
+    /* LLM status text - shorter on mobile */
+    #llm-status-text {
+        display: none;
+    }
+}
+
+/* Tablet responsive design - medium screens */
+@media (min-width: 641px) and (max-width: 1024px) {
+    /* Smaller navigation buttons */
+    .nav-tab {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    /* Reduce spacing in header */
+    header .w-full.px-4 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* Status indicators spacing */
+    #status-indicators {
+        gap: 1rem;
+    }
+    
+    /* Shorter status text */
+    #auth-success span:not(.text-gray-500) {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 }
 
 /* Dark mode support (future enhancement) */
