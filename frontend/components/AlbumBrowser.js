@@ -51,6 +51,19 @@ class AlbumBrowser {
         eventBus.on('ui:unfreeze-navigation', () => {
             this.unfreezeNavigation();
         });
+
+        // Listen for photo processing events to update album indicators
+        eventBus.on('photos:processing-complete', (data) => {
+            this.updateAlbumProcessingIndicators(data);
+        });
+
+        eventBus.on('photos:single-processing-success', (data) => {
+            this.updateAlbumProcessingIndicators(data);
+        });
+
+        eventBus.on('photos:batch-processing-started', (data) => {
+            this.updateAlbumProcessingIndicators(data);
+        });
     }
 
     handleFolderLoaded(data) {
@@ -104,9 +117,6 @@ class AlbumBrowser {
         const albumsList = document.getElementById('albums-list');
         const albumCount = document.getElementById('album-count');
         
-        // Clear loading state
-        const loading = document.getElementById('loading-albums');
-        if (loading) loading.remove();
         
         // Update breadcrumbs
         this.updateBreadcrumbs();
@@ -248,14 +258,15 @@ class AlbumBrowser {
                         <p class="text-xs text-gray-500 flex items-center">
                             <span class="mr-2">${album.image_count || 0} photos</span>
                             ${album.is_synced ? `
-                                <svg class="h-3 w-3 text-green-500" fill="currentColor" viewBox="0 0 20 20" title="Synced">
+                                <svg class="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20" title="Synced">
                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                                 </svg>
                             ` : `
-                                <svg class="h-3 w-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20" title="Not synced">
+                                <svg class="h-3 w-3 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20" title="Not synced">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z" clip-rule="evenodd"/>
                                 </svg>
                             `}
+                            ${this.renderProcessingIndicatorInline(album)}
                         </p>
                     </div>
                 </div>
@@ -271,6 +282,65 @@ class AlbumBrowser {
         return div;
     }
 
+    renderProcessingIndicator(album) {
+        if (!album.is_synced || !album.synced_photo_count) {
+            return '';
+        }
+
+        const totalPhotos = album.synced_photo_count || 0;
+        const processedPhotos = album.ai_processed_count || 0;
+
+        if (totalPhotos === 0) {
+            return '';
+        }
+
+        let statusColor = 'text-gray-400';
+        let statusIcon = '○';
+        
+        if (processedPhotos === totalPhotos) {
+            statusColor = 'text-green-500';
+            statusIcon = '✓';
+        } else if (processedPhotos > 0) {
+            statusColor = 'text-yellow-500';
+            statusIcon = '◐';
+        }
+
+        return `
+            <div class="album-processing-indicator text-xs ${statusColor} flex items-center mt-1">
+                <span class="mr-1">${statusIcon}</span>
+                <span>${processedPhotos}/${totalPhotos}</span>
+            </div>
+        `;
+    }
+
+    renderProcessingIndicatorInline(album) {
+        if (!album.is_synced || !album.synced_photo_count) {
+            return '';
+        }
+
+        const totalPhotos = album.synced_photo_count || 0;
+        const processedPhotos = album.ai_processed_count || 0;
+
+        if (totalPhotos === 0) {
+            return '';
+        }
+
+        let statusColor = 'text-gray-400';
+        let statusIcon = '○';
+        
+        if (processedPhotos === totalPhotos) {
+            statusColor = 'text-green-500';
+            statusIcon = '✓';
+        } else if (processedPhotos > 0) {
+            statusColor = 'text-yellow-500';
+            statusIcon = '◐';
+        }
+
+        return `<span class="album-processing-indicator ${statusColor}">
+            <span class="mr-1">${statusIcon}</span><span>${processedPhotos}/${totalPhotos}</span>
+        </span>`;
+    }
+
     selectFolderItem(folder, element) {
         // Remove selection from other items
         document.querySelectorAll('.folder-item, .album-item').forEach(item => {
@@ -281,11 +351,6 @@ class AlbumBrowser {
         const folderItem = element.querySelector('.folder-item');
         folderItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
         
-        // Show loading state immediately for visual feedback
-        eventBus.emit('progress:show-item-loading', { 
-            itemId: folder.node_id, 
-            itemType: 'folder-tree' 
-        });
         
         // Navigate to folder contents instead of showing folder info
         this.navigateToFolder(folder, element);
@@ -310,11 +375,6 @@ class AlbumBrowser {
         const albumItem = element.querySelector('.album-item');
         albumItem.classList.add('bg-blue-100', 'border-l-4', 'border-blue-500');
         
-        // Show loading state for album selection
-        eventBus.emit('progress:show-item-loading', { 
-            itemId: album.album_key || album.node_id, 
-            itemType: 'album-tree' 
-        });
         
         // Emit event to select album (photos loading handled by DataManager)
         eventBus.emit('album:selected', { album });
@@ -331,8 +391,6 @@ class AlbumBrowser {
         }
 
         try {
-            // Show loading state for folder grid
-            eventBus.emit('folders:loading:show');
             
             // Add current location to history for back navigation
             this.nodeHistory.push({
@@ -356,9 +414,7 @@ class AlbumBrowser {
                 message: `Failed to load folder: ${error.message}`
             });
         } finally {
-            // Clear loading states
-            eventBus.emit('folders:loading:hide');
-            eventBus.emit('progress:hide-item-loading', { itemId: folder.node_id });
+            // Navigation complete
         }
     }
     
@@ -455,8 +511,6 @@ class AlbumBrowser {
                     // Clear photo selection
                     eventBus.emit('photos:clear-selection');
                     
-                    // Show loading states
-                    eventBus.emit('folders:loading:show');
                     
                     // Use consistent navigation flow - let smugMugAPI handle the loading
                     // This will emit 'smugmug:folder-loaded' which triggers proper updates
@@ -469,8 +523,7 @@ class AlbumBrowser {
                         message: `Failed to load folder: ${error.message}`
                     });
                 } finally {
-                    // Clear loading states
-                    eventBus.emit('folders:loading:hide');
+                    // Navigation complete
                 }
             });
         }
@@ -610,26 +663,6 @@ class AlbumBrowser {
             item.setAttribute('data-frozen', 'true');
         });
 
-        // Show loading overlay or message
-        const albumsList = document.getElementById('albums-list');
-        if (albumsList) {
-            const existingOverlay = albumsList.querySelector('.navigation-frozen-overlay');
-            if (!existingOverlay) {
-                const overlay = document.createElement('div');
-                overlay.className = 'navigation-frozen-overlay absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10';
-                overlay.innerHTML = `
-                    <div class="text-center">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                        <div class="text-sm text-gray-600">${reason}</div>
-                    </div>
-                `;
-                // Make sure the parent has relative positioning
-                if (albumsList.style.position !== 'relative') {
-                    albumsList.style.position = 'relative';
-                }
-                albumsList.appendChild(overlay);
-            }
-        }
     }
 
     unfreezeNavigation() {
@@ -642,10 +675,65 @@ class AlbumBrowser {
             item.removeAttribute('data-frozen');
         });
 
-        // Remove loading overlay
-        const overlay = document.querySelector('.navigation-frozen-overlay');
-        if (overlay) {
-            overlay.remove();
+    }
+
+    async updateAlbumProcessingIndicators(data) {
+        // If we have album information in the data, refresh the album statistics
+        const albumId = data.albumId || (data.album && data.album.id);
+        if (albumId) {
+            try {
+                // Find the album in our current list
+                const albumIndex = this.smugmugAlbums.findIndex(a => 
+                    a.local_album_id === albumId ||
+                    a.smugmug_id === albumId ||
+                    a.album_key === albumId
+                );
+
+                if (albumIndex !== -1) {
+                    // For now, do a simple increment for single photo processing
+                    // In a more sophisticated implementation, we could fetch fresh stats from backend
+                    if (data.processingType === 'single') {
+                        const currentProcessed = this.smugmugAlbums[albumIndex].ai_processed_count || 0;
+                        this.smugmugAlbums[albumIndex].ai_processed_count = currentProcessed + 1;
+                        
+                        // Recalculate progress percentage
+                        const totalPhotos = this.smugmugAlbums[albumIndex].synced_photo_count || 0;
+                        const processedPhotos = this.smugmugAlbums[albumIndex].ai_processed_count || 0;
+                        this.smugmugAlbums[albumIndex].processing_progress = totalPhotos > 0 
+                            ? Math.round((processedPhotos / totalPhotos) * 100) 
+                            : 0;
+
+                        // Update the UI element for this album
+                        this.refreshAlbumElement(this.smugmugAlbums[albumIndex]);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating album processing indicators:', error);
+            }
+        }
+    }
+
+    refreshAlbumElement(album) {
+        const albumElement = document.querySelector(`[data-album-id="${album.album_key || album.local_album_id}"]`);
+        if (albumElement) {
+            // Find the inline processing indicator element and update it
+            const processingIndicator = albumElement.querySelector('.album-processing-indicator');
+            if (processingIndicator) {
+                // Get the new inline indicator HTML
+                const newIndicatorHtml = this.renderProcessingIndicatorInline(album);
+                if (newIndicatorHtml) {
+                    // Create a temporary element to parse the HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = newIndicatorHtml;
+                    const newIndicator = tempDiv.firstElementChild;
+                    
+                    // Replace the old indicator with the new one
+                    processingIndicator.replaceWith(newIndicator);
+                } else {
+                    // No processing indicator needed, remove existing one
+                    processingIndicator.remove();
+                }
+            }
         }
     }
 }

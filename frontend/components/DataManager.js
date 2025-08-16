@@ -319,15 +319,69 @@ class DataManager {
                 return; // Loading was cancelled, don't continue with background refresh
             }
 
-            // Background refresh
-            // For background refresh, load all photos to compare with cache
-            const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=0&limit=100`, {
-                signal: this.currentLoadingController.signal
-            });
-            if (!response.ok) return;
+            // Background refresh - load all photos in batches to compare with cache
+            let allFreshPhotos = [];
+            let skip = 0;
+            const batchSize = 100;
+            let hasMore = true;
+            let totalCount = 0;
+            let isFirstBatch = true;
             
-            const data = await response.json();
-            const freshPhotos = data.photos || data; // Handle both new and old API responses
+            while (hasMore) {
+                const response = await fetch(`${this.apiBase}/smugmug/albums/${albumId}/photos?skip=${skip}&limit=${batchSize}`, {
+                    signal: this.currentLoadingController.signal
+                });
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                const batchPhotos = data.photos || [];
+                
+                // Set total count from first batch
+                if (isFirstBatch) {
+                    totalCount = data.total_count || 0;
+                    
+                    // Only show UI indicator if there are more photos to load beyond first batch
+                    if (totalCount > batchSize) {
+                        eventBus.emit('photos:batch-loading:show', {
+                            loaded: Math.min(batchSize, totalCount),
+                            total: totalCount,
+                            progress: Math.round((Math.min(batchSize, totalCount) / totalCount) * 100)
+                        });
+                    }
+                    isFirstBatch = false;
+                }
+                
+                allFreshPhotos = [...allFreshPhotos, ...batchPhotos];
+                
+                hasMore = data.has_more && batchPhotos.length === batchSize;
+                skip += batchSize;
+                
+                // Update progress indicator for subsequent batches
+                if (totalCount > batchSize) {
+                    eventBus.emit('photos:batch-loading:progress', {
+                        loaded: allFreshPhotos.length,
+                        total: totalCount,
+                        progress: Math.round((allFreshPhotos.length / totalCount) * 100)
+                    });
+                }
+                
+                // Add small delay between batches to avoid overwhelming the system
+                if (hasMore) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                // Check if we're still in the same context
+                if (!this.currentLoadingController) {
+                    return; // Loading was cancelled
+                }
+            }
+            
+            // Hide loading indicator when complete
+            if (totalCount > batchSize) {
+                eventBus.emit('photos:batch-loading:complete');
+            }
+            
+            const freshPhotos = allFreshPhotos;
             
             cacheManager.setCachedAlbumPhotos(albumId, freshPhotos);
             
@@ -337,9 +391,9 @@ class DataManager {
                     // Photos updated from background refresh
                     app.currentPhotos = freshPhotos;
                     app.photosMetadata = {
-                        totalCount: data.total_count || freshPhotos.length,
+                        totalCount: freshPhotos.length,
                         loadedCount: freshPhotos.length,
-                        hasMore: data.has_more || false
+                        hasMore: false // All photos loaded during background refresh
                     };
                     eventBus.emit('photos:display', { photos: app.currentPhotos, isRefresh: true });
                 }
@@ -350,6 +404,8 @@ class DataManager {
                 return;
             }
             console.log('Background refresh failed (ignoring):', error.message);
+            // Hide any active batch loading indicator on error
+            eventBus.emit('photos:batch-loading:error');
         }
     }
 

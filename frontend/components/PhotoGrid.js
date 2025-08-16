@@ -270,8 +270,8 @@ class PhotoGrid {
                     loading="lazy"
                 />
                 
-                <!-- Selection hover checkmark (shows on hover when not selected) -->
-                <div class="selection-hover-checkmark absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity z-19 ${isSelected ? 'hidden' : ''} flex items-center justify-center">
+                <!-- Selection hover checkmark (shows on hover when not selected and unprocessed) -->
+                <div class="selection-hover-checkmark absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity z-19 ${isSelected || status === 'processed' || status === 'completed' ? 'hidden' : ''} flex items-center justify-center">
                     <div class="w-8 h-8 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center text-gray-700 shadow-lg transition-all cursor-pointer">
                         <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -335,8 +335,19 @@ class PhotoGrid {
             // Don't select if clicking on buttons or checkboxes
             if (e.target.type === 'checkbox' || e.target.closest('button')) return;
             
-            // If photo is synced, toggle selection
+            // If photo is synced, check if it can be selected
             if (photo.is_synced) {
+                // Check if photo is already processed
+                const currentStatus = this.getPhotoProcessingStatus(photo);
+                if (currentStatus === 'processed' || currentStatus === 'completed') {
+                    // Show message for already processed photos
+                    eventBus.emit('toast:info', {
+                        title: 'Already Processed',
+                        message: 'This photo has already been processed and cannot be selected for batch processing.'
+                    });
+                    return;
+                }
+                
                 const isCurrentlySelected = this.selectedPhotos.has(photo.smugmug_id);
                 this.togglePhotoSelection(photo.smugmug_id, !isCurrentlySelected);
             } else {
@@ -363,6 +374,17 @@ class PhotoGrid {
             hoverCheckmark.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (photo.is_synced) {
+                    // Check if photo is already processed
+                    const currentStatus = this.getPhotoProcessingStatus(photo);
+                    if (currentStatus === 'processed' || currentStatus === 'completed') {
+                        // Show message for already processed photos
+                        eventBus.emit('toast:info', {
+                            title: 'Already Processed',
+                            message: 'This photo has already been processed and cannot be selected for batch processing.'
+                        });
+                        return;
+                    }
+                    
                     this.togglePhotoSelection(photo.smugmug_id, true);
                 } else {
                     eventBus.emit('ui:show-error', {
@@ -557,7 +579,17 @@ class PhotoGrid {
             // Update hover checkmark visibility
             const hoverCheckmark = photoCard.querySelector('.selection-hover-checkmark');
             if (hoverCheckmark) {
-                if (isSelected) {
+                // Find the photo to check its processing status
+                const photo = this.currentPhotos.find(p => 
+                    (p.smugmug_id && p.smugmug_id === photoId) ||
+                    (p.image_key && p.image_key === photoId) ||
+                    (p.local_photo_id && p.local_photo_id === photoId)
+                );
+                
+                const status = photo ? this.getPhotoProcessingStatus(photo) : 'unknown';
+                const isProcessed = status === 'processed' || status === 'completed';
+                
+                if (isSelected || isProcessed) {
                     hoverCheckmark.classList.add('hidden');
                 } else {
                     hoverCheckmark.classList.remove('hidden');
