@@ -1011,6 +1011,19 @@ async def sync_smugmug_album(
         album_uri = target_album.get("Uri", "")
         album_name = target_album.get("Name", "Untitled Album")
         
+        # Get folder breadcrumbs for this album to build folder path
+        folder_path = None
+        try:
+            breadcrumbs = await service.get_folder_breadcrumbs(album_uri)
+            if breadcrumbs and len(breadcrumbs) > 1:
+                # Build folder path from breadcrumbs (excluding the album itself)
+                folder_names = [crumb.get("name", "") for crumb in breadcrumbs[:-1] if crumb.get("name")]
+                if folder_names:
+                    folder_path = " > ".join(folder_names)
+                    logger.info(f"Album '{album_name}' folder path: {folder_path}")
+        except Exception as e:
+            logger.warning(f"Failed to get folder breadcrumbs for album {album_name}: {e}")
+        
         # Check if album already exists in local database
         existing_album = db.query(Album).filter_by(smugmug_id=album_uri).first()
         
@@ -1071,6 +1084,7 @@ async def sync_smugmug_album(
                     album_id=album_id,
                     album_name=album_name,
                     album_uri=album_uri,
+                    folder_path=folder_path,
                     width=photo_metadata.get("width"),
                     height=photo_metadata.get("height"),
                     format=photo_metadata.get("format"),
@@ -1082,6 +1096,7 @@ async def sync_smugmug_album(
             else:
                 # Update existing photo
                 existing_photo.album_id = album_id
+                existing_photo.folder_path = folder_path
                 existing_photo.image_url = photo_metadata.get("image_url") or existing_photo.image_url
                 existing_photo.thumbnail_url = photo_metadata.get("thumbnail_url") or existing_photo.thumbnail_url
                 synced_count += 1
@@ -2033,6 +2048,19 @@ async def confirm_processing_status(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to confirm processing status: {str(e)}")
 
 # Search Endpoints
+async def enhance_photos_with_folder_info(photos):
+    """Enhance photo results with folder breadcrumb information"""
+    try:
+        # Photos now have folder_path stored in database, so no enhancement needed
+        # The folder_path is already included in Photo.to_dict() method
+        logger.info(f"Photos already include folder_path from database: {len(photos)} photos")
+        return photos
+            
+    except Exception as e:
+        logger.error(f"Error enhancing photos with folder info: {e}")
+        # Return original photos if enhancement fails
+        return photos
+
 @app.get("/search")
 async def search_photos(
     q: str = Query(..., min_length=1, description="Search query"),
@@ -2080,6 +2108,9 @@ async def search_photos(
             # For vector search, we'll need to implement filtering separately
             results = await vector_search.search_by_text(q, limit)
             # TODO: Apply filters to vector search results
+            
+            # Enhance vector search results with folder info
+            results = await enhance_photos_with_folder_info(results)
         elif search_type == "text":
             # Enhanced text search implementation with filters
             db = next(get_db())
@@ -2133,16 +2164,22 @@ async def search_photos(
             finally:
                 db.close()
                 
+            # Enhance text search results with folder info
+            results = await enhance_photos_with_folder_info(results)
+                
         else:  # hybrid
             # For hybrid search, we'll also need to implement filtering
             results = await hybrid_search.search(q, limit)
             # TODO: Apply filters to hybrid search results
         
+        # Enhance results with folder breadcrumb information
+        enhanced_results = await enhance_photos_with_folder_info(results)
+        
         return {
             "query": q,
             "search_type": search_type,
-            "results": len(results),
-            "photos": results,
+            "results": len(enhanced_results),
+            "photos": enhanced_results,
             "filters": {
                 "album": album,
                 "processing_status": processing_status,

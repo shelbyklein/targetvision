@@ -62,6 +62,7 @@ class Photo(Base):
     album_id = Column(Integer, ForeignKey("albums.id"), nullable=True, index=True)
     album_name = Column(String(255))  # Keep for backwards compatibility
     album_uri = Column(String(500))   # Keep for backwards compatibility
+    folder_path = Column(String(500), nullable=True)  # Full folder hierarchy path (e.g., "2025 > Buckeye Classic")
     width = Column(Integer)
     height = Column(Integer)
     format = Column(String(50))
@@ -84,6 +85,7 @@ class Photo(Base):
             "keywords": self.keywords,
             "album_id": self.album_id,
             "album_name": self.album_name,
+            "folder_path": self.folder_path,
             "image_url": self.image_url,
             "thumbnail_url": self.thumbnail_url,
             "width": self.width,

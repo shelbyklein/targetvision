@@ -449,6 +449,55 @@ img[loading="lazy"] {
     min-height: 0; /* Allow flex items to shrink below content size */
 }
 
+/* Album card processing statistics */
+.album-card .processing-stats {
+    margin-top: 8px;
+    padding: 0 4px;
+}
+
+.album-card .progress-bar {
+    height: 2px;
+    background-color: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.album-card .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease-in-out;
+}
+
+.album-card .stats-text {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    text-align: center;
+}
+
+/* Processing status color variations */
+.album-card .progress-fill.bg-green-500 {
+    background-color: #10b981; /* Completed - green */
+}
+
+.album-card .progress-fill.bg-blue-500 {
+    background-color: #3b82f6; /* In progress - blue */
+}
+
+.album-card .progress-fill.bg-gray-400 {
+    background-color: #9ca3af; /* Not started - gray */
+}
+
+/* Hover effects for processing stats */
+.album-card:hover .processing-stats {
+    opacity: 1;
+}
+
+.album-card .processing-stats {
+    opacity: 0.9;
+    transition: opacity 0.2s ease-in-out;
+}
+
 /* Full-screen lightbox animations */
 #fullscreen-lightbox {
     backdrop-filter: blur(2px);

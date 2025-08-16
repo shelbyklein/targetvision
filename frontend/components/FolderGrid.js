@@ -43,6 +43,20 @@ class FolderGrid {
         eventBus.on('ui:unfreeze-navigation', () => {
             this.unfreezeNavigation();
         });
+
+        // Listen for photo processing events to update album statistics
+        eventBus.on('photos:processing-complete', (data) => {
+            this.updateAlbumProcessingStats(data);
+        });
+
+        eventBus.on('photos:batch-complete', (data) => {
+            this.updateAlbumProcessingStats(data);
+        });
+
+        // Listen for album sync completion to refresh statistics
+        eventBus.on('smugmug:album-sync-complete', (data) => {
+            this.refreshAlbumStats(data.albumId);
+        });
     }
 
     displayFolderGrid() {
@@ -195,7 +209,7 @@ class FolderGrid {
                     </h3>
                     <div class="text-xs text-gray-500">
                         <p class="mb-1">${imageCount} photo${imageCount !== 1 ? 's' : ''}</p>
-                        <div class="flex items-center justify-center">
+                        <div class="flex items-center justify-center mb-2">
                             ${isSynced ? `
                                 <svg class="h-3 w-3 text-green-500" fill="currentColor" viewBox="0 0 20 20" title="Synced">
                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -206,6 +220,8 @@ class FolderGrid {
                                 </svg>
                             `}
                         </div>
+                        
+                        ${isSynced ? this.renderProcessingStats(album) : ''}
                     </div>
                 </div>
             </div>
@@ -276,6 +292,44 @@ class FolderGrid {
                 `;
             }
         }
+    }
+    
+    renderProcessingStats(album) {
+        // Extract processing statistics
+        const totalPhotos = album.synced_photo_count || 0;
+        const processedPhotos = album.ai_processed_count || 0;
+        const processingProgress = album.processing_progress || 0;
+        
+        // Don't show stats if no photos are synced
+        if (totalPhotos === 0) {
+            return '';
+        }
+        
+        // Determine progress bar color based on completion percentage
+        let progressBarColor = '';
+        if (processingProgress === 100) {
+            progressBarColor = 'bg-green-500'; // Green for 100%
+        } else if (processingProgress > 0) {
+            progressBarColor = 'bg-blue-500'; // Blue for 1-99%
+        } else {
+            progressBarColor = 'bg-gray-400'; // Gray for 0%
+        }
+        
+        return `
+            <div class="processing-stats mt-2 w-full">
+                <!-- Progress Bar -->
+                <div class="progress-bar w-full h-1 bg-gray-200 rounded-full mb-1">
+                    <div class="progress-fill h-full ${progressBarColor} rounded-full transition-all duration-300" 
+                         style="width: ${processingProgress}%"></div>
+                </div>
+                
+                <!-- Stats Text -->
+                <div class="stats-text text-xs">
+                    <span class="text-gray-600">${processedPhotos}/${totalPhotos} processed</span>
+                    <span class="text-gray-500 ml-1">(${Math.round(processingProgress)}%)</span>
+                </div>
+            </div>
+        `;
     }
     
     selectFolder(folder) {
@@ -399,6 +453,94 @@ class FolderGrid {
         const overlay = document.querySelector('.navigation-frozen-overlay');
         if (overlay) {
             overlay.remove();
+        }
+    }
+
+    updateAlbumProcessingStats(data) {
+        // Update album statistics when photos are processed
+        if (!data.albumId) return;
+
+        // Find the album card in the current display
+        const albumCard = document.querySelector(`[data-album-id="${data.albumId}"]`);
+        if (!albumCard) return;
+
+        // Find the corresponding album in currentItems
+        const album = this.currentItems.find(item => 
+            item.type === 'album' && 
+            (item.album_key === data.albumId || 
+             item.local_album_id === data.albumId || 
+             item.smugmug_id === data.albumId)
+        );
+        
+        if (!album) return;
+
+        // Update album data with new processing stats
+        if (data.updatedStats) {
+            album.ai_processed_count = data.updatedStats.ai_processed_count || album.ai_processed_count;
+            album.processed_count = data.updatedStats.processed_count || album.processed_count;
+            album.processing_progress = data.updatedStats.processing_progress || album.processing_progress;
+        } else {
+            // Increment processed count for single photo processing
+            album.ai_processed_count = (album.ai_processed_count || 0) + 1;
+            album.processed_count = (album.processed_count || 0) + 1;
+            const totalPhotos = album.synced_photo_count || 1;
+            album.processing_progress = Math.round((album.ai_processed_count / totalPhotos) * 100);
+        }
+
+        // Re-render the processing stats for this album card
+        this.updateAlbumCardStats(albumCard, album);
+    }
+
+    updateAlbumCardStats(albumCard, album) {
+        // Find the processing stats container in the album card
+        const statsContainer = albumCard.querySelector('.processing-stats');
+        if (!statsContainer) return;
+
+        // Generate new processing stats HTML
+        const newStatsHTML = this.renderProcessingStats(album);
+        
+        // Update the stats container
+        if (newStatsHTML) {
+            statsContainer.outerHTML = newStatsHTML;
+        } else {
+            statsContainer.remove();
+        }
+    }
+
+    async refreshAlbumStats(albumId) {
+        // Refresh album statistics from the backend after sync
+        try {
+            // Find the album card
+            const albumCard = document.querySelector(`[data-album-id="${albumId}"]`);
+            if (!albumCard) return;
+
+            // Find the album in currentItems
+            const albumIndex = this.currentItems.findIndex(item => 
+                item.type === 'album' && 
+                (item.album_key === albumId || 
+                 item.local_album_id === albumId || 
+                 item.smugmug_id === albumId)
+            );
+            
+            if (albumIndex === -1) return;
+
+            // Fetch fresh album data from the API
+            const response = await apiService.get(`/albums/${albumId}`);
+            if (response) {
+                // Update the album data in currentItems
+                Object.assign(this.currentItems[albumIndex], {
+                    synced_photo_count: response.actual_photo_count,
+                    processed_count: response.processed_count,
+                    ai_processed_count: response.ai_processed_count,
+                    processing_progress: response.processing_progress,
+                    is_synced: true
+                });
+
+                // Update the visual display
+                this.updateAlbumCardStats(albumCard, this.currentItems[albumIndex]);
+            }
+        } catch (error) {
+            console.warn('Failed to refresh album stats:', error);
         }
     }
 }

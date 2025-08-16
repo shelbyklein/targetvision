@@ -25,7 +25,7 @@ class ModalManager {
 
     setupEventListeners() {
         // Photo modal events
-        eventBus.on('photo:show-modal', (data) => this.showPhotoModal(data.photo));
+        eventBus.on('photo:show-modal', (data) => this.showPhotoModal(data.photo, data.showCollections));
         eventBus.on('modal:close', () => this.closeModal());
         eventBus.on('lightbox:open', (data) => this.openFullScreenLightbox(data.photo));
         eventBus.on('lightbox:close', () => this.closeFullScreenLightbox());
@@ -71,8 +71,8 @@ class ModalManager {
     }
 
     // Photo Modal Management
-    async showPhotoModal(photo) {
-        console.log('Show modal for photo:', photo);
+    async showPhotoModal(photo, showCollections = false) {
+        console.log('Show modal for photo:', photo, 'showCollections:', showCollections);
         
         // Fetch complete photo data including embeddings from API
         let completePhoto = photo;
@@ -98,6 +98,11 @@ class ModalManager {
         
         // Show modal with animation
         this.showModalWithAnimation();
+        
+        // Auto-show collections interface if requested
+        if (showCollections) {
+            setTimeout(() => this.showCollectionInterface(), 100);
+        }
     }
 
     populateModalData(completePhoto, photo) {

@@ -38,6 +38,7 @@ class ChatManager {
             // data.photo should already be the photo object
             eventBus.emit('photo:show-modal', { photo: data.photo });
         });
+        
     }
 
     bindDOMEventListeners() {
@@ -246,12 +247,13 @@ You can also ask for help with syncing albums or processing photos with AI. What
                         }
                         
                         return `
-                            <div class="chat-photo-result relative group cursor-pointer" 
+                            <div class="chat-photo-result relative group" 
                                  data-photo='${JSON.stringify(photoData).replace(/'/g, '&apos;')}'>
-                                <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
+                                <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative cursor-pointer"
+                                     onclick="eventBus.emit('chat:show-photo-modal', { photo: JSON.parse(this.closest('.chat-photo-result').dataset.photo.replace(/&apos;/g, '\\'')) });">
                                     <img 
                                         src="${photoData.thumbnail_url}" 
-                                        alt="${photoData.title || 'Photo'}"
+                                        alt="${photoData.title || photoData.filename || 'Photo'}"
                                         class="w-full h-full object-cover"
                                         loading="lazy"
                                     />
@@ -264,7 +266,7 @@ You can also ask for help with syncing albums or processing photos with AI. What
                                     ` : ''}
                                     
                                     <!-- Hover overlay -->
-                                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center pointer-events-none">
                                         <div class="opacity-0 group-hover:opacity-100 transition-opacity">
                                             <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -273,37 +275,25 @@ You can also ask for help with syncing albums or processing photos with AI. What
                                     </div>
                                 </div>
                                 
-                                <!-- Photo title -->
-                                <p class="text-xs text-gray-600 mt-1 truncate">${photoData.title || photoData.filename || 'Untitled'}</p>
+                                <!-- Enhanced photo info -->
+                                <div class="mt-1">
+                                    ${photoData.folder_path && photoData.album_name ? 
+                                        `<p class="text-xs text-gray-500 truncate">${photoData.folder_path} / ${photoData.album_name}</p>` :
+                                        photoData.album_name ? 
+                                        `<p class="text-xs text-gray-500 truncate">${photoData.album_name}</p>` : 
+                                        ''
+                                    }
+                                </div>
                             </div>
                         `;
                     }).join('')}
                 </div>
-                <p class="text-xs text-gray-500 mt-2 px-2">Click any photo to view details</p>
+                <p class="text-xs text-gray-500 mt-2 px-2">Click photos to view details • Hover and click + to add to collections</p>
             </div>
         `;
         
         messagesContainer.appendChild(photoResultsDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // Add click handlers for photo results
-        photoResultsDiv.querySelectorAll('.chat-photo-result').forEach(photoDiv => {
-            photoDiv.addEventListener('click', () => {
-                try {
-                    const photoData = JSON.parse(photoDiv.dataset.photo.replace(/&apos;/g, "'"));
-                    
-                    // Validate photo data before emitting
-                    if (!photoData.id && !photoData.smugmug_id) {
-                        console.error('ChatManager: Cannot open modal for invalid photo data:', photoData);
-                        return;
-                    }
-                    
-                    eventBus.emit('chat:show-photo-modal', { photo: photoData });
-                } catch (error) {
-                    console.error('Error parsing photo data:', error);
-                }
-            });
-        });
     }
     
     clearChat() {
@@ -326,6 +316,15 @@ You can also ask for help with syncing albums or processing photos with AI. What
         this.chatMessages = [];
     }
 
+    // Collection Management for Chat Results
+    openPhotoForCollections(photo) {
+        // Open the photo modal and automatically show the collections interface
+        eventBus.emit('photo:show-modal', { 
+            photo: photo,
+            showCollections: true  // Signal to auto-open collections interface
+        });
+    }
+
     // Utility methods for accessing chat data
     getChatMessages() {
         return this.chatMessages;
@@ -334,4 +333,8 @@ You can also ask for help with syncing albums or processing photos with AI. What
 
 // Create and export singleton instance
 const chatManager = new ChatManager();
+
+// Make available globally for inline event handlers
+window.chatManager = chatManager;
+
 export default chatManager;

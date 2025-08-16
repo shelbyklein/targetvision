@@ -248,6 +248,15 @@ class PhotoProcessor {
                     result,
                     message: result.message || SUCCESS_MESSAGES.PHOTO_PROCESSED
                 });
+
+                // Emit album-specific processing complete event for real-time stats updates
+                if (photo.album_id) {
+                    eventBus.emit('photos:processing-complete', {
+                        albumId: photo.album_id,
+                        photoId: photo.id,
+                        processingType: 'single'
+                    });
+                }
             } else {
                 this.updatePhotoThumbnailStatus(displayId, PHOTO_STATUS.FAILED);
                 
@@ -654,12 +663,20 @@ class PhotoProcessor {
                 title: 'Processing Complete', 
                 message: `Finished processing ${this.lastProcessingCount} photos. Results are now available.` 
             });
-            // Clear batch tracking
-            this.batchTotalPhotos = 0;
-            // Refresh current album to show updated status
+
+            // Emit album-specific batch completion event for real-time stats updates
             if (window.app && window.app.currentAlbum) {
+                eventBus.emit('photos:batch-complete', {
+                    albumId: window.app.currentAlbum.local_album_id || window.app.currentAlbum.id,
+                    processedCount: this.lastProcessingCount,
+                    processingType: 'batch'
+                });
+                
                 eventBus.emit('photos:refresh-album-status', { album: window.app.currentAlbum });
             }
+            
+            // Clear batch tracking
+            this.batchTotalPhotos = 0;
         }
 
         // Check for newly completed photos

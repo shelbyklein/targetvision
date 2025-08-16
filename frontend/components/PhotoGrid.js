@@ -175,11 +175,8 @@ class PhotoGrid {
         
         photoGrid.classList.remove('hidden');
         
-        // Only clear grid for initial loads or refreshes, not for progressive updates
-        if (isInitialLoad || isRefresh) {
-            photoGrid.innerHTML = '';
-            // Rendering photos
-        }
+        // Always clear grid when displaying photos (appendPhotos handles progressive loading)
+        photoGrid.innerHTML = '';
         
         photosToShow.forEach(photo => {
             const photoElement = this.createPhotoCard(photo);
