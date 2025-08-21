@@ -40,6 +40,11 @@ class PhotoGrid {
             this.clearSelection();
         });
 
+        // Listen for interactive selection events
+        eventBus.on('photos:toggle-selection', (data) => {
+            this.togglePhotoSelection(data.photoId, data.isSelected);
+        });
+
         // Listen for visibility toggle events
         eventBus.on('photos:toggle-processed', () => {
             this.toggleProcessedVisibility();
@@ -80,6 +85,7 @@ class PhotoGrid {
         // Photo selection DOM events
         const selectAllButton = document.getElementById('select-all');
         const selectNoneButton = document.getElementById('select-none');
+        const interactiveButton = document.getElementById('interactive-selection');
         
         if (selectAllButton) {
             selectAllButton.addEventListener('click', () => eventBus.emit('photos:select-all'));
@@ -87,6 +93,10 @@ class PhotoGrid {
 
         if (selectNoneButton) {
             selectNoneButton.addEventListener('click', () => eventBus.emit('photos:clear-selection'));
+        }
+
+        if (interactiveButton) {
+            interactiveButton.addEventListener('click', () => this.startInteractiveSelection());
         }
 
         // Photo filtering DOM events
@@ -161,6 +171,9 @@ class PhotoGrid {
         
         // Update toggle button styles to reflect current state
         this.updateToggleButtonStyles();
+        
+        // Update selection UI to ensure interactive selection button is properly enabled/disabled
+        this.updateSelectionUI();
     }
     
     // Progressive loading - append new photos without clearing existing ones
@@ -192,6 +205,9 @@ class PhotoGrid {
         
         // Update photo selection visuals after adding new photos
         this.updatePhotoSelectionVisuals();
+        
+        // Update selection UI to ensure interactive selection button reflects new photo count
+        this.updateSelectionUI();
     }
 
     // Helper function to determine consistent photo processing status
@@ -508,6 +524,7 @@ class PhotoGrid {
     updateSelectionUI() {
         const count = this.selectedPhotos.size;
         const processButton = document.getElementById('process-selected');
+        const interactiveButton = document.getElementById('interactive-selection');
         
         // Update selection count display
         document.getElementById('selection-count').textContent = `${count} selected`;
@@ -515,6 +532,22 @@ class PhotoGrid {
         // Disable button if no photos selected OR if photos are still loading
         const shouldDisable = count === 0 || this.isLoadingPhotos;
         processButton.disabled = shouldDisable;
+        
+        // Update interactive selection button
+        if (interactiveButton) {
+            // Enable if there are synced photos available and not loading
+            const syncedPhotos = this.getSyncedPhotos();
+            const hasSyncedPhotos = syncedPhotos.length > 0;
+            interactiveButton.disabled = !hasSyncedPhotos || this.isLoadingPhotos;
+            
+            if (this.isLoadingPhotos) {
+                interactiveButton.title = 'Cannot start interactive selection while photos are loading';
+            } else if (!hasSyncedPhotos) {
+                interactiveButton.title = 'No synced photos available for selection. Sync the album first.';
+            } else {
+                interactiveButton.title = `Select photos for batch processing (${syncedPhotos.length} synced photos)`;
+            }
+        }
         
         // Update button text/tooltip based on state
         if (this.isLoadingPhotos) {
@@ -740,6 +773,51 @@ class PhotoGrid {
         eventBus.emit('photos:loading-state-changed', { 
             isLoading: this.isLoadingPhotos 
         });
+    }
+
+    // Interactive Selection Methods
+    getSyncedPhotos() {
+        // Return all synced photos regardless of processing status
+        return this.currentPhotos.filter(photo => photo.is_synced);
+    }
+
+    getUnprocessedPhotos() {
+        return this.currentPhotos.filter(photo => {
+            if (!photo.is_synced) return false;
+            
+            // Use same logic as getPhotoProcessingStatus to determine if unprocessed
+            const hasAiMetadata = photo.ai_metadata && photo.ai_metadata.length > 0;
+            const isProcessed = photo.processing_status === 'processed' || photo.processing_status === 'completed' || hasAiMetadata;
+            
+            return !isProcessed; // Only include unprocessed photos
+        });
+    }
+
+    startInteractiveSelection() {
+        if (this.isLoadingPhotos) {
+            eventBus.emit('toast:warning', {
+                title: 'Loading in Progress',
+                message: 'Please wait for photos to finish loading before starting interactive selection.'
+            });
+            return;
+        }
+
+        const syncedPhotos = this.getSyncedPhotos();
+        
+        if (syncedPhotos.length === 0) {
+            eventBus.emit('toast:info', {
+                title: 'No Photos Available',
+                message: 'No synced photos available for selection. Please sync the album first.'
+            });
+            return;
+        }
+
+        // Start interactive selection mode
+        eventBus.emit('interactive:start', { 
+            photos: syncedPhotos 
+        });
+        
+        console.log(`🎯 Starting interactive selection with ${syncedPhotos.length} synced photos`);
     }
 }
 

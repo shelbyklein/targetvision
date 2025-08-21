@@ -19,6 +19,7 @@ import settingsManager from './components/SettingsManager.js';
 import navigationManager from './components/NavigationManager.js';
 import dataManager from './components/DataManager.js';
 import folderGrid from './components/FolderGrid.js';
+import interactiveSelection from './components/InteractiveSelection.js';
 import { EVENTS, PHOTO_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from './utils/Constants.js';
 import UIUtils from './utils/UIUtils.js';
 
