@@ -128,8 +128,7 @@ class DataManager {
             this.currentLoadingController = null;
             eventBus.emit('photos:loading:cancelled');
         }
-        // Always unfreeze operations when cancelling
-        this.setLoadingState(false);
+        // Note: Loading state is managed by the calling context
     }
 
     // Photo Loading Methods
@@ -143,11 +142,11 @@ class DataManager {
             return;
         }
 
+        // Cancel any existing photo loading first
+        this.cancelPhotoLoading();
+        
         // Set loading state to freeze operations
         this.setLoadingState(true);
-        
-        // Cancel any existing photo loading
-        this.cancelPhotoLoading();
         
         // Create new AbortController for this loading operation
         this.currentLoadingController = new AbortController();
@@ -167,7 +166,7 @@ class DataManager {
             };
             eventBus.emit('photos:display', { photos: app.currentPhotos, isInitialLoad: true });
             await this.refreshAlbumPhotosInBackground(albumId, app);
-            this.setLoadingState(false); // Unfreeze after background refresh
+            // Note: Loading state will be unfrozen by refreshAlbumPhotosInBackground
             return;
         }
         
@@ -280,6 +279,14 @@ class DataManager {
                 const albumIdForProgress = app.currentAlbum.album_key || app.currentAlbum.node_id;
                 eventBus.emit('progress:hide-item-loading', { itemId: albumIdForProgress });
             }
+            
+            // For initial loads, ensure loading state is cleared on error
+            // (subsequent batches are handled by parent methods)
+            if (isInitialLoad && this.isLoadingPhotos) {
+                this.setLoadingState(false);
+            }
+            
+            throw error; // Re-throw to be handled by calling method
         }
     }
     
@@ -288,34 +295,51 @@ class DataManager {
         const batchSize = 30;
         let skip = currentCount;
         
-        while (skip < totalCount && app.photosMetadata.hasMore) {
-            // Small delay between batches to avoid overwhelming the system
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Check if we're still viewing the same album
-            const currentAlbumId = app.currentAlbum?.smugmug_id || app.currentAlbum?.album_key;
-            if (currentAlbumId !== albumId) {
-                // Album changed, stopping background loading
-                break;
+        try {
+            while (skip < totalCount && app.photosMetadata.hasMore) {
+                // Small delay between batches to avoid overwhelming the system
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Check if we're still viewing the same album
+                const currentAlbumId = app.currentAlbum?.smugmug_id || app.currentAlbum?.album_key;
+                if (currentAlbumId !== albumId) {
+                    // Album changed, stopping background loading
+                    break;
+                }
+                
+                // Check if loading was cancelled
+                if (!this.currentLoadingController) {
+                    // Loading was cancelled, stop background loading
+                    break;
+                }
+                
+                await this.fetchPhotoBatch(albumId, app, skip, batchSize, false);
+                skip += batchSize;
             }
-            
-            await this.fetchPhotoBatch(albumId, app, skip, batchSize, false);
-            skip += batchSize;
+        } finally {
+            // Background loading complete - unfreeze navigation
+            this.setLoadingState(false);
         }
-        
-        // Background loading complete
     }
     
     // Legacy method - redirect to batch loading for compatibility
     async fetchAlbumPhotos(albumId, app) {
-        // Redirecting to batch loading
-        await this.fetchPhotoBatch(albumId, app, 0, 100, true); // Load larger first batch for legacy calls
+        try {
+            // Redirecting to batch loading
+            await this.fetchPhotoBatch(albumId, app, 0, 100, true); // Load larger first batch for legacy calls
+        } catch (error) {
+            console.error('Legacy photo loading failed:', error);
+            // Ensure loading state is cleared
+            this.setLoadingState(false);
+            throw error;
+        }
     }
     
     async refreshAlbumPhotosInBackground(albumId, app) {
         try {
             // Check if this background refresh is still relevant (loading not cancelled)
             if (!this.currentLoadingController) {
+                this.setLoadingState(false); // Ensure navigation is unfrozen
                 return; // Loading was cancelled, don't continue with background refresh
             }
 
@@ -406,6 +430,9 @@ class DataManager {
             console.log('Background refresh failed (ignoring):', error.message);
             // Hide any active batch loading indicator on error
             eventBus.emit('photos:batch-loading:error');
+        } finally {
+            // Always unfreeze navigation when background refresh completes
+            this.setLoadingState(false);
         }
     }
 
