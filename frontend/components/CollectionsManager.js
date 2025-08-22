@@ -22,6 +22,7 @@ class CollectionsManager {
         this.currentCollection = null;
         this.currentCollectionPhotos = [];
         this.currentPhoto = null; // For modal operations
+        this.selectedCollectionId = null; // For pill button selection
         this.apiBase = 'http://localhost:8000';
         this.domListenersBound = false; // Prevent double-binding DOM listeners
         this.modalListenersBound = false; // Prevent double-binding modal listeners
@@ -83,12 +84,12 @@ class CollectionsManager {
             this.handleCollectionCreated(data);
         });
         
-        // Listen for requests to refresh modal dropdown
+        // Listen for requests to refresh modal pills
         eventBus.on('collections:refresh-modal-dropdown', () => {
-            console.log('Received request to refresh modal dropdown');
+            console.log('Received request to refresh modal pills');
             // Add a small delay to ensure any modal state changes have processed
             setTimeout(() => {
-                this.populateCollectionSelect();
+                this.renderCollectionPills();
             }, 50);
         });
     }
@@ -399,10 +400,10 @@ class CollectionsManager {
                 message: `Collection "${name}" created successfully` 
             });
             
-            // Update the collection dropdown in photo modal if it exists
+            // Update the collection pills in photo modal if it exists
             // Add a small delay to ensure modal events have processed
             setTimeout(() => {
-                this.populateCollectionSelect();
+                this.renderCollectionPills();
             }, 100);
             
             eventBus.emit('toast:success', { title: 'Success', message: `Collection "${name}" created successfully` });
@@ -520,7 +521,7 @@ class CollectionsManager {
             if (!localPhoto || !localPhoto.id) {
                 console.error('Could not get local photo ID for:', photo);
                 this.renderPhotoCollections([]);
-                this.populateCollectionSelect();
+                this.renderCollectionPills();
                 return;
             }
             
@@ -531,16 +532,16 @@ class CollectionsManager {
             if (response.ok) {
                 const data = await response.json();
                 this.renderPhotoCollections(data || []);
-                this.populateCollectionSelect();
+                this.renderCollectionPills();
             } else {
                 console.error('Failed to load photo collections:', response.status, response.statusText);
                 this.renderPhotoCollections([]);
-                this.populateCollectionSelect();
+                this.renderCollectionPills();
             }
         } catch (error) {
             console.error('Error loading photo collections:', error);
             this.renderPhotoCollections([]);
-            this.populateCollectionSelect();
+            this.renderCollectionPills();
         }
     }
     
@@ -601,42 +602,83 @@ class CollectionsManager {
         `).join('');
     }
     
-    populateCollectionSelect() {
-        const select = document.getElementById('modal-collection-select');
-        if (!select) {
-            console.log('Collection dropdown not found - modal may not be open');
+    renderCollectionPills() {
+        const pillsContainer = document.getElementById('modal-collection-pills');
+        if (!pillsContainer) {
+            console.log('Collection pills container not found - modal may not be open');
             return;
         }
         
-        console.log('Populating collection dropdown with', this.collections.length, 'collections');
+        console.log('Rendering collection pills with', this.collections.length, 'collections:', this.collections.map(c => c.name));
         
-        select.innerHTML = '<option value="">Choose a collection...</option>';
+        if (this.collections.length === 0) {
+            pillsContainer.innerHTML = '<div class="text-sm text-gray-500 italic">No collections available</div>';
+            return;
+        }
         
-        this.collections.forEach(collection => {
-            const option = document.createElement('option');
-            option.value = collection.id;
-            option.textContent = collection.name;
-            select.appendChild(option);
-        });
+        // Generate pill buttons
+        const pillsHtml = this.collections.map(collection => {
+            const isSelected = this.selectedCollectionId === collection.id;
+            const baseClasses = 'px-3 py-1 rounded-full text-sm transition-colors cursor-pointer border';
+            const stateClasses = isSelected 
+                ? 'bg-purple-500 text-white border-purple-500' 
+                : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300';
+            
+            return `
+                <button 
+                    class="${baseClasses} ${stateClasses}" 
+                    data-collection-id="${collection.id}"
+                    onclick="collectionsManager.handlePillSelection(${collection.id})"
+                >
+                    ${collection.name}
+                    <span class="ml-1 text-xs opacity-75">(${collection.photo_count || 0})</span>
+                </button>
+            `;
+        }).join('');
         
-        console.log('Collection dropdown populated successfully');
+        pillsContainer.innerHTML = pillsHtml;
+        console.log('Collection pills rendered successfully');
     }
     
-    showCollectionInterface() {
+    handlePillSelection(collectionId) {
+        // Toggle selection - if already selected, deselect
+        if (this.selectedCollectionId === collectionId) {
+            this.selectedCollectionId = null;
+        } else {
+            this.selectedCollectionId = collectionId;
+        }
+        
+        console.log('Collection pill selected:', collectionId, 'Current selection:', this.selectedCollectionId);
+        
+        // Re-render pills to update visual state
+        this.renderCollectionPills();
+    }
+    
+    async showCollectionInterface() {
+        console.log('showCollectionInterface called, current collections:', this.collections.length);
         const interfaceEl = document.getElementById('modal-collection-interface');
         if (interfaceEl) interfaceEl.classList.remove('hidden');
+        
+        // Ensure collections are loaded and pills are rendered when interface is shown
+        if (this.collections.length === 0) {
+            console.log('Collections not loaded, loading now...');
+            await this.loadCollections();
+        }
+        this.renderCollectionPills();
     }
     
     hideCollectionInterface() {
         const interfaceEl = document.getElementById('modal-collection-interface');
-        const select = document.getElementById('modal-collection-select');
         
         if (interfaceEl) interfaceEl.classList.add('hidden');
-        if (select) select.value = '';
+        
+        // Clear pill selection
+        this.selectedCollectionId = null;
+        this.renderCollectionPills();
     }
     
     async addPhotoToCollection() {
-        const collectionId = document.getElementById('modal-collection-select')?.value;
+        const collectionId = this.selectedCollectionId;
         if (!collectionId) {
             eventBus.emit('toast:error', { title: 'Error', message: 'Please select a collection' });
             return;
@@ -735,9 +777,9 @@ class CollectionsManager {
             this.renderCollections();
         }
         
-        // Also refresh modal dropdown to ensure new collection appears
+        // Also refresh modal pills to ensure new collection appears
         setTimeout(() => {
-            this.populateCollectionSelect();
+            this.renderCollectionPills();
         }, 150);
         
         // Log the event for debugging
