@@ -108,6 +108,7 @@ class InteractiveSelection {
         this.updateProgressDisplay();
         this.updateSelectionCount();
         this.updateNavigationButtons();
+        this.updateSelectionIndicator();
         
         console.log(`🎯 Interactive selection started with ${this.currentPhotos.length} photos`);
     }
@@ -214,8 +215,11 @@ class InteractiveSelection {
         // Add to selected photos
         this.selectedPhotos.add(photoId);
         
-        // Move to next photo
-        this.nextPhoto();
+        // Show approval feedback animation
+        this.showApprovalFeedback(() => {
+            // Move to next photo after animation
+            this.nextPhoto();
+        });
         
         // Update selection count
         this.updateSelectionCount();
@@ -232,8 +236,11 @@ class InteractiveSelection {
         // Remove from selected photos if it was selected
         this.selectedPhotos.delete(photoId);
         
-        // Move to next photo
-        this.nextPhoto();
+        // Show skip feedback animation
+        this.showSkipFeedback(() => {
+            // Move to next photo after animation
+            this.nextPhoto();
+        });
         
         // Update selection count
         this.updateSelectionCount();
@@ -247,6 +254,7 @@ class InteractiveSelection {
             this.displayCurrentPhoto();
             this.updateProgressDisplay();
             this.updateNavigationButtons();
+            this.updateSelectionIndicator();
         } else {
             // Reached end - show completion message
             this.showCompletionMessage();
@@ -259,6 +267,7 @@ class InteractiveSelection {
             this.displayCurrentPhoto();
             this.updateProgressDisplay();
             this.updateNavigationButtons();
+            this.updateSelectionIndicator();
         }
     }
 
@@ -280,6 +289,25 @@ class InteractiveSelection {
         
         prevBtn.disabled = this.currentIndex === 0;
         nextBtn.disabled = this.currentIndex >= this.currentPhotos.length - 1;
+    }
+
+    updateSelectionIndicator() {
+        const indicator = document.getElementById('interactive-selection-indicator');
+        
+        if (this.currentIndex >= this.currentPhotos.length) {
+            indicator.classList.add('hidden');
+            return;
+        }
+        
+        const photo = this.currentPhotos[this.currentIndex];
+        const photoId = photo.smugmug_id || photo.image_key || photo.local_photo_id;
+        const isSelected = this.selectedPhotos.has(photoId);
+        
+        if (isSelected) {
+            indicator.classList.remove('hidden');
+        } else {
+            indicator.classList.add('hidden');
+        }
     }
 
 
@@ -311,6 +339,47 @@ class InteractiveSelection {
         });
         
         console.log(`🔄 Synced ${this.selectedPhotos.size} selections with PhotoGrid`);
+    }
+
+    // Visual Feedback Methods
+    showApprovalFeedback(callback) {
+        const feedbackElement = document.getElementById('interactive-approved-feedback');
+        const iconElement = feedbackElement.querySelector('div');
+        
+        // Show the feedback overlay
+        feedbackElement.classList.remove('hidden');
+        
+        // Trigger scale animation
+        requestAnimationFrame(() => {
+            iconElement.style.transform = 'scale(1)';
+        });
+        
+        // Quick flash - hide after brief moment
+        setTimeout(() => {
+            iconElement.style.transform = 'scale(0)';
+            feedbackElement.classList.add('hidden');
+            if (callback) callback();
+        }, 150); // Quick 150ms flash
+    }
+
+    showSkipFeedback(callback) {
+        const feedbackElement = document.getElementById('interactive-skipped-feedback');
+        const iconElement = feedbackElement.querySelector('div');
+        
+        // Show the feedback overlay
+        feedbackElement.classList.remove('hidden');
+        
+        // Trigger scale animation
+        requestAnimationFrame(() => {
+            iconElement.style.transform = 'scale(1)';
+        });
+        
+        // Quick flash - hide after brief moment
+        setTimeout(() => {
+            iconElement.style.transform = 'scale(0)';
+            feedbackElement.classList.add('hidden');
+            if (callback) callback();
+        }, 150); // Quick 150ms flash
     }
 
     // Public API methods
