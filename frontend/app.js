@@ -170,8 +170,7 @@ class TargetVisionApp {
         document.getElementById('modal-delete-ai').addEventListener('click', () => eventBus.emit('metadata:ai:delete'));
         
         
-        // Collection management
-        document.getElementById('modal-add-to-collection').addEventListener('click', () => eventBus.emit('collections:show-interface'));
+        // Collection management - "Add to Collection" button removed, pills are now always visible
         document.getElementById('modal-add-collection-confirm').addEventListener('click', () => eventBus.emit('collections:add-photo'));
         document.getElementById('modal-add-collection-cancel').addEventListener('click', () => eventBus.emit('collections:hide-interface'));
         document.getElementById('modal-create-collection').addEventListener('click', () => eventBus.emit('collections:create-from-modal'));
@@ -567,6 +566,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.app = new TargetVisionApp();
         // Make eventBus globally available for onclick handlers
         window.eventBus = eventBus;
+        // Make collectionsManager globally available for onclick handlers
+        window.collectionsManager = collectionsManager;
         // Component initialized
         
         // Make emergency stop globally accessible from browser console

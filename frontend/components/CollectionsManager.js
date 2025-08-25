@@ -23,6 +23,7 @@ class CollectionsManager {
         this.currentCollectionPhotos = [];
         this.currentPhoto = null; // For modal operations
         this.selectedCollectionId = null; // For pill button selection
+        this.photoCollections = []; // Collections that current photo is in
         this.apiBase = 'http://localhost:8000';
         this.domListenersBound = false; // Prevent double-binding DOM listeners
         this.modalListenersBound = false; // Prevent double-binding modal listeners
@@ -73,6 +74,9 @@ class CollectionsManager {
         eventBus.on('collections:show-interface', () => this.showCollectionInterface());
         eventBus.on('collections:hide-interface', () => this.hideCollectionInterface());
         eventBus.on('collections:create-from-modal', () => this.createCollectionFromModal());
+        
+        // New event-based handlers for improved UI
+        eventBus.on('collections:toggle-photo-collection', (data) => this.togglePhotoCollection(data.collectionId));
         
         // Set current photo for modal operations
         eventBus.on('photo:set-current', (data) => {
@@ -532,10 +536,12 @@ class CollectionsManager {
             if (response.ok) {
                 const data = await response.json();
                 this.renderPhotoCollections(data || []);
+                // Always render pills when photo collections are loaded
                 this.renderCollectionPills();
             } else {
                 console.error('Failed to load photo collections:', response.status, response.statusText);
                 this.renderPhotoCollections([]);
+                // Render pills even if no collections loaded, to show "Create New" option
                 this.renderCollectionPills();
             }
         } catch (error) {
@@ -583,17 +589,31 @@ class CollectionsManager {
     }
     
     renderPhotoCollections(collections) {
+        // Store photo collections for pills rendering
+        this.photoCollections = collections || [];
+        
         const collectionsList = document.getElementById('modal-collections-list');
         
-        if (collections.length === 0) {
-            collectionsList.innerHTML = '<span class="text-sm text-gray-500 italic">No collections</span>';
+        if (!collectionsList) {
+            console.log('Collections list container not found');
             return;
         }
         
+        if (collections.length === 0) {
+            collectionsList.innerHTML = '<span class="text-sm text-gray-500 italic">Not in any collections yet</span>';
+            return;
+        }
+        
+        // Render current collections as simple pills with remove option
         collectionsList.innerHTML = collections.map(collection => `
-            <div class="flex items-center bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">
+            <div class="flex items-center bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm border border-green-200">
+                <svg class="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
                 <span>${collection.name}</span>
-                <button onclick="eventBus.emit('collections:remove-photo', {collectionId: ${collection.id}})" class="ml-1 text-purple-600 hover:text-purple-800">
+                <button onclick="eventBus.emit('collections:toggle-photo-collection', {collectionId: ${collection.id}})" 
+                        class="ml-2 text-green-600 hover:text-green-800 transition-colors" 
+                        title="Remove from ${collection.name}">
                     <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
@@ -616,42 +636,82 @@ class CollectionsManager {
             return;
         }
         
-        // Generate pill buttons
+        // Generate pill buttons with current membership status
         const pillsHtml = this.collections.map(collection => {
-            const isSelected = this.selectedCollectionId === collection.id;
-            const baseClasses = 'px-3 py-1 rounded-full text-sm transition-colors cursor-pointer border';
-            const stateClasses = isSelected 
-                ? 'bg-purple-500 text-white border-purple-500' 
+            // Check if photo is currently in this collection
+            const isInCollection = this.photoCollections.some(pc => pc.id === collection.id);
+            const baseClasses = 'px-3 py-1 rounded-full text-sm transition-all duration-200 cursor-pointer border flex items-center gap-1';
+            
+            // New visual design: Active collections are highlighted, inactive are subtle
+            const stateClasses = isInCollection
+                ? 'bg-purple-500 text-white border-purple-500 shadow-md hover:bg-purple-600' 
                 : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300';
+            
+            // Add checkmark icon for active collections
+            const checkIcon = isInCollection ? `
+                <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+            ` : '';
             
             return `
                 <button 
                     class="${baseClasses} ${stateClasses}" 
                     data-collection-id="${collection.id}"
-                    onclick="collectionsManager.handlePillSelection(${collection.id})"
+                    onclick="eventBus.emit('collections:toggle-photo-collection', {collectionId: ${collection.id}})"
+                    title="${isInCollection ? 'Remove from' : 'Add to'} ${collection.name}"
                 >
-                    ${collection.name}
-                    <span class="ml-1 text-xs opacity-75">(${collection.photo_count || 0})</span>
+                    ${checkIcon}
+                    <span>${collection.name}</span>
+                    <span class="text-xs opacity-75">(${collection.photo_count || 0})</span>
                 </button>
             `;
         }).join('');
         
-        pillsContainer.innerHTML = pillsHtml;
-        console.log('Collection pills rendered successfully');
+        // Add "Create New Collection" button
+        const createButton = `
+            <button 
+                class="px-3 py-1 rounded-full text-sm transition-colors cursor-pointer border border-dashed border-gray-400 text-gray-600 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 flex items-center gap-1"
+                onclick="eventBus.emit('collections:create-from-modal')"
+                title="Create new collection"
+            >
+                <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path>
+                </svg>
+                <span>New Collection</span>
+            </button>
+        `;
+        
+        pillsContainer.innerHTML = pillsHtml + createButton;
+        console.log('Collection pills rendered successfully with', this.photoCollections.length, 'active collections');
     }
     
-    handlePillSelection(collectionId) {
-        // Toggle selection - if already selected, deselect
-        if (this.selectedCollectionId === collectionId) {
-            this.selectedCollectionId = null;
-        } else {
-            this.selectedCollectionId = collectionId;
+    // New method: Toggle photo collection membership directly
+    async togglePhotoCollection(collectionId) {
+        if (!this.currentPhoto) {
+            eventBus.emit('toast:error', { title: 'Error', message: 'No photo selected' });
+            return;
         }
         
-        console.log('Collection pill selected:', collectionId, 'Current selection:', this.selectedCollectionId);
+        // Check if photo is currently in this collection
+        const isInCollection = this.photoCollections.some(pc => pc.id === collectionId);
         
-        // Re-render pills to update visual state
-        this.renderCollectionPills();
+        console.log('Toggling photo collection:', { collectionId, isInCollection, photo: this.currentPhoto.id });
+        
+        if (isInCollection) {
+            // Remove from collection
+            await this.removePhotoFromCollection(collectionId);
+        } else {
+            // Add to collection
+            await this.addPhotoToCollectionDirect(collectionId);
+        }
+    }
+    
+    // Keep original method for backward compatibility but mark as deprecated
+    handlePillSelection(collectionId) {
+        console.warn('handlePillSelection is deprecated, use togglePhotoCollection instead');
+        // For backward compatibility, call the new method
+        this.togglePhotoCollection(collectionId);
     }
     
     async showCollectionInterface() {
@@ -677,13 +737,8 @@ class CollectionsManager {
         this.renderCollectionPills();
     }
     
-    async addPhotoToCollection() {
-        const collectionId = this.selectedCollectionId;
-        if (!collectionId) {
-            eventBus.emit('toast:error', { title: 'Error', message: 'Please select a collection' });
-            return;
-        }
-        
+    // New direct method for adding photo to collection (used by toggle)
+    async addPhotoToCollectionDirect(collectionId) {
         if (!this.currentPhoto) {
             eventBus.emit('toast:error', { title: 'Error', message: 'No photo selected' });
             return;
@@ -712,8 +767,8 @@ class CollectionsManager {
             });
             
             if (response.ok) {
-                eventBus.emit('toast:success', { title: 'Success', message: 'Photo added to collection successfully' });
-                this.hideCollectionInterface();
+                const collectionName = this.collections.find(c => c.id === collectionId)?.name || 'Collection';
+                eventBus.emit('toast:success', { title: 'Added!', message: `Photo added to ${collectionName}` });
                 await this.loadPhotoCollections(this.currentPhoto);
             } else {
                 console.error('Server response:', response.status, response.statusText);
@@ -725,6 +780,18 @@ class CollectionsManager {
             console.error('Error adding photo to collection:', error);
             eventBus.emit('toast:error', { title: 'Error', message: 'Failed to add photo to collection' });
         }
+    }
+    
+    // Keep original method for backward compatibility (used by confirmation workflow)
+    async addPhotoToCollection() {
+        const collectionId = this.selectedCollectionId;
+        if (!collectionId) {
+            eventBus.emit('toast:error', { title: 'Error', message: 'Please select a collection' });
+            return;
+        }
+        
+        await this.addPhotoToCollectionDirect(collectionId);
+        this.hideCollectionInterface();
     }
     
     async removePhotoFromCollection(collectionId) {
@@ -750,7 +817,8 @@ class CollectionsManager {
             });
             
             if (response.ok) {
-                eventBus.emit('toast:success', { title: 'Success', message: 'Photo removed from collection' });
+                const collectionName = this.collections.find(c => c.id === collectionId)?.name || 'Collection';
+                eventBus.emit('toast:success', { title: 'Removed!', message: `Photo removed from ${collectionName}` });
                 await this.loadPhotoCollections(this.currentPhoto);
             } else {
                 console.error('Server response:', response.status, response.statusText);

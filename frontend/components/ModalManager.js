@@ -68,8 +68,7 @@ class ModalManager {
         document.getElementById('modal-delete-ai').addEventListener('click', () => this.deleteAIMetadata());
         
         
-        // Collection handlers
-        document.getElementById('modal-add-to-collection').addEventListener('click', () => this.showCollectionInterface());
+        // Collection handlers - "Add to Collection" button removed, pills are always visible
         document.getElementById('modal-add-collection-confirm').addEventListener('click', () => this.addPhotoToCollection());
         document.getElementById('modal-add-collection-cancel').addEventListener('click', () => this.hideCollectionInterface());
         document.getElementById('modal-create-collection').addEventListener('click', () => this.createCollectionFromModal());

@@ -1025,6 +1025,57 @@
                             <p id="modal-dimensions"></p>
                             <p id="modal-album"></p>
                         </div>
+                        
+                        <!-- Collections Management (Moved from right column) -->
+                        <div id="modal-collections-section" class="border-t pt-4 mt-4">
+                            <h4 class="font-medium text-gray-900 flex items-center mb-3">
+                                <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
+                                Collections
+                            </h4>
+                            
+                            <!-- Unified Collections Interface -->
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <!-- Current Collections (if any) -->
+                                <div id="modal-collections-list" class="flex flex-wrap gap-2 mb-3 min-h-[1.5rem]">
+                                    <!-- Current collections will be populated here -->
+                                </div>
+                                
+                                <p class="text-sm text-gray-700 mb-3">
+                                    <strong>Click to add/remove:</strong> Active collections are highlighted with checkmarks
+                                </p>
+                                <div id="modal-collection-pills" class="flex flex-wrap gap-2 min-h-[2rem]">
+                                    <div class="text-sm text-gray-500 italic">Loading collections...</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Legacy Interface (Hidden - kept for backward compatibility) -->
+                            <div id="modal-collection-interface" class="hidden bg-purple-50 border border-purple-200 rounded-lg p-4 mt-3">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-sm font-medium text-purple-900 mb-2">Select Collection:</label>
+                                        <div id="modal-collection-pills-legacy" class="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
+                                            <div class="text-sm text-gray-500 italic">Loading collections...</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between pt-2">
+                                        <button id="modal-create-collection" class="text-sm text-purple-600 hover:text-purple-700">
+                                            + Create New Collection
+                                        </button>
+                                        <div class="flex items-center space-x-2">
+                                            <button id="modal-add-collection-confirm" class="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition-colors">
+                                                Add
+                                            </button>
+                                            <button id="modal-add-collection-cancel" class="text-sm bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 transition-colors">
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Metadata -->
@@ -1139,54 +1190,7 @@
                             </div>
                         </div>
                         
-                        <!-- Collections Management -->
-                        <div id="modal-collections-section">
-                            <div class="flex items-center justify-between mb-3">
-                                <h4 class="font-medium text-gray-900 flex items-center">
-                                    <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                    </svg>
-                                    Collections
-                                </h4>
-                                <button id="modal-add-to-collection" class="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition-colors">
-                                    Add to Collection
-                                </button>
-                            </div>
-                            
-                            <!-- Current Collections -->
-                            <div id="modal-current-collections" class="space-y-2 mb-4">
-                                <p class="text-sm text-gray-600">This photo is in:</p>
-                                <div id="modal-collections-list" class="flex flex-wrap gap-2">
-                                    <!-- Collections will be populated here -->
-                                </div>
-                            </div>
-                            
-                            <!-- Add to Collection Interface -->
-                            <div id="modal-collection-interface" class="hidden bg-purple-50 border border-purple-200 rounded-lg p-4">
-                                <div class="space-y-3">
-                                    <div>
-                                        <label class="block text-sm font-medium text-purple-900 mb-2">Select Collection:</label>
-                                        <div id="modal-collection-pills" class="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
-                                            <div class="text-sm text-gray-500 italic">Loading collections...</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="flex items-center justify-between pt-2">
-                                        <button id="modal-create-collection" class="text-sm text-purple-600 hover:text-purple-700">
-                                            + Create New Collection
-                                        </button>
-                                        <div class="flex items-center space-x-2">
-                                            <button id="modal-add-collection-confirm" class="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition-colors">
-                                                Add
-                                            </button>
-                                            <button id="modal-add-collection-cancel" class="text-sm bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 transition-colors">
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Collections section moved to left column -->
                         
                         <!-- No AI Metadata -->
                         <div id="modal-no-ai" class="hidden">
