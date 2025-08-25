@@ -2,11 +2,10 @@
  * SearchManager Component
  * 
  * Handles all search functionality across the application including main search,
- * filtering, natural language chat-based search, and search result display.
+ * natural language chat-based search, and search result display.
  * 
  * Key Responsibilities:
  * - Main search execution and display
- * - Search filter management (album, status, date filters)
  * - Natural language search processing for chat interface
  * - Search result rendering and interaction
  * - Search state management and UI updates
@@ -18,13 +17,6 @@ class SearchManager {
     constructor() {
         this.apiBase = 'http://localhost:8000';
         this.searchResults = [];
-        this.searchFilters = {
-            album: '',
-            status: '',
-            dateFrom: '',
-            dateTo: ''
-        };
-        this.smugmugAlbums = []; // Will be populated from app state
         
         this.setupEventListeners();
         // Component initialized
@@ -35,20 +27,10 @@ class SearchManager {
         eventBus.on('search:perform', () => this.performMainSearch());
         eventBus.on('search:clear', () => this.clearMainSearch());
         
-        // Filter events
-        eventBus.on('search:filters:toggle', () => this.toggleFilters());
-        eventBus.on('search:filters:apply', () => this.applyFilters());
-        eventBus.on('search:filters:clear', () => this.clearFilters());
-        eventBus.on('search:filters:populate-albums', () => this.populateAlbumFilter());
         
         // Chat-based search events
         eventBus.on('search:chat:handle', (data) => this.handlePhotoSearchChat(data.message));
         
-        // Album data updates
-        eventBus.on('albums:loaded', (data) => {
-            this.smugmugAlbums = data.albums || [];
-            this.populateAlbumFilter();
-        });
         
         // Page initialization
         eventBus.on('search:initialize-page', () => this.initializeSearchPage());
@@ -98,22 +80,6 @@ class SearchManager {
             clearMainSearch.addEventListener('click', () => this.clearMainSearch());
         }
 
-        // Filter functionality DOM events  
-        const toggleFilters = document.getElementById('toggle-filters');
-        const applyFilters = document.getElementById('apply-filters');
-        const clearFilters = document.getElementById('clear-filters');
-
-        if (toggleFilters) {
-            toggleFilters.addEventListener('click', () => eventBus.emit('search:filters:toggle'));
-        }
-
-        if (applyFilters) {
-            applyFilters.addEventListener('click', () => eventBus.emit('search:filters:apply'));
-        }
-
-        if (clearFilters) {
-            clearFilters.addEventListener('click', () => eventBus.emit('search:filters:clear'));
-        }
     }
 
     // Search Page Initialization
@@ -122,131 +88,6 @@ class SearchManager {
         
         // Bind DOM event listeners now that the page is loaded
         this.bindDOMEventListeners();
-        
-        this.populateAlbumFilter();
-    }
-    
-    // Filter Management
-    async populateAlbumFilter() {
-        try {
-            // Get albums for filter dropdown
-            const albumSelect = document.getElementById('search-filter-album');
-            if (!albumSelect) return;
-            
-            // Clear existing options except "All Albums"
-            while (albumSelect.children.length > 1) {
-                albumSelect.removeChild(albumSelect.lastChild);
-            }
-            
-            // Add albums from current data
-            if (this.smugmugAlbums && this.smugmugAlbums.length > 0) {
-                this.smugmugAlbums.forEach(album => {
-                    const option = document.createElement('option');
-                    option.value = album.smugmug_id || album.album_key;
-                    option.textContent = album.title || album.name;
-                    albumSelect.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Error populating album filter:', error);
-        }
-    }
-    
-    toggleFilters() {
-        const filtersDiv = document.getElementById('search-filters');
-        const toggleText = document.getElementById('filter-toggle-text');
-        const toggleIcon = document.getElementById('filter-toggle-icon');
-        
-        if (filtersDiv.classList.contains('hidden')) {
-            filtersDiv.classList.remove('hidden');
-            toggleText.textContent = 'Hide Filters';
-            toggleIcon.style.transform = 'rotate(180deg)';
-        } else {
-            filtersDiv.classList.add('hidden');
-            toggleText.textContent = 'Show Filters';
-            toggleIcon.style.transform = 'rotate(0deg)';
-        }
-    }
-    
-    applyFilters() {
-        // Get filter values
-        this.searchFilters.album = document.getElementById('search-filter-album').value;
-        this.searchFilters.status = document.getElementById('search-filter-status').value;
-        this.searchFilters.dateFrom = document.getElementById('search-filter-date-from').value;
-        this.searchFilters.dateTo = document.getElementById('search-filter-date-to').value;
-        
-        // Update active filters display
-        this.updateActiveFiltersDisplay();
-        
-        // Re-run search with filters if there's a current query
-        const searchInput = document.getElementById('search-main-input');
-        if (searchInput.value.trim()) {
-            this.performMainSearch();
-        }
-    }
-    
-    clearFilters() {
-        // Clear filter values
-        document.getElementById('search-filter-album').value = '';
-        document.getElementById('search-filter-status').value = '';
-        document.getElementById('search-filter-date-from').value = '';
-        document.getElementById('search-filter-date-to').value = '';
-        
-        // Reset internal filter state
-        this.searchFilters = {
-            album: '',
-            status: '',
-            dateFrom: '',
-            dateTo: ''
-        };
-        
-        // Clear active filters display
-        this.updateActiveFiltersDisplay();
-        
-        // Re-run search if there's a current query
-        const searchInput = document.getElementById('search-main-input');
-        if (searchInput.value.trim()) {
-            this.performMainSearch();
-        }
-    }
-    
-    updateActiveFiltersDisplay() {
-        const activeFiltersDiv = document.getElementById('active-filters');
-        const activeFilters = [];
-        
-        if (this.searchFilters.album) {
-            const albumSelect = document.getElementById('search-filter-album');
-            const selectedAlbum = albumSelect.options[albumSelect.selectedIndex].text;
-            activeFilters.push(`Album: ${selectedAlbum}`);
-        }
-        
-        if (this.searchFilters.status) {
-            const statusSelect = document.getElementById('search-filter-status');
-            const selectedStatus = statusSelect.options[statusSelect.selectedIndex].text;
-            activeFilters.push(`Status: ${selectedStatus}`);
-        }
-        
-        if (this.searchFilters.dateFrom) {
-            activeFilters.push(`From: ${this.searchFilters.dateFrom}`);
-        }
-        
-        if (this.searchFilters.dateTo) {
-            activeFilters.push(`To: ${this.searchFilters.dateTo}`);
-        }
-        
-        if (activeFilters.length > 0) {
-            activeFiltersDiv.innerHTML = `
-                <div class="text-sm text-gray-600 mb-2">Active filters:</div>
-                <div class="flex flex-wrap gap-2">
-                    ${activeFilters.map(filter => 
-                        `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">${filter}</span>`
-                    ).join('')}
-                </div>
-            `;
-            activeFiltersDiv.classList.remove('hidden');
-        } else {
-            activeFiltersDiv.classList.add('hidden');
-        }
     }
 
     // Chat-Based Natural Language Search
@@ -356,26 +197,12 @@ class SearchManager {
         eventBus.emit('search:loading:show');
         
         try {
-            // Build search URL with filters
+            // Build search URL
             const params = new URLSearchParams({
                 q: query,
                 search_type: searchType,
                 limit: '50'
             });
-            
-            // Add filter parameters if they exist
-            if (this.searchFilters.album) {
-                params.append('album', this.searchFilters.album);
-            }
-            if (this.searchFilters.status) {
-                params.append('status', this.searchFilters.status);
-            }
-            if (this.searchFilters.dateFrom) {
-                params.append('date_from', this.searchFilters.dateFrom);
-            }
-            if (this.searchFilters.dateTo) {
-                params.append('date_to', this.searchFilters.dateTo);
-            }
             
             const searchUrl = `${this.apiBase}/search?${params}`;
             console.log('Search URL:', searchUrl);
@@ -442,6 +269,9 @@ class SearchManager {
         const photo = result.photo || result;
         const searchScore = result.search_score || 0;
         
+        // Generate original image URL for download
+        const originalUrl = this.getOriginalImageUrl(photo);
+        
         
         div.innerHTML = `
             <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
@@ -454,17 +284,24 @@ class SearchManager {
                 />
                 
                 
-                <!-- Download button -->
-                <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <a href="${photo.image_url || photo.thumbnail_url}" 
-                       download="${photo.title || 'photo'}"
-                       class="download-btn inline-block w-8 h-8 bg-green-600 bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center text-white transition-all mr-1" 
-                       onclick="event.stopPropagation()"
-                       title="Download">
+                <!-- Action buttons -->
+                <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex gap-1">
+                    <!-- Collection button -->
+                    <button class="collection-btn w-8 h-8 bg-blue-600 bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center text-white transition-all" 
+                            title="Add to Collection">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Download button -->
+                    <button class="download-btn w-8 h-8 bg-green-600 bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center text-white transition-all" 
+                            onclick="event.stopPropagation()"
+                            title="Download Original">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                    </a>
+                    </button>
                 </div>
                 
                 <!-- Hover overlay for visual feedback -->
@@ -478,6 +315,20 @@ class SearchManager {
                 <p class="text-xs text-gray-400">${photo.album_name || ''}</p>
             </div>
         `;
+        
+        // Add collection button click handler
+        const collectionBtn = div.querySelector('.collection-btn');
+        collectionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            eventBus.emit('photo:show-modal', { photo: photo });
+        });
+        
+        // Add download button click handler
+        const downloadBtn = div.querySelector('.download-btn');
+        downloadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.downloadImage(originalUrl, photo.title || 'photo');
+        });
         
         // Make entire card clickable to open lightbox
         div.addEventListener('click', () => {
@@ -501,18 +352,69 @@ class SearchManager {
         this.searchResults = [];
     }
 
+    // Helper method to generate original image URL from SmugMug photo data
+    getOriginalImageUrl(photo) {
+        // If we have an image_url, try to convert it to original size
+        if (photo.image_url) {
+            // SmugMug URL pattern: https://photos.smugmug.com/photos/i-{id}/0/{size}/i-{id}-{size}.jpg
+            // Extract the smugmug ID from the URL
+            const match = photo.image_url.match(/i-([a-zA-Z0-9]+)/);
+            if (match && match[1]) {
+                const smugmugId = match[1];
+                // Return the original size URL (size code "O")
+                return `https://photos.smugmug.com/photos/i-${smugmugId}/0/O/i-${smugmugId}-O.jpg`;
+            }
+        }
+        
+        // Fallback to the image_url if we can't construct the original URL
+        return photo.image_url || photo.thumbnail_url || '';
+    }
+    
+    // Helper method to download image to user's computer
+    async downloadImage(imageUrl, filename) {
+        try {
+            // Use backend proxy to avoid CORS issues
+            const proxyUrl = `${this.apiBase}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+            
+            // Fetch the image through our proxy
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+            
+            // Get the image as a blob
+            const blob = await response.blob();
+            
+            // Create a temporary URL for the blob
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // Create a temporary anchor element and trigger download
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            
+            // Clean up
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+            
+            // Show success message
+            eventBus.emit('toast:success', { 
+                title: 'Download Started', 
+                message: `${filename} is being downloaded` 
+            });
+            
+        } catch (error) {
+            console.error('Download failed:', error);
+            eventBus.emit('toast:error', { 
+                title: 'Download Failed', 
+                message: 'Could not download the image. Please try again.' 
+            });
+        }
+    }
+    
     // Utility methods for accessing search data
     getSearchResults() {
         return this.searchResults;
-    }
-
-    getSearchFilters() {
-        return this.searchFilters;
-    }
-
-    setAlbums(albums) {
-        this.smugmugAlbums = albums;
-        this.populateAlbumFilter();
     }
 }
 

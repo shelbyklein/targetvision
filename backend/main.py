@@ -2853,6 +2853,49 @@ async def get_photo_collections(photo_id: int, db: Session = Depends(get_db)):
     
     return collections
 
+@app.get("/api/proxy-image")
+async def proxy_image(url: str):
+    """Proxy endpoint to download SmugMug images and bypass CORS restrictions"""
+    import httpx
+    from fastapi.responses import StreamingResponse
+    import io
+    
+    try:
+        # Validate URL is from SmugMug to prevent abuse
+        if not url.startswith('https://photos.smugmug.com'):
+            raise HTTPException(status_code=400, detail="Invalid image URL")
+        
+        # Fetch the image from SmugMug
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url)
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=404, detail="Image not found")
+            
+            # Extract filename from URL for download
+            filename = url.split('/')[-1]
+            if not filename.endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                filename += '.jpg'  # Default extension
+            
+            # Return the image with proper headers for download
+            headers = {
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': response.headers.get('Content-Type', 'image/jpeg')
+            }
+            
+            return StreamingResponse(
+                io.BytesIO(response.content),
+                media_type=response.headers.get('Content-Type', 'image/jpeg'),
+                headers=headers
+            )
+            
+    except httpx.RequestError as e:
+        logger.error(f"Error fetching image from {url}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch image")
+    except Exception as e:
+        logger.error(f"Error proxying image: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
