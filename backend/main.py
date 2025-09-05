@@ -14,6 +14,10 @@ import httpx
 
 load_dotenv()
 
+# Environment-specific configuration
+IS_DOCKER = os.getenv("ENVIRONMENT", "development") in ["production", "docker"]
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 # Import our modules
 from database import get_db, init_db, test_connection
 from models import Album, Photo, AIMetadata, OAuthToken, ProcessingQueue, Collection, CollectionItem
@@ -83,9 +87,11 @@ app = FastAPI(
     description="SmugMug-integrated RAG application with AI-powered photo metadata"
 )
 
+# CORS configuration - use environment variable for Docker
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://localhost:3000"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -100,16 +106,45 @@ async def root():
     }
 
 @app.get("/health")
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint for Docker and monitoring"""
     health_status = {
         "status": "healthy",
-        "api": "running",
-        "database": "pending",
-        "smugmug": "pending",
-        "ai_service": "pending"
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "services": {
+            "api": "healthy",
+            "database": "checking",
+            "smugmug": "checking",
+            "ai_service": "checking"
+        }
     }
     
-    # TODO: Add actual health checks for database and services
+    # Check database connection
+    try:
+        db.execute("SELECT 1")
+        health_status["services"]["database"] = "healthy"
+    except Exception as e:
+        health_status["services"]["database"] = "unhealthy"
+        health_status["status"] = "degraded"
+        logger.error(f"Database health check failed: {e}")
+    
+    # Check SmugMug API key configuration
+    if os.getenv("SMUGMUG_API_KEY") and os.getenv("SMUGMUG_API_SECRET"):
+        health_status["services"]["smugmug"] = "configured"
+    else:
+        health_status["services"]["smugmug"] = "not_configured"
+    
+    # Check AI service configuration
+    if os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"):
+        health_status["services"]["ai_service"] = "configured"
+    else:
+        health_status["services"]["ai_service"] = "not_configured"
+        
+    # Determine overall health
+    if health_status["services"]["database"] == "unhealthy":
+        health_status["status"] = "unhealthy"
+        raise HTTPException(status_code=503, detail=health_status)
     
     return health_status
 
