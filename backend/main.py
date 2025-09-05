@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Query, File, UploadFile, Header, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 from typing import Dict, List, Optional
 import os
@@ -2829,6 +2829,122 @@ async def set_collection_cover(
         "message": f"Cover photo set for collection '{collection.name}'",
         "collection": collection.to_dict()
     }
+
+@app.get("/collections/{collection_id}/download-urls", response_model=Dict)
+async def get_collection_download_urls(
+    collection_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get high-resolution download URLs for all photos in a collection"""
+    
+    # Verify collection exists
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    # Get all photos in the collection with their download URLs
+    photos_query = db.query(Photo).join(
+        CollectionItem, CollectionItem.photo_id == Photo.id
+    ).filter(CollectionItem.collection_id == collection_id)
+    
+    photos = photos_query.all()
+    
+    photo_data = []
+    for photo in photos:
+        # Create filename from title or smugmug_id
+        filename = photo.title if photo.title else f"photo_{photo.smugmug_id}"
+        # Ensure filename has extension
+        if not filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.tif')):
+            filename += ".jpg"  # Default to .jpg for SmugMug photos
+        
+        # Sanitize filename for download
+        import re
+        filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        
+        photo_data.append({
+            "id": photo.id,
+            "filename": filename,
+            "url": photo.image_url,
+            "title": photo.title or "",
+            "smugmug_id": photo.smugmug_id
+        })
+    
+    return {
+        "collection_name": collection.name,
+        "collection_id": collection_id,
+        "photo_count": len(photo_data),
+        "photos": photo_data
+    }
+
+@app.get("/photos/{photo_id}/download")
+async def download_photo_proxy(photo_id: int, db: Session = Depends(get_db)):
+    """Proxy endpoint to download a photo (bypasses CORS restrictions)"""
+    
+    # Get photo from database
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    if not photo.image_url:
+        raise HTTPException(status_code=404, detail="Photo URL not available")
+    
+    try:
+        # Ensure we always use the highest resolution URL
+        high_res_url = photo.image_url
+        if high_res_url:
+            # Convert any size indicator to Original (O) for highest resolution
+            if '/L/' in high_res_url:  # Large
+                high_res_url = high_res_url.replace('/L/', '/O/').replace('-L.jpg', '-O.jpg').replace('-L.jpeg', '-O.jpeg')
+            elif '/XL/' in high_res_url:  # XLarge
+                high_res_url = high_res_url.replace('/XL/', '/O/').replace('-XL.jpg', '-O.jpg').replace('-XL.jpeg', '-O.jpeg')
+            elif '/X2/' in high_res_url:  # X2Large
+                high_res_url = high_res_url.replace('/X2/', '/O/').replace('-X2.jpg', '-O.jpg').replace('-X2.jpeg', '-O.jpeg')
+            elif '/X3/' in high_res_url:  # X3Large
+                high_res_url = high_res_url.replace('/X3/', '/O/').replace('-X3.jpg', '-O.jpg').replace('-X3.jpeg', '-O.jpeg')
+            elif '/X4/' in high_res_url:  # X4Large
+                high_res_url = high_res_url.replace('/X4/', '/O/').replace('-X4.jpg', '-O.jpg').replace('-X4.jpeg', '-O.jpeg')
+            elif '/X5/' in high_res_url:  # X5Large
+                high_res_url = high_res_url.replace('/X5/', '/O/').replace('-X5.jpg', '-O.jpg').replace('-X5.jpeg', '-O.jpeg')
+            elif '/M/' in high_res_url:  # Medium
+                high_res_url = high_res_url.replace('/M/', '/O/').replace('-M.jpg', '-O.jpg').replace('-M.jpeg', '-O.jpeg')
+        
+        # Download the photo from SmugMug
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(high_res_url)
+            response.raise_for_status()
+            
+            # Create filename from title or smugmug_id
+            filename = photo.title if photo.title else f"photo_{photo.smugmug_id}"
+            # Ensure filename has extension
+            if not filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.tiff', '.tif')):
+                filename += ".jpg"  # Default to .jpg for SmugMug photos
+            
+            # Sanitize filename for download
+            import re
+            filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+            
+            # Return the image with proper headers
+            headers = {
+                'Content-Type': response.headers.get('content-type', 'image/jpeg'),
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+            
+            return Response(
+                content=response.content,
+                media_type=response.headers.get('content-type', 'image/jpeg'),
+                headers=headers
+            )
+            
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to download photo from SmugMug")
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=408, detail="Timeout downloading photo")
+    except Exception as e:
+        logger.error(f"Error downloading photo {photo_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to download photo")
 
 @app.get("/photos/{photo_id}/collections", response_model=List[Dict])
 async def get_photo_collections(photo_id: int, db: Session = Depends(get_db)):

@@ -213,8 +213,8 @@ class SmugMugService:
         if "ImageSizes" in image_data:
             sizes = image_data["ImageSizes"]
             
-            # Get largest available image URL
-            for size_key in ["X5Large", "X4Large", "X3Large", "X2Large", "XLarge", "Large", "Medium"]:
+            # Get largest available image URL (prioritize Original first)
+            for size_key in ["Original", "X5Large", "X4Large", "X3Large", "X2Large", "XLarge", "Large", "Medium"]:
                 if size_key in sizes:
                     metadata["image_url"] = sizes[size_key]["Url"]
                     break
@@ -228,8 +228,9 @@ class SmugMugService:
         # If no direct URLs, construct them based on pattern
         if not metadata.get("image_url") and image_id:
             # SmugMug URL pattern (this is a fallback, actual URLs should come from API)
+            # Use Original (O) for highest resolution instead of Large (L)
             base_url = "https://photos.smugmug.com"
-            metadata["image_url"] = f"{base_url}/photos/i-{image_id}/0/L/i-{image_id}-L.jpg"
+            metadata["image_url"] = f"{base_url}/photos/i-{image_id}/0/O/i-{image_id}-O.jpg"
             metadata["thumbnail_url"] = f"{base_url}/photos/i-{image_id}/0/S/i-{image_id}-S.jpg"
         
         return metadata
@@ -645,7 +646,7 @@ class SmugMugService:
                     
                     # Get various sizes (only if we don't already have ThumbnailUrl)
                     if "image_url" not in image_info:
-                        for size_key in ["X5Large", "X4Large", "X3Large", "X2Large", "XLarge", "Large", "Medium"]:
+                        for size_key in ["Original", "X5Large", "X4Large", "X3Large", "X2Large", "XLarge", "Large", "Medium"]:
                             if size_key in sizes:
                                 image_info["image_url"] = sizes[size_key]["Url"]
                                 image_info["width"] = sizes[size_key].get("Width", 0)

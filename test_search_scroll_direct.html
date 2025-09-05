@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Scroll Test - Direct Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .debug-info { 
+            background: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            font-family: monospace; 
+            font-size: 14px;
+        }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        
+        /* Replicate the exact same search container styles from the main app */
+        .mock-search-container {
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            overflow: hidden; /* This is the problematic style! */
+        }
+        
+        .mock-search-results-grid {
+            padding: 1rem;
+            height: 400px; /* Fixed height to demonstrate the issue */
+        }
+        
+        .mock-photo-card {
+            aspect-ratio: 1;
+            background-color: #f3f4f6;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 p-4">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Search Results Scrolling Issue Analysis</h1>
+        
+        <div class="debug-info">
+            <h2 class="text-lg font-semibold mb-2">Issue Analysis:</h2>
+            <p>The search results container uses <code>overflow: hidden</code> which prevents scrolling when content exceeds the container height.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Problem Demo -->
+            <div>
+                <h3 class="text-lg font-semibold mb-3 error">❌ Current Implementation (Broken)</h3>
+                <div class="mock-search-container">
+                    <div class="mock-search-results-grid">
+                        <div class="grid grid-cols-3 gap-4" id="broken-grid">
+                            <!-- Will be populated with many items to demonstrate overflow -->
+                        </div>
+                    </div>
+                </div>
+                <div class="debug-info error">
+                    <strong>Problem:</strong> Content overflows but cannot be scrolled due to <code>overflow: hidden</code>
+                </div>
+            </div>
+
+            <!-- Fixed Demo -->
+            <div>
+                <h3 class="text-lg font-semibold mb-3 success">✅ Fixed Implementation (Working)</h3>
+                <div class="mock-search-container" style="overflow-y: auto; max-height: 400px;">
+                    <div class="mock-search-results-grid" style="height: auto;">
+                        <div class="grid grid-cols-3 gap-4" id="fixed-grid">
+                            <!-- Will be populated with many items to demonstrate proper scrolling -->
+                        </div>
+                    </div>
+                </div>
+                <div class="debug-info success">
+                    <strong>Solution:</strong> Change container to <code>overflow-y: auto</code> and add <code>max-height</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Analysis -->
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold mb-4">Detailed CSS Analysis</h2>
+            
+            <div class="debug-info">
+                <h3 class="font-semibold mb-2">Current HTML Structure (from index.html line 562):</h3>
+                <pre class="bg-gray-100 p-3 rounded overflow-x-auto"><code>&lt;div id="search-results-container" 
+     class="bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden"&gt;
+    &lt;div id="search-results-grid" class="hidden p-4"&gt;
+        &lt;div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"&gt;
+            &lt;!-- Search results populated by SearchManager.js --&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+            </div>
+
+            <div class="debug-info error">
+                <h3 class="font-semibold mb-2">❌ Problems Identified:</h3>
+                <ol class="list-decimal pl-5">
+                    <li><strong>overflow-hidden</strong> on the container prevents vertical scrolling</li>
+                    <li>No <strong>height constraints</strong> or <strong>max-height</strong> specified</li>
+                    <li>Grid can grow infinitely tall without scroll capability</li>
+                    <li>No fallback for when viewport height is exceeded</li>
+                </ol>
+            </div>
+
+            <div class="debug-info success">
+                <h3 class="font-semibold mb-2">✅ Recommended Solutions:</h3>
+                
+                <h4 class="font-semibold mt-3 mb-2">Option 1: Container-level scrolling</h4>
+                <pre class="bg-green-50 p-3 rounded overflow-x-auto"><code>/* Change the container class from: */
+class="bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden"
+
+/* To: */
+class="bg-white border border-gray-300 rounded-lg shadow-sm overflow-y-auto"
+style="max-height: 70vh;" /* or any appropriate height */</code></pre>
+
+                <h4 class="font-semibold mt-3 mb-2">Option 2: Grid-level scrolling</h4>
+                <pre class="bg-green-50 p-3 rounded overflow-x-auto"><code>/* Keep container as-is, modify grid: */
+&lt;div id="search-results-grid" class="hidden p-4 overflow-y-auto" style="max-height: 60vh;"&gt;</code></pre>
+
+                <h4 class="font-semibold mt-3 mb-2">Option 3: CSS-only solution (recommended)</h4>
+                <pre class="bg-green-50 p-3 rounded overflow-x-auto"><code>/* Add to styles.css: */
+#search-results-container {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* And remove overflow-hidden from the HTML class */</code></pre>
+            </div>
+
+            <div class="debug-info info">
+                <h3 class="font-semibold mb-2">Additional Considerations:</h3>
+                <ul class="list-disc pl-5">
+                    <li>Consider implementing <strong>pagination</strong> or <strong>infinite scroll</strong> for large result sets</li>
+                    <li>Add a <strong>scroll-to-top</strong> button for long lists</li>
+                    <li>Ensure <strong>keyboard navigation</strong> works properly with scrollable content</li>
+                    <li>Test on <strong>mobile devices</strong> where viewport height is limited</li>
+                    <li>Consider <strong>virtual scrolling</strong> for very large datasets (hundreds of photos)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Test the actual application -->
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold mb-4">Live Application Test</h2>
+            <div class="debug-info info">
+                <p>Click the button below to open the actual application in a new tab and test the search functionality:</p>
+                <button onclick="window.open('http://localhost:3000', '_blank')" 
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mt-2">
+                    Open TargetVision App
+                </button>
+                <p class="mt-2 text-sm text-gray-600">
+                    Once opened: 
+                    1. Navigate to the "Search" page
+                    2. Search for "test" or "archery" 
+                    3. Check if you can scroll through results
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Populate the demo grids with mock photo cards
+        function populateGrid(gridId, count) {
+            const grid = document.getElementById(gridId);
+            for (let i = 1; i <= count; i++) {
+                const card = document.createElement('div');
+                card.className = 'mock-photo-card';
+                card.textContent = `Photo ${i}`;
+                grid.appendChild(card);
+            }
+        }
+
+        // Create enough items to demonstrate the scrolling issue
+        populateGrid('broken-grid', 30);
+        populateGrid('fixed-grid', 30);
+
+        // Log analysis results
+        console.log('Search Scrolling Issue Analysis:');
+        console.log('- Problem: overflow-hidden prevents scrolling');
+        console.log('- Solution: Use overflow-y: auto with max-height');
+        console.log('- Location: /Users/shelbyklein/apps/targetvision/frontend/index.html:562');
+        console.log('- Component: SearchManager.js handles result display');
+    </script>
+</body>
+</html>
