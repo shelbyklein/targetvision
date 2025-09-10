@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Scrolling Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-results { background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 10px 0; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+        .info { color: blue; }
+        .console-log { 
+            background: #000; 
+            color: #0f0; 
+            padding: 10px; 
+            font-family: monospace; 
+            white-space: pre-wrap; 
+            max-height: 200px; 
+            overflow-y: auto; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Search Results Scrolling Debug Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            results.appendChild(div);
+        }
+        
+        function addSection(title, content) {
+            const section = document.createElement('div');
+            section.className = 'test-results';
+            section.innerHTML = `<h3>${title}</h3>${content}`;
+            results.appendChild(section);
+        }
+        
+        async function runTests() {
+            log('Starting search scrolling debug test...', 'info');
+            
+            try {
+                // Test 1: Load the main app in an iframe
+                log('Test 1: Loading main application...', 'info');
+                
+                const iframe = document.createElement('iframe');
+                iframe.src = 'http://localhost:3000/';
+                iframe.width = '1200';
+                iframe.height = '800';
+                iframe.style.border = '1px solid #ccc';
+                
+                const testContainer = document.createElement('div');
+                testContainer.innerHTML = '<h3>Main Application (in iframe)</h3>';
+                testContainer.appendChild(iframe);
+                results.appendChild(testContainer);
+                
+                // Wait for iframe to load
+                await new Promise(resolve => {
+                    iframe.onload = resolve;
+                    setTimeout(resolve, 5000); // Fallback timeout
+                });
+                
+                log('✓ Main application loaded', 'success');
+                
+                // Test 2: Check if we can access the iframe document
+                setTimeout(() => {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        if (iframeDoc) {
+                            log('✓ Can access iframe document', 'success');
+                            
+                            // Test 3: Check for search elements
+                            const searchContainer = iframeDoc.getElementById('search-results-container');
+                            const searchGrid = iframeDoc.getElementById('search-results-grid');
+                            
+                            if (searchContainer && searchGrid) {
+                                log('✓ Found search container and grid elements', 'success');
+                                
+                                // Test 4: Check current CSS styles
+                                const containerStyles = window.getComputedStyle(searchContainer);
+                                const gridStyles = window.getComputedStyle(searchGrid);
+                                
+                                const styleInfo = `
+                                <h4>Container Styles:</h4>
+                                <ul>
+                                    <li>overflow: ${containerStyles.overflow}</li>
+                                    <li>height: ${containerStyles.height}</li>
+                                    <li>max-height: ${containerStyles.maxHeight}</li>
+                                </ul>
+                                <h4>Grid Styles:</h4>
+                                <ul>
+                                    <li>overflow: ${gridStyles.overflow}</li>
+                                    <li>height: ${gridStyles.height}</li>
+                                    <li>max-height: ${gridStyles.maxHeight}</li>
+                                </ul>
+                                `;
+                                
+                                addSection('CSS Styles Analysis', styleInfo);
+                                
+                                // Test 5: Simulate navigation to search page
+                                try {
+                                    const navButton = iframeDoc.querySelector('[data-page="search"]') || 
+                                                    iframeDoc.querySelector('button[onclick*="search"]');
+                                    
+                                    if (navButton) {
+                                        log('✓ Found search navigation button', 'success');
+                                        navButton.click();
+                                        
+                                        setTimeout(() => {
+                                            // Test 6: Check if search page is visible
+                                            const searchPage = iframeDoc.getElementById('search-page');
+                                            if (searchPage && !searchPage.classList.contains('hidden')) {
+                                                log('✓ Search page is now visible', 'success');
+                                                
+                                                // Test 7: Check search input
+                                                const searchInput = iframeDoc.getElementById('search-main-input');
+                                                if (searchInput) {
+                                                    log('✓ Found search input field', 'success');
+                                                    
+                                                    // Simulate a search query
+                                                    searchInput.value = 'test search query';
+                                                    
+                                                    const searchBtn = iframeDoc.getElementById('search-main-button');
+                                                    if (searchBtn) {
+                                                        log('Simulating search click (note: may not return results without data)', 'warning');
+                                                        searchBtn.click();
+                                                    }
+                                                } else {
+                                                    log('✗ Search input field not found', 'error');
+                                                }
+                                            } else {
+                                                log('✗ Search page not visible after navigation', 'error');
+                                            }
+                                        }, 1000);
+                                        
+                                    } else {
+                                        log('✗ Search navigation button not found', 'error');
+                                    }
+                                } catch (navError) {
+                                    log('✗ Error navigating to search page: ' + navError.message, 'error');
+                                }
+                                
+                            } else {
+                                log('✗ Search container or grid elements not found', 'error');
+                            }
+                        } else {
+                            log('✗ Cannot access iframe document (CORS restrictions)', 'error');
+                        }
+                    } catch (accessError) {
+                        log('✗ Error accessing iframe: ' + accessError.message, 'error');
+                        log('This is likely due to same-origin policy. We\'ll need to inspect directly.', 'warning');
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                log('✗ Test failed: ' + error.message, 'error');
+            }
+        }
+        
+        // Run tests when page loads
+        window.addEventListener('load', runTests);
+    </script>
+</body>
+</html>

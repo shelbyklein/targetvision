@@ -28,6 +28,10 @@ class CollectionsManager {
         this.domListenersBound = false; // Prevent double-binding DOM listeners
         this.modalListenersBound = false; // Prevent double-binding modal listeners
         
+        // Download-related properties
+        this.downloadCancelled = false;
+        this.downloadInProgress = false;
+        
         this.setupEventListeners();
         
         // Bind DOM event listeners immediately (for direct page loads)
@@ -125,9 +129,11 @@ class CollectionsManager {
         }
 
         // Collection action buttons (these exist on page load)
+        const downloadBtn = document.getElementById('download-collection');
         const editBtn = document.getElementById('edit-collection');
         const deleteBtn = document.getElementById('delete-collection');
 
+        if (downloadBtn) downloadBtn.addEventListener('click', () => this.downloadCollection());
         if (editBtn) editBtn.addEventListener('click', () => this.showEditCollectionModal());
         if (deleteBtn) deleteBtn.addEventListener('click', () => this.handleDeleteCollection());
         
@@ -157,6 +163,13 @@ class CollectionsManager {
         if (editCloseBtn) editCloseBtn.addEventListener('click', () => this.hideEditCollectionModal());
         if (editCancelBtn) editCancelBtn.addEventListener('click', () => this.hideEditCollectionModal());
         if (editForm) editForm.addEventListener('submit', (e) => this.handleEditCollection(e));
+
+        // Download progress modal events
+        const downloadCancelBtn = document.getElementById('download-cancel');
+        const downloadCloseBtn = document.getElementById('download-close');
+        
+        if (downloadCancelBtn) downloadCancelBtn.addEventListener('click', () => this.cancelDownload());
+        if (downloadCloseBtn) downloadCloseBtn.addEventListener('click', () => this.hideDownloadModal());
         
         // Mark modal listeners as bound
         this.modalListenersBound = true;
@@ -852,6 +865,210 @@ class CollectionsManager {
         
         // Log the event for debugging
         console.log('Collection created:', data.collection);
+    }
+
+    // Download Collection Methods
+    async downloadCollection() {
+        if (!this.currentCollection) {
+            eventBus.emit('toast:error', { title: 'Error', message: 'No collection selected' });
+            return;
+        }
+
+        if (this.downloadInProgress) {
+            eventBus.emit('toast:warning', { title: 'Download in Progress', message: 'Please wait for current download to complete' });
+            return;
+        }
+
+        this.downloadInProgress = true;
+        this.downloadCancelled = false;
+
+        try {
+            // Show download modal
+            this.showDownloadModal();
+            
+            // Update modal with collection info
+            const collectionNameEl = document.getElementById('download-collection-name');
+            if (collectionNameEl) {
+                collectionNameEl.textContent = this.currentCollection.name;
+            }
+
+            // Fetch download URLs from backend
+            this.updateDownloadStatus('Fetching photo information...');
+            const response = await fetch(`${this.apiBase}/collections/${this.currentCollection.id}/download-urls`);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch download URLs: ${response.status}`);
+            }
+
+            const downloadData = await response.json();
+            const photos = downloadData.photos || [];
+
+            if (photos.length === 0) {
+                this.showDownloadError('No photos found in this collection');
+                return;
+            }
+
+            // Update progress display
+            const progressText = document.getElementById('download-progress-text');
+            if (progressText) {
+                progressText.textContent = `0 / ${photos.length} photos`;
+            }
+
+            // Create ZIP archive
+            const zip = new JSZip();
+            let downloadedCount = 0;
+
+            this.updateDownloadStatus('Starting download...');
+
+            // Download photos one by one
+            for (let i = 0; i < photos.length; i++) {
+                if (this.downloadCancelled) {
+                    this.updateDownloadStatus('Download cancelled');
+                    return;
+                }
+
+                const photo = photos[i];
+                this.updateDownloadStatus(`Downloading ${photo.filename}... (${i + 1}/${photos.length})`);
+
+                try {
+                    // Download photo via backend proxy to bypass CORS
+                    const proxyUrl = `${this.apiBase}/photos/${photo.id}/download`;
+                    const photoResponse = await fetch(proxyUrl);
+                    if (!photoResponse.ok) {
+                        console.error(`Failed to download photo ${photo.filename}:`, photoResponse.status);
+                        continue; // Skip this photo and continue with others
+                    }
+
+                    const photoBlob = await photoResponse.blob();
+                    zip.file(photo.filename, photoBlob);
+                    
+                    downloadedCount++;
+
+                    // Update progress
+                    const progressPercent = (downloadedCount / photos.length) * 100;
+                    this.updateDownloadProgress(downloadedCount, photos.length, progressPercent);
+
+                } catch (error) {
+                    console.error(`Error downloading photo ${photo.filename}:`, error);
+                    // Continue with other photos
+                }
+            }
+
+            if (downloadedCount === 0) {
+                this.showDownloadError('Failed to download any photos');
+                return;
+            }
+
+            // Generate and download ZIP file
+            this.updateDownloadStatus('Creating ZIP file...');
+            
+            const zipBlob = await zip.generateAsync({ 
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: { level: 6 }
+            });
+
+            // Create download link
+            const downloadUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = downloadUrl;
+            downloadLink.download = `${this.currentCollection.name.replace(/[<>:"/\\|?*]/g, '_')}.zip`;
+            
+            // Trigger download
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Clean up
+            URL.revokeObjectURL(downloadUrl);
+
+            // Show success
+            this.showDownloadSuccess(`Successfully downloaded ${downloadedCount} photos`);
+
+        } catch (error) {
+            console.error('Error downloading collection:', error);
+            this.showDownloadError(error.message);
+        } finally {
+            this.downloadInProgress = false;
+        }
+    }
+
+    showDownloadModal() {
+        const modal = document.getElementById('download-progress-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            
+            // Reset modal state
+            this.updateDownloadProgress(0, 0, 0);
+            this.updateDownloadStatus('Preparing download...');
+            
+            // Hide error/success states
+            const errorDiv = document.getElementById('download-error');
+            const successDiv = document.getElementById('download-success');
+            if (errorDiv) errorDiv.classList.add('hidden');
+            if (successDiv) successDiv.classList.add('hidden');
+        }
+    }
+
+    hideDownloadModal() {
+        const modal = document.getElementById('download-progress-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    updateDownloadStatus(message) {
+        const statusEl = document.getElementById('download-status-text');
+        if (statusEl) {
+            statusEl.textContent = message;
+        }
+    }
+
+    updateDownloadProgress(current, total, percent) {
+        const progressText = document.getElementById('download-progress-text');
+        const progressBar = document.getElementById('download-progress-bar');
+        
+        if (progressText) {
+            progressText.textContent = `${current} / ${total} photos`;
+        }
+        
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+        }
+    }
+
+    showDownloadError(message) {
+        const errorDiv = document.getElementById('download-error');
+        const errorMessage = document.getElementById('download-error-message');
+        const successDiv = document.getElementById('download-success');
+        
+        if (errorDiv) errorDiv.classList.remove('hidden');
+        if (errorMessage) errorMessage.textContent = message;
+        if (successDiv) successDiv.classList.add('hidden');
+        
+        this.updateDownloadStatus('Download failed');
+    }
+
+    showDownloadSuccess(message) {
+        const successDiv = document.getElementById('download-success');
+        const errorDiv = document.getElementById('download-error');
+        
+        if (successDiv) successDiv.classList.remove('hidden');
+        if (errorDiv) errorDiv.classList.add('hidden');
+        
+        this.updateDownloadStatus('Download completed');
+        
+        // Auto-close modal after 3 seconds
+        setTimeout(() => {
+            this.hideDownloadModal();
+        }, 3000);
+    }
+
+    cancelDownload() {
+        this.downloadCancelled = true;
+        this.downloadInProgress = false;
+        this.hideDownloadModal();
+        eventBus.emit('toast:info', { title: 'Download Cancelled', message: 'Collection download was cancelled' });
     }
 
     // Utility methods for accessing collections data

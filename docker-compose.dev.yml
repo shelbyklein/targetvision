@@ -1,0 +1,50 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Use builder stage for development
+    volumes:
+      - ./backend:/app/backend:rw  # Read-write for hot reload
+      - ./uploads:/app/uploads
+    environment:
+      ENVIRONMENT: development
+      LOG_LEVEL: debug
+      RELOAD: "true"  # Enable auto-reload
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    
+  frontend:
+    volumes:
+      - ./frontend:/usr/share/nginx/html:rw  # Read-write for live changes
+      - ./docker/nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    environment:
+      NODE_ENV: development
+    
+  database:
+    ports:
+      - "5432:5432"  # Expose database for local development tools
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust  # Less strict auth for dev
+      
+  redis:
+    ports:
+      - "6379:6379"  # Expose Redis for local development tools
+    
+  # Additional development services
+  adminer:
+    image: adminer
+    container_name: targetvision-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: database
+    networks:
+      - targetvision-network
+    depends_on:
+      - database
