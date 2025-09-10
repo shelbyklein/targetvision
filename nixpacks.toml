@@ -1,0 +1,17 @@
+# Nixpacks configuration for Railway deployment
+
+[phases.setup]
+nixPkgs = ["python311", "postgresql_15"]
+
+[phases.install]
+cmds = [
+    "pip install --upgrade pip",
+    "pip install -r requirements.txt",
+    "pip install gunicorn"
+]
+
+[start]
+cmd = "gunicorn backend.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"
+
+[variables]
+PYTHON_VERSION = "3.11"

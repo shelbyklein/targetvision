@@ -7,6 +7,10 @@ load_dotenv()
 class Settings:
     """Application configuration settings"""
     
+    # Environment
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    IS_PRODUCTION: bool = ENVIRONMENT == "production"
+    
     # SmugMug OAuth Settings
     SMUGMUG_API_KEY: str = os.getenv("SMUGMUG_API_KEY", "")
     SMUGMUG_API_SECRET: str = os.getenv("SMUGMUG_API_SECRET", "")
@@ -27,12 +31,18 @@ class Settings:
     
     # Database Settings
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/targetvision")
+    # Railway compatibility - ensure proper URL format
+    if "railway" in DATABASE_URL.lower():
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
     # Application Settings
     SECRET_KEY: str = os.getenv("SECRET_KEY", "development-secret-key-change-in-production")
-    DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
+    DEBUG: bool = os.getenv("DEBUG", "false" if os.getenv("ENVIRONMENT") == "production" else "true").lower() == "true"
     PORT: int = int(os.getenv("PORT", 8000))
     MAX_PHOTOS_MVP: int = int(os.getenv("MAX_PHOTOS_MVP", 10000))
+    
+    # CORS Settings
+    CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "*").split(",") if not os.getenv("ENVIRONMENT") == "production" else os.getenv("CORS_ORIGINS", "").split(",")
     
     # Image Processing Settings
     MAX_IMAGE_WIDTH: int = 2200

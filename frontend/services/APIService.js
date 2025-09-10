@@ -1,4 +1,5 @@
 import eventBus from './EventBus.js';
+import config from '../config.js';
 
 class APIService {
     constructor(baseURL = '', options = {}) {
@@ -157,7 +158,7 @@ class APIService {
     }
 }
 
-const apiService = new APIService('http://localhost:8000');
+const apiService = new APIService(config.API_URL);
 
 apiService.addRequestInterceptor(async (config) => {
     eventBus.emit('api:request:start', config);

@@ -1,0 +1,26 @@
+# Railway.toml - Railway-specific configuration
+# This file helps Railway understand your project structure
+
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt && cd frontend && echo 'Frontend ready'"
+
+[deploy]
+startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "always"
+
+[[services]]
+name = "backend"
+buildCommand = "pip install -r requirements.txt"
+startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+
+[[services]]
+name = "postgres"
+image = "timescale/timescaledb-ha:pg15-latest"
+
+[environments.production]
+DATABASE_INIT_SCRIPT = """
+CREATE EXTENSION IF NOT EXISTS vector;
+"""

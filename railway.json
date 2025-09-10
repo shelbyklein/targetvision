@@ -1,0 +1,41 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "pip install -r requirements.txt"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "startCommand": "uvicorn backend.main:app --host 0.0.0.0 --port $PORT",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "services": [
+    {
+      "name": "backend",
+      "source": ".",
+      "builder": "NIXPACKS",
+      "buildCommand": "pip install -r requirements.txt",
+      "startCommand": "uvicorn backend.main:app --host 0.0.0.0 --port $PORT",
+      "envVars": {
+        "PYTHON_VERSION": "3.11"
+      }
+    },
+    {
+      "name": "frontend",
+      "source": "./frontend",
+      "builder": "STATIC",
+      "buildCommand": "",
+      "headers": {
+        "/*": {
+          "Cache-Control": "public, max-age=0, must-revalidate"
+        },
+        "/assets/*": {
+          "Cache-Control": "public, max-age=31536000, immutable"
+        }
+      }
+    }
+  ]
+}
