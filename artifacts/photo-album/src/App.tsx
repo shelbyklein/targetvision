@@ -148,13 +148,13 @@ function ClerkProviderWithRoutes() {
         signIn: {
           start: {
             title: "Welcome back to Target Vision",
-            subtitle: "Sign in to access your team photos",
+            subtitle: "Sign in to start picking photos for marketing",
           },
         },
         signUp: {
           start: {
             title: "Join Target Vision",
-            subtitle: "Create an account to get started",
+            subtitle: "Create an account to help choose USA Archery's marketing photos",
           },
         },
       }}

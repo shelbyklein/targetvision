@@ -117,7 +117,7 @@ export default function Albums() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Albums</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {albums?.length ?? 0} album{albums?.length !== 1 ? "s" : ""} in your archive
+              {albums?.length ?? 0} album{albums?.length !== 1 ? "s" : ""} ready to review
             </p>
           </div>
           <CreateAlbumDialog onCreated={refetch} />
@@ -179,7 +179,7 @@ export default function Albums() {
             </div>
             <h3 className="text-base font-medium text-foreground mb-1">No albums yet</h3>
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
-              Create your first album to start organizing your team photos.
+              Create your first album to start gathering photos for the team to review.
             </p>
             <CreateAlbumDialog onCreated={refetch} />
           </div>

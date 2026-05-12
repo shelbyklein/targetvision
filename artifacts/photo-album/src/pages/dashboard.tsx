@@ -87,7 +87,7 @@ export default function Dashboard() {
       <div className="space-y-8" data-testid="dashboard-page">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Your team photo archive at a glance.</p>
+          <p className="text-sm text-muted-foreground mt-1">Your marketing photo selection workspace at a glance.</p>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="stats-grid">

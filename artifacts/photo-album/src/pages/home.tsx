@@ -25,16 +25,17 @@ export default function Home() {
       <main className="max-w-5xl mx-auto px-6 py-20 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm text-primary font-medium mb-8">
           <Camera className="h-4 w-4" />
-          Team Photo Album
+          Internal Marketing Tool
         </div>
 
         <h1 className="text-5xl font-bold tracking-tight text-foreground mb-6 leading-tight">
-          Every team moment,<br />beautifully preserved.
+          Pick the right photos<br />for marketing, together.
         </h1>
 
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          Target Vision is USA Archery's team photo archive. Organize events into albums, discover
-          top-rated shots, and surface the moments that matter — all in one quiet, purposeful space.
+          Target Vision is USA Archery's internal workspace for staff to collaborate on choosing
+          photos for marketing. Browse event albums, rate candidates, and shortlist the shots
+          that belong on the next campaign — together, in one place.
         </p>
 
         <div className="flex items-center justify-center gap-4">
@@ -57,32 +58,35 @@ export default function Home() {
             </div>
             <h3 className="font-semibold text-foreground">Albums by Event</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Group photos by event, date, and context. Each album tells a complete story.
+              Pull together every shot from a shoot or event so the team can review the full
+              set in one place before picking favorites.
             </p>
           </div>
           <div className="space-y-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Star className="h-5 w-5 text-primary" />
             </div>
-            <h3 className="font-semibold text-foreground">Star Ratings</h3>
+            <h3 className="font-semibold text-foreground">Collaborative Ratings</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Rate and surface the best shots. Top-rated photos rise to the front page.
+              Rate candidates as a team so the strongest marketing photos rise to the top
+              and decisions are easy to defend.
             </p>
           </div>
           <div className="space-y-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Tag className="h-5 w-5 text-primary" />
             </div>
-            <h3 className="font-semibold text-foreground">Tags & Categories</h3>
+            <h3 className="font-semibold text-foreground">Tags & Collections</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Cross-album tagging so you can find every shot from any event in seconds.
+              Tag by athlete, event, or campaign and group shortlisted shots into collections
+              ready to hand off to designers.
             </p>
           </div>
         </div>
       </main>
 
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        <p className="mb-3">Target Vision &mdash; USA Archery team photo archive</p>
+        <p className="mb-3">Target Vision &mdash; USA Archery internal marketing photo selection tool</p>
         <div className="flex items-center justify-center gap-2">
           <span className="text-xs text-muted-foreground/70">a</span>
           <a
