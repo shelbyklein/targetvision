@@ -280,6 +280,7 @@ export interface AiProviderInfo {
   id: AiProviderInfoId;
   label: string;
   model: string;
+  availableModels: string[];
   hasKey: boolean;
   /** @nullable */
   keyPreview?: string | null;
@@ -318,9 +319,16 @@ export const AiSettingsUpdateActiveProvider = {
   gemini: "gemini",
 } as const;
 
+export type AiSettingsUpdateProviderModels = {
+  openai?: string;
+  anthropic?: string;
+  gemini?: string;
+};
+
 export interface AiSettingsUpdate {
   enabled?: boolean;
   activeProvider?: AiSettingsUpdateActiveProvider;
+  providerModels?: AiSettingsUpdateProviderModels;
 }
 
 export interface AiProviderKeyInput {

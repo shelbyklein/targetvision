@@ -1662,7 +1662,7 @@ components:
 
     AiProviderInfo:
       type: object
-      required: [id, label, model, hasKey, replitFallbackAvailable, usable]
+      required: [id, label, model, availableModels, hasKey, replitFallbackAvailable, usable]
       properties:
         id:
           type: string
@@ -1671,6 +1671,10 @@ components:
           type: string
         model:
           type: string
+        availableModels:
+          type: array
+          items:
+            type: string
         hasKey:
           type: boolean
         keyPreview:
@@ -1710,6 +1714,15 @@ components:
         activeProvider:
           type: string
           enum: [openai, anthropic, gemini]
+        providerModels:
+          type: object
+          properties:
+            openai:
+              type: string
+            anthropic:
+              type: string
+            gemini:
+              type: string
 
     AiProviderKeyInput:
       type: object

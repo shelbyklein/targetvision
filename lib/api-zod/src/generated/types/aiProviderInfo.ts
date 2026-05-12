@@ -11,6 +11,7 @@ export interface AiProviderInfo {
   id: AiProviderInfoId;
   label: string;
   model: string;
+  availableModels: string[];
   hasKey: boolean;
   /** @nullable */
   keyPreview?: string | null;

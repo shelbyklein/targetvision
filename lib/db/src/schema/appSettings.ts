@@ -11,16 +11,19 @@ export const appSettingsTable = pgTable("app_settings", {
   openaiKeyIv: text("openai_key_iv"),
   openaiKeyTag: text("openai_key_tag"),
   openaiKeyPreview: text("openai_key_preview"),
+  openaiModel: text("openai_model"),
 
   anthropicKeyCiphertext: text("anthropic_key_ciphertext"),
   anthropicKeyIv: text("anthropic_key_iv"),
   anthropicKeyTag: text("anthropic_key_tag"),
   anthropicKeyPreview: text("anthropic_key_preview"),
+  anthropicModel: text("anthropic_model"),
 
   geminiKeyCiphertext: text("gemini_key_ciphertext"),
   geminiKeyIv: text("gemini_key_iv"),
   geminiKeyTag: text("gemini_key_tag"),
   geminiKeyPreview: text("gemini_key_preview"),
+  geminiModel: text("gemini_model"),
 
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

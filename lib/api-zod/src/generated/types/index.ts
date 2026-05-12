@@ -16,6 +16,7 @@ export * from "./aiSettingsActiveProvider";
 export * from "./aiSettingsProviders";
 export * from "./aiSettingsUpdate";
 export * from "./aiSettingsUpdateActiveProvider";
+export * from "./aiSettingsUpdateProviderModels";
 export * from "./album";
 export * from "./albumCoverUpdate";
 export * from "./albumInput";

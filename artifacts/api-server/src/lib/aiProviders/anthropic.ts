@@ -3,7 +3,7 @@ import { logger } from "../logger";
 import {
   AnalysisProvider,
   AnalysisRequest,
-  PROVIDER_MODELS,
+  DEFAULT_PROVIDER_MODELS,
   RawAnalysisResult,
 } from "./types";
 
@@ -21,9 +21,11 @@ function extractBase64FromDataUrl(dataUrl: string): {
 export class AnthropicProvider implements AnalysisProvider {
   id = "anthropic" as const;
   private client: Anthropic;
+  private model: string;
 
-  constructor(apiKey: string, baseURL?: string | null) {
+  constructor(apiKey: string, baseURL?: string | null, model?: string | null) {
     this.client = new Anthropic({ apiKey, baseURL: baseURL ?? undefined });
+    this.model = model || DEFAULT_PROVIDER_MODELS.anthropic;
   }
 
   async analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null> {
@@ -52,7 +54,7 @@ export class AnthropicProvider implements AnalysisProvider {
           };
 
       const response = await this.client.messages.create({
-        model: PROVIDER_MODELS.anthropic,
+        model: this.model,
         max_tokens: 1024,
         system: req.systemPrompt,
         tools: [

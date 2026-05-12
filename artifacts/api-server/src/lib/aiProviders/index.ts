@@ -11,9 +11,10 @@ import { AnthropicProvider } from "./anthropic";
 import { GeminiProvider } from "./gemini";
 import {
   AnalysisProvider,
+  DEFAULT_PROVIDER_MODELS,
   PROVIDER_IDS,
   PROVIDER_LABELS,
-  PROVIDER_MODELS,
+  PROVIDER_MODEL_OPTIONS,
   ProviderId,
 } from "./types";
 import { logger } from "../logger";
@@ -21,7 +22,8 @@ import { logger } from "../logger";
 export {
   PROVIDER_IDS,
   PROVIDER_LABELS,
-  PROVIDER_MODELS,
+  PROVIDER_MODEL_OPTIONS,
+  DEFAULT_PROVIDER_MODELS,
   type ProviderId,
 } from "./types";
 
@@ -29,6 +31,7 @@ export interface ProviderStatus {
   id: ProviderId;
   label: string;
   model: string;
+  availableModels: string[];
   hasKey: boolean;
   keyPreview: string | null;
   replitFallbackAvailable: boolean;
@@ -86,6 +89,24 @@ function providerPreview(settings: AppSettings, id: ProviderId): string | null {
   return settings.geminiKeyPreview;
 }
 
+function configuredModelFor(
+  settings: AppSettings,
+  id: ProviderId,
+): string | null {
+  if (id === "openai") return settings.openaiModel;
+  if (id === "anthropic") return settings.anthropicModel;
+  return settings.geminiModel;
+}
+
+export function resolveProviderModel(
+  settings: AppSettings,
+  id: ProviderId,
+): string {
+  const stored = configuredModelFor(settings, id);
+  if (stored && PROVIDER_MODEL_OPTIONS[id].includes(stored)) return stored;
+  return DEFAULT_PROVIDER_MODELS[id];
+}
+
 export function summarizeSettings(settings: AppSettings): ResolvedSettings {
   const providers = {} as Record<ProviderId, ProviderStatus>;
   for (const id of PROVIDER_IDS) {
@@ -94,7 +115,8 @@ export function summarizeSettings(settings: AppSettings): ResolvedSettings {
     providers[id] = {
       id,
       label: PROVIDER_LABELS[id],
-      model: PROVIDER_MODELS[id],
+      model: resolveProviderModel(settings, id),
+      availableModels: PROVIDER_MODEL_OPTIONS[id],
       hasKey,
       keyPreview: providerPreview(settings, id),
       replitFallbackAvailable: fallback,
@@ -170,14 +192,17 @@ export async function getActiveProvider(): Promise<{
   }
   const id = (settings.activeProvider as ProviderId) ?? "openai";
   const adminKey = getStoredKey(settings, id);
+  const model = resolveProviderModel(settings, id);
 
   if (id === "openai") {
-    if (adminKey) return { provider: new OpenAIProvider(adminKey), settings };
+    if (adminKey)
+      return { provider: new OpenAIProvider(adminKey, null, model), settings };
     if (replitFallbackFor("openai")) {
       return {
         provider: new OpenAIProvider(
           process.env.AI_INTEGRATIONS_OPENAI_API_KEY!,
           process.env.AI_INTEGRATIONS_OPENAI_BASE_URL!,
+          model,
         ),
         settings,
       };
@@ -186,24 +211,30 @@ export async function getActiveProvider(): Promise<{
   }
   if (id === "anthropic") {
     if (adminKey)
-      return { provider: new AnthropicProvider(adminKey), settings };
+      return {
+        provider: new AnthropicProvider(adminKey, null, model),
+        settings,
+      };
     if (replitFallbackFor("anthropic")) {
       return {
         provider: new AnthropicProvider(
           process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY!,
           process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL!,
+          model,
         ),
         settings,
       };
     }
     return { provider: null, settings, reason: "No Anthropic key configured" };
   }
-  if (adminKey) return { provider: new GeminiProvider(adminKey), settings };
+  if (adminKey)
+    return { provider: new GeminiProvider(adminKey, undefined, model), settings };
   if (replitFallbackFor("gemini")) {
     return {
       provider: new GeminiProvider(
         process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
         process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+        model,
       ),
       settings,
     };

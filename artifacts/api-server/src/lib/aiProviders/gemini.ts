@@ -3,7 +3,7 @@ import { logger } from "../logger";
 import {
   AnalysisProvider,
   AnalysisRequest,
-  PROVIDER_MODELS,
+  DEFAULT_PROVIDER_MODELS,
   RawAnalysisResult,
 } from "./types";
 
@@ -19,12 +19,14 @@ function extractBase64FromDataUrl(dataUrl: string): {
 export class GeminiProvider implements AnalysisProvider {
   id = "gemini" as const;
   private client: GoogleGenAI;
+  private model: string;
 
-  constructor(apiKey: string, baseUrl?: string) {
+  constructor(apiKey: string, baseUrl?: string, model?: string | null) {
     this.client = new GoogleGenAI({
       apiKey,
       ...(baseUrl ? { httpOptions: { baseUrl } } : {}),
     });
+    this.model = model || DEFAULT_PROVIDER_MODELS.gemini;
   }
 
   async analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null> {
@@ -47,7 +49,7 @@ export class GeminiProvider implements AnalysisProvider {
       }
 
       const response = await this.client.models.generateContent({
-        model: PROVIDER_MODELS.gemini,
+        model: this.model,
         contents: [{ role: "user", parts }],
         config: {
           responseMimeType: "application/json",

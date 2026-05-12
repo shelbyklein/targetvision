@@ -3,22 +3,24 @@ import { logger } from "../logger";
 import {
   AnalysisProvider,
   AnalysisRequest,
-  PROVIDER_MODELS,
+  DEFAULT_PROVIDER_MODELS,
   RawAnalysisResult,
 } from "./types";
 
 export class OpenAIProvider implements AnalysisProvider {
   id = "openai" as const;
   private client: OpenAI;
+  private model: string;
 
-  constructor(apiKey: string, baseURL?: string | null) {
+  constructor(apiKey: string, baseURL?: string | null, model?: string | null) {
     this.client = new OpenAI({ apiKey, baseURL: baseURL ?? undefined });
+    this.model = model || DEFAULT_PROVIDER_MODELS.openai;
   }
 
   async analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null> {
     try {
       const response = await this.client.chat.completions.create({
-        model: PROVIDER_MODELS.openai,
+        model: this.model,
         max_completion_tokens: 8192,
         messages: [
           { role: "system", content: req.systemPrompt },

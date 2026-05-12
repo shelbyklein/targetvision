@@ -16,6 +16,13 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, KeyRound, AlertTriangle, Check, Activity, CircleX, MinusCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +65,20 @@ export function AiServicesSection() {
         },
         onError: () =>
           toast({ title: "Failed to update active provider", variant: "destructive" }),
+      },
+    );
+  }
+
+  function handleSetModel(provider: ProviderId, model: string) {
+    updateSettings(
+      { data: { providerModels: { [provider]: model } } },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: `Model updated to ${model}` });
+        },
+        onError: () =>
+          toast({ title: "Failed to update model", variant: "destructive" }),
       },
     );
   }
@@ -138,6 +159,8 @@ export function AiServicesSection() {
               provider={settings.providers[id]}
               isActive={settings.activeProvider === id}
               disabled={!settings.enabled}
+              onModelChange={(model) => handleSetModel(id, model)}
+              modelChangeDisabled={updating || !settings.enabled}
             />
           ))}
         </RadioGroup>
@@ -262,10 +285,14 @@ function ProviderCard({
   provider,
   isActive,
   disabled,
+  onModelChange,
+  modelChangeDisabled,
 }: {
   provider: AiProviderInfo;
   isActive: boolean;
   disabled: boolean;
+  onModelChange: (model: string) => void;
+  modelChangeDisabled: boolean;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -335,9 +362,30 @@ function ProviderCard({
                 </span>
               )}
             </Label>
-            <span className="text-xs text-muted-foreground font-mono">
-              {provider.model}
-            </span>
+            <Select
+              value={provider.model}
+              onValueChange={onModelChange}
+              disabled={modelChangeDisabled}
+            >
+              <SelectTrigger
+                className="h-8 w-auto min-w-[180px] text-xs font-mono"
+                data-testid={`provider-model-trigger-${provider.id}`}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {provider.availableModels.map((m) => (
+                  <SelectItem
+                    key={m}
+                    value={m}
+                    className="font-mono text-xs"
+                    data-testid={`provider-model-option-${provider.id}-${m}`}
+                  >
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="mt-1 text-xs text-muted-foreground flex items-center gap-2 flex-wrap">

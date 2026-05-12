@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AiSettingsUpdateActiveProvider } from "./aiSettingsUpdateActiveProvider";
+import type { AiSettingsUpdateProviderModels } from "./aiSettingsUpdateProviderModels";
 
 export interface AiSettingsUpdate {
   enabled?: boolean;
   activeProvider?: AiSettingsUpdateActiveProvider;
+  providerModels?: AiSettingsUpdateProviderModels;
 }

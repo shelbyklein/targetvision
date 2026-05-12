@@ -23,6 +23,7 @@ import {
   loadAppSettings,
   summarizeSettings,
   PROVIDER_IDS,
+  PROVIDER_MODEL_OPTIONS,
   type ProviderId,
 } from "../lib/aiProviders";
 import { encryptSecret, maskKey } from "../lib/secretCrypto";
@@ -45,6 +46,26 @@ router.patch("/admin/ai-settings", requireAdmin, async (req, res): Promise<void>
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (typeof body.data.enabled === "boolean") updates.aiEnabled = body.data.enabled;
   if (body.data.activeProvider) updates.activeProvider = body.data.activeProvider;
+
+  const providerModels = body.data.providerModels;
+  if (providerModels) {
+    const modelColumns: Record<ProviderId, "openaiModel" | "anthropicModel" | "geminiModel"> = {
+      openai: "openaiModel",
+      anthropic: "anthropicModel",
+      gemini: "geminiModel",
+    };
+    for (const id of PROVIDER_IDS) {
+      const requested = providerModels[id];
+      if (typeof requested !== "string") continue;
+      if (!PROVIDER_MODEL_OPTIONS[id].includes(requested)) {
+        res.status(400).json({
+          error: `Unsupported model "${requested}" for provider "${id}"`,
+        });
+        return;
+      }
+      updates[modelColumns[id]] = requested;
+    }
+  }
 
   const [updated] = await db
     .update(appSettingsTable)
