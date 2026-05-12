@@ -5,6 +5,7 @@ import albumsRouter from "./albums";
 import photosRouter from "./photos";
 import tagsCategoriesRouter from "./tagsCategories";
 import statsRouter from "./stats";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(albumsRouter);
 router.use(photosRouter);
 router.use(tagsCategoriesRouter);
 router.use(statsRouter);
+router.use(storageRouter);
 
 export default router;
