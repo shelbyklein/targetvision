@@ -14,6 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/albums", label: "Albums", icon: Images },
@@ -106,6 +108,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3 shrink-0">
             <GlobalSearchBar />
+
+            <div
+              className="hidden md:flex items-center gap-1.5 pr-1 border-r border-border/60 mr-1"
+              data-testid="usaa-attribution"
+            >
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">a</span>
+              <img
+                src={`${basePath}/usaa-horizontal.svg`}
+                alt="USA Archery"
+                className="h-3.5 w-auto opacity-70"
+                data-testid="usaa-attribution-logo"
+              />
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70 pr-2">product</span>
+            </div>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
