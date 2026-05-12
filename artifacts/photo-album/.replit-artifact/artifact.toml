@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Team Photo Album"
+version = "1.0.0"
+id = "artifacts/photo-album"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20268
+
+[services.development]
+run = "pnpm --filter @workspace/photo-album run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/photo-album", "run", "build" ]
+publicDir = "artifacts/photo-album/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20268"
+BASE_PATH = "/"
