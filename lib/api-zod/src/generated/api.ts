@@ -259,8 +259,65 @@ export const UploadPhotoBody = zod.object({
 });
 
 /**
- * @summary List all photos
+ * @summary Search photos by keyword across caption, album title, tags, and uploader name
  */
+export const SearchPhotosQueryParams = zod.object({
+  q: zod.coerce.string(),
+  tag: zod.coerce.string().optional(),
+  categoryId: zod.coerce.number().optional(),
+  ratingMin: zod.coerce.number().optional(),
+  ratingMax: zod.coerce.number().optional(),
+  dateFrom: zod.coerce.string().optional(),
+  dateTo: zod.coerce.string().optional(),
+  uploaderId: zod.coerce.number().optional(),
+});
+
+export const SearchPhotosResponseItem = zod.object({
+  id: zod.number(),
+  albumId: zod.number(),
+  albumTitle: zod.string().nullish(),
+  uploaderId: zod.number(),
+  uploaderName: zod.string().nullish(),
+  storageKey: zod.string().nullish(),
+  url: zod.string(),
+  caption: zod.string().nullish(),
+  takenAt: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  averageRating: zod.number().nullish(),
+  ratingCount: zod.number(),
+  myRating: zod.number().nullish(),
+  tags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional(),
+  categories: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional(),
+});
+export const SearchPhotosResponse = zod.array(SearchPhotosResponseItem);
+
+/**
+ * @summary List all photos with optional filters
+ */
+export const ListPhotosQueryParams = zod.object({
+  tag: zod.coerce.string().optional(),
+  categoryId: zod.coerce.number().optional(),
+  ratingMin: zod.coerce.number().optional(),
+  ratingMax: zod.coerce.number().optional(),
+  dateFrom: zod.coerce.string().optional(),
+  dateTo: zod.coerce.string().optional(),
+  uploaderId: zod.coerce.number().optional(),
+});
+
 export const ListPhotosResponseItem = zod.object({
   id: zod.number(),
   albumId: zod.number(),

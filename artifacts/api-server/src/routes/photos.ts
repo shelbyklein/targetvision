@@ -6,6 +6,7 @@ import {
   ListAlbumPhotosResponse,
   UploadPhotoParams,
   UploadPhotoBody,
+  ListPhotosQueryParams,
   ListPhotosResponse,
   GetPhotoParams,
   GetPhotoResponse,
@@ -29,6 +30,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
+import { applyFiltersAndFetchIds } from "./search";
 
 const router: IRouter = Router();
 
@@ -87,12 +89,31 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
 });
 
 router.get("/photos", requireAuth, async (req, res): Promise<void> => {
-  const photos = await db
+  const query = ListPhotosQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+
+  const allPhotos = await db
     .select({ id: photosTable.id })
     .from(photosTable)
     .orderBy(photosTable.createdAt);
 
-  const full = await Promise.all(photos.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
+  const allIds = allPhotos.map((p) => p.id);
+  const { tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = query.data;
+
+  const filteredIds = await applyFiltersAndFetchIds(allIds, {
+    tag,
+    categoryId,
+    ratingMin,
+    ratingMax,
+    dateFrom,
+    dateTo,
+    uploaderId,
+  });
+
+  const full = await Promise.all(filteredIds.map((id) => buildPhotoResponse(id, req.dbUser?.id)));
   res.json(ListPhotosResponse.parse(full.filter(Boolean)));
 });
 

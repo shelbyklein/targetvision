@@ -25,12 +25,14 @@ import type {
   CategoryInput,
   DashboardStats,
   HealthStatus,
+  ListPhotosParams,
   Photo,
   PhotoCategoryInput,
   PhotoTagInput,
   PhotoUpdate,
   PhotoUploadInput,
   RatingInput,
+  SearchPhotosParams,
   Tag,
   TagCount,
   TagInput,
@@ -1104,41 +1106,153 @@ export const useUploadPhoto = <
 };
 
 /**
- * @summary List all photos
+ * @summary Search photos by keyword across caption, album title, tags, and uploader name
  */
-export const getListPhotosUrl = () => {
-  return `/api/photos`;
+export const getSearchPhotosUrl = (params: SearchPhotosParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/search?${stringifiedParams}`
+    : `/api/search`;
 };
 
-export const listPhotos = async (options?: RequestInit): Promise<Photo[]> => {
-  return customFetch<Photo[]>(getListPhotosUrl(), {
+export const searchPhotos = async (
+  params: SearchPhotosParams,
+  options?: RequestInit,
+): Promise<Photo[]> => {
+  return customFetch<Photo[]>(getSearchPhotosUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListPhotosQueryKey = () => {
-  return [`/api/photos`] as const;
+export const getSearchPhotosQueryKey = (params?: SearchPhotosParams) => {
+  return [`/api/search`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchPhotosQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchPhotos>>,
+  TError = ErrorType<void>,
+>(
+  params: SearchPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSearchPhotosQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchPhotos>>> = ({
+    signal,
+  }) => searchPhotos(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchPhotos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchPhotosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchPhotos>>
+>;
+export type SearchPhotosQueryError = ErrorType<void>;
+
+/**
+ * @summary Search photos by keyword across caption, album title, tags, and uploader name
+ */
+
+export function useSearchPhotos<
+  TData = Awaited<ReturnType<typeof searchPhotos>>,
+  TError = ErrorType<void>,
+>(
+  params: SearchPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchPhotosQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all photos with optional filters
+ */
+export const getListPhotosUrl = (params?: ListPhotosParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/photos?${stringifiedParams}`
+    : `/api/photos`;
+};
+
+export const listPhotos = async (
+  params?: ListPhotosParams,
+  options?: RequestInit,
+): Promise<Photo[]> => {
+  return customFetch<Photo[]>(getListPhotosUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPhotosQueryKey = (params?: ListPhotosParams) => {
+  return [`/api/photos`, ...(params ? [params] : [])] as const;
 };
 
 export const getListPhotosQueryOptions = <
   TData = Awaited<ReturnType<typeof listPhotos>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listPhotos>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListPhotosQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListPhotosQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listPhotos>>> = ({
     signal,
-  }) => listPhotos({ signal, ...requestOptions });
+  }) => listPhotos(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listPhotos>>,
@@ -1153,21 +1267,24 @@ export type ListPhotosQueryResult = NonNullable<
 export type ListPhotosQueryError = ErrorType<unknown>;
 
 /**
- * @summary List all photos
+ * @summary List all photos with optional filters
  */
 
 export function useListPhotos<
   TData = Awaited<ReturnType<typeof listPhotos>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listPhotos>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListPhotosQueryOptions(options);
+>(
+  params?: ListPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPhotosQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

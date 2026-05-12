@@ -189,3 +189,24 @@ export interface UploadUrlResponse {
   objectPath: string;
   metadata?: UploadUrlRequest;
 }
+
+export type SearchPhotosParams = {
+  q: string;
+  tag?: string;
+  categoryId?: number;
+  ratingMin?: number;
+  ratingMax?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  uploaderId?: number;
+};
+
+export type ListPhotosParams = {
+  tag?: string;
+  categoryId?: number;
+  ratingMin?: number;
+  ratingMax?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  uploaderId?: number;
+};

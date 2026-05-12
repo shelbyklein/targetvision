@@ -307,11 +307,105 @@ paths:
         "404":
           description: Album not found
 
+  /search:
+    get:
+      operationId: searchPhotos
+      tags: [photos]
+      summary: Search photos by keyword across caption, album title, tags, and uploader name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: ratingMin
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: ratingMax
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: uploaderId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+
   /photos:
     get:
       operationId: listPhotos
       tags: [photos]
-      summary: List all photos
+      summary: List all photos with optional filters
+      parameters:
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: ratingMin
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: ratingMax
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: uploaderId
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
           description: List of photos
