@@ -90,18 +90,30 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+function PoweredByUSAA() {
+  return (
+    <div className="flex items-center justify-center gap-2 mt-5">
+      <span className="text-xs text-muted-foreground/70">a</span>
+      <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+      <span className="text-xs text-muted-foreground/70">product</span>
+    </div>
+  );
+}
+
 function SignInPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4">
       <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+      <PoweredByUSAA />
     </div>
   );
 }
 
 function SignUpPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4">
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      <PoweredByUSAA />
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { Link } from "wouter";
 import { Camera, Image, Star, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-background" data-testid="home-page">
@@ -80,7 +82,12 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        Target Vision &mdash; USA Archery team photo archive
+        <p className="mb-3">Target Vision &mdash; USA Archery team photo archive</p>
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-xs text-muted-foreground/70">a</span>
+          <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+          <span className="text-xs text-muted-foreground/70">product</span>
+        </div>
       </footer>
     </div>
   );
