@@ -3,6 +3,7 @@ import { useParams, Link } from "wouter";
 import {
   useGetPhoto,
   useRatePhoto,
+  useClearPhotoRating,
   useAddPhotoTag,
   useRemovePhotoTag,
   useListCategories,
@@ -61,6 +62,7 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
 }) {
   const [hovered, setHovered] = useState(0);
   const { mutate: ratePhoto, isPending } = useRatePhoto();
+  const { mutate: clearRating, isPending: isClearing } = useClearPhotoRating();
   const { toast } = useToast();
 
   const isSignedIn = currentUserId != null;
@@ -69,6 +71,19 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
   const displayRating = isOwn
     ? Math.round(averageRating ?? 0)
     : (hovered || myRating || 0);
+
+  function handleClear() {
+    clearRating(
+      { id: photoId },
+      {
+        onSuccess: () => {
+          onRated();
+          toast({ title: "Rating cleared" });
+        },
+        onError: () => toast({ title: "Failed to clear rating", variant: "destructive" }),
+      }
+    );
+  }
 
   function handleRate(score: number) {
     if (!isSignedIn) {
@@ -113,7 +128,7 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
             onClick={() => handleRate(star)}
             onMouseEnter={() => interactive && setHovered(star)}
             onMouseLeave={() => interactive && setHovered(0)}
-            disabled={isPending || !interactive}
+            disabled={isPending || isClearing || !interactive}
             aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
             aria-pressed={!isOwn && myRating === star}
             className={
@@ -140,6 +155,17 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
           </span>
         )}
       </div>
+      {interactive && myRating != null && (
+        <button
+          type="button"
+          onClick={handleClear}
+          disabled={isPending || isClearing}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          data-testid="clear-rating"
+        >
+          Clear rating
+        </button>
+      )}
     </div>
   );
 }

@@ -907,6 +907,68 @@ export const RatePhotoResponse = zod.object({
 });
 
 /**
+ * @summary Clear the current user's rating on a photo
+ */
+export const ClearPhotoRatingParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ClearPhotoRatingResponse = zod.object({
+  id: zod.number(),
+  albumId: zod.number(),
+  albumTitle: zod.string().nullish(),
+  uploaderId: zod.number(),
+  uploaderName: zod.string().nullish(),
+  storageKey: zod.string().nullish(),
+  url: zod.string(),
+  caption: zod.string().nullish(),
+  takenAt: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  averageRating: zod.number().nullish(),
+  ratingCount: zod.number(),
+  myRating: zod.number().nullish(),
+  tags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional(),
+  categories: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
+  aiDescription: zod.string().nullish(),
+  suggestedCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * @summary List all tags
  */
 export const ListTagsResponseItem = zod.object({

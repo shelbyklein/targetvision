@@ -1986,6 +1986,90 @@ export const useRatePhoto = <
 };
 
 /**
+ * @summary Clear the current user's rating on a photo
+ */
+export const getClearPhotoRatingUrl = (id: number) => {
+  return `/api/photos/${id}/rating`;
+};
+
+export const clearPhotoRating = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getClearPhotoRatingUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getClearPhotoRatingMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearPhotoRating>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clearPhotoRating>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["clearPhotoRating"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clearPhotoRating>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return clearPhotoRating(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClearPhotoRatingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clearPhotoRating>>
+>;
+
+export type ClearPhotoRatingMutationError = ErrorType<void>;
+
+/**
+ * @summary Clear the current user's rating on a photo
+ */
+export const useClearPhotoRating = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearPhotoRating>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clearPhotoRating>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getClearPhotoRatingMutationOptions(options));
+};
+
+/**
  * @summary List all tags
  */
 export const getListTagsUrl = () => {

@@ -617,6 +617,27 @@ paths:
           description: Unauthorized
         "403":
           description: Cannot rate own photo
+    delete:
+      operationId: clearPhotoRating
+      tags: [ratings]
+      summary: Clear the current user's rating on a photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated photo with rating removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Photo not found
 
   /tags:
     get:

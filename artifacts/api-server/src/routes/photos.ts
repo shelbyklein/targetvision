@@ -29,6 +29,8 @@ import {
   RatePhotoParams,
   RatePhotoBody,
   RatePhotoResponse,
+  ClearPhotoRatingParams,
+  ClearPhotoRatingResponse,
   AcceptPhotoSuggestionParams,
   AcceptPhotoSuggestionResponse,
   DismissPhotoSuggestionParams,
@@ -388,6 +390,28 @@ router.post("/photos/:id/rating", requireAuth, async (req, res): Promise<void> =
 
   const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
   res.json(RatePhotoResponse.parse(full));
+});
+
+router.delete("/photos/:id/rating", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = ClearPhotoRatingParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photo) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  await db
+    .delete(ratingsTable)
+    .where(and(eq(ratingsTable.photoId, params.data.id), eq(ratingsTable.userId, req.dbUser!.id)));
+
+  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  res.json(ClearPhotoRatingResponse.parse(full));
 });
 
 router.post("/photos/:id/suggestions/:collectionId/accept", requireAuth, async (req, res): Promise<void> => {
