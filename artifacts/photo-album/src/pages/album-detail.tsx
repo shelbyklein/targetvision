@@ -15,7 +15,6 @@ import { useUpload } from "@workspace/object-storage-web";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -43,6 +42,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Plus,
   MoreHorizontal,
   Star,
@@ -56,8 +62,11 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  ArrowUpDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+type SortOption = "newest" | "oldest" | "top-rated";
 
 interface FileItem {
   file: File;
@@ -304,12 +313,34 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
   );
 }
 
+function sortPhotos(
+  photos: Array<{ id: number; createdAt: string; averageRating?: number | null; ratingCount: number }>,
+  sort: SortOption
+) {
+  const sorted = [...photos];
+  if (sort === "newest") {
+    sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } else if (sort === "oldest") {
+    sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  } else if (sort === "top-rated") {
+    sorted.sort((a, b) => {
+      const ratingDiff = (b.averageRating ?? 0) - (a.averageRating ?? 0);
+      if (ratingDiff !== 0) return ratingDiff;
+      const countDiff = b.ratingCount - a.ratingCount;
+      if (countDiff !== 0) return countDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }
+  return sorted;
+}
+
 export default function AlbumDetail() {
   const { id } = useParams<{ id: string }>();
   const albumId = parseInt(id, 10);
   const qc = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [sort, setSort] = useState<SortOption>("newest");
 
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
@@ -352,6 +383,8 @@ export default function AlbumDetail() {
       }
     );
   }
+
+  const sortedPhotos = photos ? sortPhotos(photos, sort) : undefined;
 
   if (albumLoading) {
     return (
@@ -463,18 +496,42 @@ export default function AlbumDetail() {
           </div>
         </div>
 
+        {photos && photos.length > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {photos.length} photo{photos.length !== 1 ? "s" : ""}
+            </p>
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <Select
+                value={sort}
+                onValueChange={(v) => setSort(v as SortOption)}
+              >
+                <SelectTrigger className="h-8 w-36 text-sm" data-testid="sort-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest first</SelectItem>
+                  <SelectItem value="oldest">Oldest first</SelectItem>
+                  <SelectItem value="top-rated">Top rated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
         {photosLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 10 }).map((_, i) => (
               <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
             ))}
           </div>
-        ) : photos && photos.length > 0 ? (
+        ) : sortedPhotos && sortedPhotos.length > 0 ? (
           <div
             className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
             data-testid="photo-grid"
           >
-            {photos.map((photo) => (
+            {sortedPhotos.map((photo) => (
               <div
                 key={photo.id}
                 className="relative group rounded-lg overflow-hidden bg-muted"

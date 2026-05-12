@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import {
   useGetPhoto,
@@ -8,10 +8,12 @@ import {
   useListCategories,
   useAddPhotoCategory,
   useRemovePhotoCategory,
-  useUpdatePhoto,
   useDeletePhoto,
+  useListTags,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
+  getGetTagCloudQueryKey,
+  getListTagsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
@@ -107,20 +109,134 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, onRated }: {
   );
 }
 
+function TagAutocomplete({ photoId, existingTagIds, onTagAdded }: {
+  photoId: number;
+  existingTagIds: number[];
+  onTagAdded: () => void;
+}) {
+  const [input, setInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { mutate: addTag, isPending } = useAddPhotoTag();
+  const { data: allTags } = useListTags();
+  const { toast } = useToast();
+
+  const suggestions = allTags
+    ? allTags.filter(
+        (t) =>
+          t.name.toLowerCase().includes(input.toLowerCase()) &&
+          !existingTagIds.includes(t.id) &&
+          input.length > 0
+      )
+    : [];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function submit(tagName: string) {
+    const trimmed = tagName.trim().toLowerCase();
+    if (!trimmed) return;
+    addTag(
+      { id: photoId, data: { tagName: trimmed } },
+      {
+        onSuccess: () => {
+          setInput("");
+          setShowSuggestions(false);
+          onTagAdded();
+        },
+        onError: () => toast({ title: "Failed to add tag", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submit(input);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  }
+
+  return (
+    <div ref={containerRef} className="relative mt-1">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(input);
+        }}
+        className="flex gap-2"
+      >
+        <div className="relative flex-1">
+          <Input
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onKeyDown={handleKeyDown}
+            placeholder="Add tag..."
+            className="h-8 text-sm"
+            data-testid="add-tag-input"
+            autoComplete="off"
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div
+              className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-border bg-popover shadow-md overflow-hidden"
+              data-testid="tag-suggestions"
+            >
+              {suggestions.slice(0, 6).map((tag) => (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    submit(tag.name);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                  data-testid={`tag-suggestion-${tag.id}`}
+                >
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          className="h-8 px-2"
+          disabled={!input.trim() || isPending}
+          data-testid="add-tag-submit"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 export default function PhotoDetail() {
   const { id } = useParams<{ id: string }>();
   const photoId = parseInt(id, 10);
   const qc = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [newTag, setNewTag] = useState("");
 
   const { data: photo, isLoading } = useGetPhoto(photoId, {
     query: { enabled: !!photoId, queryKey: getGetPhotoQueryKey(photoId) },
   });
   const { data: me } = useGetMe();
   const { data: allCategories } = useListCategories();
-  const { mutate: addTag } = useAddPhotoTag();
   const { mutate: removeTag } = useRemovePhotoTag();
   const { mutate: addCategory } = useAddPhotoCategory();
   const { mutate: removeCategory } = useRemovePhotoCategory();
@@ -133,22 +249,16 @@ export default function PhotoDetail() {
     }
   }
 
-  function handleAddTag(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newTag.trim()) return;
-    addTag(
-      { id: photoId, data: { tagName: newTag.trim().toLowerCase() } },
-      {
-        onSuccess: () => { setNewTag(""); invalidate(); },
-        onError: () => toast({ title: "Failed to add tag", variant: "destructive" }),
-      }
-    );
+  function invalidateWithTags() {
+    invalidate();
+    qc.invalidateQueries({ queryKey: getListTagsQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetTagCloudQueryKey() });
   }
 
   function handleRemoveTag(tagId: number) {
     removeTag(
       { id: photoId, tagId },
-      { onSuccess: invalidate, onError: () => toast({ title: "Failed to remove tag", variant: "destructive" }) }
+      { onSuccess: invalidateWithTags, onError: () => toast({ title: "Failed to remove tag", variant: "destructive" }) }
     );
   }
 
@@ -304,18 +414,11 @@ export default function PhotoDetail() {
                   <span className="text-xs text-muted-foreground">No tags yet</span>
                 )}
               </div>
-              <form onSubmit={handleAddTag} className="flex gap-2 mt-1">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Add tag..."
-                  className="h-8 text-sm"
-                  data-testid="add-tag-input"
-                />
-                <Button type="submit" size="sm" variant="outline" className="h-8 px-2" disabled={!newTag.trim()} data-testid="add-tag-submit">
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </form>
+              <TagAutocomplete
+                photoId={photoId}
+                existingTagIds={photo.tags?.map((t) => t.id) ?? []}
+                onTagAdded={invalidateWithTags}
+              />
             </div>
 
             <div className="space-y-2">
