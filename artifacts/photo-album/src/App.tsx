@@ -205,6 +205,18 @@ function ClerkProviderWithRoutes() {
               </>
             )}
           </Route>
+          <Route path="/photos">
+            {() => (
+              <>
+                <Show when="signed-in">
+                  <LazyPage load={() => import("@/pages/photos")} />
+                </Show>
+                <Show when="signed-out">
+                  <Redirect to="/sign-in" />
+                </Show>
+              </>
+            )}
+          </Route>
           <Route path="/tags">
             {() => (
               <>

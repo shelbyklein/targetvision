@@ -2,7 +2,7 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Tag, Shield, LogOut, Camera, ChevronDown, Search } from "lucide-react";
+import { LayoutDashboard, Images, Tag, Shield, LogOut, Camera, ChevronDown, Search, Grid2x2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/albums", label: "Albums", icon: Images },
+  { href: "/photos", label: "Photos", icon: Grid2x2 },
   { href: "/tags", label: "Tags", icon: Tag },
 ];
 

@@ -121,7 +121,7 @@ export default function Dashboard() {
                 {tagCloud?.map((tag) => {
                   const scale = 0.8 + (tag.count / maxTagCount) * 0.8;
                   return (
-                    <Link key={tag.id} href="/tags">
+                    <Link key={tag.id} href={`/photos?tag=${encodeURIComponent(tag.name)}`}>
                       <span
                         className="inline-block rounded-full bg-primary/10 text-primary px-3 py-1 cursor-pointer hover:bg-primary/20 transition-colors font-medium"
                         style={{ fontSize: `${Math.round(12 * scale)}px` }}

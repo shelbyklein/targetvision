@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { useGetTagCloud } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,18 +38,19 @@ export default function TagsPage() {
         ) : tagCloud && tagCloud.length > 0 ? (
           <div className="rounded-xl border border-border bg-card p-8 flex flex-wrap gap-x-4 gap-y-3 items-baseline" data-testid="tag-cloud">
             {tagCloud.map((tag) => (
-              <span
-                key={tag.id}
-                className="text-primary font-medium cursor-default select-none transition-opacity hover:opacity-100"
-                style={{
-                  fontSize: `${getFontSize(tag.count)}px`,
-                  opacity: getOpacity(tag.count),
-                }}
-                data-testid="tag-cloud-word"
-                title={`${tag.count} photo${tag.count !== 1 ? "s" : ""}`}
-              >
-                {tag.name}
-              </span>
+              <Link key={tag.id} href={`/photos?tag=${encodeURIComponent(tag.name)}`}>
+                <span
+                  className="text-primary font-medium cursor-pointer select-none transition-opacity hover:opacity-100 hover:underline"
+                  style={{
+                    fontSize: `${getFontSize(tag.count)}px`,
+                    opacity: getOpacity(tag.count),
+                  }}
+                  data-testid="tag-cloud-word"
+                  title={`${tag.count} photo${tag.count !== 1 ? "s" : ""} — click to browse`}
+                >
+                  {tag.name}
+                </span>
+              </Link>
             ))}
           </div>
         ) : (
@@ -66,12 +68,14 @@ export default function TagsPage() {
         {tagCloud && tagCloud.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="tag-list">
             {tagCloud.map((tag) => (
-              <div key={tag.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2" data-testid="tag-row">
-                <span className="text-sm font-medium text-foreground">{tag.name}</span>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {tag.count}
-                </span>
-              </div>
+              <Link key={tag.id} href={`/photos?tag=${encodeURIComponent(tag.name)}`}>
+                <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:border-primary/50 hover:bg-accent transition-colors cursor-pointer" data-testid="tag-row">
+                  <span className="text-sm font-medium text-foreground">{tag.name}</span>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {tag.count}
+                  </span>
+                </div>
+              </Link>
             ))}
           </div>
         )}
