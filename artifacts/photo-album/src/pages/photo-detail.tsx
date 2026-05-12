@@ -51,20 +51,30 @@ import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderO
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-function StarRating({ photoId, myRating, uploaderId, currentUserId, onRated }: {
+function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRating, onRated }: {
   photoId: number;
   myRating?: number | null;
   uploaderId: number;
   currentUserId?: number;
+  averageRating?: number | null;
   onRated: () => void;
 }) {
   const [hovered, setHovered] = useState(0);
   const { mutate: ratePhoto, isPending } = useRatePhoto();
   const { toast } = useToast();
 
-  const isOwn = currentUserId === uploaderId;
+  const isSignedIn = currentUserId != null;
+  const isOwn = isSignedIn && currentUserId === uploaderId;
+  const interactive = isSignedIn && !isOwn;
+  const displayRating = isOwn
+    ? Math.round(averageRating ?? 0)
+    : (hovered || myRating || 0);
 
   function handleRate(score: number) {
+    if (!isSignedIn) {
+      toast({ title: "Sign in to rate photos", variant: "destructive" });
+      return;
+    }
     if (isOwn) {
       toast({ title: "Cannot rate your own photo", variant: "destructive" });
       return;
@@ -82,32 +92,52 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, onRated }: {
   }
 
   return (
-    <div className="space-y-2">
-      <Label className="text-sm font-medium text-muted-foreground">
-        {isOwn ? "Your photo" : "Your Rating"}
-      </Label>
-      <div className="flex items-center gap-1" data-testid="star-rating">
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3" data-testid="rating-section">
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold text-foreground">Rate this photo</h2>
+        <p className="text-xs text-muted-foreground">
+          {isOwn
+            ? "You can't rate your own photos — only other team members can rate this one."
+            : !isSignedIn
+              ? "Sign in to give this photo a rating from 1 to 5 stars."
+              : myRating != null
+                ? "Tap a star to update your rating."
+                : "Tap a star to rate from 1 (lowest) to 5 (highest)."}
+        </p>
+      </div>
+      <div className="flex items-center gap-1.5" data-testid="star-rating">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
+            type="button"
             onClick={() => handleRate(star)}
-            onMouseEnter={() => setHovered(star)}
-            onMouseLeave={() => setHovered(0)}
-            disabled={isPending || isOwn}
-            className="p-0.5 disabled:cursor-not-allowed disabled:opacity-50 transition-transform hover:scale-110"
+            onMouseEnter={() => interactive && setHovered(star)}
+            onMouseLeave={() => interactive && setHovered(0)}
+            disabled={isPending || !interactive}
+            aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
+            aria-pressed={!isOwn && myRating === star}
+            className={
+              interactive
+                ? "p-1 rounded-md transition-all hover:scale-110 hover:bg-amber-50 dark:hover:bg-amber-950/30 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:cursor-not-allowed"
+                : "p-1 rounded-md cursor-not-allowed"
+            }
             data-testid={`star-${star}`}
           >
             <Star
               className={
-                (hovered || myRating || 0) >= star
-                  ? "h-6 w-6 fill-amber-400 text-amber-400"
-                  : "h-6 w-6 text-muted-foreground/40"
+                displayRating >= star
+                  ? "h-7 w-7 fill-amber-400 text-amber-400"
+                  : interactive
+                    ? "h-7 w-7 text-muted-foreground/70 stroke-[1.75]"
+                    : "h-7 w-7 text-muted-foreground/40 stroke-[1.75]"
               }
             />
           </button>
         ))}
-        {myRating != null && (
-          <span className="text-sm text-muted-foreground ml-2">({myRating}/5)</span>
+        {!isOwn && myRating != null && (
+          <span className="text-sm font-medium text-foreground ml-2" data-testid="my-rating-text">
+            Your rating: {myRating}/5
+          </span>
         )}
       </div>
     </div>
@@ -582,6 +612,7 @@ export default function PhotoDetail() {
               myRating={photo.myRating}
               uploaderId={photo.uploaderId}
               currentUserId={me?.id}
+              averageRating={photo.averageRating}
               onRated={invalidate}
             />
 
