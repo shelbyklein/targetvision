@@ -201,7 +201,10 @@ export async function getActiveProvider(): Promise<{
   if (adminKey) return { provider: new GeminiProvider(adminKey), settings };
   if (replitFallbackFor("gemini")) {
     return {
-      provider: new GeminiProvider(process.env.AI_INTEGRATIONS_GEMINI_API_KEY!),
+      provider: new GeminiProvider(
+        process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+        process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+      ),
       settings,
     };
   }

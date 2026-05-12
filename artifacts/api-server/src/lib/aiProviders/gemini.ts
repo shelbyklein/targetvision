@@ -20,8 +20,11 @@ export class GeminiProvider implements AnalysisProvider {
   id = "gemini" as const;
   private client: GoogleGenAI;
 
-  constructor(apiKey: string) {
-    this.client = new GoogleGenAI({ apiKey });
+  constructor(apiKey: string, baseUrl?: string) {
+    this.client = new GoogleGenAI({
+      apiKey,
+      ...(baseUrl ? { httpOptions: { baseUrl } } : {}),
+    });
   }
 
   async analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null> {
