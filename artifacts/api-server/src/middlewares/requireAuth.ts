@@ -1,5 +1,5 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { getAuth, type SignedInAuthObject } from "@clerk/express";
+import { getAuth } from "@clerk/express";
 import { db, usersTable, insertUserSchema } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -11,9 +11,11 @@ declare global {
   }
 }
 
-function claimString(auth: SignedInAuthObject, key: string): string | undefined {
+type AuthObject = ReturnType<typeof getAuth>;
+
+function claimString(auth: AuthObject, key: string): string | undefined {
   const claims = auth.sessionClaims;
-  if (claims && typeof claims === "object" && key in claims) {
+  if (claims && typeof claims === "object" && key in (claims as object)) {
     const val = (claims as Record<string, unknown>)[key];
     if (typeof val === "string") return val;
   }

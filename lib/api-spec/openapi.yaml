@@ -203,6 +203,31 @@ paths:
         "404":
           description: Not found
 
+  /albums/{id}/top-rated:
+    get:
+      operationId: getAlbumTopRated
+      tags: [photos]
+      summary: Get top-rated photos in an album
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Top-rated photos in this album
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
   /albums/{id}/cover:
     patch:
       operationId: setAlbumCover

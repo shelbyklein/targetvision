@@ -141,6 +141,46 @@ export const DeleteAlbumParams = zod.object({
 });
 
 /**
+ * @summary Get top-rated photos in an album
+ */
+export const GetAlbumTopRatedParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAlbumTopRatedResponseItem = zod.object({
+  id: zod.number(),
+  albumId: zod.number(),
+  albumTitle: zod.string().nullish(),
+  uploaderId: zod.number(),
+  uploaderName: zod.string().nullish(),
+  storageKey: zod.string().nullish(),
+  url: zod.string(),
+  caption: zod.string().nullish(),
+  takenAt: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  averageRating: zod.number().nullish(),
+  ratingCount: zod.number(),
+  myRating: zod.number().nullish(),
+  tags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional(),
+  categories: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional(),
+});
+export const GetAlbumTopRatedResponse = zod.array(GetAlbumTopRatedResponseItem);
+
+/**
  * @summary Set the cover photo for an album
  */
 export const SetAlbumCoverParams = zod.object({

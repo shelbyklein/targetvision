@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, count, sql } from "drizzle-orm";
-import { db, albumsTable, photosTable, usersTable } from "@workspace/db";
+import { eq, count, sql, desc, avg } from "drizzle-orm";
+import { db, albumsTable, photosTable, usersTable, ratingsTable } from "@workspace/db";
 import {
   ListAlbumsResponse,
   ListAlbumsResponseItem,
@@ -14,8 +14,11 @@ import {
   SetAlbumCoverParams,
   SetAlbumCoverBody,
   SetAlbumCoverResponse,
+  GetAlbumTopRatedParams,
+  GetAlbumTopRatedResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { buildPhotoResponse } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
@@ -204,6 +207,33 @@ router.patch("/albums/:id/cover", requireAuth, async (req, res): Promise<void> =
 
   const full = await buildAlbumResponse(params.data.id);
   res.json(SetAlbumCoverResponse.parse(full));
+});
+
+router.get("/albums/:id/top-rated", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = GetAlbumTopRatedParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [album] = await db.select().from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  if (!album) {
+    res.status(404).json({ error: "Album not found" });
+    return;
+  }
+
+  const rows = await db
+    .select({ id: photosTable.id, avgRating: avg(ratingsTable.score) })
+    .from(photosTable)
+    .innerJoin(ratingsTable, eq(ratingsTable.photoId, photosTable.id))
+    .where(eq(photosTable.albumId, params.data.id))
+    .groupBy(photosTable.id)
+    .orderBy(desc(avg(ratingsTable.score)))
+    .limit(12);
+
+  const photos = await Promise.all(rows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
+  res.json(GetAlbumTopRatedResponse.parse(photos.filter(Boolean)));
 });
 
 export default router;
