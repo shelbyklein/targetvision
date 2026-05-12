@@ -63,7 +63,7 @@ async function seed() {
     .values({
       clerkId: "seed_demo_user",
       name: "Alex Rivera",
-      email: "alex@framevault.demo",
+      email: "alex@targetvision.demo",
       role: "admin",
     })
     .onConflictDoNothing()
@@ -80,7 +80,7 @@ async function seed() {
     .values({
       clerkId: "seed_demo_user_2",
       name: "Jordan Kim",
-      email: "jordan@framevault.demo",
+      email: "jordan@targetvision.demo",
       role: "member",
     })
     .onConflictDoNothing()
