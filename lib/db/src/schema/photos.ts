@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { albumsTable } from "./albums";
 import { collectionsTable } from "./collections";
+import { categoriesTable } from "./categories";
 
 export const photosTable = pgTable("photos", {
   id: serial("id").primaryKey(),
@@ -45,8 +46,20 @@ export const photoTagSuggestionsTable = pgTable(
   (table) => [primaryKey({ columns: [table.photoId, table.tagName] })],
 );
 
+export const photoCategorySuggestionsTable = pgTable(
+  "photo_category_suggestions",
+  {
+    photoId: integer("photo_id").notNull().references(() => photosTable.id, { onDelete: "cascade" }),
+    categoryId: integer("category_id").notNull().references(() => categoriesTable.id, { onDelete: "cascade" }),
+    status: photoSuggestionStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.photoId, table.categoryId] })],
+);
+
 export const insertPhotoSchema = createInsertSchema(photosTable).omit({ id: true, createdAt: true });
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type Photo = typeof photosTable.$inferSelect;
 export type PhotoCollectionSuggestion = typeof photoCollectionSuggestionsTable.$inferSelect;
 export type PhotoTagSuggestion = typeof photoTagSuggestionsTable.$inferSelect;
+export type PhotoCategorySuggestion = typeof photoCategorySuggestionsTable.$inferSelect;

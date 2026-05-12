@@ -8,6 +8,7 @@
 import type { Category } from "./category";
 import type { CollectionSummary } from "./collectionSummary";
 import type { PhotoRating } from "./photoRating";
+import type { SuggestedCategory } from "./suggestedCategory";
 import type { SuggestedCollection } from "./suggestedCollection";
 import type { SuggestedTag } from "./suggestedTag";
 import type { Tag } from "./tag";
@@ -41,4 +42,5 @@ export interface Photo {
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
   suggestedTags?: SuggestedTag[];
+  suggestedCategories?: SuggestedCategory[];
 }

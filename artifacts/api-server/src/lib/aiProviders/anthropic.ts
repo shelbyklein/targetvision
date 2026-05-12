@@ -74,8 +74,13 @@ export class AnthropicProvider implements AnalysisProvider {
                   items: { type: "string" },
                   maxItems: 5,
                 },
+                suggestedCategoryIds: {
+                  type: "array",
+                  items: { type: "integer" },
+                  maxItems: 2,
+                },
               },
-              required: ["description", "suggestedCollectionIds", "suggestedTags"],
+              required: ["description", "suggestedCollectionIds", "suggestedTags", "suggestedCategoryIds"],
             },
           },
         ],
@@ -100,6 +105,9 @@ export class AnthropicProvider implements AnalysisProvider {
           : [],
         suggestedTags: Array.isArray(input.suggestedTags)
           ? input.suggestedTags
+          : [],
+        suggestedCategoryIds: Array.isArray(input.suggestedCategoryIds)
+          ? input.suggestedCategoryIds
           : [],
       };
     } catch (err) {

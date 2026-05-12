@@ -18,6 +18,8 @@ import {
   useDismissPhotoSuggestion,
   useAcceptPhotoTagSuggestion,
   useDismissPhotoTagSuggestion,
+  useAcceptPhotoCategorySuggestion,
+  useDismissPhotoCategorySuggestion,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -312,6 +314,8 @@ export default function PhotoDetail() {
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
   const { mutate: acceptTagSuggestion } = useAcceptPhotoTagSuggestion();
   const { mutate: dismissTagSuggestion } = useDismissPhotoTagSuggestion();
+  const { mutate: acceptCategorySuggestion } = useAcceptPhotoCategorySuggestion();
+  const { mutate: dismissCategorySuggestion } = useDismissPhotoCategorySuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const [downloading, setDownloading] = useState(false);
 
@@ -501,6 +505,26 @@ export default function PhotoDetail() {
       {
         onSuccess: invalidate,
         onError: () => toast({ title: "Failed to dismiss tag", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleAcceptCategorySuggestion(categoryId: number) {
+    acceptCategorySuggestion(
+      { id: photoId, categoryId },
+      {
+        onSuccess: invalidate,
+        onError: () => toast({ title: "Failed to accept category", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleDismissCategorySuggestion(categoryId: number) {
+    dismissCategorySuggestion(
+      { id: photoId, categoryId },
+      {
+        onSuccess: invalidate,
+        onError: () => toast({ title: "Failed to dismiss category", variant: "destructive" }),
       }
     );
   }
@@ -820,6 +844,40 @@ export default function PhotoDetail() {
                   <span className="text-xs text-muted-foreground">No categories</span>
                 )}
               </div>
+              {photo.suggestedCategories && photo.suggestedCategories.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Suggested
+                  </p>
+                  <div className="flex flex-wrap gap-1.5" data-testid="suggested-categories">
+                    {photo.suggestedCategories.map((s) => (
+                      <div
+                        key={s.id}
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-2.5 pr-1 py-0.5 text-xs"
+                        data-testid={`suggested-category-${s.id}`}
+                      >
+                        <span className="text-foreground">{s.name}</span>
+                        <button
+                          onClick={() => handleAcceptCategorySuggestion(s.id)}
+                          className="rounded-full p-0.5 hover:bg-primary/15 text-primary"
+                          aria-label={`Accept category ${s.name}`}
+                          data-testid={`accept-suggested-category-${s.id}`}
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDismissCategorySuggestion(s.id)}
+                          className="rounded-full p-0.5 hover:bg-muted-foreground/15 text-muted-foreground"
+                          aria-label={`Dismiss category ${s.name}`}
+                          data-testid={`dismiss-suggested-category-${s.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {availableCategories && availableCategories.length > 0 && (
                 <Select onValueChange={handleAddCategory} data-testid="add-category-select">
                   <SelectTrigger className="h-8 text-sm w-full">

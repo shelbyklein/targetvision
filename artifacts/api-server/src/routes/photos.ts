@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable } from "@workspace/db";
+import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable } from "@workspace/db";
 import { analyzePhoto } from "../lib/aiPhotoAnalysis";
 import { logger } from "../lib/logger";
 import {
@@ -39,6 +39,10 @@ import {
   AcceptPhotoTagSuggestionResponse,
   DismissPhotoTagSuggestionParams,
   DismissPhotoTagSuggestionResponse,
+  AcceptPhotoCategorySuggestionParams,
+  AcceptPhotoCategorySuggestionResponse,
+  DismissPhotoCategorySuggestionParams,
+  DismissPhotoCategorySuggestionResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -81,16 +85,21 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
   // Fire-and-forget AI analysis. Failures are swallowed so the upload still succeeds.
   void (async () => {
     try {
-      const collections = await db
-        .select({
-          id: collectionsTable.id,
-          title: collectionsTable.title,
-          description: collectionsTable.description,
-        })
-        .from(collectionsTable)
-        .where(eq(collectionsTable.createdById, req.dbUser!.id));
+      const [collections, categories] = await Promise.all([
+        db
+          .select({
+            id: collectionsTable.id,
+            title: collectionsTable.title,
+            description: collectionsTable.description,
+          })
+          .from(collectionsTable)
+          .where(eq(collectionsTable.createdById, req.dbUser!.id)),
+        db
+          .select({ id: categoriesTable.id, name: categoriesTable.name })
+          .from(categoriesTable),
+      ]);
 
-      const result = await analyzePhoto(photo.url, collections, photo.storageKey);
+      const result = await analyzePhoto(photo.url, collections, categories, photo.storageKey);
       if (!result) return;
 
       await db
@@ -109,6 +118,29 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
             })),
           )
           .onConflictDoNothing();
+      }
+
+      if (result.suggestedCategoryIds.length > 0) {
+        const existingCats = await db
+          .select({ categoryId: photoCategoriesTable.categoryId })
+          .from(photoCategoriesTable)
+          .where(eq(photoCategoriesTable.photoId, photo.id));
+        const existingCatIds = new Set(existingCats.map((c) => c.categoryId));
+        const newCatSuggestions = result.suggestedCategoryIds.filter(
+          (cid) => !existingCatIds.has(cid),
+        );
+        if (newCatSuggestions.length > 0) {
+          await db
+            .insert(photoCategorySuggestionsTable)
+            .values(
+              newCatSuggestions.map((cid) => ({
+                photoId: photo.id,
+                categoryId: cid,
+                status: "pending" as const,
+              })),
+            )
+            .onConflictDoNothing();
+        }
       }
 
       if (result.suggestedTags.length > 0) {
@@ -658,6 +690,109 @@ router.post("/photos/:id/tag-suggestions/:tagName/dismiss", requireAuth, async (
 
   const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
   res.json(DismissPhotoTagSuggestionResponse.parse(full));
+});
+
+router.post("/photos/:id/category-suggestions/:categoryId/accept", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawCat = Array.isArray(req.params.categoryId) ? req.params.categoryId[0] : req.params.categoryId;
+  const params = AcceptPhotoCategorySuggestionParams.safeParse({
+    id: parseInt(rawId, 10),
+    categoryId: parseInt(rawCat, 10),
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const [catExists] = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.id, params.data.categoryId));
+  if (!catExists) {
+    res.status(404).json({ error: "Category not found" });
+    return;
+  }
+
+  const [suggestion] = await db
+    .select({ status: photoCategorySuggestionsTable.status })
+    .from(photoCategorySuggestionsTable)
+    .where(
+      and(
+        eq(photoCategorySuggestionsTable.photoId, params.data.id),
+        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
+      ),
+    );
+  if (!suggestion || suggestion.status !== "pending") {
+    res.status(404).json({ error: "Pending suggestion not found" });
+    return;
+  }
+
+  await db
+    .insert(photoCategoriesTable)
+    .values({ photoId: params.data.id, categoryId: params.data.categoryId })
+    .onConflictDoNothing();
+
+  await db
+    .update(photoCategorySuggestionsTable)
+    .set({ status: "accepted" })
+    .where(
+      and(
+        eq(photoCategorySuggestionsTable.photoId, params.data.id),
+        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
+      ),
+    );
+
+  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  res.json(AcceptPhotoCategorySuggestionResponse.parse(full));
+});
+
+router.post("/photos/:id/category-suggestions/:categoryId/dismiss", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawCat = Array.isArray(req.params.categoryId) ? req.params.categoryId[0] : req.params.categoryId;
+  const params = DismissPhotoCategorySuggestionParams.safeParse({
+    id: parseInt(rawId, 10),
+    categoryId: parseInt(rawCat, 10),
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ status: photoCategorySuggestionsTable.status })
+    .from(photoCategorySuggestionsTable)
+    .where(
+      and(
+        eq(photoCategorySuggestionsTable.photoId, params.data.id),
+        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
+      ),
+    );
+  if (!existing || existing.status !== "pending") {
+    res.status(404).json({ error: "Pending suggestion not found" });
+    return;
+  }
+
+  await db
+    .update(photoCategorySuggestionsTable)
+    .set({ status: "dismissed" })
+    .where(
+      and(
+        eq(photoCategorySuggestionsTable.photoId, params.data.id),
+        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
+      ),
+    );
+
+  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  res.json(DismissPhotoCategorySuggestionResponse.parse(full));
 });
 
 export default router;

@@ -1159,6 +1159,62 @@ paths:
         "404":
           description: Not found
 
+  /photos/{id}/category-suggestions/{categoryId}/accept:
+    post:
+      operationId: acceptPhotoCategorySuggestion
+      tags: [photos]
+      summary: Accept a suggested category for a photo (links the category to the photo)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /photos/{id}/category-suggestions/{categoryId}/dismiss:
+    post:
+      operationId: dismissPhotoCategorySuggestion
+      tags: [photos]
+      summary: Dismiss a suggested category for a photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
   /stats/tag-cloud:
     get:
       operationId: getTagCloud
@@ -1326,6 +1382,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SuggestedTag"
+        suggestedCategories:
+          type: array
+          items:
+            $ref: "#/components/schemas/SuggestedCategory"
 
     PhotoRating:
       type: object
@@ -1438,6 +1498,15 @@ components:
       type: object
       required: [name]
       properties:
+        name:
+          type: string
+
+    SuggestedCategory:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
         name:
           type: string
 

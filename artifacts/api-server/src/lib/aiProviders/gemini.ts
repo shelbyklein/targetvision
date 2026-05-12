@@ -63,8 +63,12 @@ export class GeminiProvider implements AnalysisProvider {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
               },
+              suggestedCategoryIds: {
+                type: Type.ARRAY,
+                items: { type: Type.INTEGER },
+              },
             },
-            required: ["description", "suggestedCollectionIds", "suggestedTags"],
+            required: ["description", "suggestedCollectionIds", "suggestedTags", "suggestedCategoryIds"],
           },
         },
       });
@@ -79,6 +83,9 @@ export class GeminiProvider implements AnalysisProvider {
           : [],
         suggestedTags: Array.isArray(parsed.suggestedTags)
           ? parsed.suggestedTags.slice(0, 5)
+          : [],
+        suggestedCategoryIds: Array.isArray(parsed.suggestedCategoryIds)
+          ? parsed.suggestedCategoryIds.slice(0, 2)
           : [],
       };
     } catch (err) {

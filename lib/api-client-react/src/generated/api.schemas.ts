@@ -115,6 +115,11 @@ export interface SuggestedTag {
   name: string;
 }
 
+export interface SuggestedCategory {
+  id: number;
+  name: string;
+}
+
 export interface Photo {
   id: number;
   albumId: number;
@@ -144,6 +149,7 @@ export interface Photo {
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
   suggestedTags?: SuggestedTag[];
+  suggestedCategories?: SuggestedCategory[];
 }
 
 export interface Collection {

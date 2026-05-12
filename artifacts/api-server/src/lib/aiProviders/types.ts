@@ -25,6 +25,7 @@ export interface RawAnalysisResult {
   description: string;
   suggestedCollectionIds: number[];
   suggestedTags: string[];
+  suggestedCategoryIds: number[];
 }
 
 export interface AnalysisProvider {
