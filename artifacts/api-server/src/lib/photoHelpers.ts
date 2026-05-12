@@ -44,8 +44,11 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     myRating = myRatingRow?.score ?? null;
   }
 
+  const p = photo.photo;
   return {
-    ...photo.photo,
+    ...p,
+    takenAt: p.takenAt instanceof Date ? p.takenAt.toISOString() : (p.takenAt ?? null),
+    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     albumTitle: photo.albumTitle ?? null,
     uploaderName: photo.uploaderName ?? null,
     tags,

@@ -164,7 +164,7 @@ function ClerkProviderWithRoutes() {
                   <LazyPage load={() => import("@/pages/dashboard")} />
                 </Show>
                 <Show when="signed-out">
-                  <Redirect to="/" />
+                  <Redirect to="/sign-in" />
                 </Show>
               </>
             )}
@@ -176,7 +176,7 @@ function ClerkProviderWithRoutes() {
                   <LazyPage load={() => import("@/pages/albums")} />
                 </Show>
                 <Show when="signed-out">
-                  <Redirect to="/" />
+                  <Redirect to="/sign-in" />
                 </Show>
               </>
             )}
@@ -188,7 +188,7 @@ function ClerkProviderWithRoutes() {
                   <LazyPage load={() => import("@/pages/album-detail")} />
                 </Show>
                 <Show when="signed-out">
-                  <Redirect to="/" />
+                  <Redirect to="/sign-in" />
                 </Show>
               </>
             )}
@@ -200,7 +200,7 @@ function ClerkProviderWithRoutes() {
                   <LazyPage load={() => import("@/pages/photo-detail")} />
                 </Show>
                 <Show when="signed-out">
-                  <Redirect to="/" />
+                  <Redirect to="/sign-in" />
                 </Show>
               </>
             )}
@@ -212,7 +212,7 @@ function ClerkProviderWithRoutes() {
                   <LazyPage load={() => import("@/pages/tags")} />
                 </Show>
                 <Show when="signed-out">
-                  <Redirect to="/" />
+                  <Redirect to="/sign-in" />
                 </Show>
               </>
             )}
@@ -224,7 +224,7 @@ function ClerkProviderWithRoutes() {
                   <LazyPage load={() => import("@/pages/admin")} />
                 </Show>
                 <Show when="signed-out">
-                  <Redirect to="/" />
+                  <Redirect to="/sign-in" />
                 </Show>
               </>
             )}
