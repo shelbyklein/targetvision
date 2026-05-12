@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AiAnalysisEvent,
   AiProviderKeyInput,
   AiSettings,
   AiSettingsUpdate,
@@ -2818,6 +2819,81 @@ export const useClearAiProviderKey = <
 > => {
   return useMutation(getClearAiProviderKeyMutationOptions(options));
 };
+
+/**
+ * @summary List recent AI photo analysis events (admin only)
+ */
+export const getListAiAnalysisEventsUrl = () => {
+  return `/api/admin/ai-analysis-events`;
+};
+
+export const listAiAnalysisEvents = async (
+  options?: RequestInit,
+): Promise<AiAnalysisEvent[]> => {
+  return customFetch<AiAnalysisEvent[]>(getListAiAnalysisEventsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAiAnalysisEventsQueryKey = () => {
+  return [`/api/admin/ai-analysis-events`] as const;
+};
+
+export const getListAiAnalysisEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAiAnalysisEvents>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAiAnalysisEvents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAiAnalysisEventsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAiAnalysisEvents>>
+  > = ({ signal }) => listAiAnalysisEvents({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAiAnalysisEvents>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAiAnalysisEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAiAnalysisEvents>>
+>;
+export type ListAiAnalysisEventsQueryError = ErrorType<void>;
+
+/**
+ * @summary List recent AI photo analysis events (admin only)
+ */
+
+export function useListAiAnalysisEvents<
+  TData = Awaited<ReturnType<typeof listAiAnalysisEvents>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAiAnalysisEvents>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAiAnalysisEventsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get dashboard summary statistics

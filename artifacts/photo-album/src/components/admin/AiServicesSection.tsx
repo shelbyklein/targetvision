@@ -4,9 +4,11 @@ import {
   useUpdateAiSettings,
   useSetAiProviderKey,
   useClearAiProviderKey,
+  useListAiAnalysisEvents,
   getGetAiSettingsQueryKey,
   type AiSettings,
   type AiProviderInfo,
+  type AiAnalysisEvent,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -15,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, KeyRound, AlertTriangle, Check } from "lucide-react";
+import { Sparkles, KeyRound, AlertTriangle, Check, Activity, CircleX, MinusCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type ProviderId = "openai" | "anthropic" | "gemini";
@@ -139,6 +141,118 @@ export function AiServicesSection() {
             />
           ))}
         </RadioGroup>
+
+        <RecentActivityPanel />
+      </div>
+    </div>
+  );
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diffMs = Date.now() - then;
+  const sec = Math.max(0, Math.floor(diffMs / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function StatusIcon({ status }: { status: AiAnalysisEvent["status"] }) {
+  if (status === "success")
+    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />;
+  if (status === "failed")
+    return <CircleX className="h-3.5 w-3.5 text-destructive" />;
+  return <MinusCircle className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+function RecentActivityPanel() {
+  const { data: events, isLoading } = useListAiAnalysisEvents();
+
+  return (
+    <div
+      className="rounded-lg border border-border bg-background/30 overflow-hidden"
+      data-testid="ai-activity-panel"
+    >
+      <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+        <Activity className="h-4 w-4 text-muted-foreground" />
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold text-foreground">Recent AI activity</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Last 20 photo analysis attempts. Use this to spot key or quota issues.
+          </p>
+        </div>
+      </div>
+      <div className="p-3">
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : !events || events.length === 0 ? (
+          <div
+            className="text-center py-6 text-xs text-muted-foreground"
+            data-testid="ai-activity-empty"
+          >
+            No AI activity yet. Upload a photo to see analysis attempts here.
+          </div>
+        ) : (
+          <ul
+            className="divide-y divide-border rounded-md border border-border overflow-hidden"
+            data-testid="ai-activity-list"
+          >
+            {events.map((ev) => (
+              <li
+                key={ev.id}
+                className="flex items-start gap-3 px-3 py-2.5 bg-background/40"
+                data-testid={`ai-activity-row-${ev.id}`}
+              >
+                {ev.photoThumbnailUrl ? (
+                  <img
+                    src={ev.photoThumbnailUrl}
+                    alt=""
+                    className="h-8 w-8 rounded object-cover shrink-0 border border-border"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded bg-muted shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <StatusIcon status={ev.status} />
+                    <span className="text-xs font-medium text-foreground capitalize">
+                      {ev.status}
+                    </span>
+                    {ev.provider && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {ev.provider}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {formatRelative(ev.createdAt)}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground truncate">
+                    {ev.photoCaption ||
+                      (ev.photoId ? `Photo #${ev.photoId}` : "Photo deleted")}
+                  </div>
+                  {ev.errorMessage && (
+                    <div
+                      className="mt-1 text-xs text-destructive break-words"
+                      data-testid={`ai-activity-error-${ev.id}`}
+                    >
+                      {ev.errorMessage}
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

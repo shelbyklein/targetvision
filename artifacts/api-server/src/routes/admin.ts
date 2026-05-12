@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import {
   db,
   appSettingsTable,
   APP_SETTINGS_SINGLETON_ID,
+  aiAnalysisEventsTable,
+  photosTable,
 } from "@workspace/db";
 import {
   GetAiSettingsResponse,
@@ -14,6 +16,7 @@ import {
   SetAiProviderKeyResponse,
   ClearAiProviderKeyParams,
   ClearAiProviderKeyResponse,
+  ListAiAnalysisEventsResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -149,5 +152,38 @@ router.delete(
     res.json(ClearAiProviderKeyResponse.parse(summarizeSettings(updated)));
   },
 );
+
+router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise<void> => {
+  const rows = await db
+    .select({
+      id: aiAnalysisEventsTable.id,
+      photoId: aiAnalysisEventsTable.photoId,
+      provider: aiAnalysisEventsTable.provider,
+      status: aiAnalysisEventsTable.status,
+      errorMessage: aiAnalysisEventsTable.errorMessage,
+      createdAt: aiAnalysisEventsTable.createdAt,
+      photoCaption: photosTable.caption,
+      photoThumbnailUrl: photosTable.url,
+    })
+    .from(aiAnalysisEventsTable)
+    .leftJoin(photosTable, eq(photosTable.id, aiAnalysisEventsTable.photoId))
+    .orderBy(desc(aiAnalysisEventsTable.createdAt))
+    .limit(20);
+
+  res.json(
+    ListAiAnalysisEventsResponse.parse(
+      rows.map((r) => ({
+        id: r.id,
+        photoId: r.photoId,
+        photoCaption: r.photoCaption,
+        photoThumbnailUrl: r.photoThumbnailUrl,
+        provider: r.provider,
+        status: r.status,
+        errorMessage: r.errorMessage,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    ),
+  );
+});
 
 export default router;

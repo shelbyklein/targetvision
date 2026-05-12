@@ -1,6 +1,7 @@
 import { logger } from "./logger";
 import { ObjectStorageService } from "./objectStorage";
 import { getActiveProvider } from "./aiProviders";
+import type { ProviderId } from "./aiProviders";
 
 const storageService = new ObjectStorageService();
 
@@ -51,16 +52,21 @@ export interface PhotoAnalysisResult {
   suggestedCategoryIds: number[];
 }
 
+export type AnalyzePhotoOutcome =
+  | { status: "success"; provider: ProviderId; result: PhotoAnalysisResult }
+  | { status: "skipped"; provider: ProviderId | null; reason: string }
+  | { status: "failed"; provider: ProviderId | null; error: string };
+
 export async function analyzePhoto(
   imageUrl: string,
   collections: CollectionForSuggestion[],
   categories: CategoryForSuggestion[],
   storageKey: string | null,
-): Promise<PhotoAnalysisResult | null> {
+): Promise<AnalyzePhotoOutcome> {
   const { provider, reason } = await getActiveProvider();
   if (!provider) {
     logger.info({ reason }, "Skipping AI photo analysis");
-    return null;
+    return { status: "skipped", provider: null, reason: reason ?? "No active provider" };
   }
 
   const allowedCollectionIds = collections.map((c) => c.id);
@@ -87,15 +93,27 @@ export async function analyzePhoto(
 
   const userText = `${collectionsText}\n\n${categoriesText}\n\nDescribe the photo, pick up to 3 fitting collection ids, suggest 3-5 short tags, and pick up to 2 fitting category ids.`;
 
-  const image = await resolveImageForAI(imageUrl, storageKey);
-
-  const result = await provider.analyze({
-    imageDataUrl: image.dataUrl,
-    contentType: image.contentType,
-    systemPrompt,
-    userText,
-  });
-  if (!result) return null;
+  let image: ResolvedImage;
+  let result: Awaited<ReturnType<typeof provider.analyze>>;
+  try {
+    image = await resolveImageForAI(imageUrl, storageKey);
+    result = await provider.analyze({
+      imageDataUrl: image.dataUrl,
+      contentType: image.contentType,
+      systemPrompt,
+      userText,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { status: "failed", provider: provider.id, error: message };
+  }
+  if (!result) {
+    return {
+      status: "failed",
+      provider: provider.id,
+      error: "Provider returned no result",
+    };
+  }
 
   const suggestedCollectionIds = Array.from(
     new Set(
@@ -128,9 +146,13 @@ export async function analyzePhoto(
   ).slice(0, 2);
 
   return {
-    description: result.description,
-    suggestedCollectionIds,
-    suggestedTags,
-    suggestedCategoryIds,
+    status: "success",
+    provider: provider.id,
+    result: {
+      description: result.description,
+      suggestedCollectionIds,
+      suggestedTags,
+      suggestedCategoryIds,
+    },
   };
 }

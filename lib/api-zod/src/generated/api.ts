@@ -1481,6 +1481,23 @@ export const ClearAiProviderKeyResponse = zod.object({
 });
 
 /**
+ * @summary List recent AI photo analysis events (admin only)
+ */
+export const ListAiAnalysisEventsResponseItem = zod.object({
+  id: zod.number(),
+  photoId: zod.number().nullish(),
+  photoCaption: zod.string().nullish(),
+  photoThumbnailUrl: zod.string().nullish(),
+  provider: zod.string().nullish(),
+  status: zod.enum(["success", "skipped", "failed"]),
+  errorMessage: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListAiAnalysisEventsResponse = zod.array(
+  ListAiAnalysisEventsResponseItem,
+);
+
+/**
  * @summary Get dashboard summary statistics
  */
 export const GetDashboardStatsResponse = zod.object({

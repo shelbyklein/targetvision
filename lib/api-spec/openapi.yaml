@@ -818,6 +818,25 @@ paths:
         "403":
           description: Forbidden
 
+  /admin/ai-analysis-events:
+    get:
+      operationId: listAiAnalysisEvents
+      tags: [admin]
+      summary: List recent AI photo analysis events (admin only)
+      responses:
+        "200":
+          description: Recent AI analysis events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiAnalysisEvent"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
   /stats/dashboard:
     get:
       operationId: getDashboardStats
@@ -1699,3 +1718,26 @@ components:
         apiKey:
           type: string
           minLength: 4
+
+    AiAnalysisEvent:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id:
+          type: integer
+        photoId:
+          type: ["integer", "null"]
+        photoCaption:
+          type: ["string", "null"]
+        photoThumbnailUrl:
+          type: ["string", "null"]
+        provider:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [success, skipped, failed]
+        errorMessage:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time

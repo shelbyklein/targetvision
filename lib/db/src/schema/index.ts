@@ -6,3 +6,4 @@ export * from "./categories";
 export * from "./ratings";
 export * from "./collections";
 export * from "./appSettings";
+export * from "./aiAnalysisEvents";

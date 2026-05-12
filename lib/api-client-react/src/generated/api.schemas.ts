@@ -328,6 +328,31 @@ export interface AiProviderKeyInput {
   apiKey: string;
 }
 
+export type AiAnalysisEventStatus =
+  (typeof AiAnalysisEventStatus)[keyof typeof AiAnalysisEventStatus];
+
+export const AiAnalysisEventStatus = {
+  success: "success",
+  skipped: "skipped",
+  failed: "failed",
+} as const;
+
+export interface AiAnalysisEvent {
+  id: number;
+  /** @nullable */
+  photoId?: number | null;
+  /** @nullable */
+  photoCaption?: string | null;
+  /** @nullable */
+  photoThumbnailUrl?: string | null;
+  /** @nullable */
+  provider?: string | null;
+  status: AiAnalysisEventStatus;
+  /** @nullable */
+  errorMessage?: string | null;
+  createdAt: string;
+}
+
 export type SearchPhotosParams = {
   q: string;
   tag?: string;

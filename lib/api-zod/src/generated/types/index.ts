@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./aiAnalysisEvent";
+export * from "./aiAnalysisEventStatus";
 export * from "./aiProviderInfo";
 export * from "./aiProviderInfoId";
 export * from "./aiProviderKeyInput";

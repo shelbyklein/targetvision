@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable } from "@workspace/db";
+import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable, aiAnalysisEventsTable } from "@workspace/db";
 import { analyzePhoto } from "../lib/aiPhotoAnalysis";
 import { logger } from "../lib/logger";
 import {
@@ -99,8 +99,29 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
           .from(categoriesTable),
       ]);
 
-      const result = await analyzePhoto(photo.url, collections, categories, photo.storageKey);
-      if (!result) return;
+      const outcome = await analyzePhoto(photo.url, collections, categories, photo.storageKey);
+
+      if (outcome.status === "skipped") {
+        await db.insert(aiAnalysisEventsTable).values({
+          photoId: photo.id,
+          provider: outcome.provider,
+          status: "skipped",
+          errorMessage: outcome.reason,
+        });
+        return;
+      }
+
+      if (outcome.status === "failed") {
+        await db.insert(aiAnalysisEventsTable).values({
+          photoId: photo.id,
+          provider: outcome.provider,
+          status: "failed",
+          errorMessage: outcome.error.slice(0, 1000),
+        });
+        return;
+      }
+
+      const result = outcome.result;
 
       await db
         .update(photosTable)
@@ -165,8 +186,25 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
             .onConflictDoNothing();
         }
       }
+
+      await db.insert(aiAnalysisEventsTable).values({
+        photoId: photo.id,
+        provider: outcome.provider,
+        status: "success",
+      });
     } catch (err) {
       logger.error({ err, photoId: photo.id }, "Background AI analysis failed");
+      try {
+        const message = err instanceof Error ? err.message : String(err);
+        await db.insert(aiAnalysisEventsTable).values({
+          photoId: photo.id,
+          provider: null,
+          status: "failed",
+          errorMessage: message.slice(0, 1000),
+        });
+      } catch (logErr) {
+        logger.error({ err: logErr }, "Failed to record AI analysis failure event");
+      }
     }
   })();
 
