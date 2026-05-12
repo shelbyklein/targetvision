@@ -114,12 +114,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               data-testid="usaa-attribution"
             >
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">a</span>
-              <img
-                src={`${basePath}/usaa-horizontal.svg`}
-                alt="USA Archery"
-                className="h-3.5 w-auto opacity-70"
-                data-testid="usaa-attribution-logo"
-              />
+              <a
+                href="https://www.usarchery.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center"
+                data-testid="usaa-attribution-link"
+              >
+                <img
+                  src={`${basePath}/usaa-horizontal.svg`}
+                  alt="USA Archery"
+                  className="h-3.5 w-auto opacity-70"
+                  data-testid="usaa-attribution-logo"
+                />
+              </a>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70 pr-2">product</span>
             </div>
 

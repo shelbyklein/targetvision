@@ -85,7 +85,14 @@ export default function Home() {
         <p className="mb-3">Target Vision &mdash; USA Archery team photo archive</p>
         <div className="flex items-center justify-center gap-2">
           <span className="text-xs text-muted-foreground/70">a</span>
-          <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+          <a
+            href="https://www.usarchery.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center"
+          >
+            <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+          </a>
           <span className="text-xs text-muted-foreground/70">product</span>
         </div>
       </footer>
