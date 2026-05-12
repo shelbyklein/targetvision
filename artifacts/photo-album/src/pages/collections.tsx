@@ -22,7 +22,7 @@ import {
 import { Plus, FolderOpen, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-function CreateCollectionDialog({ onCreated }: { onCreated: () => void }) {
+function CreateCollectionDialog({ onCreated, testId = "create-collection-btn" }: { onCreated: () => void; testId?: string }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -50,7 +50,7 @@ function CreateCollectionDialog({ onCreated }: { onCreated: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2" data-testid="create-collection-btn">
+        <Button className="gap-2" data-testid={testId}>
           <Plus className="h-4 w-4" />
           New Collection
         </Button>
@@ -184,7 +184,7 @@ export default function Collections() {
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
               Create a collection to group photos by subject or context across multiple albums.
             </p>
-            <CreateCollectionDialog onCreated={refetch} />
+            <CreateCollectionDialog onCreated={refetch} testId="create-collection-btn-empty" />
           </div>
         )}
       </div>
