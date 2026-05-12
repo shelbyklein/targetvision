@@ -6,9 +6,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background" data-testid="home-page">
       <header className="border-b border-border px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="FrameVault" className="h-8 w-auto" />
-          <span className="text-xl font-semibold tracking-tight text-foreground">FrameVault</span>
+        <div className="flex items-center gap-2.5">
+          <img src="/target-vision.svg" alt="Target Vision" className="h-8 w-8" />
+          <span className="text-xl font-semibold tracking-tight text-foreground">Target Vision</span>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/sign-in">
@@ -31,7 +31,7 @@ export default function Home() {
         </h1>
 
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          FrameVault is your team's private photo archive. Organize events into albums, discover
+          Target Vision is USA Archery's team photo archive. Organize events into albums, discover
           top-rated shots, and surface the moments that matter — all in one quiet, purposeful space.
         </p>
 
@@ -80,7 +80,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        FrameVault &mdash; Internal team photo archive
+        Target Vision &mdash; USA Archery team photo archive
       </footer>
     </div>
   );

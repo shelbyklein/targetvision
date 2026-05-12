@@ -27,18 +27,18 @@ const clerkAppearance = {
   options: {
     logoPlacement: "inside" as const,
     logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    logoImageUrl: `${window.location.origin}${basePath}/target-vision.svg`,
     socialButtonsVariant: "blockButton" as const,
   },
   variables: {
-    colorPrimary: "hsl(28, 85%, 45%)",
-    colorForeground: "hsl(20, 14%, 15%)",
-    colorMutedForeground: "hsl(30, 10%, 45%)",
-    colorDanger: "hsl(0, 84%, 60%)",
-    colorBackground: "hsl(40, 20%, 97%)",
-    colorInput: "hsl(40, 12%, 88%)",
-    colorInputForeground: "hsl(20, 14%, 15%)",
-    colorNeutral: "hsl(40, 12%, 88%)",
+    colorPrimary: "hsl(216, 54%, 24%)",
+    colorForeground: "hsl(216, 14%, 15%)",
+    colorMutedForeground: "hsl(216, 10%, 45%)",
+    colorDanger: "hsl(354, 69%, 39%)",
+    colorBackground: "hsl(216, 20%, 97%)",
+    colorInput: "hsl(216, 12%, 88%)",
+    colorInputForeground: "hsl(216, 14%, 15%)",
+    colorNeutral: "hsl(216, 12%, 88%)",
     fontFamily: "Inter, sans-serif",
     borderRadius: "0.5rem",
   },
@@ -128,13 +128,13 @@ function ClerkProviderWithRoutes() {
       localization={{
         signIn: {
           start: {
-            title: "Welcome back to FrameVault",
+            title: "Welcome back to Target Vision",
             subtitle: "Sign in to access your team photos",
           },
         },
         signUp: {
           start: {
-            title: "Join FrameVault",
+            title: "Join Target Vision",
             subtitle: "Create an account to get started",
           },
         },

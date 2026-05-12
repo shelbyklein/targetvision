@@ -2,7 +2,7 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Tag, Shield, LogOut, Camera, ChevronDown, Search, Grid2x2 } from "lucide-react";
+import { LayoutDashboard, Images, Tag, Shield, LogOut, ChevronDown, Search, Grid2x2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -62,8 +62,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0">
             <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
-              <Camera className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-foreground tracking-tight">FrameVault</span>
+              <img src="/target-vision.svg" alt="Target Vision" className="h-7 w-7" />
+              <span className="font-semibold text-foreground tracking-tight">Target Vision</span>
             </Link>
             <nav className="flex items-center gap-1" data-testid="main-nav">
               {navItems.map((item) => {

@@ -77,50 +77,51 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* Warm neutral palette - photography/darkroom vibe */
-  --background: 40 20% 97%; /* #f7f5f2 warm white */
-  --foreground: 20 14% 15%; /* #2b2825 soft black */
-  --card: 40 20% 99%; /* #fcfbf9 slightly lighter */
-  --card-foreground: 20 14% 15%;
-  --card-border: 40 10% 90%;
-  --popover: 40 20% 99%;
-  --popover-foreground: 20 14% 15%;
-  --popover-border: 40 10% 90%;
+  /* USA Archery brand palette — cool navy neutrals */
+  --background: 216 20% 97%; /* cool white */
+  --foreground: 216 14% 15%; /* near-black, navy-tinted */
+  --card: 216 20% 99%;
+  --card-foreground: 216 14% 15%;
+  --card-border: 216 10% 90%;
+  --popover: 216 20% 99%;
+  --popover-foreground: 216 14% 15%;
+  --popover-border: 216 10% 90%;
   
-  /* Expressive accent: deep amber / sepia */
-  --primary: 28 85% 45%; 
+  /* Primary: USA Archery navy #1c355e → 216 54% 24% */
+  --primary: 216 54% 24%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 40 10% 90%;
-  --secondary-foreground: 20 14% 20%;
+  --secondary: 216 10% 90%;
+  --secondary-foreground: 216 14% 20%;
   
-  --muted: 40 10% 92%;
-  --muted-foreground: 30 10% 45%;
+  --muted: 216 10% 92%;
+  --muted-foreground: 216 10% 45%;
   
-  --accent: 40 15% 94%;
-  --accent-foreground: 20 14% 15%;
+  /* Accent: subtle red tint for hover/highlight states */
+  --accent: 354 30% 93%;
+  --accent-foreground: 216 54% 20%;
   
-  --destructive: 0 84% 60%;
+  --destructive: 354 69% 39%; /* USA Archery red #aa1f2e → 354 69% 39% */
   --destructive-foreground: 0 0% 100%;
   
-  --border: 40 12% 88%;
-  --input: 40 12% 88%;
-  --ring: 28 85% 45%;
+  --border: 216 12% 88%;
+  --input: 216 12% 88%;
+  --ring: 216 54% 24%;
 
-  --sidebar: 40 15% 94%;
-  --sidebar-foreground: 20 14% 15%;
-  --sidebar-border: 40 12% 88%;
-  --sidebar-primary: 28 85% 45%;
+  --sidebar: 216 15% 94%;
+  --sidebar-foreground: 216 14% 15%;
+  --sidebar-border: 216 12% 88%;
+  --sidebar-primary: 216 54% 24%; /* navy */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 40 15% 90%;
-  --sidebar-accent-foreground: 20 14% 15%;
-  --sidebar-ring: 28 85% 45%;
+  --sidebar-accent: 354 40% 91%; /* red-tinted hover */
+  --sidebar-accent-foreground: 216 54% 20%;
+  --sidebar-ring: 216 54% 24%;
 
-  --chart-1: 28 85% 45%;
-  --chart-2: 173 58% 39%;
-  --chart-3: 197 37% 24%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
+  --chart-1: 216 54% 24%; /* navy */
+  --chart-2: 354 69% 39%; /* red */
+  --chart-3: 216 54% 45%; /* mid navy */
+  --chart-4: 354 50% 62%; /* mid red */
+  --chart-5: 216 35% 65%; /* light navy */
 
   --app-font-sans: "Inter", sans-serif;
   --app-font-serif: "Georgia", serif;
@@ -150,49 +151,51 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  /* Dark mode: actual darkroom vibes */
-  --background: 20 10% 12%; 
-  --foreground: 40 20% 90%;
-  --card: 20 10% 15%;
-  --card-foreground: 40 20% 90%;
-  --card-border: 20 10% 20%;
-  --popover: 20 10% 15%;
-  --popover-foreground: 40 20% 90%;
-  --popover-border: 20 10% 20%;
+  /* Dark mode: deep navy-tinted backgrounds */
+  --background: 216 15% 12%;
+  --foreground: 216 20% 90%;
+  --card: 216 15% 15%;
+  --card-foreground: 216 20% 90%;
+  --card-border: 216 15% 20%;
+  --popover: 216 15% 15%;
+  --popover-foreground: 216 20% 90%;
+  --popover-border: 216 15% 20%;
   
-  --primary: 28 85% 55%;
+  /* Primary: lightened navy for dark-mode readability */
+  --primary: 216 54% 55%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 20 10% 20%;
-  --secondary-foreground: 40 20% 90%;
+  --secondary: 216 15% 20%;
+  --secondary-foreground: 216 20% 90%;
   
-  --muted: 20 10% 20%;
-  --muted-foreground: 30 10% 60%;
+  --muted: 216 15% 20%;
+  --muted-foreground: 216 10% 60%;
   
-  --accent: 20 10% 22%;
-  --accent-foreground: 40 20% 90%;
+  /* Accent: dark red tint for hover states */
+  --accent: 354 25% 22%;
+  --accent-foreground: 216 20% 90%;
   
-  --destructive: 0 62% 30%;
-  --destructive-foreground: 40 20% 90%;
+  --destructive: 354 60% 45%; /* red, brightened for dark bg */
+  --destructive-foreground: 0 0% 100%;
   
-  --border: 20 10% 22%;
-  --input: 20 10% 22%;
-  --ring: 28 85% 55%;
+  --border: 216 15% 22%;
+  --input: 216 15% 22%;
+  --ring: 216 54% 55%;
 
-  --sidebar: 20 10% 15%;
-  --sidebar-foreground: 40 20% 90%;
-  --sidebar-border: 20 10% 20%;
-  --sidebar-primary: 28 85% 55%;
+  --sidebar: 216 20% 13%;
+  --sidebar-foreground: 216 20% 90%;
+  --sidebar-border: 216 15% 20%;
+  --sidebar-primary: 216 54% 55%; /* lightened navy */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 20 10% 22%;
-  --sidebar-accent-foreground: 40 20% 90%;
-  --sidebar-ring: 28 85% 55%;
+  --sidebar-accent: 354 30% 22%; /* dark red-tinted hover */
+  --sidebar-accent-foreground: 216 20% 90%;
+  --sidebar-ring: 216 54% 55%;
 
-  --chart-1: 28 85% 55%;
-  --chart-2: 173 58% 39%;
-  --chart-3: 197 37% 24%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
+  --chart-1: 216 54% 55%; /* lightened navy */
+  --chart-2: 354 60% 55%; /* lightened red */
+  --chart-3: 216 40% 40%;
+  --chart-4: 354 40% 45%;
+  --chart-5: 216 25% 65%;
 }
 
 @layer base {
