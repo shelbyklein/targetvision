@@ -42,6 +42,7 @@ export interface CollectionForSuggestion {
 export interface PhotoAnalysisResult {
   description: string;
   suggestedCollectionIds: number[];
+  suggestedTags: string[];
 }
 
 export async function analyzePhoto(
@@ -64,11 +65,11 @@ export async function analyzePhoto(
     .join("\n");
 
   const systemPrompt =
-    "You are a photo describer for a team photo album. Look at the photo and write one short, plain-English sentence (max 25 words) describing what is in it. Then, from the user's existing collections, pick up to 3 that this photo would naturally belong in. Only suggest a collection if it's a clear thematic match; return an empty list if nothing fits. Never invent collection ids.";
+    "You are a photo describer for a team photo album. Look at the photo and (1) write one short, plain-English sentence (max 25 words) describing what is in it; (2) from the user's existing collections, pick up to 3 that this photo would naturally belong in (only clear thematic matches, otherwise empty; never invent collection ids); and (3) suggest 3-5 short, lowercase, single-or-two-word tags describing the photo's subject, setting, mood, or activity (no '#', no punctuation).";
 
   const userText = collections.length
-    ? `The user has these existing collections:\n${collectionsBlock}\n\nDescribe the photo and pick up to 3 collection ids from the list above that fit it.`
-    : "The user has no collections yet. Describe the photo. Return an empty list of suggested collection ids.";
+    ? `The user has these existing collections:\n${collectionsBlock}\n\nDescribe the photo, pick up to 3 collection ids from the list above that fit it, and suggest 3-5 short tags.`
+    : "The user has no collections yet. Describe the photo, return an empty list of suggested collection ids, and suggest 3-5 short tags.";
 
   const image = await resolveImageForAI(imageUrl, storageKey);
 
@@ -88,8 +89,23 @@ export async function analyzePhoto(
     ),
   ).slice(0, 3);
 
+  const suggestedTags = Array.from(
+    new Set(
+      result.suggestedTags
+        .map((t) =>
+          String(t ?? "")
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, "")
+            .trim()
+            .replace(/\s+/g, "-"),
+        )
+        .filter((t) => t.length > 0 && t.length <= 32),
+    ),
+  ).slice(0, 5);
+
   return {
     description: result.description,
     suggestedCollectionIds,
+    suggestedTags,
   };
 }

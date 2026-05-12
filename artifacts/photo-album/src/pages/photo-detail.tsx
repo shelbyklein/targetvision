@@ -16,6 +16,8 @@ import {
   useRemovePhotoFromCollection,
   useAcceptPhotoSuggestion,
   useDismissPhotoSuggestion,
+  useAcceptPhotoTagSuggestion,
+  useDismissPhotoTagSuggestion,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -308,6 +310,8 @@ export default function PhotoDetail() {
   const { mutate: removeFromCollection } = useRemovePhotoFromCollection();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
+  const { mutate: acceptTagSuggestion } = useAcceptPhotoTagSuggestion();
+  const { mutate: dismissTagSuggestion } = useDismissPhotoTagSuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const [downloading, setDownloading] = useState(false);
 
@@ -442,6 +446,26 @@ export default function PhotoDetail() {
     dismissSuggestion(
       { id: photoId, collectionId },
       { onSuccess: invalidate, onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }) }
+    );
+  }
+
+  function handleAcceptTagSuggestion(tagName: string) {
+    acceptTagSuggestion(
+      { id: photoId, tagName },
+      {
+        onSuccess: invalidateWithTags,
+        onError: () => toast({ title: "Failed to accept tag", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleDismissTagSuggestion(tagName: string) {
+    dismissTagSuggestion(
+      { id: photoId, tagName },
+      {
+        onSuccess: invalidate,
+        onError: () => toast({ title: "Failed to dismiss tag", variant: "destructive" }),
+      }
     );
   }
 
@@ -682,6 +706,40 @@ export default function PhotoDetail() {
                   <span className="text-xs text-muted-foreground">No tags yet</span>
                 )}
               </div>
+              {photo.suggestedTags && photo.suggestedTags.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Suggested
+                  </p>
+                  <div className="flex flex-wrap gap-1.5" data-testid="suggested-tags">
+                    {photo.suggestedTags.map((s) => (
+                      <div
+                        key={s.name}
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-2.5 pr-1 py-0.5 text-xs"
+                        data-testid={`suggested-tag-${s.name}`}
+                      >
+                        <span className="text-foreground">{s.name}</span>
+                        <button
+                          onClick={() => handleAcceptTagSuggestion(s.name)}
+                          className="rounded-full p-0.5 hover:bg-primary/15 text-primary"
+                          aria-label={`Accept tag ${s.name}`}
+                          data-testid={`accept-suggested-tag-${s.name}`}
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDismissTagSuggestion(s.name)}
+                          className="rounded-full p-0.5 hover:bg-muted-foreground/15 text-muted-foreground"
+                          aria-label={`Dismiss tag ${s.name}`}
+                          data-testid={`dismiss-suggested-tag-${s.name}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <TagAutocomplete
                 photoId={photoId}
                 existingTagIds={photo.tags?.map((t) => t.id) ?? []}

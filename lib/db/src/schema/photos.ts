@@ -34,7 +34,19 @@ export const photoCollectionSuggestionsTable = pgTable(
   (table) => [primaryKey({ columns: [table.photoId, table.collectionId] })],
 );
 
+export const photoTagSuggestionsTable = pgTable(
+  "photo_tag_suggestions",
+  {
+    photoId: integer("photo_id").notNull().references(() => photosTable.id, { onDelete: "cascade" }),
+    tagName: text("tag_name").notNull(),
+    status: photoSuggestionStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.photoId, table.tagName] })],
+);
+
 export const insertPhotoSchema = createInsertSchema(photosTable).omit({ id: true, createdAt: true });
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type Photo = typeof photosTable.$inferSelect;
 export type PhotoCollectionSuggestion = typeof photoCollectionSuggestionsTable.$inferSelect;
+export type PhotoTagSuggestion = typeof photoTagSuggestionsTable.$inferSelect;

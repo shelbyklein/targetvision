@@ -37,6 +37,7 @@ export * from "./photoUploadInput";
 export * from "./ratingInput";
 export * from "./searchPhotosParams";
 export * from "./suggestedCollection";
+export * from "./suggestedTag";
 export * from "./tag";
 export * from "./tagCount";
 export * from "./tagInput";

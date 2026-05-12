@@ -111,6 +111,10 @@ export interface PhotoRating {
   createdAt: string;
 }
 
+export interface SuggestedTag {
+  name: string;
+}
+
 export interface Photo {
   id: number;
   albumId: number;
@@ -139,6 +143,7 @@ export interface Photo {
   aiDescription?: string | null;
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
+  suggestedTags?: SuggestedTag[];
 }
 
 export interface Collection {
