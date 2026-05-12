@@ -42,7 +42,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User } from "lucide-react";
+import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -241,6 +241,7 @@ export default function PhotoDetail() {
   const { mutate: addCategory } = useAddPhotoCategory();
   const { mutate: removeCategory } = useRemovePhotoCategory();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
+  const [downloading, setDownloading] = useState(false);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
@@ -274,6 +275,89 @@ export default function PhotoDetail() {
       { id: photoId, categoryId },
       { onSuccess: invalidate, onError: () => toast({ title: "Failed to remove category", variant: "destructive" }) }
     );
+  }
+
+  function deriveFilename(url: string, caption?: string | null, fallbackId?: number): string {
+    let extension = "jpg";
+    let urlBase = "";
+    try {
+      const u = new URL(url, window.location.href);
+      const lastSegment = decodeURIComponent(u.pathname.split("/").pop() ?? "");
+      const dotIndex = lastSegment.lastIndexOf(".");
+      if (dotIndex > 0 && dotIndex < lastSegment.length - 1) {
+        const ext = lastSegment.slice(dotIndex + 1).toLowerCase();
+        if (/^[a-z0-9]{2,5}$/.test(ext)) extension = ext;
+        urlBase = lastSegment.slice(0, dotIndex);
+      } else {
+        urlBase = lastSegment;
+      }
+    } catch {
+      // ignore
+    }
+
+    function sanitize(name: string): string {
+      return name
+        .trim()
+        .replace(/[^a-zA-Z0-9-_ ]+/g, "")
+        .replace(/\s+/g, "-")
+        .slice(0, 80);
+    }
+
+    const captionBase = caption ? sanitize(caption) : "";
+    const cleanedUrlBase = urlBase ? sanitize(urlBase) : "";
+    const base =
+      captionBase || cleanedUrlBase || `photo-${fallbackId ?? "image"}`;
+    return `${base}.${extension}`;
+  }
+
+  function triggerDownload(href: string, filename: string) {
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  async function handleDownload() {
+    if (!photo) return;
+    const filename = deriveFilename(photo.url, photo.caption, photo.id);
+    setDownloading(true);
+    try {
+      let isSameOrigin = true;
+      try {
+        const u = new URL(photo.url, window.location.href);
+        isSameOrigin = u.origin === window.location.origin;
+      } catch {
+        isSameOrigin = false;
+      }
+
+      if (isSameOrigin) {
+        triggerDownload(photo.url, filename);
+        toast({ title: "Download started" });
+        return;
+      }
+
+      const response = await fetch(photo.url, { mode: "cors", credentials: "omit" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        triggerDownload(objectUrl, filename);
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      }
+      toast({ title: "Download started" });
+    } catch (err) {
+      toast({
+        title: "Failed to download photo",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
   }
 
   function handleDelete() {
@@ -456,9 +540,21 @@ export default function PhotoDetail() {
               )}
             </div>
 
+            <Separator />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 w-full"
+              onClick={handleDownload}
+              disabled={downloading}
+              data-testid="download-photo-btn"
+            >
+              <Download className="h-4 w-4" />
+              {downloading ? "Downloading..." : "Download"}
+            </Button>
+
             {canDelete && (
               <>
-                <Separator />
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" className="gap-2 w-full" data-testid="delete-photo-btn">
