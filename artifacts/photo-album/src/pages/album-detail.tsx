@@ -54,172 +54,248 @@ import {
   Upload,
   ImagePlus,
   X,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+interface FileItem {
+  file: File;
+  preview: string;
+  caption: string;
+  status: "pending" | "uploading" | "done" | "error";
+  progress: number;
+}
+
 function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => void }) {
   const [open, setOpen] = useState(false);
-  const [caption, setCaption] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { mutate: uploadPhoto, isPending: isSaving } = useUploadPhoto();
+  const { mutateAsync: uploadPhoto } = useUploadPhoto();
   const { toast } = useToast();
 
-  const { uploadFile, isUploading, progress } = useUpload({
-    basePath: "/api/storage",
-  });
+  const { uploadFile } = useUpload({ basePath: "/api/storage" });
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setSelectedFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setPreview(objectUrl);
-  }
-
-  function clearFile() {
-    setSelectedFile(null);
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(null);
+    const selected = Array.from(e.target.files ?? []);
+    if (!selected.length) return;
+    const newItems: FileItem[] = selected.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+      caption: "",
+      status: "pending",
+      progress: 0,
+    }));
+    setFiles((prev) => [...prev, ...newItems]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function handleClose(open: boolean) {
-    if (!open) {
-      clearFile();
-      setCaption("");
+  function removeFile(index: number) {
+    setFiles((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
+  function updateCaption(index: number, caption: string) {
+    setFiles((prev) =>
+      prev.map((f, i) => (i === index ? { ...f, caption } : f))
+    );
+  }
+
+  function handleClose(nextOpen: boolean) {
+    if (!nextOpen && !isSubmitting) {
+      files.forEach((f) => URL.revokeObjectURL(f.preview));
+      setFiles([]);
     }
-    setOpen(open);
+    setOpen(nextOpen);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedFile) return;
+    if (!files.length || isSubmitting) return;
+    setIsSubmitting(true);
 
-    const uploadResult = await uploadFile(selectedFile);
-    if (!uploadResult) {
-      toast({ title: "Upload failed", description: "Could not upload the image.", variant: "destructive" });
-      return;
-    }
+    let successCount = 0;
+    let errorCount = 0;
 
-    const servingUrl = `/api/storage${uploadResult.objectPath}`;
+    await Promise.all(
+      files.map(async (item, index) => {
+        setFiles((prev) =>
+          prev.map((f, i) =>
+            i === index ? { ...f, status: "uploading", progress: 10 } : f
+          )
+        );
 
-    uploadPhoto(
-      {
-        id: albumId,
-        data: {
-          url: servingUrl,
-          storageKey: uploadResult.objectPath,
-          caption: caption.trim() || undefined,
-        },
-      },
-      {
-        onSuccess: () => {
-          handleClose(false);
-          onAdded();
-          toast({ title: "Photo uploaded" });
-        },
-        onError: () =>
-          toast({ title: "Failed to save photo", variant: "destructive" }),
-      }
+        try {
+          const result = await uploadFile(item.file);
+          if (!result) throw new Error("Upload failed");
+
+          setFiles((prev) =>
+            prev.map((f, i) =>
+              i === index ? { ...f, progress: 70 } : f
+            )
+          );
+
+          await uploadPhoto({
+            id: albumId,
+            data: {
+              url: `/api/storage${result.objectPath}`,
+              storageKey: result.objectPath,
+              caption: item.caption.trim() || undefined,
+            },
+          });
+
+          setFiles((prev) =>
+            prev.map((f, i) =>
+              i === index ? { ...f, status: "done", progress: 100 } : f
+            )
+          );
+          successCount++;
+        } catch {
+          setFiles((prev) =>
+            prev.map((f, i) =>
+              i === index ? { ...f, status: "error", progress: 0 } : f
+            )
+          );
+          errorCount++;
+        }
+      })
     );
+
+    setIsSubmitting(false);
+    onAdded();
+
+    if (errorCount === 0) {
+      toast({
+        title: successCount === 1 ? "Photo uploaded" : `${successCount} photos uploaded`,
+      });
+      handleClose(false);
+    } else {
+      toast({
+        title: `${errorCount} photo${errorCount !== 1 ? "s" : ""} failed to upload`,
+        variant: "destructive",
+      });
+    }
   }
 
-  const isBusy = isUploading || isSaving;
+  const pendingCount = files.filter((f) => f.status === "pending").length;
+  const canSubmit = pendingCount > 0 && !isSubmitting;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogTrigger asChild>
         <Button className="gap-2" size="sm" data-testid="add-photo-btn">
           <Plus className="h-4 w-4" />
-          Add Photo
+          Add Photos
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Upload Photo</DialogTitle>
+          <DialogTitle>Upload Photos</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-          {preview ? (
-            <div className="relative rounded-lg overflow-hidden border border-border bg-muted aspect-video">
-              <img
-                src={preview}
-                alt="Preview"
-                className="h-full w-full object-contain"
-              />
-              <button
-                type="button"
-                onClick={clearFile}
-                disabled={isBusy}
-                className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors disabled:opacity-50"
-                aria-label="Remove selected file"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full border-2 border-dashed border-border rounded-lg aspect-video flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
-              data-testid="file-drop-zone"
-            >
-              <ImagePlus className="h-8 w-8" />
-              <span className="text-sm font-medium">Click to select a photo</span>
-              <span className="text-xs">JPG, PNG, GIF, WebP supported</span>
-            </button>
-          )}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 min-h-0 pt-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSubmitting}
+            className="w-full border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            data-testid="file-drop-zone"
+          >
+            <ImagePlus className="h-7 w-7" />
+            <span className="text-sm font-medium">Click to select photos</span>
+            <span className="text-xs">Multiple files supported · JPG, PNG, GIF, WebP</span>
+          </button>
 
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
             onChange={handleFileChange}
             data-testid="photo-file-input"
           />
 
-          {isUploading && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Upload className="h-3 w-3 animate-bounce" />
-                  Uploading…
-                </span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-1.5" />
+          {files.length > 0 && (
+            <div className="overflow-y-auto space-y-3 flex-1 min-h-0 pr-1">
+              {files.map((item, index) => (
+                <div
+                  key={index}
+                  className="flex gap-3 items-start bg-muted/40 rounded-lg p-2.5"
+                  data-testid="file-queue-item"
+                >
+                  <div className="relative shrink-0 w-16 h-16 rounded-md overflow-hidden bg-muted">
+                    <img
+                      src={item.preview}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    {item.status === "done" && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <CheckCircle2 className="h-5 w-5 text-green-400" />
+                      </div>
+                    )}
+                    {item.status === "error" && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <AlertCircle className="h-5 w-5 text-red-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <p className="text-xs text-muted-foreground truncate">{item.file.name}</p>
+                    <Input
+                      value={item.caption}
+                      onChange={(e) => updateCaption(index, e.target.value)}
+                      placeholder="Caption (optional)"
+                      className="h-7 text-xs"
+                      disabled={item.status !== "pending" || isSubmitting}
+                      data-testid="photo-caption-input"
+                    />
+                    {item.status === "uploading" && (
+                      <Progress value={item.progress} className="h-1" />
+                    )}
+                  </div>
+
+                  {item.status === "pending" && !isSubmitting && (
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Remove"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="photo-caption">Caption (optional)</Label>
-            <Input
-              id="photo-caption"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="Add a caption…"
-              disabled={isBusy}
-              data-testid="photo-caption-input"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 shrink-0">
             <Button
               type="button"
               variant="outline"
               onClick={() => handleClose(false)}
-              disabled={isBusy}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isBusy || !selectedFile}
+              disabled={!canSubmit}
               data-testid="upload-photo-submit"
             >
-              {isUploading ? "Uploading…" : isSaving ? "Saving…" : "Upload Photo"}
+              {isSubmitting ? (
+                <span className="flex items-center gap-1.5">
+                  <Upload className="h-4 w-4 animate-bounce" />
+                  Uploading…
+                </span>
+              ) : (
+                `Upload ${pendingCount > 0 ? pendingCount : ""} Photo${pendingCount !== 1 ? "s" : ""}`
+              )}
             </Button>
           </div>
         </form>
@@ -271,7 +347,8 @@ export default function AlbumDetail() {
           toast({ title: "Album deleted" });
           navigate("/albums");
         },
-        onError: () => toast({ title: "Failed to delete album", variant: "destructive" }),
+        onError: () =>
+          toast({ title: "Failed to delete album", variant: "destructive" }),
       }
     );
   }
@@ -322,7 +399,10 @@ export default function AlbumDetail() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="album-title">
+              <h1
+                className="text-2xl font-bold text-foreground"
+                data-testid="album-title"
+              >
                 {album.title}
               </h1>
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
@@ -351,7 +431,12 @@ export default function AlbumDetail() {
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" data-testid="delete-album-btn">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid="delete-album-btn"
+                  title="Delete album"
+                >
                   <Trash2 className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </AlertDialogTrigger>
@@ -379,27 +464,51 @@ export default function AlbumDetail() {
         </div>
 
         {photosLoading ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-lg" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
             ))}
           </div>
         ) : photos && photos.length > 0 ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3" data-testid="photo-grid">
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
+            data-testid="photo-grid"
+          >
             {photos.map((photo) => (
               <div
                 key={photo.id}
-                className="relative group rounded-lg overflow-hidden aspect-square bg-muted"
+                className="relative group rounded-lg overflow-hidden bg-muted"
                 data-testid="photo-grid-item"
               >
                 <Link href={`/photos/${photo.id}`}>
-                  <img
-                    src={photo.url}
-                    alt={photo.caption ?? "Photo"}
-                    className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
-                  />
+                  <div className="aspect-[4/3] overflow-hidden">
+                    <img
+                      src={photo.url}
+                      alt={photo.caption ?? "Photo"}
+                      className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                    />
+                  </div>
                 </Link>
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 pointer-events-none" />
+
+                <div className="p-2 space-y-0.5">
+                  {photo.caption ? (
+                    <p className="text-xs font-medium text-foreground truncate">
+                      {photo.caption}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/60 italic truncate">
+                      No caption
+                    </p>
+                  )}
+                  {photo.uploaderName && (
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      by {photo.uploaderName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
+
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -423,16 +532,18 @@ export default function AlbumDetail() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+
                 {photo.averageRating != null && (
-                  <div className="absolute bottom-2 left-2 flex items-center gap-0.5 bg-black/60 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-black/60 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                     <span className="text-xs text-white font-medium">
                       {photo.averageRating.toFixed(1)}
                     </span>
                   </div>
                 )}
+
                 {album.coverPhotoId === photo.id && (
-                  <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded font-medium">
+                  <div className="absolute bottom-[3.5rem] left-2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded font-medium">
                     Cover
                   </div>
                 )}
@@ -447,7 +558,7 @@ export default function AlbumDetail() {
             <Camera className="h-10 w-10 text-muted-foreground/40 mb-3" />
             <p className="text-sm font-medium text-foreground mb-1">No photos yet</p>
             <p className="text-xs text-muted-foreground mb-4">
-              Upload the first photo to this album.
+              Upload the first photos to this album.
             </p>
             <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
           </div>
