@@ -98,6 +98,11 @@ export interface CollectionSummary {
   createdAt: string;
 }
 
+export interface SuggestedCollection {
+  id: number;
+  title: string;
+}
+
 export interface Photo {
   id: number;
   albumId: number;
@@ -122,6 +127,9 @@ export interface Photo {
   tags?: Tag[];
   categories?: Category[];
   photoCollections?: CollectionSummary[];
+  /** @nullable */
+  aiDescription?: string | null;
+  suggestedCollections?: SuggestedCollection[];
 }
 
 export interface Collection {
@@ -158,6 +166,8 @@ export interface CollectionPhotoInput {
 
 export interface PhotoUpdate {
   caption?: string;
+  /** @nullable */
+  aiDescription?: string | null;
   /** @nullable */
   takenAt?: string | null;
 }

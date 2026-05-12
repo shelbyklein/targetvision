@@ -7,6 +7,7 @@
  */
 import type { Category } from "./category";
 import type { CollectionSummary } from "./collectionSummary";
+import type { SuggestedCollection } from "./suggestedCollection";
 import type { Tag } from "./tag";
 
 export interface Photo {
@@ -33,4 +34,7 @@ export interface Photo {
   tags?: Tag[];
   categories?: Category[];
   photoCollections?: CollectionSummary[];
+  /** @nullable */
+  aiDescription?: string | null;
+  suggestedCollections?: SuggestedCollection[];
 }

@@ -6,6 +6,8 @@ import {
   useUploadPhoto,
   useDeleteAlbum,
   useSetAlbumCover,
+  useAcceptPhotoSuggestion,
+  useDismissPhotoSuggestion,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -63,6 +65,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowUpDown,
+  Sparkles,
+  Loader2,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -346,10 +351,47 @@ export default function AlbumDetail() {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
   const { data: photos, isLoading: photosLoading } = useListAlbumPhotos(albumId, {
-    query: { enabled: !!albumId, queryKey: getListAlbumPhotosQueryKey(albumId) },
+    query: {
+      enabled: !!albumId,
+      queryKey: getListAlbumPhotosQueryKey(albumId),
+      refetchInterval: (q) => {
+        const data = q.state.data as Array<{ aiDescription?: string | null; createdAt?: string }> | undefined;
+        if (!data) return false;
+        const now = Date.now();
+        const stillAnalyzing = data.some(
+          (p) =>
+            p.aiDescription == null &&
+            p.createdAt &&
+            now - new Date(p.createdAt).getTime() < 60_000,
+        );
+        return stillAnalyzing ? 3000 : false;
+      },
+    },
   });
   const { mutate: setCover } = useSetAlbumCover();
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
+  const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
+  const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
+
+  function handleAcceptSuggestion(photoId: number, collectionId: number) {
+    acceptSuggestion(
+      { id: photoId, collectionId },
+      {
+        onSuccess: invalidate,
+        onError: () => toast({ title: "Failed to accept suggestion", variant: "destructive" }),
+      },
+    );
+  }
+
+  function handleDismissSuggestion(photoId: number, collectionId: number) {
+    dismissSuggestion(
+      { id: photoId, collectionId },
+      {
+        onSuccess: invalidate,
+        onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }),
+      },
+    );
+  }
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: getGetAlbumQueryKey(albumId) });
@@ -547,7 +589,7 @@ export default function AlbumDetail() {
                   </div>
                 </Link>
 
-                <div className="p-2 space-y-0.5">
+                <div className="p-2 space-y-1">
                   {photo.caption ? (
                     <p className="text-xs font-medium text-foreground truncate">
                       {photo.caption}
@@ -556,6 +598,65 @@ export default function AlbumDetail() {
                     <p className="text-xs text-muted-foreground/60 italic truncate">
                       No caption
                     </p>
+                  )}
+                  {photo.aiDescription ? (
+                    <p
+                      className="text-[10px] text-muted-foreground line-clamp-2 flex items-start gap-1"
+                      data-testid="card-ai-description"
+                    >
+                      <Sparkles className="h-2.5 w-2.5 text-primary mt-[2px] shrink-0" />
+                      <span>{photo.aiDescription}</span>
+                    </p>
+                  ) : photo.createdAt && Date.now() - new Date(photo.createdAt).getTime() < 60_000 ? (
+                    <p
+                      className="text-[10px] text-muted-foreground/70 flex items-center gap-1"
+                      data-testid="card-ai-loading"
+                    >
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                      Analyzing…
+                    </p>
+                  ) : null}
+                  {photo.suggestedCollections && photo.suggestedCollections.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-0.5" data-testid="card-suggestions">
+                      {photo.suggestedCollections.slice(0, 3).map((s) => (
+                        <span
+                          key={s.id}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-primary/5 pl-1.5 pr-0.5 py-px text-[9px] text-foreground"
+                          data-testid={`card-suggested-collection-${s.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <Sparkles className="h-2 w-2 text-primary" />
+                          <span>Add to {s.title}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAcceptSuggestion(photo.id, s.id);
+                            }}
+                            className="rounded-full p-0.5 hover:bg-primary/20 text-primary"
+                            aria-label={`Accept suggestion ${s.title}`}
+                            data-testid={`card-accept-suggestion-${s.id}`}
+                          >
+                            <Check className="h-2 w-2" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDismissSuggestion(photo.id, s.id);
+                            }}
+                            className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
+                            aria-label={`Dismiss suggestion ${s.title}`}
+                            data-testid={`card-dismiss-suggestion-${s.id}`}
+                          >
+                            <X className="h-2 w-2" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   )}
                   {photo.uploaderName && (
                     <p className="text-[10px] text-muted-foreground truncate">

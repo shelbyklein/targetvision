@@ -13,6 +13,8 @@ import {
   useListCollections,
   useAddPhotoToCollection,
   useRemovePhotoFromCollection,
+  useAcceptPhotoSuggestion,
+  useDismissPhotoSuggestion,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getGetTagCloudQueryKey,
@@ -45,7 +47,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderOpen } from "lucide-react";
+import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderOpen, Sparkles, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -236,7 +238,17 @@ export default function PhotoDetail() {
   const [, navigate] = useLocation();
 
   const { data: photo, isLoading } = useGetPhoto(photoId, {
-    query: { enabled: !!photoId, queryKey: getGetPhotoQueryKey(photoId) },
+    query: {
+      enabled: !!photoId,
+      queryKey: getGetPhotoQueryKey(photoId),
+      refetchInterval: (q) => {
+        const data = q.state.data as { aiDescription?: string | null; createdAt?: string } | undefined;
+        if (!data || data.aiDescription != null) return false;
+        const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+        if (!created || Date.now() - created > 60_000) return false;
+        return 3000;
+      },
+    },
   });
   const { data: me } = useGetMe();
   const { data: allCategories } = useListCategories();
@@ -246,6 +258,8 @@ export default function PhotoDetail() {
   const { mutate: removeCategory } = useRemovePhotoCategory();
   const { mutate: addToCollection } = useAddPhotoToCollection();
   const { mutate: removeFromCollection } = useRemovePhotoFromCollection();
+  const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
+  const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const [downloading, setDownloading] = useState(false);
 
@@ -366,6 +380,20 @@ export default function PhotoDetail() {
     }
   }
 
+  function handleAcceptSuggestion(collectionId: number) {
+    acceptSuggestion(
+      { id: photoId, collectionId },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to accept suggestion", variant: "destructive" }) }
+    );
+  }
+
+  function handleDismissSuggestion(collectionId: number) {
+    dismissSuggestion(
+      { id: photoId, collectionId },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }) }
+    );
+  }
+
   function handleAddCollection(collectionId: string) {
     addToCollection(
       { id: parseInt(collectionId, 10), data: { photoId } },
@@ -456,6 +484,62 @@ export default function PhotoDetail() {
             {photo.caption && (
               <p className="text-sm text-muted-foreground italic">{photo.caption}</p>
             )}
+            <div
+              className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 space-y-2"
+              data-testid="ai-description-block"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI description
+              </div>
+              {photo.aiDescription ? (
+                <p className="text-sm text-foreground" data-testid="ai-description-text">
+                  {photo.aiDescription}
+                </p>
+              ) : photo.createdAt && Date.now() - new Date(photo.createdAt).getTime() < 60_000 ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="ai-description-loading">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Analyzing photo…
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground/70 italic">No description available.</p>
+              )}
+              {photo.suggestedCollections && photo.suggestedCollections.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Suggested collections
+                  </p>
+                  <div className="flex flex-wrap gap-1.5" data-testid="suggested-collections">
+                    {photo.suggestedCollections.map((s) => (
+                      <div
+                        key={s.id}
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-2.5 pr-1 py-0.5 text-xs"
+                        data-testid={`suggested-collection-${s.id}`}
+                      >
+                        <Sparkles className="h-3 w-3 text-primary" />
+                        <span className="text-foreground">{s.title}</span>
+                        <button
+                          onClick={() => handleAcceptSuggestion(s.id)}
+                          className="rounded-full p-0.5 hover:bg-primary/15 text-primary"
+                          aria-label="Accept suggestion"
+                          data-testid={`accept-suggestion-${s.id}`}
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDismissSuggestion(s.id)}
+                          className="rounded-full p-0.5 hover:bg-muted-foreground/15 text-muted-foreground"
+                          aria-label="Dismiss suggestion"
+                          data-testid={`dismiss-suggestion-${s.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-6">

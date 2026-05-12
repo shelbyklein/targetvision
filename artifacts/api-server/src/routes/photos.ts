@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable } from "@workspace/db";
+import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable } from "@workspace/db";
+import { analyzePhoto } from "../lib/aiPhotoAnalysis";
+import { logger } from "../lib/logger";
 import {
   ListAlbumPhotosParams,
   ListAlbumPhotosResponse,
@@ -27,6 +29,10 @@ import {
   RatePhotoParams,
   RatePhotoBody,
   RatePhotoResponse,
+  AcceptPhotoSuggestionParams,
+  AcceptPhotoSuggestionResponse,
+  DismissPhotoSuggestionParams,
+  DismissPhotoSuggestionResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -65,6 +71,43 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
       takenAt: body.data.takenAt ? new Date(body.data.takenAt) : null,
     })
     .returning();
+
+  // Fire-and-forget AI analysis. Failures are swallowed so the upload still succeeds.
+  void (async () => {
+    try {
+      const collections = await db
+        .select({
+          id: collectionsTable.id,
+          title: collectionsTable.title,
+          description: collectionsTable.description,
+        })
+        .from(collectionsTable)
+        .where(eq(collectionsTable.createdById, req.dbUser!.id));
+
+      const result = await analyzePhoto(photo.url, collections, photo.storageKey);
+      if (!result) return;
+
+      await db
+        .update(photosTable)
+        .set({ aiDescription: result.description || null })
+        .where(eq(photosTable.id, photo.id));
+
+      if (result.suggestedCollectionIds.length > 0) {
+        await db
+          .insert(photoCollectionSuggestionsTable)
+          .values(
+            result.suggestedCollectionIds.map((cid) => ({
+              photoId: photo.id,
+              collectionId: cid,
+              status: "pending" as const,
+            })),
+          )
+          .onConflictDoNothing();
+      }
+    } catch (err) {
+      logger.error({ err, photoId: photo.id }, "Background AI analysis failed");
+    }
+  })();
 
   const full = await buildPhotoResponse(photo.id, req.dbUser?.id);
   res.status(201).json(GetPhotoResponse.parse(full));
@@ -161,6 +204,7 @@ router.patch("/photos/:id", requireAuth, async (req, res): Promise<void> => {
 
   const updateData: Record<string, unknown> = {};
   if (body.data.caption !== undefined) updateData.caption = body.data.caption;
+  if (body.data.aiDescription !== undefined) updateData.aiDescription = body.data.aiDescription;
   if (body.data.takenAt !== undefined) updateData.takenAt = body.data.takenAt ? new Date(body.data.takenAt) : null;
 
   if (Object.keys(updateData).length > 0) {
@@ -344,6 +388,124 @@ router.post("/photos/:id/rating", requireAuth, async (req, res): Promise<void> =
 
   const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
   res.json(RatePhotoResponse.parse(full));
+});
+
+router.post("/photos/:id/suggestions/:collectionId/accept", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawCol = Array.isArray(req.params.collectionId) ? req.params.collectionId[0] : req.params.collectionId;
+  const params = AcceptPhotoSuggestionParams.safeParse({
+    id: parseInt(rawId, 10),
+    collectionId: parseInt(rawCol, 10),
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db.select({ id: photosTable.id, uploaderId: photosTable.uploaderId }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const [collection] = await db.select({ id: collectionsTable.id, createdById: collectionsTable.createdById }).from(collectionsTable).where(eq(collectionsTable.id, params.data.collectionId));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+
+  const isAdmin = req.dbUser!.role === "admin";
+  const isOwner = photoExists.uploaderId === req.dbUser!.id || collection.createdById === req.dbUser!.id;
+  if (!isAdmin && !isOwner) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [suggestion] = await db
+    .select({ status: photoCollectionSuggestionsTable.status })
+    .from(photoCollectionSuggestionsTable)
+    .where(
+      and(
+        eq(photoCollectionSuggestionsTable.photoId, params.data.id),
+        eq(photoCollectionSuggestionsTable.collectionId, params.data.collectionId),
+      ),
+    );
+  if (!suggestion || suggestion.status !== "pending") {
+    res.status(404).json({ error: "Pending suggestion not found" });
+    return;
+  }
+
+  await db
+    .insert(photoCollectionsTable)
+    .values({ collectionId: params.data.collectionId, photoId: params.data.id })
+    .onConflictDoNothing();
+
+  await db
+    .update(photoCollectionSuggestionsTable)
+    .set({ status: "accepted" })
+    .where(
+      and(
+        eq(photoCollectionSuggestionsTable.photoId, params.data.id),
+        eq(photoCollectionSuggestionsTable.collectionId, params.data.collectionId),
+      ),
+    );
+
+  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  res.json(AcceptPhotoSuggestionResponse.parse(full));
+});
+
+router.post("/photos/:id/suggestions/:collectionId/dismiss", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawCol = Array.isArray(req.params.collectionId) ? req.params.collectionId[0] : req.params.collectionId;
+  const params = DismissPhotoSuggestionParams.safeParse({
+    id: parseInt(rawId, 10),
+    collectionId: parseInt(rawCol, 10),
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db.select({ id: photosTable.id, uploaderId: photosTable.uploaderId }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const [collection] = await db.select({ createdById: collectionsTable.createdById }).from(collectionsTable).where(eq(collectionsTable.id, params.data.collectionId));
+  const isAdmin = req.dbUser!.role === "admin";
+  const isOwner = photoExists.uploaderId === req.dbUser!.id || (collection && collection.createdById === req.dbUser!.id);
+  if (!isAdmin && !isOwner) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ status: photoCollectionSuggestionsTable.status })
+    .from(photoCollectionSuggestionsTable)
+    .where(
+      and(
+        eq(photoCollectionSuggestionsTable.photoId, params.data.id),
+        eq(photoCollectionSuggestionsTable.collectionId, params.data.collectionId),
+      ),
+    );
+  if (!existing || existing.status !== "pending") {
+    res.status(404).json({ error: "Pending suggestion not found" });
+    return;
+  }
+
+  await db
+    .update(photoCollectionSuggestionsTable)
+    .set({ status: "dismissed" })
+    .where(
+      and(
+        eq(photoCollectionSuggestionsTable.photoId, params.data.id),
+        eq(photoCollectionSuggestionsTable.collectionId, params.data.collectionId),
+      ),
+    );
+
+  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  res.json(DismissPhotoSuggestionResponse.parse(full));
 });
 
 export default router;
