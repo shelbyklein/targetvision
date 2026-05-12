@@ -16,7 +16,7 @@ router.get("/users/me", requireAuth, async (req, res): Promise<void> => {
   res.json(GetMeResponse.parse(req.dbUser));
 });
 
-router.get("/users", requireAuth, async (req, res): Promise<void> => {
+router.get("/users", requireAdmin, async (req, res): Promise<void> => {
   const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
   res.json(ListUsersResponse.parse(users));
 });

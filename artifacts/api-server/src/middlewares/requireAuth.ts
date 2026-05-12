@@ -1,5 +1,5 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { getAuth } from "@clerk/express";
+import { getAuth, type SignedInAuthObject } from "@clerk/express";
 import { db, usersTable, insertUserSchema } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -9,6 +9,15 @@ declare global {
       dbUser?: typeof usersTable.$inferSelect;
     }
   }
+}
+
+function claimString(auth: SignedInAuthObject, key: string): string | undefined {
+  const claims = auth.sessionClaims;
+  if (claims && typeof claims === "object" && key in claims) {
+    const val = (claims as Record<string, unknown>)[key];
+    if (typeof val === "string") return val;
+  }
+  return undefined;
 }
 
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -23,8 +32,8 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
   let [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
 
   if (!user) {
-    const name = (auth as any)?.sessionClaims?.name ?? (auth as any)?.sessionClaims?.email ?? "Unknown";
-    const email = (auth as any)?.sessionClaims?.email ?? `${clerkId}@unknown.com`;
+    const name = claimString(auth, "name") ?? claimString(auth, "email") ?? "Unknown";
+    const email = claimString(auth, "email") ?? `${clerkId}@unknown.com`;
     const parsed = insertUserSchema.safeParse({ clerkId, name, email, role: "member" });
     if (!parsed.success) {
       res.status(500).json({ error: "Failed to create user" });
