@@ -686,54 +686,6 @@ paths:
         '500':
           description: Failed to generate upload URL.
 
-  /storage/public-objects/{filePath}:
-    get:
-      tags: [Storage]
-      operationId: getPublicObject
-      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
-      parameters:
-        - name: filePath
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Object content streamed with correct Content-Type.
-          content:
-            '*/*':
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: File not found.
-        '500':
-          description: Failed to serve public object.
-
-  /storage/objects/{objectPath}:
-    get:
-      tags: [Storage]
-      operationId: getStorageObject
-      summary: Serve an object entity from PRIVATE_OBJECT_DIR
-      parameters:
-        - name: objectPath
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Object content streamed with correct Content-Type.
-          content:
-            '*/*':
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: Object not found.
-        '500':
-          description: Failed to serve object.
-
   /stats/tag-cloud:
     get:
       operationId: getTagCloud

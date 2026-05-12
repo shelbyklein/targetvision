@@ -789,20 +789,6 @@ export const RequestUploadUrlResponse = zod.object({
 });
 
 /**
- * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
- */
-export const GetPublicObjectParams = zod.object({
-  filePath: zod.coerce.string(),
-});
-
-/**
- * @summary Serve an object entity from PRIVATE_OBJECT_DIR
- */
-export const GetStorageObjectParams = zod.object({
-  objectPath: zod.coerce.string(),
-});
-
-/**
  * @summary Get tag usage counts for tag cloud display
  */
 export const GetTagCloudResponseItem = zod.object({
