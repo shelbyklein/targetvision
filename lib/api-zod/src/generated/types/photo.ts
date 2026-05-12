@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Category } from "./category";
+import type { CollectionSummary } from "./collectionSummary";
 import type { Tag } from "./tag";
 
 export interface Photo {
@@ -31,4 +32,5 @@ export interface Photo {
   myRating?: number | null;
   tags?: Tag[];
   categories?: Category[];
+  photoCollections?: CollectionSummary[];
 }

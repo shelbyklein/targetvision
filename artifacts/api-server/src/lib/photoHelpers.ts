@@ -1,4 +1,4 @@
-import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, usersTable, albumsTable } from "@workspace/db";
+import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, usersTable, albumsTable, collectionsTable, photoCollectionsTable } from "@workspace/db";
 import { eq, and, avg, count, sql } from "drizzle-orm";
 
 export async function buildPhotoResponse(photoId: number, currentUserId?: number) {
@@ -15,25 +15,40 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
 
   if (!photo) return null;
 
-  const tags = await db
-    .select({ id: tagsTable.id, name: tagsTable.name })
-    .from(tagsTable)
-    .innerJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
-    .where(eq(photoTagsTable.photoId, photoId));
+  const [tags, categories, photoCollections, ratingDataArr] = await Promise.all([
+    db
+      .select({ id: tagsTable.id, name: tagsTable.name })
+      .from(tagsTable)
+      .innerJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
+      .where(eq(photoTagsTable.photoId, photoId)),
+    db
+      .select({ id: categoriesTable.id, name: categoriesTable.name })
+      .from(categoriesTable)
+      .innerJoin(photoCategoriesTable, eq(categoriesTable.id, photoCategoriesTable.categoryId))
+      .where(eq(photoCategoriesTable.photoId, photoId)),
+    db
+      .select({
+        id: collectionsTable.id,
+        title: collectionsTable.title,
+        description: collectionsTable.description,
+        createdById: collectionsTable.createdById,
+        createdAt: collectionsTable.createdAt,
+        creatorName: usersTable.name,
+      })
+      .from(collectionsTable)
+      .innerJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
+      .leftJoin(usersTable, eq(collectionsTable.createdById, usersTable.id))
+      .where(eq(photoCollectionsTable.photoId, photoId)),
+    db
+      .select({
+        averageRating: avg(ratingsTable.score),
+        ratingCount: count(ratingsTable.id),
+      })
+      .from(ratingsTable)
+      .where(eq(ratingsTable.photoId, photoId)),
+  ]);
 
-  const categories = await db
-    .select({ id: categoriesTable.id, name: categoriesTable.name })
-    .from(categoriesTable)
-    .innerJoin(photoCategoriesTable, eq(categoriesTable.id, photoCategoriesTable.categoryId))
-    .where(eq(photoCategoriesTable.photoId, photoId));
-
-  const [ratingData] = await db
-    .select({
-      averageRating: avg(ratingsTable.score),
-      ratingCount: count(ratingsTable.id),
-    })
-    .from(ratingsTable)
-    .where(eq(ratingsTable.photoId, photoId));
+  const ratingData = ratingDataArr[0];
 
   let myRating: number | null = null;
   if (currentUserId) {
@@ -53,6 +68,16 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     uploaderName: photo.uploaderName ?? null,
     tags,
     categories,
+    photoCollections: photoCollections.map((c) => ({
+      id: c.id,
+      title: c.title,
+      description: c.description ?? null,
+      createdById: c.createdById,
+      creatorName: c.creatorName ?? null,
+      createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
+      photoCount: 0,
+      coverPhotoUrl: null,
+    })),
     averageRating: ratingData?.averageRating ? parseFloat(String(ratingData.averageRating)) : null,
     ratingCount: Number(ratingData?.ratingCount ?? 0),
     myRating,

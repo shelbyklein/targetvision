@@ -7,6 +7,7 @@ import searchRouter from "./search";
 import tagsCategoriesRouter from "./tagsCategories";
 import statsRouter from "./stats";
 import storageRouter from "./storage";
+import collectionsRouter from "./collections";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(searchRouter);
 router.use(tagsCategoriesRouter);
 router.use(statsRouter);
 router.use(storageRouter);
+router.use(collectionsRouter);
 
 export default router;

@@ -10,6 +10,9 @@ import {
   useRemovePhotoCategory,
   useDeletePhoto,
   useListTags,
+  useListCollections,
+  useAddPhotoToCollection,
+  useRemovePhotoFromCollection,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getGetTagCloudQueryKey,
@@ -42,7 +45,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download } from "lucide-react";
+import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -237,9 +240,12 @@ export default function PhotoDetail() {
   });
   const { data: me } = useGetMe();
   const { data: allCategories } = useListCategories();
+  const { data: allCollections } = useListCollections();
   const { mutate: removeTag } = useRemovePhotoTag();
   const { mutate: addCategory } = useAddPhotoCategory();
   const { mutate: removeCategory } = useRemovePhotoCategory();
+  const { mutate: addToCollection } = useAddPhotoToCollection();
+  const { mutate: removeFromCollection } = useRemovePhotoFromCollection();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const [downloading, setDownloading] = useState(false);
 
@@ -360,6 +366,20 @@ export default function PhotoDetail() {
     }
   }
 
+  function handleAddCollection(collectionId: string) {
+    addToCollection(
+      { id: parseInt(collectionId, 10), data: { photoId } },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to add to collection", variant: "destructive" }) }
+    );
+  }
+
+  function handleRemoveFromCollection(collectionId: number) {
+    removeFromCollection(
+      { id: collectionId, photoId },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to remove from collection", variant: "destructive" }) }
+    );
+  }
+
   function handleDelete() {
     deletePhoto(
       { id: photoId },
@@ -376,6 +396,10 @@ export default function PhotoDetail() {
 
   const availableCategories = allCategories?.filter(
     (cat) => !photo?.categories?.some((c) => c.id === cat.id)
+  );
+
+  const availableCollections = allCollections?.filter(
+    (col) => !photo?.photoCollections?.some((c) => c.id === col.id)
   );
 
   const canDelete = me && photo && (me.id === photo.uploaderId || me.role === "admin");
@@ -533,6 +557,46 @@ export default function PhotoDetail() {
                     {availableCategories.map((cat) => (
                       <SelectItem key={cat.id} value={String(cat.id)} data-testid={`category-option-${cat.id}`}>
                         {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                <FolderOpen className="h-3.5 w-3.5" />
+                Collections
+              </Label>
+              <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="photo-collections">
+                {photo.photoCollections?.map((col) => (
+                  <Badge key={col.id} variant="outline" className="gap-1 pr-1">
+                    <Link href={`/collections/${col.id}`} className="hover:underline">
+                      {col.title}
+                    </Link>
+                    <button
+                      onClick={() => handleRemoveFromCollection(col.id)}
+                      className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 p-0.5"
+                      data-testid={`remove-collection-${col.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {(!photo.photoCollections || photo.photoCollections.length === 0) && (
+                  <span className="text-xs text-muted-foreground">Not in any collection</span>
+                )}
+              </div>
+              {availableCollections && availableCollections.length > 0 && (
+                <Select onValueChange={handleAddCollection} data-testid="add-collection-select">
+                  <SelectTrigger className="h-8 text-sm w-full">
+                    <SelectValue placeholder="Add to collection..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCollections.map((col) => (
+                      <SelectItem key={col.id} value={String(col.id)} data-testid={`collection-option-${col.id}`}>
+                        {col.title}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -177,6 +177,20 @@ export const GetAlbumTopRatedResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const GetAlbumTopRatedResponse = zod.array(GetAlbumTopRatedResponseItem);
 
@@ -241,6 +255,20 @@ export const ListAlbumPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const ListAlbumPhotosResponse = zod.array(ListAlbumPhotosResponseItem);
 
@@ -302,6 +330,20 @@ export const SearchPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const SearchPhotosResponse = zod.array(SearchPhotosResponseItem);
 
@@ -348,6 +390,20 @@ export const ListPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const ListPhotosResponse = zod.array(ListPhotosResponseItem);
 
@@ -385,6 +441,20 @@ export const GetPhotoResponse = zod.object({
       zod.object({
         id: zod.number(),
         name: zod.string(),
+      }),
+    )
+    .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -429,6 +499,20 @@ export const UpdatePhotoResponse = zod.object({
       zod.object({
         id: zod.number(),
         name: zod.string(),
+      }),
+    )
+    .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -482,6 +566,20 @@ export const AddPhotoTagResponse = zod.object({
       }),
     )
     .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -519,6 +617,20 @@ export const RemovePhotoTagResponse = zod.object({
       zod.object({
         id: zod.number(),
         name: zod.string(),
+      }),
+    )
+    .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -565,6 +677,20 @@ export const AddPhotoCategoryResponse = zod.object({
       }),
     )
     .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -602,6 +728,20 @@ export const RemovePhotoCategoryResponse = zod.object({
       zod.object({
         id: zod.number(),
         name: zod.string(),
+      }),
+    )
+    .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -647,6 +787,20 @@ export const RatePhotoResponse = zod.object({
       zod.object({
         id: zod.number(),
         name: zod.string(),
+      }),
+    )
+    .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -732,6 +886,20 @@ export const GetDashboardStatsResponse = zod.object({
           }),
         )
         .optional(),
+      photoCollections: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            title: zod.string(),
+            description: zod.string().nullish(),
+            createdById: zod.number(),
+            creatorName: zod.string().nullish(),
+            photoCount: zod.number(),
+            coverPhotoUrl: zod.string().nullish(),
+            createdAt: zod.coerce.date(),
+          }),
+        )
+        .optional(),
     }),
   ),
 });
@@ -769,6 +937,20 @@ export const GetRecentPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const GetRecentPhotosResponse = zod.array(GetRecentPhotosResponseItem);
 
@@ -802,6 +984,20 @@ export const GetTopRatedPhotosResponseItem = zod.object({
       zod.object({
         id: zod.number(),
         name: zod.string(),
+      }),
+    )
+    .optional(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        creatorName: zod.string().nullish(),
+        photoCount: zod.number(),
+        coverPhotoUrl: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -843,6 +1039,195 @@ export const RequestUploadUrlResponse = zod.object({
         .describe("MIME type of the file (e.g. `image\/jpeg`)."),
     })
     .optional(),
+});
+
+/**
+ * @summary List all collections
+ */
+export const ListCollectionsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  createdById: zod.number(),
+  creatorName: zod.string().nullish(),
+  photoCount: zod.number(),
+  coverPhotoUrl: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem);
+
+/**
+ * @summary Create a new collection
+ */
+
+export const CreateCollectionBody = zod.object({
+  title: zod.string().min(1),
+  description: zod.string().optional(),
+});
+
+/**
+ * @summary Get a single collection with its photos
+ */
+export const GetCollectionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCollectionResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  createdById: zod.number(),
+  creatorName: zod.string().nullish(),
+  photoCount: zod.number(),
+  coverPhotoUrl: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  photos: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        albumId: zod.number(),
+        albumTitle: zod.string().nullish(),
+        uploaderId: zod.number(),
+        uploaderName: zod.string().nullish(),
+        storageKey: zod.string().nullish(),
+        url: zod.string(),
+        caption: zod.string().nullish(),
+        takenAt: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        averageRating: zod.number().nullish(),
+        ratingCount: zod.number(),
+        myRating: zod.number().nullish(),
+        tags: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional(),
+        categories: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional(),
+        photoCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+              description: zod.string().nullish(),
+              createdById: zod.number(),
+              creatorName: zod.string().nullish(),
+              photoCount: zod.number(),
+              coverPhotoUrl: zod.string().nullish(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Update a collection (owner or admin)
+ */
+export const UpdateCollectionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCollectionBody = zod.object({
+  title: zod.string().min(1).optional(),
+  description: zod.string().nullish(),
+});
+
+export const UpdateCollectionResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  createdById: zod.number(),
+  creatorName: zod.string().nullish(),
+  photoCount: zod.number(),
+  coverPhotoUrl: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  photos: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        albumId: zod.number(),
+        albumTitle: zod.string().nullish(),
+        uploaderId: zod.number(),
+        uploaderName: zod.string().nullish(),
+        storageKey: zod.string().nullish(),
+        url: zod.string(),
+        caption: zod.string().nullish(),
+        takenAt: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        averageRating: zod.number().nullish(),
+        ratingCount: zod.number(),
+        myRating: zod.number().nullish(),
+        tags: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional(),
+        categories: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional(),
+        photoCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+              description: zod.string().nullish(),
+              createdById: zod.number(),
+              creatorName: zod.string().nullish(),
+              photoCount: zod.number(),
+              coverPhotoUrl: zod.string().nullish(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Delete a collection (owner or admin)
+ */
+export const DeleteCollectionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Add a photo to a collection
+ */
+export const AddPhotoToCollectionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddPhotoToCollectionBody = zod.object({
+  photoId: zod.number(),
+});
+
+/**
+ * @summary Remove a photo from a collection
+ */
+export const RemovePhotoFromCollectionParams = zod.object({
+  id: zod.coerce.number(),
+  photoId: zod.coerce.number(),
 });
 
 /**

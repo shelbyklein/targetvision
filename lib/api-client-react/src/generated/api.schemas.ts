@@ -84,6 +84,20 @@ export interface Category {
   name: string;
 }
 
+export interface CollectionSummary {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  createdById: number;
+  /** @nullable */
+  creatorName?: string | null;
+  photoCount: number;
+  /** @nullable */
+  coverPhotoUrl?: string | null;
+  createdAt: string;
+}
+
 export interface Photo {
   id: number;
   albumId: number;
@@ -107,6 +121,39 @@ export interface Photo {
   myRating?: number | null;
   tags?: Tag[];
   categories?: Category[];
+  photoCollections?: CollectionSummary[];
+}
+
+export interface Collection {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  createdById: number;
+  /** @nullable */
+  creatorName?: string | null;
+  photoCount: number;
+  /** @nullable */
+  coverPhotoUrl?: string | null;
+  createdAt: string;
+  photos?: Photo[];
+}
+
+export interface CollectionInput {
+  /** @minLength 1 */
+  title: string;
+  description?: string;
+}
+
+export interface CollectionUpdate {
+  /** @minLength 1 */
+  title?: string;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface CollectionPhotoInput {
+  photoId: number;
 }
 
 export interface PhotoUpdate {

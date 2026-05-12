@@ -1,0 +1,21 @@
+import { pgTable, text, serial, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
+import { photosTable } from "./photos";
+
+export const collectionsTable = pgTable("collections", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const photoCollectionsTable = pgTable("photo_collections", {
+  collectionId: integer("collection_id").notNull().references(() => collectionsTable.id, { onDelete: "cascade" }),
+  photoId: integer("photo_id").notNull().references(() => photosTable.id, { onDelete: "cascade" }),
+}, (table) => [
+  primaryKey({ columns: [table.collectionId, table.photoId] }),
+]);
+
+export type Collection = typeof collectionsTable.$inferSelect;
+export type PhotoCollection = typeof photoCollectionsTable.$inferSelect;
