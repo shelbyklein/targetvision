@@ -6,6 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./aiProviderInfo";
+export * from "./aiProviderInfoId";
+export * from "./aiProviderKeyInput";
+export * from "./aiSettings";
+export * from "./aiSettingsActiveProvider";
+export * from "./aiSettingsProviders";
+export * from "./aiSettingsUpdate";
+export * from "./aiSettingsUpdateActiveProvider";
 export * from "./album";
 export * from "./albumCoverUpdate";
 export * from "./albumInput";

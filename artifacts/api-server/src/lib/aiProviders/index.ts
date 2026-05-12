@@ -1,0 +1,209 @@
+import { eq } from "drizzle-orm";
+import {
+  db,
+  appSettingsTable,
+  APP_SETTINGS_SINGLETON_ID,
+  type AppSettings,
+} from "@workspace/db";
+import { decryptSecret } from "../secretCrypto";
+import { OpenAIProvider } from "./openai";
+import { AnthropicProvider } from "./anthropic";
+import { GeminiProvider } from "./gemini";
+import {
+  AnalysisProvider,
+  PROVIDER_IDS,
+  PROVIDER_LABELS,
+  PROVIDER_MODELS,
+  ProviderId,
+} from "./types";
+import { logger } from "../logger";
+
+export {
+  PROVIDER_IDS,
+  PROVIDER_LABELS,
+  PROVIDER_MODELS,
+  type ProviderId,
+} from "./types";
+
+export interface ProviderStatus {
+  id: ProviderId;
+  label: string;
+  model: string;
+  hasKey: boolean;
+  keyPreview: string | null;
+  replitFallbackAvailable: boolean;
+  usable: boolean;
+}
+
+export interface ResolvedSettings {
+  enabled: boolean;
+  activeProvider: ProviderId;
+  providers: Record<ProviderId, ProviderStatus>;
+  hasUsableActive: boolean;
+}
+
+export async function loadAppSettings(): Promise<AppSettings> {
+  const [existing] = await db
+    .select()
+    .from(appSettingsTable)
+    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
+  if (existing) return existing;
+  const [created] = await db
+    .insert(appSettingsTable)
+    .values({ id: APP_SETTINGS_SINGLETON_ID })
+    .returning();
+  return created;
+}
+
+function replitFallbackFor(id: ProviderId): boolean {
+  if (id === "openai") {
+    return Boolean(
+      process.env.AI_INTEGRATIONS_OPENAI_API_KEY &&
+        process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    );
+  }
+  if (id === "anthropic") {
+    return Boolean(
+      process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY &&
+        process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+    );
+  }
+  return Boolean(
+    process.env.AI_INTEGRATIONS_GEMINI_API_KEY &&
+      process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  );
+}
+
+function providerHasKey(settings: AppSettings, id: ProviderId): boolean {
+  if (id === "openai") return Boolean(settings.openaiKeyCiphertext);
+  if (id === "anthropic") return Boolean(settings.anthropicKeyCiphertext);
+  return Boolean(settings.geminiKeyCiphertext);
+}
+
+function providerPreview(settings: AppSettings, id: ProviderId): string | null {
+  if (id === "openai") return settings.openaiKeyPreview;
+  if (id === "anthropic") return settings.anthropicKeyPreview;
+  return settings.geminiKeyPreview;
+}
+
+export function summarizeSettings(settings: AppSettings): ResolvedSettings {
+  const providers = {} as Record<ProviderId, ProviderStatus>;
+  for (const id of PROVIDER_IDS) {
+    const hasKey = providerHasKey(settings, id);
+    const fallback = replitFallbackFor(id);
+    providers[id] = {
+      id,
+      label: PROVIDER_LABELS[id],
+      model: PROVIDER_MODELS[id],
+      hasKey,
+      keyPreview: providerPreview(settings, id),
+      replitFallbackAvailable: fallback,
+      usable: hasKey || fallback,
+    };
+  }
+  const active = (settings.activeProvider as ProviderId) ?? "openai";
+  return {
+    enabled: settings.aiEnabled,
+    activeProvider: PROVIDER_IDS.includes(active) ? active : "openai",
+    providers,
+    hasUsableActive:
+      providers[PROVIDER_IDS.includes(active) ? active : "openai"].usable,
+  };
+}
+
+function getStoredKey(
+  settings: AppSettings,
+  id: ProviderId,
+): string | null {
+  try {
+    if (id === "openai") {
+      if (
+        !settings.openaiKeyCiphertext ||
+        !settings.openaiKeyIv ||
+        !settings.openaiKeyTag
+      )
+        return null;
+      return decryptSecret({
+        ciphertext: settings.openaiKeyCiphertext,
+        iv: settings.openaiKeyIv,
+        tag: settings.openaiKeyTag,
+      });
+    }
+    if (id === "anthropic") {
+      if (
+        !settings.anthropicKeyCiphertext ||
+        !settings.anthropicKeyIv ||
+        !settings.anthropicKeyTag
+      )
+        return null;
+      return decryptSecret({
+        ciphertext: settings.anthropicKeyCiphertext,
+        iv: settings.anthropicKeyIv,
+        tag: settings.anthropicKeyTag,
+      });
+    }
+    if (
+      !settings.geminiKeyCiphertext ||
+      !settings.geminiKeyIv ||
+      !settings.geminiKeyTag
+    )
+      return null;
+    return decryptSecret({
+      ciphertext: settings.geminiKeyCiphertext,
+      iv: settings.geminiKeyIv,
+      tag: settings.geminiKeyTag,
+    });
+  } catch (err) {
+    logger.error({ err, providerId: id }, "Failed to decrypt provider key");
+    return null;
+  }
+}
+
+export async function getActiveProvider(): Promise<{
+  provider: AnalysisProvider | null;
+  settings: AppSettings;
+  reason?: string;
+}> {
+  const settings = await loadAppSettings();
+  if (!settings.aiEnabled) {
+    return { provider: null, settings, reason: "AI disabled" };
+  }
+  const id = (settings.activeProvider as ProviderId) ?? "openai";
+  const adminKey = getStoredKey(settings, id);
+
+  if (id === "openai") {
+    if (adminKey) return { provider: new OpenAIProvider(adminKey), settings };
+    if (replitFallbackFor("openai")) {
+      return {
+        provider: new OpenAIProvider(
+          process.env.AI_INTEGRATIONS_OPENAI_API_KEY!,
+          process.env.AI_INTEGRATIONS_OPENAI_BASE_URL!,
+        ),
+        settings,
+      };
+    }
+    return { provider: null, settings, reason: "No OpenAI key configured" };
+  }
+  if (id === "anthropic") {
+    if (adminKey)
+      return { provider: new AnthropicProvider(adminKey), settings };
+    if (replitFallbackFor("anthropic")) {
+      return {
+        provider: new AnthropicProvider(
+          process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY!,
+          process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL!,
+        ),
+        settings,
+      };
+    }
+    return { provider: null, settings, reason: "No Anthropic key configured" };
+  }
+  if (adminKey) return { provider: new GeminiProvider(adminKey), settings };
+  if (replitFallbackFor("gemini")) {
+    return {
+      provider: new GeminiProvider(process.env.AI_INTEGRATIONS_GEMINI_API_KEY!),
+      settings,
+    };
+  }
+  return { provider: null, settings, reason: "No Gemini key configured" };
+}

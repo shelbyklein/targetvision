@@ -35,6 +35,7 @@ import {
 import { Shield, Plus, Trash2, FolderOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { AiServicesSection } from "@/components/admin/AiServicesSection";
 
 export default function Admin() {
   const qc = useQueryClient();
@@ -129,6 +130,8 @@ export default function Admin() {
             <p className="text-sm text-muted-foreground">Manage team member roles and photo categories.</p>
           </div>
         </div>
+
+        <AiServicesSection />
 
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2">

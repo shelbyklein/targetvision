@@ -28,6 +28,8 @@ tags:
     description: Aggregation and statistics
   - name: Storage
     description: Object storage upload and serving endpoints.
+  - name: admin
+    description: Admin-only configuration endpoints.
 paths:
   /healthz:
     get:
@@ -728,6 +730,96 @@ paths:
         "403":
           description: Forbidden
 
+  /admin/ai-settings:
+    get:
+      operationId: getAiSettings
+      tags: [admin]
+      summary: Get AI provider settings (admin only)
+      responses:
+        "200":
+          description: Current AI settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettings"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+    patch:
+      operationId: updateAiSettings
+      tags: [admin]
+      summary: Update AI enabled flag and active provider (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiSettingsUpdate"
+      responses:
+        "200":
+          description: Updated AI settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettings"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+  /admin/ai-settings/providers/{provider}/key:
+    put:
+      operationId: setAiProviderKey
+      tags: [admin]
+      summary: Save (or replace) the API key for a provider (admin only)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [openai, anthropic, gemini]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiProviderKeyInput"
+      responses:
+        "200":
+          description: Updated AI settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettings"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+    delete:
+      operationId: clearAiProviderKey
+      tags: [admin]
+      summary: Clear the saved API key for a provider (admin only)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [openai, anthropic, gemini]
+      responses:
+        "200":
+          description: Updated AI settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettings"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
   /stats/dashboard:
     get:
       operationId: getDashboardStats
@@ -1396,3 +1488,62 @@ components:
           description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
         metadata:
           $ref: '#/components/schemas/UploadUrlRequest'
+
+    AiProviderInfo:
+      type: object
+      required: [id, label, model, hasKey, replitFallbackAvailable, usable]
+      properties:
+        id:
+          type: string
+          enum: [openai, anthropic, gemini]
+        label:
+          type: string
+        model:
+          type: string
+        hasKey:
+          type: boolean
+        keyPreview:
+          type: ["string", "null"]
+        replitFallbackAvailable:
+          type: boolean
+        usable:
+          type: boolean
+
+    AiSettings:
+      type: object
+      required: [enabled, activeProvider, providers, hasUsableActive]
+      properties:
+        enabled:
+          type: boolean
+        activeProvider:
+          type: string
+          enum: [openai, anthropic, gemini]
+        hasUsableActive:
+          type: boolean
+        providers:
+          type: object
+          required: [openai, anthropic, gemini]
+          properties:
+            openai:
+              $ref: "#/components/schemas/AiProviderInfo"
+            anthropic:
+              $ref: "#/components/schemas/AiProviderInfo"
+            gemini:
+              $ref: "#/components/schemas/AiProviderInfo"
+
+    AiSettingsUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        activeProvider:
+          type: string
+          enum: [openai, anthropic, gemini]
+
+    AiProviderKeyInput:
+      type: object
+      required: [apiKey]
+      properties:
+        apiKey:
+          type: string
+          minLength: 4

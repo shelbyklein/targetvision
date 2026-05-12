@@ -1010,6 +1010,177 @@ export const DeleteCategoryParams = zod.object({
 });
 
 /**
+ * @summary Get AI provider settings (admin only)
+ */
+export const GetAiSettingsResponse = zod.object({
+  enabled: zod.boolean(),
+  activeProvider: zod.enum(["openai", "anthropic", "gemini"]),
+  hasUsableActive: zod.boolean(),
+  providers: zod.object({
+    openai: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    anthropic: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    gemini: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+  }),
+});
+
+/**
+ * @summary Update AI enabled flag and active provider (admin only)
+ */
+export const UpdateAiSettingsBody = zod.object({
+  enabled: zod.boolean().optional(),
+  activeProvider: zod.enum(["openai", "anthropic", "gemini"]).optional(),
+});
+
+export const UpdateAiSettingsResponse = zod.object({
+  enabled: zod.boolean(),
+  activeProvider: zod.enum(["openai", "anthropic", "gemini"]),
+  hasUsableActive: zod.boolean(),
+  providers: zod.object({
+    openai: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    anthropic: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    gemini: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+  }),
+});
+
+/**
+ * @summary Save (or replace) the API key for a provider (admin only)
+ */
+export const SetAiProviderKeyParams = zod.object({
+  provider: zod.enum(["openai", "anthropic", "gemini"]),
+});
+
+export const setAiProviderKeyBodyApiKeyMin = 4;
+
+export const SetAiProviderKeyBody = zod.object({
+  apiKey: zod.string().min(setAiProviderKeyBodyApiKeyMin),
+});
+
+export const SetAiProviderKeyResponse = zod.object({
+  enabled: zod.boolean(),
+  activeProvider: zod.enum(["openai", "anthropic", "gemini"]),
+  hasUsableActive: zod.boolean(),
+  providers: zod.object({
+    openai: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    anthropic: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    gemini: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+  }),
+});
+
+/**
+ * @summary Clear the saved API key for a provider (admin only)
+ */
+export const ClearAiProviderKeyParams = zod.object({
+  provider: zod.enum(["openai", "anthropic", "gemini"]),
+});
+
+export const ClearAiProviderKeyResponse = zod.object({
+  enabled: zod.boolean(),
+  activeProvider: zod.enum(["openai", "anthropic", "gemini"]),
+  hasUsableActive: zod.boolean(),
+  providers: zod.object({
+    openai: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    anthropic: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+    gemini: zod.object({
+      id: zod.enum(["openai", "anthropic", "gemini"]),
+      label: zod.string(),
+      model: zod.string(),
+      hasKey: zod.boolean(),
+      keyPreview: zod.string().nullish(),
+      replitFallbackAvailable: zod.boolean(),
+      usable: zod.boolean(),
+    }),
+  }),
+});
+
+/**
  * @summary Get dashboard summary statistics
  */
 export const GetDashboardStatsResponse = zod.object({

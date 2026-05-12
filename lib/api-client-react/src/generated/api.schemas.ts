@@ -247,6 +247,67 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+export type AiProviderInfoId =
+  (typeof AiProviderInfoId)[keyof typeof AiProviderInfoId];
+
+export const AiProviderInfoId = {
+  openai: "openai",
+  anthropic: "anthropic",
+  gemini: "gemini",
+} as const;
+
+export interface AiProviderInfo {
+  id: AiProviderInfoId;
+  label: string;
+  model: string;
+  hasKey: boolean;
+  /** @nullable */
+  keyPreview?: string | null;
+  replitFallbackAvailable: boolean;
+  usable: boolean;
+}
+
+export type AiSettingsActiveProvider =
+  (typeof AiSettingsActiveProvider)[keyof typeof AiSettingsActiveProvider];
+
+export const AiSettingsActiveProvider = {
+  openai: "openai",
+  anthropic: "anthropic",
+  gemini: "gemini",
+} as const;
+
+export type AiSettingsProviders = {
+  openai: AiProviderInfo;
+  anthropic: AiProviderInfo;
+  gemini: AiProviderInfo;
+};
+
+export interface AiSettings {
+  enabled: boolean;
+  activeProvider: AiSettingsActiveProvider;
+  hasUsableActive: boolean;
+  providers: AiSettingsProviders;
+}
+
+export type AiSettingsUpdateActiveProvider =
+  (typeof AiSettingsUpdateActiveProvider)[keyof typeof AiSettingsUpdateActiveProvider];
+
+export const AiSettingsUpdateActiveProvider = {
+  openai: "openai",
+  anthropic: "anthropic",
+  gemini: "gemini",
+} as const;
+
+export interface AiSettingsUpdate {
+  enabled?: boolean;
+  activeProvider?: AiSettingsUpdateActiveProvider;
+}
+
+export interface AiProviderKeyInput {
+  /** @minLength 4 */
+  apiKey: string;
+}
+
 export type SearchPhotosParams = {
   q: string;
   tag?: string;

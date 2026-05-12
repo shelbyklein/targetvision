@@ -8,6 +8,7 @@ import tagsCategoriesRouter from "./tagsCategories";
 import statsRouter from "./stats";
 import storageRouter from "./storage";
 import collectionsRouter from "./collections";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(tagsCategoriesRouter);
 router.use(statsRouter);
 router.use(storageRouter);
 router.use(collectionsRouter);
+router.use(adminRouter);
 
 export default router;

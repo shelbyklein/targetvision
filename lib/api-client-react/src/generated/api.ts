@@ -17,6 +17,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AiProviderKeyInput,
+  AiSettings,
+  AiSettingsUpdate,
   Album,
   AlbumCoverUpdate,
   AlbumInput,
@@ -2463,6 +2466,357 @@ export const useDeleteCategory = <
   TContext
 > => {
   return useMutation(getDeleteCategoryMutationOptions(options));
+};
+
+/**
+ * @summary Get AI provider settings (admin only)
+ */
+export const getGetAiSettingsUrl = () => {
+  return `/api/admin/ai-settings`;
+};
+
+export const getAiSettings = async (
+  options?: RequestInit,
+): Promise<AiSettings> => {
+  return customFetch<AiSettings>(getGetAiSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAiSettingsQueryKey = () => {
+  return [`/api/admin/ai-settings`] as const;
+};
+
+export const getGetAiSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAiSettings>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAiSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAiSettingsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAiSettings>>> = ({
+    signal,
+  }) => getAiSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAiSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAiSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAiSettings>>
+>;
+export type GetAiSettingsQueryError = ErrorType<void>;
+
+/**
+ * @summary Get AI provider settings (admin only)
+ */
+
+export function useGetAiSettings<
+  TData = Awaited<ReturnType<typeof getAiSettings>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAiSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAiSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update AI enabled flag and active provider (admin only)
+ */
+export const getUpdateAiSettingsUrl = () => {
+  return `/api/admin/ai-settings`;
+};
+
+export const updateAiSettings = async (
+  aiSettingsUpdate: AiSettingsUpdate,
+  options?: RequestInit,
+): Promise<AiSettings> => {
+  return customFetch<AiSettings>(getUpdateAiSettingsUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(aiSettingsUpdate),
+  });
+};
+
+export const getUpdateAiSettingsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAiSettings>>,
+    TError,
+    { data: BodyType<AiSettingsUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAiSettings>>,
+  TError,
+  { data: BodyType<AiSettingsUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateAiSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAiSettings>>,
+    { data: BodyType<AiSettingsUpdate> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateAiSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAiSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAiSettings>>
+>;
+export type UpdateAiSettingsMutationBody = BodyType<AiSettingsUpdate>;
+export type UpdateAiSettingsMutationError = ErrorType<void>;
+
+/**
+ * @summary Update AI enabled flag and active provider (admin only)
+ */
+export const useUpdateAiSettings = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAiSettings>>,
+    TError,
+    { data: BodyType<AiSettingsUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAiSettings>>,
+  TError,
+  { data: BodyType<AiSettingsUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateAiSettingsMutationOptions(options));
+};
+
+/**
+ * @summary Save (or replace) the API key for a provider (admin only)
+ */
+export const getSetAiProviderKeyUrl = (
+  provider: "openai" | "anthropic" | "gemini",
+) => {
+  return `/api/admin/ai-settings/providers/${provider}/key`;
+};
+
+export const setAiProviderKey = async (
+  provider: "openai" | "anthropic" | "gemini",
+  aiProviderKeyInput: AiProviderKeyInput,
+  options?: RequestInit,
+): Promise<AiSettings> => {
+  return customFetch<AiSettings>(getSetAiProviderKeyUrl(provider), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(aiProviderKeyInput),
+  });
+};
+
+export const getSetAiProviderKeyMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAiProviderKey>>,
+    TError,
+    {
+      provider: "openai" | "anthropic" | "gemini";
+      data: BodyType<AiProviderKeyInput>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAiProviderKey>>,
+  TError,
+  {
+    provider: "openai" | "anthropic" | "gemini";
+    data: BodyType<AiProviderKeyInput>;
+  },
+  TContext
+> => {
+  const mutationKey = ["setAiProviderKey"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAiProviderKey>>,
+    {
+      provider: "openai" | "anthropic" | "gemini";
+      data: BodyType<AiProviderKeyInput>;
+    }
+  > = (props) => {
+    const { provider, data } = props ?? {};
+
+    return setAiProviderKey(provider, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetAiProviderKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setAiProviderKey>>
+>;
+export type SetAiProviderKeyMutationBody = BodyType<AiProviderKeyInput>;
+export type SetAiProviderKeyMutationError = ErrorType<void>;
+
+/**
+ * @summary Save (or replace) the API key for a provider (admin only)
+ */
+export const useSetAiProviderKey = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAiProviderKey>>,
+    TError,
+    {
+      provider: "openai" | "anthropic" | "gemini";
+      data: BodyType<AiProviderKeyInput>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setAiProviderKey>>,
+  TError,
+  {
+    provider: "openai" | "anthropic" | "gemini";
+    data: BodyType<AiProviderKeyInput>;
+  },
+  TContext
+> => {
+  return useMutation(getSetAiProviderKeyMutationOptions(options));
+};
+
+/**
+ * @summary Clear the saved API key for a provider (admin only)
+ */
+export const getClearAiProviderKeyUrl = (
+  provider: "openai" | "anthropic" | "gemini",
+) => {
+  return `/api/admin/ai-settings/providers/${provider}/key`;
+};
+
+export const clearAiProviderKey = async (
+  provider: "openai" | "anthropic" | "gemini",
+  options?: RequestInit,
+): Promise<AiSettings> => {
+  return customFetch<AiSettings>(getClearAiProviderKeyUrl(provider), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getClearAiProviderKeyMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearAiProviderKey>>,
+    TError,
+    { provider: "openai" | "anthropic" | "gemini" },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clearAiProviderKey>>,
+  TError,
+  { provider: "openai" | "anthropic" | "gemini" },
+  TContext
+> => {
+  const mutationKey = ["clearAiProviderKey"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clearAiProviderKey>>,
+    { provider: "openai" | "anthropic" | "gemini" }
+  > = (props) => {
+    const { provider } = props ?? {};
+
+    return clearAiProviderKey(provider, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClearAiProviderKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clearAiProviderKey>>
+>;
+
+export type ClearAiProviderKeyMutationError = ErrorType<void>;
+
+/**
+ * @summary Clear the saved API key for a provider (admin only)
+ */
+export const useClearAiProviderKey = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearAiProviderKey>>,
+    TError,
+    { provider: "openai" | "anthropic" | "gemini" },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clearAiProviderKey>>,
+  TError,
+  { provider: "openai" | "anthropic" | "gemini" },
+  TContext
+> => {
+  return useMutation(getClearAiProviderKeyMutationOptions(options));
 };
 
 /**
