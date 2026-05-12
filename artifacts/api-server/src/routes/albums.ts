@@ -200,6 +200,15 @@ router.patch("/albums/:id/cover", requireAuth, async (req, res): Promise<void> =
     return;
   }
 
+  const [coverPhoto] = await db
+    .select()
+    .from(photosTable)
+    .where(eq(photosTable.id, body.data.photoId));
+  if (!coverPhoto || coverPhoto.albumId !== params.data.id) {
+    res.status(400).json({ error: "Photo does not belong to this album" });
+    return;
+  }
+
   await db
     .update(albumsTable)
     .set({ coverPhotoId: body.data.photoId })

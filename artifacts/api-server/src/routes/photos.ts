@@ -187,6 +187,12 @@ router.post("/photos/:id/tags", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
+  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
   let [tag] = await db.select().from(tagsTable).where(eq(tagsTable.name, body.data.tagName));
   if (!tag) {
     [tag] = await db.insert(tagsTable).values({ name: body.data.tagName }).returning();
@@ -207,6 +213,12 @@ router.delete("/photos/:id/tags/:tagId", requireAuth, async (req, res): Promise<
   const params = RemovePhotoTagParams.safeParse({ id: parseInt(rawId, 10), tagId: parseInt(rawTagId, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
     return;
   }
 
@@ -232,6 +244,18 @@ router.post("/photos/:id/categories", requireAuth, async (req, res): Promise<voi
     return;
   }
 
+  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const [catExists] = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.id, body.data.categoryId));
+  if (!catExists) {
+    res.status(404).json({ error: "Category not found" });
+    return;
+  }
+
   await db
     .insert(photoCategoriesTable)
     .values({ photoId: params.data.id, categoryId: body.data.categoryId })
@@ -247,6 +271,12 @@ router.delete("/photos/:id/categories/:categoryId", requireAuth, async (req, res
   const params = RemovePhotoCategoryParams.safeParse({ id: parseInt(rawId, 10), categoryId: parseInt(rawCatId, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
     return;
   }
 
