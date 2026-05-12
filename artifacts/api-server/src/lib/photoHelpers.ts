@@ -15,7 +15,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
 
   if (!photo) return null;
 
-  const [tags, categories, photoCollections, ratingDataArr, suggestedCollections] = await Promise.all([
+  const [tags, categories, photoCollections, ratingDataArr, ratingsList, suggestedCollections] = await Promise.all([
     db
       .select({ id: tagsTable.id, name: tagsTable.name })
       .from(tagsTable)
@@ -46,6 +46,17 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
       })
       .from(ratingsTable)
       .where(eq(ratingsTable.photoId, photoId)),
+    db
+      .select({
+        userId: ratingsTable.userId,
+        userName: usersTable.name,
+        score: ratingsTable.score,
+        createdAt: ratingsTable.createdAt,
+      })
+      .from(ratingsTable)
+      .leftJoin(usersTable, eq(ratingsTable.userId, usersTable.id))
+      .where(eq(ratingsTable.photoId, photoId))
+      .orderBy(ratingsTable.createdAt),
     db
       .select({ id: collectionsTable.id, title: collectionsTable.title })
       .from(photoCollectionSuggestionsTable)
@@ -91,6 +102,12 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     averageRating: ratingData?.averageRating ? parseFloat(String(ratingData.averageRating)) : null,
     ratingCount: Number(ratingData?.ratingCount ?? 0),
     myRating,
+    ratings: ratingsList.map((r) => ({
+      userId: r.userId,
+      userName: r.userName ?? null,
+      score: r.score,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    })),
     suggestedCollections,
   };
 }

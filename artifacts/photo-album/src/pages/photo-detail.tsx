@@ -18,6 +18,9 @@ import {
   useDismissPhotoSuggestion,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
+  getListPhotosQueryKey,
+  getGetRecentPhotosQueryKey,
+  getGetTopRatedPhotosQueryKey,
   getGetTagCloudQueryKey,
   getListTagsQueryKey,
 } from "@workspace/api-client-react";
@@ -52,12 +55,10 @@ import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderO
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRating, onRated }: {
+function StarRating({ photoId, myRating, currentUserId, onRated }: {
   photoId: number;
   myRating?: number | null;
-  uploaderId: number;
   currentUserId?: number;
-  averageRating?: number | null;
   onRated: () => void;
 }) {
   const [hovered, setHovered] = useState(0);
@@ -66,11 +67,8 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
   const { toast } = useToast();
 
   const isSignedIn = currentUserId != null;
-  const isOwn = isSignedIn && currentUserId === uploaderId;
-  const interactive = isSignedIn && !isOwn;
-  const displayRating = isOwn
-    ? Math.round(averageRating ?? 0)
-    : (hovered || myRating || 0);
+  const interactive = isSignedIn;
+  const displayRating = hovered || myRating || 0;
 
   function handleClear() {
     clearRating(
@@ -90,10 +88,6 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
       toast({ title: "Sign in to rate photos", variant: "destructive" });
       return;
     }
-    if (isOwn) {
-      toast({ title: "Cannot rate your own photo", variant: "destructive" });
-      return;
-    }
     ratePhoto(
       { id: photoId, data: { score } },
       {
@@ -111,13 +105,11 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
       <div className="space-y-1">
         <h2 className="text-base font-semibold text-foreground">Rate this photo</h2>
         <p className="text-xs text-muted-foreground">
-          {isOwn
-            ? "You can't rate your own photos — only other team members can rate this one."
-            : !isSignedIn
-              ? "Sign in to give this photo a rating from 1 to 5 stars."
-              : myRating != null
-                ? "Tap a star to update your rating."
-                : "Tap a star to rate from 1 (lowest) to 5 (highest)."}
+          {!isSignedIn
+            ? "Sign in to give this photo a rating from 1 to 5 stars."
+            : myRating != null
+              ? "Tap a star to update your rating."
+              : "Tap a star to rate from 1 (lowest) to 5 (highest)."}
         </p>
       </div>
       <div className="flex items-center gap-1.5" data-testid="star-rating">
@@ -130,7 +122,7 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
             onMouseLeave={() => interactive && setHovered(0)}
             disabled={isPending || isClearing || !interactive}
             aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
-            aria-pressed={!isOwn && myRating === star}
+            aria-pressed={myRating === star}
             className={
               interactive
                 ? "p-1 rounded-md transition-all hover:scale-110 hover:bg-amber-50 dark:hover:bg-amber-950/30 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:cursor-not-allowed"
@@ -149,7 +141,7 @@ function StarRating({ photoId, myRating, uploaderId, currentUserId, averageRatin
             />
           </button>
         ))}
-        {!isOwn && myRating != null && (
+        {myRating != null && (
           <span className="text-sm font-medium text-foreground ml-2" data-testid="my-rating-text">
             Your rating: {myRating}/5
           </span>
@@ -324,6 +316,9 @@ export default function PhotoDetail() {
     if (photo?.albumId) {
       qc.invalidateQueries({ queryKey: getListAlbumPhotosQueryKey(photo.albumId) });
     }
+    qc.invalidateQueries({ queryKey: getListPhotosQueryKey().slice(0, 1) });
+    qc.invalidateQueries({ queryKey: getGetRecentPhotosQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
   }
 
   function invalidateWithTags() {
@@ -636,11 +631,35 @@ export default function PhotoDetail() {
             <StarRating
               photoId={photoId}
               myRating={photo.myRating}
-              uploaderId={photo.uploaderId}
               currentUserId={me?.id}
-              averageRating={photo.averageRating}
               onRated={invalidate}
             />
+
+            {photo.ratings && photo.ratings.length > 0 && (
+              <div className="rounded-lg border border-border bg-card p-4 space-y-2" data-testid="ratings-breakdown">
+                <h3 className="text-sm font-semibold text-foreground">All ratings</h3>
+                <ul className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {photo.ratings.map((r) => (
+                    <li
+                      key={r.userId}
+                      className="flex items-center justify-between text-sm"
+                      data-testid={`rating-row-${r.userId}`}
+                    >
+                      <span className="text-foreground truncate">
+                        {r.userName ?? "Unknown"}
+                        {me?.id === r.userId && (
+                          <span className="ml-1 text-xs text-muted-foreground">(you)</span>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-1 text-foreground font-medium shrink-0">
+                        {r.score}
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <Separator />
 

@@ -697,6 +697,9 @@ export default function AlbumDetail() {
                     <span className="text-xs text-white font-medium">
                       {photo.averageRating.toFixed(1)}
                     </span>
+                    <span className="text-[10px] text-white/80 ml-0.5">
+                      ({photo.ratingCount})
+                    </span>
                   </div>
                 )}
 

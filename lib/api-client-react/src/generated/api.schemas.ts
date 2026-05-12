@@ -103,6 +103,14 @@ export interface SuggestedCollection {
   title: string;
 }
 
+export interface PhotoRating {
+  userId: number;
+  /** @nullable */
+  userName?: string | null;
+  score: number;
+  createdAt: string;
+}
+
 export interface Photo {
   id: number;
   albumId: number;
@@ -130,6 +138,7 @@ export interface Photo {
   /** @nullable */
   aiDescription?: string | null;
   suggestedCollections?: SuggestedCollection[];
+  ratings?: PhotoRating[];
 }
 
 export interface Collection {

@@ -375,11 +375,6 @@ router.post("/photos/:id/rating", requireAuth, async (req, res): Promise<void> =
     return;
   }
 
-  if (photo.uploaderId === req.dbUser!.id) {
-    res.status(403).json({ error: "Cannot rate your own photo" });
-    return;
-  }
-
   await db
     .insert(ratingsTable)
     .values({ photoId: params.data.id, userId: req.dbUser!.id, score: body.data.score })

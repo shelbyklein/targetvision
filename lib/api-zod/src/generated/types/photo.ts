@@ -7,6 +7,7 @@
  */
 import type { Category } from "./category";
 import type { CollectionSummary } from "./collectionSummary";
+import type { PhotoRating } from "./photoRating";
 import type { SuggestedCollection } from "./suggestedCollection";
 import type { Tag } from "./tag";
 
@@ -37,4 +38,5 @@ export interface Photo {
   /** @nullable */
   aiDescription?: string | null;
   suggestedCollections?: SuggestedCollection[];
+  ratings?: PhotoRating[];
 }

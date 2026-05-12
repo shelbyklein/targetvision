@@ -617,8 +617,6 @@ paths:
                 $ref: "#/components/schemas/Photo"
         "401":
           description: Unauthorized
-        "403":
-          description: Cannot rate own photo
     delete:
       operationId: clearPhotoRating
       tags: [ratings]
@@ -1264,6 +1262,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SuggestedCollection"
+        ratings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PhotoRating"
+
+    PhotoRating:
+      type: object
+      required: [userId, score, createdAt]
+      properties:
+        userId:
+          type: integer
+        userName:
+          type: ["string", "null"]
+        score:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
 
     CollectionSummary:
       type: object

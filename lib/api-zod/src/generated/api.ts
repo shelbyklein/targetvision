@@ -200,6 +200,16 @@ export const GetAlbumTopRatedResponseItem = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const GetAlbumTopRatedResponse = zod.array(GetAlbumTopRatedResponseItem);
 
@@ -287,6 +297,16 @@ export const ListAlbumPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const ListAlbumPhotosResponse = zod.array(ListAlbumPhotosResponseItem);
 
@@ -371,6 +391,16 @@ export const SearchPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const SearchPhotosResponse = zod.array(SearchPhotosResponseItem);
 
@@ -440,6 +470,16 @@ export const ListPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const ListPhotosResponse = zod.array(ListPhotosResponseItem);
 
@@ -500,6 +540,16 @@ export const GetPhotoResponse = zod.object({
       zod.object({
         id: zod.number(),
         title: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -568,6 +618,16 @@ export const UpdatePhotoResponse = zod.object({
       zod.object({
         id: zod.number(),
         title: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -644,6 +704,16 @@ export const AddPhotoTagResponse = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -704,6 +774,16 @@ export const RemovePhotoTagResponse = zod.object({
       zod.object({
         id: zod.number(),
         title: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -773,6 +853,16 @@ export const AddPhotoCategoryResponse = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -833,6 +923,16 @@ export const RemovePhotoCategoryResponse = zod.object({
       zod.object({
         id: zod.number(),
         title: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -904,6 +1004,16 @@ export const RatePhotoResponse = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -963,6 +1073,16 @@ export const ClearPhotoRatingResponse = zod.object({
       zod.object({
         id: zod.number(),
         title: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -1242,6 +1362,16 @@ export const GetDashboardStatsResponse = zod.object({
           }),
         )
         .optional(),
+      ratings: zod
+        .array(
+          zod.object({
+            userId: zod.number(),
+            userName: zod.string().nullish(),
+            score: zod.number(),
+            createdAt: zod.coerce.date(),
+          }),
+        )
+        .optional(),
     }),
   ),
 });
@@ -1302,6 +1432,16 @@ export const GetRecentPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 export const GetRecentPhotosResponse = zod.array(GetRecentPhotosResponseItem);
 
@@ -1358,6 +1498,16 @@ export const GetTopRatedPhotosResponseItem = zod.object({
       zod.object({
         id: zod.number(),
         title: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
@@ -1496,6 +1646,16 @@ export const GetCollectionResponse = zod.object({
             }),
           )
           .optional(),
+        ratings: zod
+          .array(
+            zod.object({
+              userId: zod.number(),
+              userName: zod.string().nullish(),
+              score: zod.number(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
       }),
     )
     .optional(),
@@ -1574,6 +1734,16 @@ export const UpdateCollectionResponse = zod.object({
             zod.object({
               id: zod.number(),
               title: zod.string(),
+            }),
+          )
+          .optional(),
+        ratings: zod
+          .array(
+            zod.object({
+              userId: zod.number(),
+              userName: zod.string().nullish(),
+              score: zod.number(),
+              createdAt: zod.coerce.date(),
             }),
           )
           .optional(),
@@ -1669,6 +1839,16 @@ export const AcceptPhotoSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -1729,6 +1909,16 @@ export const DismissPhotoSuggestionResponse = zod.object({
       zod.object({
         id: zod.number(),
         title: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
       }),
     )
     .optional(),

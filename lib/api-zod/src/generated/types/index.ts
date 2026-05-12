@@ -30,6 +30,7 @@ export * from "./healthStatus";
 export * from "./listPhotosParams";
 export * from "./photo";
 export * from "./photoCategoryInput";
+export * from "./photoRating";
 export * from "./photoTagInput";
 export * from "./photoUpdate";
 export * from "./photoUploadInput";
