@@ -459,6 +459,42 @@ export default function PhotoDetail() {
     );
   }
 
+  const [acceptingAllTags, setAcceptingAllTags] = useState(false);
+
+  async function handleAcceptAllTagSuggestions() {
+    if (!photo?.suggestedTags || photo.suggestedTags.length === 0) return;
+    const names = photo.suggestedTags.map((s) => s.name);
+    setAcceptingAllTags(true);
+    let failed = 0;
+    await Promise.all(
+      names.map(
+        (tagName) =>
+          new Promise<void>((resolve) => {
+            acceptTagSuggestion(
+              { id: photoId, tagName },
+              {
+                onSuccess: () => resolve(),
+                onError: () => {
+                  failed += 1;
+                  resolve();
+                },
+              }
+            );
+          })
+      )
+    );
+    invalidateWithTags();
+    setAcceptingAllTags(false);
+    if (failed > 0) {
+      toast({
+        title: failed === names.length ? "Failed to accept tags" : `Failed to accept ${failed} tag${failed !== 1 ? "s" : ""}`,
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: `Accepted ${names.length} tags` });
+    }
+  }
+
   function handleDismissTagSuggestion(tagName: string) {
     dismissTagSuggestion(
       { id: photoId, tagName },
@@ -708,9 +744,27 @@ export default function PhotoDetail() {
               </div>
               {photo.suggestedTags && photo.suggestedTags.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" /> Suggested
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" /> Suggested
+                    </p>
+                    {photo.suggestedTags.length >= 2 && (
+                      <button
+                        type="button"
+                        onClick={handleAcceptAllTagSuggestions}
+                        disabled={acceptingAllTags}
+                        className="text-[11px] font-medium text-primary hover:underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                        data-testid="accept-all-suggested-tags"
+                      >
+                        {acceptingAllTags ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Check className="h-3 w-3" />
+                        )}
+                        Accept all
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-1.5" data-testid="suggested-tags">
                     {photo.suggestedTags.map((s) => (
                       <div
