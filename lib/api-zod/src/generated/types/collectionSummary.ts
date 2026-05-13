@@ -12,8 +12,6 @@ export interface CollectionSummary {
   /** @nullable */
   description?: string | null;
   createdById: number;
-  /** @nullable */
-  creatorName?: string | null;
   photoCount: number;
   /** @nullable */
   coverPhotoUrl?: string | null;

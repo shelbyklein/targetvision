@@ -20,8 +20,6 @@ export interface Photo {
   albumTitle?: string | null;
   uploaderId: number;
   /** @nullable */
-  uploaderName?: string | null;
-  /** @nullable */
   storageKey?: string | null;
   url: string;
   /** @nullable */

@@ -6,11 +6,9 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     .select({
       photo: photosTable,
       albumTitle: albumsTable.title,
-      uploaderName: usersTable.name,
     })
     .from(photosTable)
     .leftJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-    .leftJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
     .where(eq(photosTable.id, photoId));
 
   if (!photo) return null;
@@ -33,11 +31,9 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
         description: collectionsTable.description,
         createdById: collectionsTable.createdById,
         createdAt: collectionsTable.createdAt,
-        creatorName: usersTable.name,
       })
       .from(collectionsTable)
       .innerJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
-      .leftJoin(usersTable, eq(collectionsTable.createdById, usersTable.id))
       .where(eq(photoCollectionsTable.photoId, photoId)),
     db
       .select({
@@ -105,7 +101,6 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     takenAt: p.takenAt instanceof Date ? p.takenAt.toISOString() : (p.takenAt ?? null),
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     albumTitle: photo.albumTitle ?? null,
-    uploaderName: photo.uploaderName ?? null,
     tags,
     categories,
     photoCollections: photoCollections.map((c) => ({
@@ -113,7 +108,6 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
       title: c.title,
       description: c.description ?? null,
       createdById: c.createdById,
-      creatorName: c.creatorName ?? null,
       createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
       photoCount: 0,
       coverPhotoUrl: null,

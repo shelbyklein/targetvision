@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, count, sql, and } from "drizzle-orm";
-import { db, collectionsTable, photoCollectionsTable, photosTable, usersTable } from "@workspace/db";
+import { db, collectionsTable, photoCollectionsTable, photosTable } from "@workspace/db";
 import {
   ListCollectionsResponse,
   CreateCollectionBody,
@@ -23,14 +23,12 @@ async function buildCollectionResponse(collectionId: number) {
   const [row] = await db
     .select({
       collection: collectionsTable,
-      creatorName: usersTable.name,
       photoCount: count(photoCollectionsTable.photoId),
     })
     .from(collectionsTable)
-    .leftJoin(usersTable, eq(collectionsTable.createdById, usersTable.id))
     .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
     .where(eq(collectionsTable.id, collectionId))
-    .groupBy(collectionsTable.id, usersTable.name);
+    .groupBy(collectionsTable.id);
 
   if (!row) return null;
 
@@ -45,7 +43,6 @@ async function buildCollectionResponse(collectionId: number) {
   return {
     ...row.collection,
     createdAt: row.collection.createdAt.toISOString(),
-    creatorName: row.creatorName ?? null,
     photoCount: Number(row.photoCount),
     coverPhotoUrl: coverPhotoRow[0]?.url ?? null,
   };
@@ -55,13 +52,11 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
   const rows = await db
     .select({
       collection: collectionsTable,
-      creatorName: usersTable.name,
       photoCount: count(photoCollectionsTable.photoId),
     })
     .from(collectionsTable)
-    .leftJoin(usersTable, eq(collectionsTable.createdById, usersTable.id))
     .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
-    .groupBy(collectionsTable.id, usersTable.name)
+    .groupBy(collectionsTable.id)
     .orderBy(sql`${collectionsTable.createdAt} desc`);
 
   const collections = await Promise.all(
@@ -77,7 +72,6 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
       return {
         ...row.collection,
         createdAt: row.collection.createdAt.toISOString(),
-        creatorName: row.creatorName ?? null,
         photoCount: Number(row.photoCount),
         coverPhotoUrl: coverPhotoRow[0]?.url ?? null,
       };

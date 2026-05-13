@@ -1408,8 +1408,6 @@ components:
           type: ["string", "null"]
         uploaderId:
           type: integer
-        uploaderName:
-          type: ["string", "null"]
         storageKey:
           type: ["string", "null"]
         url:
@@ -1484,8 +1482,6 @@ components:
           type: ["string", "null"]
         createdById:
           type: integer
-        creatorName:
-          type: ["string", "null"]
         photoCount:
           type: integer
         coverPhotoUrl:
@@ -1506,8 +1502,6 @@ components:
           type: ["string", "null"]
         createdById:
           type: integer
-        creatorName:
-          type: ["string", "null"]
         photoCount:
           type: integer
         coverPhotoUrl:
