@@ -511,6 +511,12 @@ export default function AlbumDetail() {
                 <span className="flex items-center gap-1">
                   <Camera className="h-3.5 w-3.5" />
                   {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
+                  {me?.role === "admin" && !!album.hiddenCount && (
+                    <span className="flex items-center gap-0.5 text-muted-foreground/70">
+                      <EyeOff className="h-3 w-3" />
+                      {album.hiddenCount} hidden
+                    </span>
+                  )}
                 </span>
                 {album.ownerName && <span>by {album.ownerName}</span>}
               </div>

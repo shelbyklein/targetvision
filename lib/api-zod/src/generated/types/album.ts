@@ -21,5 +21,6 @@ export interface Album {
   /** @nullable */
   coverPhotoUrl?: string | null;
   photoCount: number;
+  hiddenCount?: number;
   createdAt: Date;
 }
