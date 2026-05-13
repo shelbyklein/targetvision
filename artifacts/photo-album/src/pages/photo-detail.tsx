@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import {
   useGetPhoto,
+  useListAlbumPhotos,
   useRatePhoto,
   useClearPhotoRating,
   useAddPhotoTag,
@@ -56,7 +57,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw } from "lucide-react";
+import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -320,6 +321,35 @@ export default function PhotoDetail() {
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { mutate: rerunAnalysis, isPending: rerunning } = useRerunPhotoAnalysis();
   const [downloading, setDownloading] = useState(false);
+
+  const { data: albumPhotos } = useListAlbumPhotos(photo?.albumId ?? 0, {
+    query: { enabled: !!photo?.albumId },
+  });
+
+  const currentIndex = albumPhotos ? albumPhotos.findIndex((p) => p.id === photoId) : -1;
+  const prevPhotoId = currentIndex > 0 ? albumPhotos![currentIndex - 1].id : null;
+  const nextPhotoId = currentIndex >= 0 && albumPhotos && currentIndex < albumPhotos.length - 1 ? albumPhotos![currentIndex + 1].id : null;
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented) return;
+      const target = e.target as Element | null;
+      if (!target) return;
+      const tag = (target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if ((target as HTMLElement).isContentEditable) return;
+      if (target.closest('[role="listbox"], [role="menu"], [role="dialog"], [role="combobox"]')) return;
+      if (e.key === "ArrowLeft" && prevPhotoId != null) {
+        e.preventDefault();
+        navigate(`/photos/${prevPhotoId}`);
+      } else if (e.key === "ArrowRight" && nextPhotoId != null) {
+        e.preventDefault();
+        navigate(`/photos/${nextPhotoId}`);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [prevPhotoId, nextPhotoId, navigate]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
@@ -611,14 +641,49 @@ export default function PhotoDetail() {
   return (
     <AppLayout>
       <div className="space-y-6" data-testid="photo-detail-page">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {photo.albumId && (
+              <Link href={`/albums/${photo.albumId}`}>
+                <Button variant="ghost" size="sm" className="gap-1.5" data-testid="back-to-album">
+                  <ArrowLeft className="h-4 w-4" />
+                  {photo.albumTitle ?? "Album"}
+                </Button>
+              </Link>
+            )}
+          </div>
           {photo.albumId && (
-            <Link href={`/albums/${photo.albumId}`}>
-              <Button variant="ghost" size="sm" className="gap-1.5" data-testid="back-to-album">
-                <ArrowLeft className="h-4 w-4" />
-                {photo.albumTitle ?? "Album"}
+            <div className="flex items-center gap-1" data-testid="photo-nav">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                disabled={prevPhotoId == null}
+                onClick={() => prevPhotoId != null && navigate(`/photos/${prevPhotoId}`)}
+                aria-label="Previous photo"
+                data-testid="prev-photo-btn"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Prev
               </Button>
-            </Link>
+              {albumPhotos && currentIndex >= 0 && (
+                <span className="text-xs text-muted-foreground px-1 tabular-nums" data-testid="photo-position">
+                  {currentIndex + 1} / {albumPhotos.length}
+                </span>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                disabled={nextPhotoId == null}
+                onClick={() => nextPhotoId != null && navigate(`/photos/${nextPhotoId}`)}
+                aria-label="Next photo"
+                data-testid="next-photo-btn"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </div>
 
