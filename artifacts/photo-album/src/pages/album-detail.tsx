@@ -574,7 +574,8 @@ export default function AlbumDetail() {
 
                 {(photo.aiDescription ||
                   (photo.createdAt && Date.now() - new Date(photo.createdAt).getTime() < 60_000) ||
-                  (photo.suggestedCollections && photo.suggestedCollections.length > 0)) && (
+                  (photo.suggestedCollections && photo.suggestedCollections.length > 0) ||
+                  (photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0)) && (
                 <div className="p-2 space-y-1">
                   {photo.aiDescription ? (
                     <p
@@ -632,6 +633,24 @@ export default function AlbumDetail() {
                             <X className="h-2 w-2" />
                           </button>
                         </span>
+                      ))}
+                    </div>
+                  )}
+                  {photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-0.5" data-testid="card-new-collection-suggestions">
+                      {photo.suggestedNewCollections.slice(0, 2).map((s) => (
+                        <Link
+                          key={s.id}
+                          href={`/photos/${photo.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          data-testid={`card-suggested-new-collection-${s.id}`}
+                        >
+                          <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-1.5 py-px text-[9px] text-foreground hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors">
+                            <Sparkles className="h-2 w-2 text-emerald-600 dark:text-emerald-400" />
+                            <span>New: {s.suggestedName}</span>
+                          </span>
+                        </Link>
                       ))}
                     </div>
                   )}

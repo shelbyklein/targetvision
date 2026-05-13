@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 24;
@@ -324,34 +324,51 @@ export default function PhotosPage() {
               className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
               data-testid="photos-grid"
             >
-              {paginatedPhotos.map((photo) => (
-                <Link key={photo.id} href={`/photos/${photo.id}`} data-testid="photo-grid-item">
-                  <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
-                    <img
-                      src={photo.url}
-                      alt="Photo"
-                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
-                      {photo.albumTitle && (
-                        <p className="text-xs text-white/80 truncate">{photo.albumTitle}</p>
-                      )}
-                      {photo.averageRating != null && (
-                        <div className="flex items-center gap-0.5 mt-1">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                          <span className="text-xs text-white font-medium">
-                            {photo.averageRating.toFixed(1)}
-                          </span>
-                          <span className="text-[10px] text-white/80 ml-0.5">
-                            ({photo.ratingCount})
+              {paginatedPhotos.map((photo) => {
+                const suggestionCount =
+                  (photo.suggestedCollections?.length ?? 0) +
+                  (photo.suggestedNewCollections?.length ?? 0);
+                return (
+                  <Link key={photo.id} href={`/photos/${photo.id}`} data-testid="photo-grid-item">
+                    <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
+                      <img
+                        src={photo.url}
+                        alt="Photo"
+                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
+                        {photo.albumTitle && (
+                          <p className="text-xs text-white/80 truncate">{photo.albumTitle}</p>
+                        )}
+                        {photo.averageRating != null && (
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <span className="text-xs text-white font-medium">
+                              {photo.averageRating.toFixed(1)}
+                            </span>
+                            <span className="text-[10px] text-white/80 ml-0.5">
+                              ({photo.ratingCount})
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {suggestionCount > 0 && (
+                        <div
+                          className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-primary/90 px-1.5 py-0.5 shadow"
+                          title={`${suggestionCount} collection suggestion${suggestionCount !== 1 ? "s" : ""} — click to review`}
+                          data-testid="suggestion-badge"
+                        >
+                          <Sparkles className="h-2.5 w-2.5 text-primary-foreground" />
+                          <span className="text-[10px] font-semibold text-primary-foreground leading-none">
+                            {suggestionCount}
                           </span>
                         </div>
                       )}
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
 
             {totalPages > 1 && (
