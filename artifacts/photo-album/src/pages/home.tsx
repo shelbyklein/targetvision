@@ -14,10 +14,7 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-3">
           <Link href="/sign-in">
-            <Button variant="ghost" data-testid="sign-in-btn">Sign In</Button>
-          </Link>
-          <Link href="/sign-up">
-            <Button data-testid="sign-up-btn">Get Started</Button>
+            <Button data-testid="sign-in-btn">Sign In</Button>
           </Link>
         </div>
       </header>
@@ -39,13 +36,8 @@ export default function Home() {
         </p>
 
         <div className="flex items-center justify-center gap-4">
-          <Link href="/sign-up">
-            <Button size="lg" data-testid="get-started-btn" className="px-8">
-              Get Started
-            </Button>
-          </Link>
           <Link href="/sign-in">
-            <Button size="lg" variant="outline" data-testid="home-sign-in-btn">
+            <Button size="lg" data-testid="home-sign-in-btn" className="px-8">
               Sign In
             </Button>
           </Link>
