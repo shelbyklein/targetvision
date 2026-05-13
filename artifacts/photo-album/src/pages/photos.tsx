@@ -4,7 +4,10 @@ import {
   useListPhotos,
   useListUsers,
   useGetMe,
+  useBulkUpdatePhotos,
+  getListPhotosQueryKey,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,9 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Eye, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
+import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 24;
 
@@ -84,6 +88,10 @@ export default function PhotosPage() {
   const { search, ratingMin, uploaderId, dateFrom, dateTo, page } = urlParams;
   const [inputValue, setInputValue] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
 
   useEffect(() => {
     setInputValue(search);
@@ -117,6 +125,36 @@ export default function PhotosPage() {
   function navigate(next: Partial<ReturnType<typeof parseSearch>>) {
     const merged = { ...urlParams, ...next };
     setLocation(`/photos${buildQs(merged)}`, { replace: true });
+  }
+
+  function toggleSelect(photoId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkVisibility(isHidden: boolean) {
+    const ids = Array.from(selectedIds);
+    try {
+      const result = await bulkUpdatePhotos({ data: { ids, isHidden } });
+      const count = result?.updated ?? ids.length;
+      toast({
+        title: isHidden
+          ? `${count} photo${count !== 1 ? "s" : ""} hidden`
+          : `${count} photo${count !== 1 ? "s" : ""} unhidden`,
+      });
+      clearSelection();
+      qc.invalidateQueries({ queryKey: getListPhotosQueryKey() });
+    } catch {
+      toast({ title: "Bulk action failed", variant: "destructive" });
+    }
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -331,16 +369,40 @@ export default function PhotosPage() {
                 const suggestionCount =
                   (photo.suggestedCollections?.length ?? 0) +
                   (photo.suggestedNewCollections?.length ?? 0);
+                const isSelected = selectedIds.has(photo.id);
                 return (
-                  <Link key={photo.id} href={`/photos/${photo.id}`} data-testid="photo-grid-item">
-                    <div className={cn(
-                      "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
-                      photo.isHidden && "opacity-60"
-                    )}>
+                  <div
+                    key={photo.id}
+                    className={cn(
+                      "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted",
+                      isSelected && "ring-2 ring-primary ring-offset-1"
+                    )}
+                    data-testid="photo-grid-item"
+                  >
+                    {me?.role === "admin" && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSelect(photo.id)}
+                        className={cn(
+                          "absolute top-1.5 left-1.5 z-20 h-5 w-5 rounded border-2 transition-all flex items-center justify-center",
+                          isSelected
+                            ? "bg-primary border-primary text-primary-foreground opacity-100"
+                            : "bg-white/80 border-white/80 opacity-0 group-hover:opacity-100"
+                        )}
+                        aria-label={isSelected ? "Deselect photo" : "Select photo"}
+                        data-testid="photo-select-checkbox"
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </button>
+                    )}
+                    <Link href={`/photos/${photo.id}`} className="block h-full w-full cursor-pointer">
                       <img
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        className={cn(
+                          "h-full w-full object-cover transition-transform duration-200 group-hover:scale-105",
+                          photo.isHidden && "opacity-60"
+                        )}
                         loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
@@ -359,30 +421,30 @@ export default function PhotosPage() {
                           </div>
                         )}
                       </div>
-                      {photo.isHidden && (
-                        <div
-                          className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow"
-                          title="Hidden photo"
-                          data-testid="hidden-badge"
-                        >
-                          <EyeOff className="h-2.5 w-2.5 text-white" />
-                          <span className="text-[10px] font-semibold text-white leading-none">Hidden</span>
-                        </div>
-                      )}
-                      {suggestionCount > 0 && (
-                        <div
-                          className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-primary/90 px-1.5 py-0.5 shadow"
-                          title={`${suggestionCount} collection suggestion${suggestionCount !== 1 ? "s" : ""} — click to review`}
-                          data-testid="suggestion-badge"
-                        >
-                          <Sparkles className="h-2.5 w-2.5 text-primary-foreground" />
-                          <span className="text-[10px] font-semibold text-primary-foreground leading-none">
-                            {suggestionCount}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </Link>
+                    </Link>
+                    {photo.isHidden && (
+                      <div
+                        className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow pointer-events-none"
+                        title="Hidden photo"
+                        data-testid="hidden-badge"
+                      >
+                        <EyeOff className="h-2.5 w-2.5 text-white" />
+                        <span className="text-[10px] font-semibold text-white leading-none">Hidden</span>
+                      </div>
+                    )}
+                    {suggestionCount > 0 && (
+                      <div
+                        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-primary/90 px-1.5 py-0.5 shadow pointer-events-none"
+                        title={`${suggestionCount} collection suggestion${suggestionCount !== 1 ? "s" : ""} — click to review`}
+                        data-testid="suggestion-badge"
+                      >
+                        <Sparkles className="h-2.5 w-2.5 text-primary-foreground" />
+                        <span className="text-[10px] font-semibold text-primary-foreground leading-none">
+                          {suggestionCount}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -465,6 +527,49 @@ export default function PhotosPage() {
           </div>
         )}
       </div>
+
+      {me?.role === "admin" && selectedIds.size > 0 && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full bg-foreground text-background shadow-xl px-5 py-3"
+          data-testid="bulk-action-toolbar"
+        >
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <div className="w-px h-4 bg-background/30" />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
+            onClick={() => handleBulkVisibility(true)}
+            disabled={bulkUpdating}
+            data-testid="bulk-hide-btn"
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+            Hide selected
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
+            onClick={() => handleBulkVisibility(false)}
+            disabled={bulkUpdating}
+            data-testid="bulk-unhide-btn"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Unhide selected
+          </Button>
+          <div className="w-px h-4 bg-background/30" />
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="text-background/70 hover:text-background transition-colors"
+            aria-label="Clear selection"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </AppLayout>
   );
 }

@@ -176,15 +176,6 @@ export interface SuggestedCategory {
   name: string;
 }
 
-export interface SuggestedTag {
-  name: string;
-}
-
-export interface SuggestedCategory {
-  id: number;
-  name: string;
-}
-
 export interface PhotoUploadInput {
   /** @minLength 1 */
   url: string;
@@ -349,6 +340,20 @@ export interface AiSettingsUpdate {
 export interface AiProviderKeyInput {
   /** @minLength 4 */
   apiKey: string;
+}
+
+export interface AcceptNewCollectionSuggestionBody {
+  name?: string;
+}
+
+export interface BulkPhotoUpdate {
+  /** @minItems 1 */
+  ids: number[];
+  isHidden: boolean;
+}
+
+export interface BulkPhotoUpdateResult {
+  updated: number;
 }
 
 export interface BulkRetryAiAnalysisEventsResult {

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./acceptNewCollectionSuggestionBody";
 export * from "./aiAnalysisEvent";
 export * from "./aiAnalysisEventStatus";
 export * from "./aiModelOption";
@@ -22,6 +23,8 @@ export * from "./album";
 export * from "./albumCoverUpdate";
 export * from "./albumInput";
 export * from "./albumUpdate";
+export * from "./bulkPhotoUpdate";
+export * from "./bulkPhotoUpdateResult";
 export * from "./bulkRetryAiAnalysisEventsResult";
 export * from "./category";
 export * from "./categoryInput";

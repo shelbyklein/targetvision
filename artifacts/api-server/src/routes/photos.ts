@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
@@ -32,6 +32,8 @@ import {
   DismissPhotoNewCollectionSuggestionResponse,
   RerunPhotoAnalysisParams,
   RerunPhotoAnalysisResponse,
+  BulkUpdatePhotosBody,
+  BulkUpdatePhotosResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -141,6 +143,29 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
 
   const full = await Promise.all(filteredIds.map((id) => buildPhotoResponse(id, req.dbUser?.id)));
   res.json(ListPhotosResponse.parse(full.filter(Boolean)));
+});
+
+router.patch("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
+  if (req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const body = BulkUpdatePhotosBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const { ids, isHidden } = body.data;
+
+  const updated = await db
+    .update(photosTable)
+    .set({ isHidden })
+    .where(inArray(photosTable.id, ids))
+    .returning({ id: photosTable.id });
+
+  res.json(BulkUpdatePhotosResponse.parse({ updated: updated.length }));
 });
 
 router.get("/photos/:id", requireAuth, async (req, res): Promise<void> => {

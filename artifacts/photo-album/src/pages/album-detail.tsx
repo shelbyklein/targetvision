@@ -10,6 +10,7 @@ import {
   useDismissPhotoSuggestion,
   useAcceptPhotoNewCollectionSuggestion,
   useDismissPhotoNewCollectionSuggestion,
+  useBulkUpdatePhotos,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -72,6 +73,7 @@ import {
   Loader2,
   Check,
   EyeOff,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
@@ -340,6 +342,8 @@ export default function AlbumDetail() {
     name: string;
   } | null>(null);
   const { showHidden } = useShowHiddenPhotos();
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
 
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
@@ -393,7 +397,7 @@ export default function AlbumDetail() {
 
   function handleAcceptNewCollectionSuggestion(photoId: number, suggestionId: number, name: string) {
     acceptNewCollectionSuggestion(
-      { id: photoId, suggestionId, name },
+      { id: photoId, suggestionId, data: { name } },
       {
         onSuccess: () => {
           setConfirmNewCollection(null);
@@ -418,6 +422,36 @@ export default function AlbumDetail() {
     qc.invalidateQueries({ queryKey: getGetAlbumQueryKey(albumId) });
     qc.invalidateQueries({ queryKey: getListAlbumPhotosQueryKey(albumId) });
     qc.invalidateQueries({ queryKey: getListAlbumsQueryKey() });
+  }
+
+  function toggleSelect(photoId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkVisibility(isHidden: boolean) {
+    const ids = Array.from(selectedIds);
+    try {
+      const result = await bulkUpdatePhotos({ data: { ids, isHidden } });
+      const count = result?.updated ?? ids.length;
+      toast({
+        title: isHidden
+          ? `${count} photo${count !== 1 ? "s" : ""} hidden`
+          : `${count} photo${count !== 1 ? "s" : ""} unhidden`,
+      });
+      clearSelection();
+      invalidate();
+    } catch {
+      toast({ title: "Bulk action failed", variant: "destructive" });
+    }
   }
 
   function handleSetCover(photoId: number) {
@@ -602,12 +636,29 @@ export default function AlbumDetail() {
             className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
             data-testid="photo-grid"
           >
-            {sortedPhotos.map((photo) => (
+            {sortedPhotos.map((photo) => {
+              const isSelected = selectedIds.has(photo.id);
+              return (
               <div
                 key={photo.id}
-                className="relative group rounded-lg overflow-hidden bg-muted"
+                className={`relative group rounded-lg overflow-hidden bg-muted${isSelected ? " ring-2 ring-primary ring-offset-1" : ""}`}
                 data-testid="photo-grid-item"
               >
+                {me?.role === "admin" && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSelect(photo.id)}
+                    className={`absolute top-2 left-2 z-20 h-5 w-5 rounded border-2 transition-all ${
+                      isSelected
+                        ? "bg-primary border-primary text-primary-foreground opacity-100"
+                        : "bg-white/80 border-white/80 opacity-0 group-hover:opacity-100"
+                    } flex items-center justify-center`}
+                    aria-label={isSelected ? "Deselect photo" : "Select photo"}
+                    data-testid="photo-select-checkbox"
+                  >
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </button>
+                )}
                 <Link href={`/photos/${photo.id}`}>
                   <div className={`aspect-[4/3] overflow-hidden${photo.isHidden ? " opacity-60" : ""}`}>
                     <img
@@ -765,7 +816,7 @@ export default function AlbumDetail() {
                 </div>
 
                 {photo.averageRating != null && (
-                  <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-black/60 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-black/60 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                     <span className="text-xs text-white font-medium">
                       {photo.averageRating.toFixed(1)}
@@ -782,7 +833,8 @@ export default function AlbumDetail() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div
@@ -798,6 +850,49 @@ export default function AlbumDetail() {
           </div>
         )}
       </div>
+
+      {me?.role === "admin" && selectedIds.size > 0 && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full bg-foreground text-background shadow-xl px-5 py-3"
+          data-testid="bulk-action-toolbar"
+        >
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <div className="w-px h-4 bg-background/30" />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
+            onClick={() => handleBulkVisibility(true)}
+            disabled={bulkUpdating}
+            data-testid="bulk-hide-btn"
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+            Hide selected
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
+            onClick={() => handleBulkVisibility(false)}
+            disabled={bulkUpdating}
+            data-testid="bulk-unhide-btn"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Unhide selected
+          </Button>
+          <div className="w-px h-4 bg-background/30" />
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="text-background/70 hover:text-background transition-colors"
+            aria-label="Clear selection"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <Dialog
         open={confirmNewCollection !== null}

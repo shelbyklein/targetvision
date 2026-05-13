@@ -269,7 +269,7 @@ export default function PhotoDetail() {
 
   function handleAcceptNewCollectionSuggestion(suggestionId: number, name: string) {
     acceptNewCollectionSuggestion(
-      { id: photoId, suggestionId, name },
+      { id: photoId, suggestionId, data: { name } },
       {
         onSuccess: () => {
           setConfirmNewCollection(null);

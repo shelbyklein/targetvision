@@ -420,6 +420,19 @@ export const ListPhotosResponseItem = zod.object({
 export const ListPhotosResponse = zod.array(ListPhotosResponseItem);
 
 /**
+ * @summary Bulk update photos (admin only)
+ */
+
+export const BulkUpdatePhotosBody = zod.object({
+  ids: zod.array(zod.number()).min(1),
+  isHidden: zod.boolean(),
+});
+
+export const BulkUpdatePhotosResponse = zod.object({
+  updated: zod.number(),
+});
+
+/**
  * @summary Get a single photo by ID
  */
 export const GetPhotoParams = zod.object({
@@ -1959,6 +1972,10 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
 export const AcceptPhotoNewCollectionSuggestionParams = zod.object({
   id: zod.coerce.number(),
   suggestionId: zod.coerce.number(),
+});
+
+export const AcceptPhotoNewCollectionSuggestionBody = zod.object({
+  name: zod.string().optional(),
 });
 
 export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({

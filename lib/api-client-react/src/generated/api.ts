@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AcceptNewCollectionSuggestionBody,
   AiAnalysisEvent,
   AiProviderKeyInput,
   AiSettings,
@@ -25,6 +26,8 @@ import type {
   AlbumCoverUpdate,
   AlbumInput,
   AlbumUpdate,
+  BulkPhotoUpdate,
+  BulkPhotoUpdateResult,
   BulkRetryAiAnalysisEventsResult,
   Category,
   CategoryInput,
@@ -1327,6 +1330,92 @@ export function useListPhotos<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Bulk update photos (admin only)
+ */
+export const getBulkUpdatePhotosUrl = () => {
+  return `/api/photos/bulk`;
+};
+
+export const bulkUpdatePhotos = async (
+  bulkPhotoUpdate: BulkPhotoUpdate,
+  options?: RequestInit,
+): Promise<BulkPhotoUpdateResult> => {
+  return customFetch<BulkPhotoUpdateResult>(getBulkUpdatePhotosUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkPhotoUpdate),
+  });
+};
+
+export const getBulkUpdatePhotosMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkUpdatePhotos>>,
+    TError,
+    { data: BodyType<BulkPhotoUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkUpdatePhotos>>,
+  TError,
+  { data: BodyType<BulkPhotoUpdate> },
+  TContext
+> => {
+  const mutationKey = ["bulkUpdatePhotos"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkUpdatePhotos>>,
+    { data: BodyType<BulkPhotoUpdate> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkUpdatePhotos(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkUpdatePhotosMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkUpdatePhotos>>
+>;
+export type BulkUpdatePhotosMutationBody = BodyType<BulkPhotoUpdate>;
+export type BulkUpdatePhotosMutationError = ErrorType<void>;
+
+/**
+ * @summary Bulk update photos (admin only)
+ */
+export const useBulkUpdatePhotos = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkUpdatePhotos>>,
+    TError,
+    { data: BodyType<BulkPhotoUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkUpdatePhotos>>,
+  TError,
+  { data: BodyType<BulkPhotoUpdate> },
+  TContext
+> => {
+  return useMutation(getBulkUpdatePhotosMutationOptions(options));
+};
 
 /**
  * @summary Get a single photo by ID
@@ -4705,15 +4794,18 @@ export const getAcceptPhotoNewCollectionSuggestionUrl = (
 export const acceptPhotoNewCollectionSuggestion = async (
   id: number,
   suggestionId: number,
-  name?: string,
+  acceptNewCollectionSuggestionBody?: AcceptNewCollectionSuggestionBody,
   options?: RequestInit,
 ): Promise<Photo> => {
-  return customFetch<Photo>(getAcceptPhotoNewCollectionSuggestionUrl(id, suggestionId), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) },
-    body: JSON.stringify({ name: name ?? "" }),
-  });
+  return customFetch<Photo>(
+    getAcceptPhotoNewCollectionSuggestionUrl(id, suggestionId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(acceptNewCollectionSuggestionBody),
+    },
+  );
 };
 
 export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
@@ -4723,14 +4815,22 @@ export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
     TError,
-    { id: number; suggestionId: number; name?: string },
+    {
+      id: number;
+      suggestionId: number;
+      data: BodyType<AcceptNewCollectionSuggestionBody>;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
   TError,
-  { id: number; suggestionId: number; name?: string },
+  {
+    id: number;
+    suggestionId: number;
+    data: BodyType<AcceptNewCollectionSuggestionBody>;
+  },
   TContext
 > => {
   const mutationKey = ["acceptPhotoNewCollectionSuggestion"];
@@ -4744,10 +4844,20 @@ export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
-    { id: number; suggestionId: number; name?: string }
+    {
+      id: number;
+      suggestionId: number;
+      data: BodyType<AcceptNewCollectionSuggestionBody>;
+    }
   > = (props) => {
-    const { id, suggestionId, name } = props ?? {};
-    return acceptPhotoNewCollectionSuggestion(id, suggestionId, name, requestOptions as RequestInit | undefined);
+    const { id, suggestionId, data } = props ?? {};
+
+    return acceptPhotoNewCollectionSuggestion(
+      id,
+      suggestionId,
+      data,
+      requestOptions,
+    );
   };
 
   return { mutationFn, ...mutationOptions };
@@ -4756,7 +4866,8 @@ export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
 export type AcceptPhotoNewCollectionSuggestionMutationResult = NonNullable<
   Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>
 >;
-
+export type AcceptPhotoNewCollectionSuggestionMutationBody =
+  BodyType<AcceptNewCollectionSuggestionBody>;
 export type AcceptPhotoNewCollectionSuggestionMutationError = ErrorType<void>;
 
 /**
@@ -4769,14 +4880,22 @@ export const useAcceptPhotoNewCollectionSuggestion = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
     TError,
-    { id: number; suggestionId: number; name?: string },
+    {
+      id: number;
+      suggestionId: number;
+      data: BodyType<AcceptNewCollectionSuggestionBody>;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
   TError,
-  { id: number; suggestionId: number; name?: string },
+  {
+    id: number;
+    suggestionId: number;
+    data: BodyType<AcceptNewCollectionSuggestionBody>;
+  },
   TContext
 > => {
   return useMutation(
