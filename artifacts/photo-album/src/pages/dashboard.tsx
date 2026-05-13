@@ -39,9 +39,9 @@ function StatCard({
 function PhotoStrip({ photos, loading }: { photos?: { id: number; url: string; name?: string | null; averageRating?: number | null }[]; loading: boolean }) {
   if (loading) {
     return (
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-40 w-40 shrink-0 rounded-lg" />
+          <Skeleton key={i} className="aspect-square rounded-lg" />
         ))}
       </div>
     );
@@ -50,10 +50,10 @@ function PhotoStrip({ photos, loading }: { photos?: { id: number; url: string; n
     return <p className="text-sm text-muted-foreground py-4">No photos yet.</p>;
   }
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
       {photos.map((photo) => (
         <Link key={photo.id} href={`/photos/${photo.id}`}>
-          <div className="relative h-40 w-40 shrink-0 rounded-lg overflow-hidden group cursor-pointer" data-testid="photo-strip-item">
+          <div className="relative aspect-square rounded-lg overflow-hidden group cursor-pointer" data-testid="photo-strip-item">
             <img src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url} alt={photo.name ?? "Photo"} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
               {photo.averageRating != null && (
