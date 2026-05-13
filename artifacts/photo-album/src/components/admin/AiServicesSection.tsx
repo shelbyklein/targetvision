@@ -198,7 +198,13 @@ function StatusIcon({ status }: { status: AiAnalysisEvent["status"] }) {
 function RecentActivityPanel() {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { data: events, isLoading } = useListAiAnalysisEvents();
+  const { data: events, isLoading } = useListAiAnalysisEvents({
+    query: {
+      refetchInterval: 10000,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: true,
+    },
+  });
   const { mutate: retry, isPending: retrying, variables: retryingVars } =
     useRetryAiAnalysisEvent();
   const retryingId = retrying ? retryingVars?.id : null;
