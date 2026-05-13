@@ -709,9 +709,6 @@ export default function PhotoDetail() {
 
           <div className="space-y-6">
             <div className="space-y-3">
-              <h1 className="text-lg font-semibold text-foreground" data-testid="photo-title">
-{"Untitled Photo"}
-              </h1>
               <div className="space-y-1.5 text-sm text-muted-foreground">
                 {photo.takenAt && (
                   <div className="flex items-center gap-2">
