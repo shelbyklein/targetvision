@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { useState } from "react";
 import {
   useGetDashboardStats,
   useGetRecentPhotos,
@@ -7,6 +7,7 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Images, Camera, Users, FolderOpen, Star } from "lucide-react";
+import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 
 function StatCard({
   label,
@@ -36,7 +37,15 @@ function StatCard({
   );
 }
 
-function PhotoStrip({ photos, loading }: { photos?: { id: number; url: string; name?: string | null; averageRating?: number | null }[]; loading: boolean }) {
+function PhotoStrip({
+  photos,
+  loading,
+  onPhotoClick,
+}: {
+  photos?: LightboxPhoto[];
+  loading: boolean;
+  onPhotoClick: (photo: LightboxPhoto) => void;
+}) {
   if (loading) {
     return (
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -52,19 +61,27 @@ function PhotoStrip({ photos, loading }: { photos?: { id: number; url: string; n
   return (
     <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
       {photos.map((photo) => (
-        <Link key={photo.id} href={`/photos/${photo.id}`}>
-          <div className="relative aspect-square rounded-lg overflow-hidden group cursor-pointer" data-testid="photo-strip-item">
-            <img src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url} alt={photo.name ?? "Photo"} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
-              {photo.averageRating != null && (
-                <div className="flex items-center gap-0.5 ml-auto">
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                  <span className="text-xs text-white font-medium">{photo.averageRating.toFixed(1)}</span>
-                </div>
-              )}
-            </div>
+        <button
+          key={photo.id}
+          onClick={() => onPhotoClick(photo)}
+          className="relative aspect-square rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          data-testid="photo-strip-item"
+          aria-label={`Preview ${photo.name ?? "photo"}`}
+        >
+          <img
+            src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
+            alt={photo.name ?? "Photo"}
+            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
+            {photo.averageRating != null && (
+              <div className="flex items-center gap-0.5 ml-auto">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <span className="text-xs text-white font-medium">{photo.averageRating.toFixed(1)}</span>
+              </div>
+            )}
           </div>
-        </Link>
+        </button>
       ))}
     </div>
   );
@@ -74,6 +91,8 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentPhotos, isLoading: recentLoading } = useGetRecentPhotos();
   const { data: topRated, isLoading: topLoading } = useGetTopRatedPhotos();
+
+  const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
 
   return (
     <AppLayout>
@@ -92,14 +111,16 @@ export default function Dashboard() {
 
         <section>
           <h2 className="text-base font-semibold text-foreground mb-3">Recent Photos</h2>
-          <PhotoStrip photos={recentPhotos ?? []} loading={recentLoading} />
+          <PhotoStrip photos={recentPhotos ?? []} loading={recentLoading} onPhotoClick={setSelectedPhoto} />
         </section>
 
         <section>
           <h2 className="text-base font-semibold text-foreground mb-3">Top Rated</h2>
-          <PhotoStrip photos={topRated ?? []} loading={topLoading} />
+          <PhotoStrip photos={topRated ?? []} loading={topLoading} onPhotoClick={setSelectedPhoto} />
         </section>
       </div>
+
+      <PhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
     </AppLayout>
   );
 }
