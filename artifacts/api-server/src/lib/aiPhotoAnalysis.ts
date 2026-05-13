@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   db,
   photosTable,
@@ -240,80 +240,111 @@ export async function runAndRecordPhotoAnalysis(
 
     const result = outcome.result;
 
-    await db
-      .update(photosTable)
-      .set({ aiDescription: result.description || null })
-      .where(eq(photosTable.id, photo.id));
+    const ev = await db.transaction(async (tx) => {
+      await Promise.all([
+        tx
+          .delete(photoCollectionSuggestionsTable)
+          .where(
+            and(
+              eq(photoCollectionSuggestionsTable.photoId, photo.id),
+              eq(photoCollectionSuggestionsTable.status, "pending"),
+            ),
+          ),
+        tx
+          .delete(photoTagSuggestionsTable)
+          .where(
+            and(
+              eq(photoTagSuggestionsTable.photoId, photo.id),
+              eq(photoTagSuggestionsTable.status, "pending"),
+            ),
+          ),
+        tx
+          .delete(photoCategorySuggestionsTable)
+          .where(
+            and(
+              eq(photoCategorySuggestionsTable.photoId, photo.id),
+              eq(photoCategorySuggestionsTable.status, "pending"),
+            ),
+          ),
+      ]);
 
-    if (result.suggestedCollectionIds.length > 0) {
-      await db
-        .insert(photoCollectionSuggestionsTable)
-        .values(
-          result.suggestedCollectionIds.map((cid) => ({
-            photoId: photo.id,
-            collectionId: cid,
-            status: "pending" as const,
-          })),
-        )
-        .onConflictDoNothing();
-    }
+      await tx
+        .update(photosTable)
+        .set({ aiDescription: result.description || null })
+        .where(eq(photosTable.id, photo.id));
 
-    if (result.suggestedCategoryIds.length > 0) {
-      const existingCats = await db
-        .select({ categoryId: photoCategoriesTable.categoryId })
-        .from(photoCategoriesTable)
-        .where(eq(photoCategoriesTable.photoId, photo.id));
-      const existingCatIds = new Set(existingCats.map((c) => c.categoryId));
-      const newCatSuggestions = result.suggestedCategoryIds.filter(
-        (cid) => !existingCatIds.has(cid),
-      );
-      if (newCatSuggestions.length > 0) {
-        await db
-          .insert(photoCategorySuggestionsTable)
+      if (result.suggestedCollectionIds.length > 0) {
+        await tx
+          .insert(photoCollectionSuggestionsTable)
           .values(
-            newCatSuggestions.map((cid) => ({
+            result.suggestedCollectionIds.map((cid) => ({
               photoId: photo.id,
-              categoryId: cid,
+              collectionId: cid,
               status: "pending" as const,
             })),
           )
           .onConflictDoNothing();
       }
-    }
 
-    if (result.suggestedTags.length > 0) {
-      const existingTags = await db
-        .select({ name: tagsTable.name })
-        .from(tagsTable)
-        .innerJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
-        .where(eq(photoTagsTable.photoId, photo.id));
-      const existingNames = new Set(existingTags.map((t) => t.name));
-      const newSuggestions = result.suggestedTags.filter(
-        (t) => !existingNames.has(t),
-      );
-
-      if (newSuggestions.length > 0) {
-        await db
-          .insert(photoTagSuggestionsTable)
-          .values(
-            newSuggestions.map((tagName) => ({
-              photoId: photo.id,
-              tagName,
-              status: "pending" as const,
-            })),
-          )
-          .onConflictDoNothing();
+      if (result.suggestedCategoryIds.length > 0) {
+        const existingCats = await tx
+          .select({ categoryId: photoCategoriesTable.categoryId })
+          .from(photoCategoriesTable)
+          .where(eq(photoCategoriesTable.photoId, photo.id));
+        const existingCatIds = new Set(existingCats.map((c) => c.categoryId));
+        const newCatSuggestions = result.suggestedCategoryIds.filter(
+          (cid) => !existingCatIds.has(cid),
+        );
+        if (newCatSuggestions.length > 0) {
+          await tx
+            .insert(photoCategorySuggestionsTable)
+            .values(
+              newCatSuggestions.map((cid) => ({
+                photoId: photo.id,
+                categoryId: cid,
+                status: "pending" as const,
+              })),
+            )
+            .onConflictDoNothing();
+        }
       }
-    }
 
-    const [ev] = await db
-      .insert(aiAnalysisEventsTable)
-      .values({
-        photoId: photo.id,
-        provider: outcome.provider,
-        status: "success",
-      })
-      .returning();
+      if (result.suggestedTags.length > 0) {
+        const existingTags = await tx
+          .select({ name: tagsTable.name })
+          .from(tagsTable)
+          .innerJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
+          .where(eq(photoTagsTable.photoId, photo.id));
+        const existingNames = new Set(existingTags.map((t) => t.name));
+        const newSuggestions = result.suggestedTags.filter(
+          (t) => !existingNames.has(t),
+        );
+
+        if (newSuggestions.length > 0) {
+          await tx
+            .insert(photoTagSuggestionsTable)
+            .values(
+              newSuggestions.map((tagName) => ({
+                photoId: photo.id,
+                tagName,
+                status: "pending" as const,
+              })),
+            )
+            .onConflictDoNothing();
+        }
+      }
+
+      const [row] = await tx
+        .insert(aiAnalysisEventsTable)
+        .values({
+          photoId: photo.id,
+          provider: outcome.provider,
+          status: "success",
+        })
+        .returning();
+      return row;
+    });
+
     return ev;
   } catch (err) {
     logger.error({ err, photoId }, "AI analysis failed");
