@@ -315,7 +315,7 @@ paths:
     get:
       operationId: searchPhotos
       tags: [photos]
-      summary: Search photos by keyword across caption, album title, tags, and uploader name
+      summary: Search photos by keyword across caption, album title, and AI description
       parameters:
         - name: q
           in: query

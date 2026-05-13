@@ -5,7 +5,6 @@ import {
   albumsTable,
   photosTable,
   ratingsTable,
-  usersTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -79,7 +78,7 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
 
   const pattern = `%${q}%`;
 
-  const [byCaption, byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
+  const [byCaption, byAlbumTitle, byAiDescription] = await Promise.all([
     db
       .select({ id: photosTable.id })
       .from(photosTable)
@@ -92,11 +91,6 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     db
       .select({ id: photosTable.id })
       .from(photosTable)
-      .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
-      .where(ilike(usersTable.name, pattern)),
-    db
-      .select({ id: photosTable.id })
-      .from(photosTable)
       .where(ilike(photosTable.aiDescription, pattern)),
   ]);
 
@@ -104,7 +98,6 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     ...new Set([
       ...byCaption.map((r) => r.id),
       ...byAlbumTitle.map((r) => r.id),
-      ...byUploader.map((r) => r.id),
       ...byAiDescription.map((r) => r.id),
     ]),
   ];
