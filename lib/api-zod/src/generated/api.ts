@@ -2685,6 +2685,24 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
 });
 
 /**
+ * @summary Re-run AI analysis for a photo (admin or uploader only)
+ */
+export const RerunPhotoAnalysisParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RerunPhotoAnalysisResponse = zod.object({
+  id: zod.number(),
+  photoId: zod.number().nullish(),
+  photoCaption: zod.string().nullish(),
+  photoThumbnailUrl: zod.string().nullish(),
+  provider: zod.string().nullish(),
+  status: zod.enum(["success", "skipped", "failed"]),
+  errorMessage: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
  * @summary Get tag usage counts for tag cloud display
  */
 export const GetTagCloudResponseItem = zod.object({

@@ -1261,6 +1261,31 @@ paths:
         "404":
           description: Not found
 
+  /photos/{id}/rerun-analysis:
+    post:
+      operationId: rerunPhotoAnalysis
+      tags: [photos]
+      summary: Re-run AI analysis for a photo (admin or uploader only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New AI analysis event recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAnalysisEvent"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Photo not found
+
   /stats/tag-cloud:
     get:
       operationId: getTagCloud

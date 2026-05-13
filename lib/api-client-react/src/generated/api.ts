@@ -4504,6 +4504,90 @@ export const useDismissPhotoCategorySuggestion = <
 };
 
 /**
+ * @summary Re-run AI analysis for a photo (admin or uploader only)
+ */
+export const getRerunPhotoAnalysisUrl = (id: number) => {
+  return `/api/photos/${id}/rerun-analysis`;
+};
+
+export const rerunPhotoAnalysis = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AiAnalysisEvent> => {
+  return customFetch<AiAnalysisEvent>(getRerunPhotoAnalysisUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRerunPhotoAnalysisMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rerunPhotoAnalysis>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rerunPhotoAnalysis>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["rerunPhotoAnalysis"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rerunPhotoAnalysis>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return rerunPhotoAnalysis(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RerunPhotoAnalysisMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rerunPhotoAnalysis>>
+>;
+
+export type RerunPhotoAnalysisMutationError = ErrorType<void>;
+
+/**
+ * @summary Re-run AI analysis for a photo (admin or uploader only)
+ */
+export const useRerunPhotoAnalysis = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rerunPhotoAnalysis>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rerunPhotoAnalysis>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRerunPhotoAnalysisMutationOptions(options));
+};
+
+/**
  * @summary Get tag usage counts for tag cloud display
  */
 export const getGetTagCloudUrl = () => {

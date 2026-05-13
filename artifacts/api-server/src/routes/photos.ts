@@ -43,6 +43,8 @@ import {
   AcceptPhotoCategorySuggestionResponse,
   DismissPhotoCategorySuggestionParams,
   DismissPhotoCategorySuggestionResponse,
+  RerunPhotoAnalysisParams,
+  RerunPhotoAnalysisResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -710,6 +712,39 @@ router.post("/photos/:id/category-suggestions/:categoryId/dismiss", requireAuth,
 
   const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
   res.json(DismissPhotoCategorySuggestionResponse.parse(full));
+});
+
+router.post("/photos/:id/rerun-analysis", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = RerunPhotoAnalysisParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ id: photosTable.id, uploaderId: photosTable.uploaderId })
+    .from(photosTable)
+    .where(eq(photosTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const isAdmin = req.dbUser!.role === "admin";
+  const isUploader = existing.uploaderId === req.dbUser!.id;
+  if (!isAdmin && !isUploader) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const event = await runAndRecordPhotoAnalysis(params.data.id);
+  if (!event) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  res.json(RerunPhotoAnalysisResponse.parse(event));
 });
 
 export default router;

@@ -20,6 +20,7 @@ import {
   useDismissPhotoTagSuggestion,
   useAcceptPhotoCategorySuggestion,
   useDismissPhotoCategorySuggestion,
+  useRerunPhotoAnalysis,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -55,7 +56,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderOpen, Sparkles, Check, Loader2 } from "lucide-react";
+import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -317,6 +318,7 @@ export default function PhotoDetail() {
   const { mutate: acceptCategorySuggestion } = useAcceptPhotoCategorySuggestion();
   const { mutate: dismissCategorySuggestion } = useDismissPhotoCategorySuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
+  const { mutate: rerunAnalysis, isPending: rerunning } = useRerunPhotoAnalysis();
   const [downloading, setDownloading] = useState(false);
 
   function invalidate() {
@@ -557,6 +559,19 @@ export default function PhotoDetail() {
     );
   }
 
+  function handleRerunAnalysis() {
+    rerunAnalysis(
+      { id: photoId },
+      {
+        onSuccess: () => {
+          toast({ title: "AI analysis started" });
+          qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
+        },
+        onError: () => toast({ title: "Failed to start AI analysis", variant: "destructive" }),
+      }
+    );
+  }
+
   const availableCategories = allCategories?.filter(
     (cat) => !photo?.categories?.some((c) => c.id === cat.id)
   );
@@ -566,6 +581,7 @@ export default function PhotoDetail() {
   );
 
   const canDelete = me && photo && (me.id === photo.uploaderId || me.role === "admin");
+  const canRerunAnalysis = me && photo && (me.id === photo.uploaderId || me.role === "admin");
 
   if (isLoading) {
     return (
@@ -623,9 +639,28 @@ export default function PhotoDetail() {
               className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 space-y-2"
               data-testid="ai-description-block"
             >
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Sparkles className="h-3.5 w-3.5" />
-                AI description
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  AI description
+                </div>
+                {canRerunAnalysis && (
+                  <button
+                    type="button"
+                    onClick={handleRerunAnalysis}
+                    disabled={rerunning}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    data-testid="rerun-analysis-btn"
+                    title="Re-run AI analysis"
+                  >
+                    {rerunning ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    Re-run analysis
+                  </button>
+                )}
               </div>
               {photo.aiDescription ? (
                 <p className="text-sm text-foreground" data-testid="ai-description-text">
