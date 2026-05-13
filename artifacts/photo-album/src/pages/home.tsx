@@ -90,7 +90,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <span>Copyright</span>
             <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-            <span>2026</span>
+            <span>{new Date().getFullYear()}</span>
           </div>
           <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
         </div>
