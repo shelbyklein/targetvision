@@ -134,12 +134,18 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
     .where(ilike(usersTable.name, pattern));
 
+  const byAiDescription = await db
+    .select({ id: photosTable.id })
+    .from(photosTable)
+    .where(ilike(photosTable.aiDescription, pattern));
+
   const uniqueIds = [
     ...new Set([
       ...byCaption.map((r) => r.id),
       ...byAlbumTitle.map((r) => r.id),
       ...byTag.map((r) => r.id),
       ...byUploader.map((r) => r.id),
+      ...byAiDescription.map((r) => r.id),
     ]),
   ];
 
