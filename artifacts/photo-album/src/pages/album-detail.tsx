@@ -8,6 +8,8 @@ import {
   useSetAlbumCover,
   useAcceptPhotoSuggestion,
   useDismissPhotoSuggestion,
+  useAcceptPhotoNewCollectionSuggestion,
+  useDismissPhotoNewCollectionSuggestion,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -355,6 +357,8 @@ export default function AlbumDetail() {
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
+  const { mutate: acceptNewCollectionSuggestion } = useAcceptPhotoNewCollectionSuggestion();
+  const { mutate: dismissNewCollectionSuggestion } = useDismissPhotoNewCollectionSuggestion();
 
   function handleAcceptSuggestion(photoId: number, collectionId: number) {
     acceptSuggestion(
@@ -369,6 +373,26 @@ export default function AlbumDetail() {
   function handleDismissSuggestion(photoId: number, collectionId: number) {
     dismissSuggestion(
       { id: photoId, collectionId },
+      {
+        onSuccess: invalidate,
+        onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }),
+      },
+    );
+  }
+
+  function handleAcceptNewCollectionSuggestion(photoId: number, suggestionId: number) {
+    acceptNewCollectionSuggestion(
+      { id: photoId, suggestionId },
+      {
+        onSuccess: invalidate,
+        onError: () => toast({ title: "Failed to create collection", variant: "destructive" }),
+      },
+    );
+  }
+
+  function handleDismissNewCollectionSuggestion(photoId: number, suggestionId: number) {
+    dismissNewCollectionSuggestion(
+      { id: photoId, suggestionId },
       {
         onSuccess: invalidate,
         onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }),
@@ -639,18 +663,42 @@ export default function AlbumDetail() {
                   {photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-0.5" data-testid="card-new-collection-suggestions">
                       {photo.suggestedNewCollections.slice(0, 2).map((s) => (
-                        <Link
+                        <span
                           key={s.id}
-                          href={`/photos/${photo.id}`}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-0.5 py-px text-[9px] text-foreground"
+                          data-testid={`card-suggested-new-collection-${s.id}`}
                           onClick={(e) => e.stopPropagation()}
                           onMouseDown={(e) => e.stopPropagation()}
-                          data-testid={`card-suggested-new-collection-${s.id}`}
                         >
-                          <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-1.5 py-px text-[9px] text-foreground hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors">
-                            <Sparkles className="h-2 w-2 text-emerald-600 dark:text-emerald-400" />
-                            <span>New: {s.suggestedName}</span>
-                          </span>
-                        </Link>
+                          <Sparkles className="h-2 w-2 text-emerald-600 dark:text-emerald-400" />
+                          <span>New: {s.suggestedName}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAcceptNewCollectionSuggestion(photo.id, s.id);
+                            }}
+                            className="rounded-full p-0.5 hover:bg-emerald-200/60 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-400"
+                            aria-label={`Accept new collection suggestion ${s.suggestedName}`}
+                            data-testid={`card-accept-new-collection-suggestion-${s.id}`}
+                          >
+                            <Check className="h-2 w-2" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDismissNewCollectionSuggestion(photo.id, s.id);
+                            }}
+                            className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
+                            aria-label={`Dismiss new collection suggestion ${s.suggestedName}`}
+                            data-testid={`card-dismiss-new-collection-suggestion-${s.id}`}
+                          >
+                            <X className="h-2 w-2" />
+                          </button>
+                        </span>
                       ))}
                     </div>
                   )}
