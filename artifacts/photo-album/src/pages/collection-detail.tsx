@@ -477,6 +477,30 @@ export default function CollectionDetail() {
                     </div>
                   )}
 
+                  {canManage && isCover && (
+                    <button
+                      type="button"
+                      data-testid="clear-cover-btn"
+                      onClick={() =>
+                        updateCollection(
+                          { id: collectionId, data: { coverPhotoId: null } },
+                          {
+                            onSuccess: () => {
+                              invalidate();
+                              toast({ title: "Cover photo cleared" });
+                            },
+                            onError: () =>
+                              toast({ title: "Failed to clear cover photo", variant: "destructive" }),
+                          }
+                        )
+                      }
+                      className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/70 hover:bg-black/90 text-white rounded px-2 py-1 text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                      Clear cover
+                    </button>
+                  )}
+
                   {canManage && !isCover && (
                     <button
                       type="button"
