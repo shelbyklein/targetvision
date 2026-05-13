@@ -252,7 +252,7 @@ export default function PhotoDetail() {
     );
   }
 
-  function deriveFilename(url: string, caption?: string | null, fallbackId?: number): string {
+  function deriveFilename(url: string, fallbackId?: number): string {
     let extension = "jpg";
     let urlBase = "";
     try {
@@ -278,9 +278,8 @@ export default function PhotoDetail() {
         .slice(0, 80);
     }
 
-    const nameBase = caption ? sanitize(caption) : "";
     const cleanedUrlBase = urlBase ? sanitize(urlBase) : "";
-    const base = nameBase || cleanedUrlBase || `photo-${fallbackId ?? "image"}`;
+    const base = cleanedUrlBase || `photo-${fallbackId ?? "image"}`;
     return `${base}.${extension}`;
   }
 
@@ -296,7 +295,7 @@ export default function PhotoDetail() {
 
   async function handleDownload() {
     if (!photo) return;
-    const filename = deriveFilename(photo.url, photo.caption, photo.id);
+    const filename = deriveFilename(photo.url, photo.id);
     setDownloading(true);
     try {
       let isSameOrigin = true;
@@ -447,7 +446,7 @@ export default function PhotoDetail() {
             <div className="rounded-xl overflow-hidden bg-muted aspect-[4/3]">
               <img
                 src={photo.url}
-                alt={photo.caption ?? "Photo"}
+                alt="Photo"
                 className="h-full w-full object-contain bg-black"
                 data-testid="photo-image"
               />
@@ -532,7 +531,7 @@ export default function PhotoDetail() {
           <div className="space-y-6">
             <div className="space-y-3">
               <h1 className="text-lg font-semibold text-foreground" data-testid="photo-title">
-                {photo.caption ?? "Untitled Photo"}
+{"Untitled Photo"}
               </h1>
               <div className="space-y-1.5 text-sm text-muted-foreground">
                 {photo.takenAt && (

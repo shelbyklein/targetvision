@@ -286,7 +286,7 @@ export default function PhotosPage() {
                   <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
                     <img
                       src={photo.url}
-                      alt={photo.caption ?? "Photo"}
+                      alt="Photo"
                       className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                       loading="lazy"
                     />

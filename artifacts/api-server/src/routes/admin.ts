@@ -187,7 +187,6 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
       status: aiAnalysisEventsTable.status,
       errorMessage: aiAnalysisEventsTable.errorMessage,
       createdAt: aiAnalysisEventsTable.createdAt,
-      photoCaption: photosTable.caption,
       photoThumbnailUrl: photosTable.url,
     })
     .from(aiAnalysisEventsTable)
@@ -200,7 +199,7 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
       rows.map((r) => ({
         id: r.id,
         photoId: r.photoId,
-        photoCaption: r.photoCaption,
+        photoCaption: null,
         photoThumbnailUrl: r.photoThumbnailUrl,
         provider: r.provider,
         status: r.status,
@@ -296,7 +295,6 @@ router.post(
         status: aiAnalysisEventsTable.status,
         errorMessage: aiAnalysisEventsTable.errorMessage,
         createdAt: aiAnalysisEventsTable.createdAt,
-        photoCaption: photosTable.caption,
         photoThumbnailUrl: photosTable.url,
       })
       .from(aiAnalysisEventsTable)
@@ -307,7 +305,7 @@ router.post(
       RetryAiAnalysisEventResponse.parse({
         id: row.id,
         photoId: row.photoId,
-        photoCaption: row.photoCaption,
+        photoCaption: null,
         photoThumbnailUrl: row.photoThumbnailUrl,
         provider: row.provider,
         status: row.status,

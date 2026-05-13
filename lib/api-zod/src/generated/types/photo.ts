@@ -23,8 +23,6 @@ export interface Photo {
   storageKey?: string | null;
   url: string;
   /** @nullable */
-  caption?: string | null;
-  /** @nullable */
   takenAt?: string | null;
   createdAt: Date;
   /** @nullable */

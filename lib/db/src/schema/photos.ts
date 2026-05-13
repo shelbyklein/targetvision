@@ -11,7 +11,6 @@ export const photosTable = pgTable("photos", {
   uploaderId: integer("uploader_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   storageKey: text("storage_key"),
   url: text("url").notNull(),
-  caption: text("caption"),
   aiDescription: text("ai_description"),
   takenAt: timestamp("taken_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -7,7 +7,6 @@
  */
 
 export interface PhotoUpdate {
-  caption?: string;
   /** @nullable */
   aiDescription?: string | null;
   /** @nullable */

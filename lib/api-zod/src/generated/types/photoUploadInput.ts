@@ -9,7 +9,6 @@
 export interface PhotoUploadInput {
   /** @minLength 1 */
   url: string;
-  caption?: string;
   storageKey?: string;
   takenAt?: string;
 }

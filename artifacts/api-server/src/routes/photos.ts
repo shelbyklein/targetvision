@@ -60,7 +60,6 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
       albumId: params.data.id,
       uploaderId: req.dbUser!.id,
       url: body.data.url,
-      caption: body.data.caption,
       storageKey: body.data.storageKey,
       takenAt: body.data.takenAt ? new Date(body.data.takenAt) : null,
     })
@@ -162,7 +161,6 @@ router.patch("/photos/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   const updateData: Record<string, unknown> = {};
-  if (body.data.caption !== undefined) updateData.caption = body.data.caption;
   if (body.data.aiDescription !== undefined) updateData.aiDescription = body.data.aiDescription;
   if (body.data.takenAt !== undefined) updateData.takenAt = body.data.takenAt ? new Date(body.data.takenAt) : null;
 

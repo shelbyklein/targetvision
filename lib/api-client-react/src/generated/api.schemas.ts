@@ -114,8 +114,6 @@ export interface Photo {
   storageKey?: string | null;
   url: string;
   /** @nullable */
-  caption?: string | null;
-  /** @nullable */
   takenAt?: string | null;
   createdAt: string;
   /** @nullable */
@@ -162,7 +160,6 @@ export interface CollectionPhotoInput {
 }
 
 export interface PhotoUpdate {
-  caption?: string;
   /** @nullable */
   aiDescription?: string | null;
   /** @nullable */
@@ -172,7 +169,6 @@ export interface PhotoUpdate {
 export interface PhotoUploadInput {
   /** @minLength 1 */
   url: string;
-  caption?: string;
   storageKey?: string;
   takenAt?: string;
 }

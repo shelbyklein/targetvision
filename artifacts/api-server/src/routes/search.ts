@@ -78,11 +78,7 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
 
   const pattern = `%${q}%`;
 
-  const [byCaption, byAlbumTitle, byAiDescription] = await Promise.all([
-    db
-      .select({ id: photosTable.id })
-      .from(photosTable)
-      .where(ilike(photosTable.caption, pattern)),
+  const [byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
     db
       .select({ id: photosTable.id })
       .from(photosTable)
@@ -96,7 +92,6 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
 
   const uniqueIds = [
     ...new Set([
-      ...byCaption.map((r) => r.id),
       ...byAlbumTitle.map((r) => r.id),
       ...byAiDescription.map((r) => r.id),
     ]),

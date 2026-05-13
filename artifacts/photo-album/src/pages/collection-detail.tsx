@@ -450,7 +450,7 @@ export default function CollectionDetail() {
                   <div className="aspect-[4/3] overflow-hidden">
                     <img
                       src={photo.url}
-                      alt={photo.caption ?? "Photo"}
+                      alt="Photo"
                       className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
                   </div>

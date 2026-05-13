@@ -1429,8 +1429,6 @@ components:
           type: ["string", "null"]
         url:
           type: string
-        caption:
-          type: ["string", "null"]
         takenAt:
           type: ["string", "null"]
         createdAt:
@@ -1558,8 +1556,6 @@ components:
     PhotoUpdate:
       type: object
       properties:
-        caption:
-          type: string
         aiDescription:
           type: ["string", "null"]
         takenAt:
@@ -1597,8 +1593,6 @@ components:
         url:
           type: string
           minLength: 1
-        caption:
-          type: string
         storageKey:
           type: string
         takenAt:
