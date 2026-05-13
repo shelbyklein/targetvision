@@ -11,4 +11,5 @@ export interface PhotoUpdate {
   aiDescription?: string | null;
   /** @nullable */
   takenAt?: string | null;
+  isHidden?: boolean;
 }

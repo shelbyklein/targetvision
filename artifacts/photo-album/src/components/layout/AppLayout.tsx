@@ -2,7 +2,7 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen } from "lucide-react";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -134,6 +134,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center gap-2 cursor-pointer" data-testid="settings-link">
+                    <Settings className="h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive gap-2 cursor-pointer"

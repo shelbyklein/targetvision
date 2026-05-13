@@ -71,8 +71,10 @@ import {
   Sparkles,
   Loader2,
   Check,
+  EyeOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
 
 type SortOption = "newest" | "oldest" | "top-rated";
 
@@ -337,14 +339,16 @@ export default function AlbumDetail() {
     suggestionId: number;
     name: string;
   } | null>(null);
+  const { showHidden } = useShowHiddenPhotos();
 
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
-  const { data: photos, isLoading: photosLoading } = useListAlbumPhotos(albumId, {
+  const hiddenParams = showHidden ? { includeHidden: true } : undefined;
+  const { data: photos, isLoading: photosLoading } = useListAlbumPhotos(albumId, hiddenParams, {
     query: {
       enabled: !!albumId,
-      queryKey: getListAlbumPhotosQueryKey(albumId),
+      queryKey: getListAlbumPhotosQueryKey(albumId, hiddenParams),
       refetchInterval: (q) => {
         const data = q.state.data as Array<{ aiDescription?: string | null; createdAt?: string }> | undefined;
         if (!data) return false;
@@ -599,7 +603,7 @@ export default function AlbumDetail() {
                 data-testid="photo-grid-item"
               >
                 <Link href={`/photos/${photo.id}`}>
-                  <div className="aspect-[4/3] overflow-hidden">
+                  <div className={`aspect-[4/3] overflow-hidden${photo.isHidden ? " opacity-60" : ""}`}>
                     <img
                       src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                       alt={photo.name ?? "Photo"}
@@ -715,6 +719,17 @@ export default function AlbumDetail() {
                     </div>
                   )}
                 </div>
+                )}
+
+                {photo.isHidden && (
+                  <div
+                    className="absolute top-2 left-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10"
+                    title="Hidden photo"
+                    data-testid="hidden-badge"
+                  >
+                    <EyeOff className="h-2.5 w-2.5 text-white" />
+                    <span className="text-[10px] font-semibold text-white leading-none">Hidden</span>
+                  </div>
                 )}
 
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />

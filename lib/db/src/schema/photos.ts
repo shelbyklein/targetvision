@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, primaryKey, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, primaryKey, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -13,6 +13,7 @@ export const photosTable = pgTable("photos", {
   thumbnailKey: text("thumbnail_key"),
   url: text("url").notNull(),
   aiDescription: text("ai_description"),
+  isHidden: boolean("is_hidden").notNull().default(false),
   takenAt: timestamp("taken_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

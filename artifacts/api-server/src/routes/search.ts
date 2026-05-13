@@ -127,24 +127,28 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
   const dateFrom = typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined;
   const dateTo = typeof req.query.dateTo === "string" ? req.query.dateTo : undefined;
   const uploaderId = req.query.uploaderId ? parseInt(String(req.query.uploaderId), 10) : undefined;
+  const includeHidden = req.query.includeHidden === "true";
+  const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
 
   const pattern = `%${q}%`;
+
+  const hiddenCondition = canSeeHidden ? undefined : eq(photosTable.isHidden, false);
 
   const [byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
     db
       .select({ id: photosTable.id })
       .from(photosTable)
       .innerJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-      .where(ilike(albumsTable.title, pattern)),
+      .where(hiddenCondition ? and(ilike(albumsTable.title, pattern), hiddenCondition) : ilike(albumsTable.title, pattern)),
     db
       .select({ id: photosTable.id })
       .from(photosTable)
       .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
-      .where(ilike(usersTable.name, pattern)),
+      .where(hiddenCondition ? and(ilike(usersTable.name, pattern), hiddenCondition) : ilike(usersTable.name, pattern)),
     db
       .select({ id: photosTable.id })
       .from(photosTable)
-      .where(ilike(photosTable.aiDescription, pattern)),
+      .where(hiddenCondition ? and(ilike(photosTable.aiDescription, pattern), hiddenCondition) : ilike(photosTable.aiDescription, pattern)),
   ]);
 
   const uniqueIds = [

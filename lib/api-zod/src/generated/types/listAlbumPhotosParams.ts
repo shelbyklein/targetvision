@@ -6,12 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SearchPhotosParams = {
-  q: string;
-  ratingMin?: number;
-  ratingMax?: number;
-  dateFrom?: string;
-  dateTo?: string;
-  uploaderId?: number;
+export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
 };

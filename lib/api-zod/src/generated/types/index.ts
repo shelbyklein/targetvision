@@ -32,6 +32,7 @@ export * from "./collectionSummary";
 export * from "./collectionUpdate";
 export * from "./dashboardStats";
 export * from "./healthStatus";
+export * from "./listAlbumPhotosParams";
 export * from "./listPhotosParams";
 export * from "./photo";
 export * from "./photoCategoryInput";

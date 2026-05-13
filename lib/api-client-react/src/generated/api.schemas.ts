@@ -111,6 +111,7 @@ export interface Photo {
   /** @nullable */
   takenAt?: string | null;
   createdAt: string;
+  isHidden: boolean;
   /** @nullable */
   averageRating?: number | null;
   ratingCount: number;
@@ -162,6 +163,16 @@ export interface PhotoUpdate {
   aiDescription?: string | null;
   /** @nullable */
   takenAt?: string | null;
+  isHidden?: boolean;
+}
+
+export interface SuggestedTag {
+  name: string;
+}
+
+export interface SuggestedCategory {
+  id: number;
+  name: string;
 }
 
 export interface SuggestedTag {
@@ -370,6 +381,10 @@ export interface AiAnalysisEvent {
   createdAt: string;
 }
 
+export type ListAlbumPhotosParams = {
+  includeHidden?: boolean;
+};
+
 export type SearchPhotosParams = {
   q: string;
   ratingMin?: number;
@@ -377,6 +392,7 @@ export type SearchPhotosParams = {
   dateFrom?: string;
   dateTo?: string;
   uploaderId?: number;
+  includeHidden?: boolean;
 };
 
 export type ListPhotosParams = {
@@ -388,4 +404,5 @@ export type ListPhotosParams = {
   dateFrom?: string;
   dateTo?: string;
   uploaderId?: number;
+  includeHidden?: boolean;
 };

@@ -55,7 +55,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil, Plus } from "lucide-react";
+import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil, Plus, EyeOff, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -469,6 +469,22 @@ export default function PhotoDetail() {
   const canDelete = me && photo && (me.id === photo.uploaderId || me.role === "admin");
   const canRerunAnalysis = me && photo && (me.id === photo.uploaderId || me.role === "admin");
   const canEditDescription = me && photo && (me.id === photo.uploaderId || me.role === "admin");
+  const canToggleHidden = me && photo && (me.id === photo.uploaderId || me.role === "admin");
+
+  function handleToggleHidden() {
+    if (!photo) return;
+    const next = !photo.isHidden;
+    updatePhoto(
+      { id: photoId, data: { isHidden: next } },
+      {
+        onSuccess: () => {
+          toast({ title: next ? "Photo hidden" : "Photo visible again" });
+          invalidate();
+        },
+        onError: () => toast({ title: "Failed to update photo", variant: "destructive" }),
+      }
+    );
+  }
 
   if (isLoading) {
     return (
@@ -546,13 +562,22 @@ export default function PhotoDetail() {
 
         <div className="grid lg:grid-cols-[1fr_320px] gap-8">
           <div className="space-y-3">
-            <div className="rounded-xl overflow-hidden bg-muted aspect-[4/3]">
+            <div className="relative rounded-xl overflow-hidden bg-muted aspect-[4/3]">
               <img
                 src={photo.url}
                 alt="Photo"
-                className="h-full w-full object-contain bg-black"
+                className={`h-full w-full object-contain bg-black${photo.isHidden ? " opacity-60" : ""}`}
                 data-testid="photo-image"
               />
+              {photo.isHidden && (
+                <div
+                  className="absolute top-3 left-3 flex items-center gap-1 rounded-full bg-black/70 px-2 py-1"
+                  data-testid="photo-hidden-badge"
+                >
+                  <EyeOff className="h-3.5 w-3.5 text-white" />
+                  <span className="text-xs font-semibold text-white">Hidden</span>
+                </div>
+              )}
             </div>
             <div
               className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 space-y-2"
@@ -859,6 +884,28 @@ export default function PhotoDetail() {
               <Download className="h-4 w-4" />
               {downloading ? "Downloading..." : "Download"}
             </Button>
+
+            {canToggleHidden && (
+              <Button
+                variant={photo.isHidden ? "outline" : "outline"}
+                size="sm"
+                className="gap-2 w-full"
+                onClick={handleToggleHidden}
+                data-testid="toggle-hidden-btn"
+              >
+                {photo.isHidden ? (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Unhide Photo
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    Hide Photo
+                  </>
+                )}
+              </Button>
+            )}
 
             {canDelete && (
               <AlertDialog>

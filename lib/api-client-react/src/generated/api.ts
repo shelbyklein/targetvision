@@ -35,6 +35,7 @@ import type {
   CollectionUpdate,
   DashboardStats,
   HealthStatus,
+  ListAlbumPhotosParams,
   ListPhotosParams,
   Photo,
   PhotoCategoryInput,
@@ -946,22 +947,41 @@ export const useSetAlbumCover = <
 /**
  * @summary List photos in an album
  */
-export const getListAlbumPhotosUrl = (id: number) => {
-  return `/api/albums/${id}/photos`;
+export const getListAlbumPhotosUrl = (
+  id: number,
+  params?: ListAlbumPhotosParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/albums/${id}/photos?${stringifiedParams}`
+    : `/api/albums/${id}/photos`;
 };
 
 export const listAlbumPhotos = async (
   id: number,
+  params?: ListAlbumPhotosParams,
   options?: RequestInit,
 ): Promise<Photo[]> => {
-  return customFetch<Photo[]>(getListAlbumPhotosUrl(id), {
+  return customFetch<Photo[]>(getListAlbumPhotosUrl(id, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListAlbumPhotosQueryKey = (id: number) => {
-  return [`/api/albums/${id}/photos`] as const;
+export const getListAlbumPhotosQueryKey = (
+  id: number,
+  params?: ListAlbumPhotosParams,
+) => {
+  return [`/api/albums/${id}/photos`, ...(params ? [params] : [])] as const;
 };
 
 export const getListAlbumPhotosQueryOptions = <
@@ -969,6 +989,7 @@ export const getListAlbumPhotosQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   id: number,
+  params?: ListAlbumPhotosParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listAlbumPhotos>>,
@@ -980,11 +1001,12 @@ export const getListAlbumPhotosQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListAlbumPhotosQueryKey(id);
+  const queryKey =
+    queryOptions?.queryKey ?? getListAlbumPhotosQueryKey(id, params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listAlbumPhotos>>> = ({
     signal,
-  }) => listAlbumPhotos(id, { signal, ...requestOptions });
+  }) => listAlbumPhotos(id, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -1012,6 +1034,7 @@ export function useListAlbumPhotos<
   TError = ErrorType<unknown>,
 >(
   id: number,
+  params?: ListAlbumPhotosParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listAlbumPhotos>>,
@@ -1021,7 +1044,7 @@ export function useListAlbumPhotos<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListAlbumPhotosQueryOptions(id, options);
+  const queryOptions = getListAlbumPhotosQueryOptions(id, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -92,10 +92,17 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
+  const includeHidden = req.query.includeHidden === "true";
+  const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
+
+  const conditions = canSeeHidden
+    ? eq(photosTable.albumId, params.data.id)
+    : and(eq(photosTable.albumId, params.data.id), eq(photosTable.isHidden, false));
+
   const photos = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(eq(photosTable.albumId, params.data.id))
+    .where(conditions)
     .orderBy(photosTable.createdAt);
 
   const full = await Promise.all(photos.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
@@ -109,9 +116,13 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  const includeHidden = req.query.includeHidden === "true";
+  const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
+
   const allPhotos = await db
     .select({ id: photosTable.id })
     .from(photosTable)
+    .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
     .orderBy(photosTable.createdAt);
 
   const allIds = allPhotos.map((p) => p.id);
@@ -177,6 +188,7 @@ router.patch("/photos/:id", requireAuth, async (req, res): Promise<void> => {
   const updateData: Record<string, unknown> = {};
   if (body.data.aiDescription !== undefined) updateData.aiDescription = body.data.aiDescription;
   if (body.data.takenAt !== undefined) updateData.takenAt = body.data.takenAt ? new Date(body.data.takenAt) : null;
+  if (body.data.isHidden !== undefined) updateData.isHidden = body.data.isHidden;
 
   if (Object.keys(updateData).length > 0) {
     await db.update(photosTable).set(updateData).where(eq(photosTable.id, params.data.id));

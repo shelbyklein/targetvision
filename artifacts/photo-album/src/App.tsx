@@ -264,6 +264,18 @@ function ClerkProviderWithRoutes() {
               </>
             )}
           </Route>
+          <Route path="/settings">
+            {() => (
+              <>
+                <Show when="signed-in">
+                  <LazyPage load={() => import("@/pages/settings")} />
+                </Show>
+                <Show when="signed-out">
+                  <Redirect to="/sign-in" />
+                </Show>
+              </>
+            )}
+          </Route>
           <Route path="/search">
             {() => (
               <>

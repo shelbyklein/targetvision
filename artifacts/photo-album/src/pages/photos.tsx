@@ -17,8 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
 
 const PAGE_SIZE = 24;
 
@@ -90,6 +91,7 @@ export default function PhotosPage() {
 
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
+  const { showHidden } = useShowHiddenPhotos();
 
   const apiParams = {
     ...(search && { search }),
@@ -97,6 +99,7 @@ export default function PhotosPage() {
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
     ...(dateFrom && { dateFrom }),
     ...(dateTo && { dateTo }),
+    ...(showHidden && { includeHidden: true }),
   };
 
   const { data: photos, isLoading } = useListPhotos(
@@ -330,7 +333,10 @@ export default function PhotosPage() {
                   (photo.suggestedNewCollections?.length ?? 0);
                 return (
                   <Link key={photo.id} href={`/photos/${photo.id}`} data-testid="photo-grid-item">
-                    <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
+                    <div className={cn(
+                      "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
+                      photo.isHidden && "opacity-60"
+                    )}>
                       <img
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
@@ -353,6 +359,16 @@ export default function PhotosPage() {
                           </div>
                         )}
                       </div>
+                      {photo.isHidden && (
+                        <div
+                          className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow"
+                          title="Hidden photo"
+                          data-testid="hidden-badge"
+                        >
+                          <EyeOff className="h-2.5 w-2.5 text-white" />
+                          <span className="text-[10px] font-semibold text-white leading-none">Hidden</span>
+                        </div>
+                      )}
                       {suggestionCount > 0 && (
                         <div
                           className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-primary/90 px-1.5 py-0.5 shadow"

@@ -18,8 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Link } from "wouter";
-import { Search, SlidersHorizontal, X, Star, Images } from "lucide-react";
+import { Search, SlidersHorizontal, X, Star, Images, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
 
 function parseSearch(search: string) {
   const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -91,6 +92,7 @@ export default function SearchPage() {
 
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
+  const { showHidden } = useShowHiddenPhotos();
 
   const hasActiveFilters =
     !!ratingMin || !!ratingMax || !!dateFrom || !!dateTo || !!uploaderId;
@@ -102,6 +104,7 @@ export default function SearchPage() {
     ...(dateFrom && { dateFrom }),
     ...(dateTo && { dateTo }),
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
+    ...(showHidden && { includeHidden: true }),
   };
 
   const { data: results, isLoading, isFetching } = useSearchPhotos(searchParams, {
@@ -399,7 +402,10 @@ export default function SearchPage() {
                     href={`/photos/${photo.id}`}
                     data-testid="search-result-item"
                   >
-                    <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
+                    <div className={cn(
+                      "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
+                      photo.isHidden && "opacity-60"
+                    )}>
                       <img
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
@@ -420,6 +426,16 @@ export default function SearchPage() {
                           </div>
                         )}
                       </div>
+                      {photo.isHidden && (
+                        <div
+                          className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5"
+                          title="Hidden photo"
+                          data-testid="hidden-badge"
+                        >
+                          <EyeOff className="h-2.5 w-2.5 text-white" />
+                          <span className="text-[10px] font-semibold text-white leading-none">Hidden</span>
+                        </div>
+                      )}
                     </div>
                   </Link>
                 ))}

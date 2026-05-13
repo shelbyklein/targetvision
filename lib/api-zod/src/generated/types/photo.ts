@@ -21,6 +21,7 @@ export interface Photo {
   /** @nullable */
   takenAt?: string | null;
   createdAt: Date;
+  isHidden: boolean;
   /** @nullable */
   averageRating?: number | null;
   ratingCount: number;
