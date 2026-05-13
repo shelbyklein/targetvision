@@ -5,13 +5,9 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
-import type { Category } from "./category";
 import type { CollectionSummary } from "./collectionSummary";
 import type { PhotoRating } from "./photoRating";
-import type { SuggestedCategory } from "./suggestedCategory";
 import type { SuggestedCollection } from "./suggestedCollection";
-import type { SuggestedTag } from "./suggestedTag";
-import type { Tag } from "./tag";
 
 export interface Photo {
   id: number;
@@ -30,13 +26,9 @@ export interface Photo {
   ratingCount: number;
   /** @nullable */
   myRating?: number | null;
-  tags?: Tag[];
-  categories?: Category[];
   photoCollections?: CollectionSummary[];
   /** @nullable */
   aiDescription?: string | null;
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
-  suggestedTags?: SuggestedTag[];
-  suggestedCategories?: SuggestedCategory[];
 }

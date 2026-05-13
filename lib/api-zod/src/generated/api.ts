@@ -302,7 +302,7 @@ export const UploadPhotoBody = zod.object({
 });
 
 /**
- * @summary Search photos by keyword across caption, album title, tags, and uploader name
+ * @summary Search photos by keyword across caption, album title, and AI description
  */
 export const SearchPhotosQueryParams = zod.object({
   q: zod.coerce.string(),

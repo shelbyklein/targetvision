@@ -322,16 +322,6 @@ paths:
           required: true
           schema:
             type: string
-        - name: tag
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: categoryId
-          in: query
-          required: false
-          schema:
-            type: integer
         - name: ratingMin
           in: query
           required: false
@@ -380,16 +370,6 @@ paths:
           required: false
           schema:
             type: string
-        - name: tag
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: categoryId
-          in: query
-          required: false
-          schema:
-            type: integer
         - name: ratingMin
           in: query
           required: false
@@ -1445,14 +1425,6 @@ components:
           type: integer
         myRating:
           type: ["integer", "null"]
-        tags:
-          type: array
-          items:
-            $ref: "#/components/schemas/Tag"
-        categories:
-          type: array
-          items:
-            $ref: "#/components/schemas/Category"
         photoCollections:
           type: array
           items:
@@ -1467,14 +1439,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PhotoRating"
-        suggestedTags:
-          type: array
-          items:
-            $ref: "#/components/schemas/SuggestedTag"
-        suggestedCategories:
-          type: array
-          items:
-            $ref: "#/components/schemas/SuggestedCategory"
 
     PhotoRating:
       type: object

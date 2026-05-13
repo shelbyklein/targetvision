@@ -8,8 +8,6 @@
 
 export type SearchPhotosParams = {
   q: string;
-  tag?: string;
-  categoryId?: number;
   ratingMin?: number;
   ratingMax?: number;
   dateFrom?: string;

@@ -169,7 +169,6 @@ beforeEach(() => {
           content: JSON.stringify({
             description: "ok",
             suggestedCollectionIds: [],
-            suggestedTags: [],
           }),
         },
       },
@@ -182,7 +181,6 @@ beforeEach(() => {
         input: {
           description: "ok",
           suggestedCollectionIds: [],
-          suggestedTags: [],
         },
       },
     ],
@@ -191,7 +189,6 @@ beforeEach(() => {
     text: JSON.stringify({
       description: "ok",
       suggestedCollectionIds: [],
-      suggestedTags: [],
     }),
   });
 
