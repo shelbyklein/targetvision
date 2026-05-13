@@ -45,4 +45,3 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.production]
-BOOTSTRAP_ADMIN_SECRET = "dbe561a3bbda82a3b7c91f456d708731b2fb67f046482766a542ab761de5231f"

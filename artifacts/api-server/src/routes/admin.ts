@@ -6,7 +6,6 @@ import {
   APP_SETTINGS_SINGLETON_ID,
   aiAnalysisEventsTable,
   photosTable,
-  usersTable,
 } from "@workspace/db";
 import {
   GetAiSettingsResponse,
@@ -316,28 +315,5 @@ router.post(
     );
   },
 );
-
-router.post("/admin/bootstrap-admin", async (req, res): Promise<void> => {
-  const secret = process.env.BOOTSTRAP_ADMIN_SECRET;
-  if (!secret || req.headers["x-bootstrap-secret"] !== secret) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-  const { clerkId } = req.body as { clerkId?: string };
-  if (!clerkId || typeof clerkId !== "string") {
-    res.status(400).json({ error: "clerkId required" });
-    return;
-  }
-  const [updated] = await db
-    .update(usersTable)
-    .set({ role: "admin" })
-    .where(eq(usersTable.clerkId, clerkId))
-    .returning({ id: usersTable.id, clerkId: usersTable.clerkId, role: usersTable.role });
-  if (!updated) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-  res.json({ success: true, user: updated });
-});
 
 export default router;
