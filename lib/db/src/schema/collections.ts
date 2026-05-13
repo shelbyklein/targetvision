@@ -7,6 +7,7 @@ export const collectionsTable = pgTable("collections", {
   title: text("title").notNull(),
   description: text("description"),
   createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  coverPhotoId: integer("cover_photo_id").references(() => photosTable.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -14,6 +14,8 @@ export interface CollectionSummary {
   createdById: number;
   photoCount: number;
   /** @nullable */
+  coverPhotoId?: number | null;
+  /** @nullable */
   coverPhotoUrl?: string | null;
   createdAt: Date;
 }

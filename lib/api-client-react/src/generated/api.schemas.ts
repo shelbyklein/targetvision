@@ -87,6 +87,8 @@ export interface CollectionSummary {
   createdById: number;
   photoCount: number;
   /** @nullable */
+  coverPhotoId?: number | null;
+  /** @nullable */
   coverPhotoUrl?: string | null;
   createdAt: string;
 }
@@ -136,6 +138,8 @@ export interface Collection {
   createdById: number;
   photoCount: number;
   /** @nullable */
+  coverPhotoId?: number | null;
+  /** @nullable */
   coverPhotoUrl?: string | null;
   createdAt: string;
   tags?: string[];
@@ -153,6 +157,8 @@ export interface CollectionUpdate {
   title?: string;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  coverPhotoId?: number | null;
 }
 
 export interface CollectionPhotoInput {

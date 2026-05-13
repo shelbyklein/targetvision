@@ -1132,6 +1132,7 @@ export const ListCollectionsResponseItem = zod.object({
   description: zod.string().nullish(),
   createdById: zod.number(),
   photoCount: zod.number(),
+  coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   tags: zod.array(zod.string()).optional(),
@@ -1160,6 +1161,7 @@ export const GetCollectionResponse = zod.object({
   description: zod.string().nullish(),
   createdById: zod.number(),
   photoCount: zod.number(),
+  coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   tags: zod.array(zod.string()).optional(),
@@ -1224,6 +1226,7 @@ export const UpdateCollectionParams = zod.object({
 export const UpdateCollectionBody = zod.object({
   title: zod.string().min(1).optional(),
   description: zod.string().nullish(),
+  coverPhotoId: zod.number().nullish(),
 });
 
 export const UpdateCollectionResponse = zod.object({
@@ -1232,6 +1235,7 @@ export const UpdateCollectionResponse = zod.object({
   description: zod.string().nullish(),
   createdById: zod.number(),
   photoCount: zod.number(),
+  coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   photos: zod

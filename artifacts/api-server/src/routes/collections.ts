@@ -43,13 +43,19 @@ async function buildCollectionResponse(collectionId: number) {
   if (!row) return null;
 
   const [coverPhotoRow, tags] = await Promise.all([
-    db
-      .select({ url: photosTable.url })
-      .from(photoCollectionsTable)
-      .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
-      .where(eq(photoCollectionsTable.collectionId, collectionId))
-      .orderBy(sql`${photoCollectionsTable.photoId} asc`)
-      .limit(1),
+    row.collection.coverPhotoId
+      ? db
+          .select({ url: photosTable.url })
+          .from(photosTable)
+          .where(eq(photosTable.id, row.collection.coverPhotoId))
+          .limit(1)
+      : db
+          .select({ url: photosTable.url })
+          .from(photoCollectionsTable)
+          .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
+          .where(eq(photoCollectionsTable.collectionId, collectionId))
+          .orderBy(sql`${photoCollectionsTable.photoId} asc`)
+          .limit(1),
     getCollectionTags(collectionId),
   ]);
 
@@ -76,13 +82,19 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
   const collections = await Promise.all(
     rows.map(async (row) => {
       const [coverPhotoRow, tags] = await Promise.all([
-        db
-          .select({ url: photosTable.url })
-          .from(photoCollectionsTable)
-          .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
-          .where(eq(photoCollectionsTable.collectionId, row.collection.id))
-          .orderBy(sql`${photoCollectionsTable.photoId} asc`)
-          .limit(1),
+        row.collection.coverPhotoId
+          ? db
+              .select({ url: photosTable.url })
+              .from(photosTable)
+              .where(eq(photosTable.id, row.collection.coverPhotoId))
+              .limit(1)
+          : db
+              .select({ url: photosTable.url })
+              .from(photoCollectionsTable)
+              .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
+              .where(eq(photoCollectionsTable.collectionId, row.collection.id))
+              .orderBy(sql`${photoCollectionsTable.photoId} asc`)
+              .limit(1),
         getCollectionTags(row.collection.id),
       ]);
 

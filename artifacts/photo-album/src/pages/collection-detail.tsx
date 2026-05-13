@@ -39,7 +39,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, FolderOpen, Pencil, Trash2, Star, Tag, X, Plus } from "lucide-react";
+import { ArrowLeft, FolderOpen, Pencil, Trash2, Star, Tag, X, Plus, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function RenameCollectionDialog({
@@ -296,6 +296,7 @@ export default function CollectionDetail() {
   });
   const { data: me } = useGetMe();
   const { mutate: deleteCollection, isPending: deletingCollection } = useDeleteCollection();
+  const { mutate: updateCollection } = useUpdateCollection();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
@@ -440,34 +441,68 @@ export default function CollectionDetail() {
             className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
             data-testid="collection-photo-grid"
           >
-            {collection.photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="relative group rounded-lg overflow-hidden bg-muted"
-                data-testid="collection-photo-item"
-              >
-                <Link href={`/photos/${photo.id}`}>
-                  <div className="aspect-[4/3] overflow-hidden">
-                    <img
-                      src={photo.url}
-                      alt="Photo"
-                      className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
-                    />
-                  </div>
-                </Link>
+            {collection.photos.map((photo) => {
+              const isCover = collection.coverPhotoId === photo.id;
+              return (
+                <div
+                  key={photo.id}
+                  className="relative group rounded-lg overflow-hidden bg-muted"
+                  data-testid="collection-photo-item"
+                >
+                  <Link href={`/photos/${photo.id}`}>
+                    <div className="aspect-[4/3] overflow-hidden">
+                      <img
+                        src={photo.url}
+                        alt={photo.caption ?? "Photo"}
+                        className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                      />
+                    </div>
+                  </Link>
 
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
 
-                {photo.averageRating != null && (
-                  <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-black/60 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                    <span className="text-xs text-white font-medium">
-                      {photo.averageRating.toFixed(1)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+                  {photo.averageRating != null && (
+                    <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-black/60 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span className="text-xs text-white font-medium">
+                        {photo.averageRating.toFixed(1)}
+                      </span>
+                    </div>
+                  )}
+
+                  {isCover && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[10px] font-medium">
+                      <ImageIcon className="h-2.5 w-2.5" />
+                      Cover
+                    </div>
+                  )}
+
+                  {canManage && !isCover && (
+                    <button
+                      type="button"
+                      data-testid="set-cover-btn"
+                      onClick={() =>
+                        updateCollection(
+                          { id: collectionId, data: { coverPhotoId: photo.id } },
+                          {
+                            onSuccess: () => {
+                              invalidate();
+                              toast({ title: "Cover photo updated" });
+                            },
+                            onError: () =>
+                              toast({ title: "Failed to set cover photo", variant: "destructive" }),
+                          }
+                        )
+                      }
+                      className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/70 hover:bg-black/90 text-white rounded px-2 py-1 text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <ImageIcon className="h-2.5 w-2.5" />
+                      Set as cover
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

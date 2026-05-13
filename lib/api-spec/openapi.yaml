@@ -1502,6 +1502,8 @@ components:
           type: integer
         photoCount:
           type: integer
+        coverPhotoId:
+          type: ["integer", "null"]
         coverPhotoUrl:
           type: ["string", "null"]
         createdAt:
@@ -1522,6 +1524,8 @@ components:
           type: integer
         photoCount:
           type: integer
+        coverPhotoId:
+          type: ["integer", "null"]
         coverPhotoUrl:
           type: ["string", "null"]
         createdAt:
@@ -1550,6 +1554,8 @@ components:
           minLength: 1
         description:
           type: ["string", "null"]
+        coverPhotoId:
+          type: ["integer", "null"]
 
     CollectionPhotoInput:
       type: object
