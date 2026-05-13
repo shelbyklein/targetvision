@@ -15,6 +15,7 @@ import {
   useDismissPhotoNewCollectionSuggestion,
   useRerunPhotoAnalysis,
   useUpdatePhoto,
+  useCreateCollection,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -48,7 +49,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -191,9 +193,11 @@ export default function PhotoDetail() {
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { mutate: rerunAnalysis, isPending: rerunning } = useRerunPhotoAnalysis();
   const { mutate: updatePhoto, isPending: savingDescription } = useUpdatePhoto();
+  const { mutate: createCollection, isPending: creatingCollection } = useCreateCollection();
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
 
   const { data: albumPhotos } = useListAlbumPhotos(photo?.albumId ?? 0, {
     query: { enabled: !!photo?.albumId },
@@ -278,6 +282,32 @@ export default function PhotoDetail() {
     addToCollection(
       { id: parseInt(collectionId, 10), data: { photoId } },
       { onSuccess: invalidate, onError: () => toast({ title: "Failed to add to collection", variant: "destructive" }) }
+    );
+  }
+
+  function handleCreateNewCollection(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newCollectionName.trim();
+    if (!name) return;
+    createCollection(
+      { data: { title: name } },
+      {
+        onSuccess: (newCol) => {
+          setNewCollectionName("");
+          qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
+          addToCollection(
+            { id: newCol.id, data: { photoId } },
+            {
+              onSuccess: () => {
+                invalidate();
+                toast({ title: `Added to "${name}"` });
+              },
+              onError: () => toast({ title: "Collection created but failed to add photo", variant: "destructive" }),
+            }
+          );
+        },
+        onError: () => toast({ title: "Failed to create collection", variant: "destructive" }),
+      }
     );
   }
 
@@ -779,6 +809,34 @@ export default function PhotoDetail() {
                   </SelectContent>
                 </Select>
               )}
+              <form
+                onSubmit={handleCreateNewCollection}
+                className="flex gap-1.5"
+                data-testid="create-collection-form"
+              >
+                <Input
+                  value={newCollectionName}
+                  onChange={(e) => setNewCollectionName(e.target.value)}
+                  placeholder="New collection name..."
+                  className="h-8 text-sm flex-1"
+                  disabled={creatingCollection}
+                  data-testid="new-collection-name-input"
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="h-8 px-2.5 gap-1"
+                  disabled={creatingCollection || !newCollectionName.trim()}
+                  data-testid="create-collection-submit"
+                >
+                  {creatingCollection ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  Create
+                </Button>
+              </form>
             </div>
 
             <Separator />
