@@ -110,28 +110,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3 shrink-0">
             <GlobalSearchBar />
 
-            <div
-              className="hidden md:flex items-center gap-1.5 pr-1 border-r border-border/60 mr-1"
-              data-testid="usaa-attribution"
-            >
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">a</span>
-              <a
-                href="https://www.usarchery.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center"
-                data-testid="usaa-attribution-link"
-              >
-                <img
-                  src={`${basePath}/usaa-horizontal.svg`}
-                  alt="USA Archery"
-                  className="h-3.5 w-auto opacity-70"
-                  data-testid="usaa-attribution-logo"
-                />
-              </a>
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70 pr-2">product</span>
-            </div>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-2" data-testid="user-menu-trigger">
@@ -175,6 +153,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
         {children}
       </main>
+
+      <footer className="border-t border-border py-6 text-sm text-muted-foreground">
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>Copyright</span>
+            <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+            <span>2026</span>
+          </div>
+          <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+        </div>
+      </footer>
     </div>
   );
 }

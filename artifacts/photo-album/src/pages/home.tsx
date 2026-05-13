@@ -85,19 +85,14 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        <p className="mb-3">Target Vision &mdash; USA Archery internal marketing photo selection tool</p>
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-xs text-muted-foreground/70">a</span>
-          <a
-            href="https://www.usarchery.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center"
-          >
+      <footer className="border-t border-border py-8 text-sm text-muted-foreground">
+        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>Copyright</span>
             <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-          </a>
-          <span className="text-xs text-muted-foreground/70">product</span>
+            <span>2026</span>
+          </div>
+          <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
         </div>
       </footer>
     </div>
