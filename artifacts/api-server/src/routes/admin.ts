@@ -17,6 +17,8 @@ import {
   ClearAiProviderKeyParams,
   ClearAiProviderKeyResponse,
   ListAiAnalysisEventsResponse,
+  RetryAiAnalysisEventParams,
+  RetryAiAnalysisEventResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -27,6 +29,7 @@ import {
   type ProviderId,
 } from "../lib/aiProviders";
 import { encryptSecret, maskKey } from "../lib/secretCrypto";
+import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 
 const router: IRouter = Router();
 
@@ -206,5 +209,71 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
     ),
   );
 });
+
+router.post(
+  "/admin/ai-analysis-events/:id/retry",
+  requireAdmin,
+  async (req, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const params = RetryAiAnalysisEventParams.safeParse({
+      id: parseInt(raw, 10),
+    });
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+
+    const [event] = await db
+      .select()
+      .from(aiAnalysisEventsTable)
+      .where(eq(aiAnalysisEventsTable.id, params.data.id));
+    if (!event) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+    if (event.status !== "failed") {
+      res.status(400).json({ error: "Only failed events can be retried" });
+      return;
+    }
+    if (event.photoId == null) {
+      res.status(404).json({ error: "Photo no longer exists" });
+      return;
+    }
+
+    const newEvent = await runAndRecordPhotoAnalysis(event.photoId);
+    if (!newEvent) {
+      res.status(404).json({ error: "Photo no longer exists" });
+      return;
+    }
+
+    const [row] = await db
+      .select({
+        id: aiAnalysisEventsTable.id,
+        photoId: aiAnalysisEventsTable.photoId,
+        provider: aiAnalysisEventsTable.provider,
+        status: aiAnalysisEventsTable.status,
+        errorMessage: aiAnalysisEventsTable.errorMessage,
+        createdAt: aiAnalysisEventsTable.createdAt,
+        photoCaption: photosTable.caption,
+        photoThumbnailUrl: photosTable.url,
+      })
+      .from(aiAnalysisEventsTable)
+      .leftJoin(photosTable, eq(photosTable.id, aiAnalysisEventsTable.photoId))
+      .where(eq(aiAnalysisEventsTable.id, newEvent.id));
+
+    res.json(
+      RetryAiAnalysisEventResponse.parse({
+        id: row.id,
+        photoId: row.photoId,
+        photoCaption: row.photoCaption,
+        photoThumbnailUrl: row.photoThumbnailUrl,
+        provider: row.provider,
+        status: row.status,
+        errorMessage: row.errorMessage,
+        createdAt: row.createdAt.toISOString(),
+      }),
+    );
+  },
+);
 
 export default router;

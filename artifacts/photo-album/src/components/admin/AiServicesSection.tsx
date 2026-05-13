@@ -5,7 +5,9 @@ import {
   useSetAiProviderKey,
   useClearAiProviderKey,
   useListAiAnalysisEvents,
+  useRetryAiAnalysisEvent,
   getGetAiSettingsQueryKey,
+  getListAiAnalysisEventsQueryKey,
   type AiSettings,
   type AiProviderInfo,
   type AiAnalysisEvent,
@@ -24,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, KeyRound, AlertTriangle, Check, Activity, CircleX, MinusCircle, CheckCircle2 } from "lucide-react";
+import { Sparkles, KeyRound, AlertTriangle, Check, Activity, CircleX, MinusCircle, CheckCircle2, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type ProviderId = "openai" | "anthropic" | "gemini";
@@ -194,7 +196,33 @@ function StatusIcon({ status }: { status: AiAnalysisEvent["status"] }) {
 }
 
 function RecentActivityPanel() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
   const { data: events, isLoading } = useListAiAnalysisEvents();
+  const { mutate: retry, isPending: retrying, variables: retryingVars } =
+    useRetryAiAnalysisEvent();
+  const retryingId = retrying ? retryingVars?.id : null;
+
+  function handleRetry(id: number) {
+    retry(
+      { id },
+      {
+        onSuccess: (newEvent) => {
+          qc.invalidateQueries({ queryKey: getListAiAnalysisEventsQueryKey() });
+          toast({
+            title:
+              newEvent.status === "success"
+                ? "AI analysis succeeded"
+                : newEvent.status === "skipped"
+                  ? "AI analysis skipped"
+                  : "AI analysis failed again",
+          });
+        },
+        onError: () =>
+          toast({ title: "Retry failed", variant: "destructive" }),
+      },
+    );
+  }
 
   return (
     <div
@@ -269,6 +297,22 @@ function RecentActivityPanel() {
                       data-testid={`ai-activity-error-${ev.id}`}
                     >
                       {ev.errorMessage}
+                    </div>
+                  )}
+                  {ev.status === "failed" && ev.photoId != null && (
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => handleRetry(ev.id)}
+                        disabled={retryingId === ev.id}
+                        data-testid={`ai-activity-retry-${ev.id}`}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        {retryingId === ev.id ? "Retrying…" : "Retry"}
+                      </Button>
                     </div>
                   )}
                 </div>

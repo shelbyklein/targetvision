@@ -1577,6 +1577,24 @@ export const ListAiAnalysisEventsResponse = zod.array(
 );
 
 /**
+ * @summary Re-run AI analysis for the photo of a failed event (admin only)
+ */
+export const RetryAiAnalysisEventParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RetryAiAnalysisEventResponse = zod.object({
+  id: zod.number(),
+  photoId: zod.number().nullish(),
+  photoCaption: zod.string().nullish(),
+  photoThumbnailUrl: zod.string().nullish(),
+  provider: zod.string().nullish(),
+  status: zod.enum(["success", "skipped", "failed"]),
+  errorMessage: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
  * @summary Get dashboard summary statistics
  */
 export const GetDashboardStatsResponse = zod.object({

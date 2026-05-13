@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable, aiAnalysisEventsTable } from "@workspace/db";
-import { analyzePhoto } from "../lib/aiPhotoAnalysis";
+import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable } from "@workspace/db";
+import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { logger } from "../lib/logger";
 import {
   ListAlbumPhotosParams,
@@ -83,130 +83,9 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
     .returning();
 
   // Fire-and-forget AI analysis. Failures are swallowed so the upload still succeeds.
-  void (async () => {
-    try {
-      const [collections, categories] = await Promise.all([
-        db
-          .select({
-            id: collectionsTable.id,
-            title: collectionsTable.title,
-            description: collectionsTable.description,
-          })
-          .from(collectionsTable)
-          .where(eq(collectionsTable.createdById, req.dbUser!.id)),
-        db
-          .select({ id: categoriesTable.id, name: categoriesTable.name })
-          .from(categoriesTable),
-      ]);
-
-      const outcome = await analyzePhoto(photo.url, collections, categories, photo.storageKey);
-
-      if (outcome.status === "skipped") {
-        await db.insert(aiAnalysisEventsTable).values({
-          photoId: photo.id,
-          provider: outcome.provider,
-          status: "skipped",
-          errorMessage: outcome.reason,
-        });
-        return;
-      }
-
-      if (outcome.status === "failed") {
-        await db.insert(aiAnalysisEventsTable).values({
-          photoId: photo.id,
-          provider: outcome.provider,
-          status: "failed",
-          errorMessage: outcome.error.slice(0, 1000),
-        });
-        return;
-      }
-
-      const result = outcome.result;
-
-      await db
-        .update(photosTable)
-        .set({ aiDescription: result.description || null })
-        .where(eq(photosTable.id, photo.id));
-
-      if (result.suggestedCollectionIds.length > 0) {
-        await db
-          .insert(photoCollectionSuggestionsTable)
-          .values(
-            result.suggestedCollectionIds.map((cid) => ({
-              photoId: photo.id,
-              collectionId: cid,
-              status: "pending" as const,
-            })),
-          )
-          .onConflictDoNothing();
-      }
-
-      if (result.suggestedCategoryIds.length > 0) {
-        const existingCats = await db
-          .select({ categoryId: photoCategoriesTable.categoryId })
-          .from(photoCategoriesTable)
-          .where(eq(photoCategoriesTable.photoId, photo.id));
-        const existingCatIds = new Set(existingCats.map((c) => c.categoryId));
-        const newCatSuggestions = result.suggestedCategoryIds.filter(
-          (cid) => !existingCatIds.has(cid),
-        );
-        if (newCatSuggestions.length > 0) {
-          await db
-            .insert(photoCategorySuggestionsTable)
-            .values(
-              newCatSuggestions.map((cid) => ({
-                photoId: photo.id,
-                categoryId: cid,
-                status: "pending" as const,
-              })),
-            )
-            .onConflictDoNothing();
-        }
-      }
-
-      if (result.suggestedTags.length > 0) {
-        const existingTags = await db
-          .select({ name: tagsTable.name })
-          .from(tagsTable)
-          .innerJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
-          .where(eq(photoTagsTable.photoId, photo.id));
-        const existingNames = new Set(existingTags.map((t) => t.name));
-        const newSuggestions = result.suggestedTags.filter((t) => !existingNames.has(t));
-
-        if (newSuggestions.length > 0) {
-          await db
-            .insert(photoTagSuggestionsTable)
-            .values(
-              newSuggestions.map((tagName) => ({
-                photoId: photo.id,
-                tagName,
-                status: "pending" as const,
-              })),
-            )
-            .onConflictDoNothing();
-        }
-      }
-
-      await db.insert(aiAnalysisEventsTable).values({
-        photoId: photo.id,
-        provider: outcome.provider,
-        status: "success",
-      });
-    } catch (err) {
-      logger.error({ err, photoId: photo.id }, "Background AI analysis failed");
-      try {
-        const message = err instanceof Error ? err.message : String(err);
-        await db.insert(aiAnalysisEventsTable).values({
-          photoId: photo.id,
-          provider: null,
-          status: "failed",
-          errorMessage: message.slice(0, 1000),
-        });
-      } catch (logErr) {
-        logger.error({ err: logErr }, "Failed to record AI analysis failure event");
-      }
-    }
-  })();
+  void runAndRecordPhotoAnalysis(photo.id).catch((err) => {
+    logger.error({ err, photoId: photo.id }, "Background AI analysis failed");
+  });
 
   const full = await buildPhotoResponse(photo.id, req.dbUser?.id);
   res.status(201).json(GetPhotoResponse.parse(full));

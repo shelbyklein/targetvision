@@ -2896,6 +2896,90 @@ export function useListAiAnalysisEvents<
 }
 
 /**
+ * @summary Re-run AI analysis for the photo of a failed event (admin only)
+ */
+export const getRetryAiAnalysisEventUrl = (id: number) => {
+  return `/api/admin/ai-analysis-events/${id}/retry`;
+};
+
+export const retryAiAnalysisEvent = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AiAnalysisEvent> => {
+  return customFetch<AiAnalysisEvent>(getRetryAiAnalysisEventUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRetryAiAnalysisEventMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof retryAiAnalysisEvent>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof retryAiAnalysisEvent>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["retryAiAnalysisEvent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof retryAiAnalysisEvent>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return retryAiAnalysisEvent(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RetryAiAnalysisEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof retryAiAnalysisEvent>>
+>;
+
+export type RetryAiAnalysisEventMutationError = ErrorType<void>;
+
+/**
+ * @summary Re-run AI analysis for the photo of a failed event (admin only)
+ */
+export const useRetryAiAnalysisEvent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof retryAiAnalysisEvent>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof retryAiAnalysisEvent>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRetryAiAnalysisEventMutationOptions(options));
+};
+
+/**
  * @summary Get dashboard summary statistics
  */
 export const getGetDashboardStatsUrl = () => {

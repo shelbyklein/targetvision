@@ -1,3 +1,18 @@
+import { eq } from "drizzle-orm";
+import {
+  db,
+  photosTable,
+  collectionsTable,
+  categoriesTable,
+  photoCategoriesTable,
+  tagsTable,
+  photoTagsTable,
+  photoCollectionSuggestionsTable,
+  photoTagSuggestionsTable,
+  photoCategorySuggestionsTable,
+  aiAnalysisEventsTable,
+  type AiAnalysisEvent,
+} from "@workspace/db";
 import { logger } from "./logger";
 import { ObjectStorageService } from "./objectStorage";
 import { getActiveProvider } from "./aiProviders";
@@ -155,4 +170,168 @@ export async function analyzePhoto(
       suggestedCategoryIds,
     },
   };
+}
+
+/**
+ * Run AI analysis for an existing photo and persist the outcome:
+ * - Updates `photos.aiDescription` on success
+ * - Inserts pending suggestions (collections, tags, categories) on success
+ * - Always records an `ai_analysis_events` row describing the attempt
+ *
+ * Used by the upload flow and by the admin "Retry" action on failed events.
+ * Returns the inserted event row, or null if the photo is missing.
+ */
+export async function runAndRecordPhotoAnalysis(
+  photoId: number,
+): Promise<AiAnalysisEvent | null> {
+  const [photo] = await db
+    .select()
+    .from(photosTable)
+    .where(eq(photosTable.id, photoId));
+  if (!photo) return null;
+
+  try {
+    const [collections, categories] = await Promise.all([
+      db
+        .select({
+          id: collectionsTable.id,
+          title: collectionsTable.title,
+          description: collectionsTable.description,
+        })
+        .from(collectionsTable)
+        .where(eq(collectionsTable.createdById, photo.uploaderId)),
+      db
+        .select({ id: categoriesTable.id, name: categoriesTable.name })
+        .from(categoriesTable),
+    ]);
+
+    const outcome = await analyzePhoto(
+      photo.url,
+      collections,
+      categories,
+      photo.storageKey,
+    );
+
+    if (outcome.status === "skipped") {
+      const [ev] = await db
+        .insert(aiAnalysisEventsTable)
+        .values({
+          photoId: photo.id,
+          provider: outcome.provider,
+          status: "skipped",
+          errorMessage: outcome.reason,
+        })
+        .returning();
+      return ev;
+    }
+
+    if (outcome.status === "failed") {
+      const [ev] = await db
+        .insert(aiAnalysisEventsTable)
+        .values({
+          photoId: photo.id,
+          provider: outcome.provider,
+          status: "failed",
+          errorMessage: outcome.error.slice(0, 1000),
+        })
+        .returning();
+      return ev;
+    }
+
+    const result = outcome.result;
+
+    await db
+      .update(photosTable)
+      .set({ aiDescription: result.description || null })
+      .where(eq(photosTable.id, photo.id));
+
+    if (result.suggestedCollectionIds.length > 0) {
+      await db
+        .insert(photoCollectionSuggestionsTable)
+        .values(
+          result.suggestedCollectionIds.map((cid) => ({
+            photoId: photo.id,
+            collectionId: cid,
+            status: "pending" as const,
+          })),
+        )
+        .onConflictDoNothing();
+    }
+
+    if (result.suggestedCategoryIds.length > 0) {
+      const existingCats = await db
+        .select({ categoryId: photoCategoriesTable.categoryId })
+        .from(photoCategoriesTable)
+        .where(eq(photoCategoriesTable.photoId, photo.id));
+      const existingCatIds = new Set(existingCats.map((c) => c.categoryId));
+      const newCatSuggestions = result.suggestedCategoryIds.filter(
+        (cid) => !existingCatIds.has(cid),
+      );
+      if (newCatSuggestions.length > 0) {
+        await db
+          .insert(photoCategorySuggestionsTable)
+          .values(
+            newCatSuggestions.map((cid) => ({
+              photoId: photo.id,
+              categoryId: cid,
+              status: "pending" as const,
+            })),
+          )
+          .onConflictDoNothing();
+      }
+    }
+
+    if (result.suggestedTags.length > 0) {
+      const existingTags = await db
+        .select({ name: tagsTable.name })
+        .from(tagsTable)
+        .innerJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
+        .where(eq(photoTagsTable.photoId, photo.id));
+      const existingNames = new Set(existingTags.map((t) => t.name));
+      const newSuggestions = result.suggestedTags.filter(
+        (t) => !existingNames.has(t),
+      );
+
+      if (newSuggestions.length > 0) {
+        await db
+          .insert(photoTagSuggestionsTable)
+          .values(
+            newSuggestions.map((tagName) => ({
+              photoId: photo.id,
+              tagName,
+              status: "pending" as const,
+            })),
+          )
+          .onConflictDoNothing();
+      }
+    }
+
+    const [ev] = await db
+      .insert(aiAnalysisEventsTable)
+      .values({
+        photoId: photo.id,
+        provider: outcome.provider,
+        status: "success",
+      })
+      .returning();
+    return ev;
+  } catch (err) {
+    logger.error({ err, photoId }, "AI analysis failed");
+    try {
+      const message = err instanceof Error ? err.message : String(err);
+      const [ev] = await db
+        .insert(aiAnalysisEventsTable)
+        .values({
+          photoId,
+          provider: null,
+          status: "failed",
+          errorMessage: message.slice(0, 1000),
+        })
+        .returning();
+      return ev;
+    } catch (logErr) {
+      logger.error({ err: logErr }, "Failed to record AI analysis failure event");
+      return null;
+    }
+  }
 }

@@ -837,6 +837,33 @@ paths:
         "403":
           description: Forbidden
 
+  /admin/ai-analysis-events/{id}/retry:
+    post:
+      operationId: retryAiAnalysisEvent
+      tags: [admin]
+      summary: Re-run AI analysis for the photo of a failed event (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New AI analysis event recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAnalysisEvent"
+        "400":
+          description: Event is not in a retryable state
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Event or its photo not found
+
   /stats/dashboard:
     get:
       operationId: getDashboardStats
