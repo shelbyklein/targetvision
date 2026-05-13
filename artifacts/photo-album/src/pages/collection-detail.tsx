@@ -11,6 +11,7 @@ import {
   useAddCollectionTag,
   useRemoveCollectionTag,
   getListCollectionTagsQueryKey,
+  useRemovePhotoFromCollection,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
@@ -297,6 +298,7 @@ export default function CollectionDetail() {
   const { data: me } = useGetMe();
   const { mutate: deleteCollection, isPending: deletingCollection } = useDeleteCollection();
   const { mutate: updateCollection } = useUpdateCollection();
+  const { mutate: removePhoto } = useRemovePhotoFromCollection();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
@@ -522,6 +524,30 @@ export default function CollectionDetail() {
                     >
                       <ImageIcon className="h-2.5 w-2.5" />
                       Set as cover
+                    </button>
+                  )}
+
+                  {canManage && (
+                    <button
+                      type="button"
+                      data-testid="remove-from-collection-btn"
+                      onClick={() =>
+                        removePhoto(
+                          { id: collectionId, photoId: photo.id },
+                          {
+                            onSuccess: () => {
+                              invalidate();
+                              toast({ title: "Photo removed from collection" });
+                            },
+                            onError: () =>
+                              toast({ title: "Failed to remove photo", variant: "destructive" }),
+                          }
+                        )
+                      }
+                      className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/70 hover:bg-red-600 text-white rounded px-2 py-1 text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                      Remove
                     </button>
                   )}
                 </div>

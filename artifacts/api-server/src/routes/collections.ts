@@ -268,6 +268,13 @@ router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res):
       )
     );
 
+  if (collection.coverPhotoId === params.data.photoId) {
+    await db
+      .update(collectionsTable)
+      .set({ coverPhotoId: null })
+      .where(eq(collectionsTable.id, params.data.id));
+  }
+
   res.sendStatus(204);
 });
 
