@@ -17,7 +17,7 @@ export default function Home() {
             <Button variant="ghost" data-testid="sign-in-btn">Sign In</Button>
           </Link>
           <Link href="/sign-up">
-            <Button data-testid="sign-up-btn">Sign Up</Button>
+            <Button data-testid="sign-up-btn" className="bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">Sign Up</Button>
           </Link>
         </div>
       </header>
@@ -45,7 +45,7 @@ export default function Home() {
             </Button>
           </Link>
           <Link href="/sign-up">
-            <Button size="lg" data-testid="home-sign-up-btn" className="px-8">
+            <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">
               Sign Up
             </Button>
           </Link>
