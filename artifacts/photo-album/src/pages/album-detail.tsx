@@ -572,6 +572,9 @@ export default function AlbumDetail() {
                   </div>
                 </Link>
 
+                {(photo.aiDescription ||
+                  (photo.createdAt && Date.now() - new Date(photo.createdAt).getTime() < 60_000) ||
+                  (photo.suggestedCollections && photo.suggestedCollections.length > 0)) && (
                 <div className="p-2 space-y-1">
                   {photo.aiDescription ? (
                     <p
@@ -633,6 +636,7 @@ export default function AlbumDetail() {
                     </div>
                   )}
                 </div>
+                )}
 
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
 
