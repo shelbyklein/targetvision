@@ -482,7 +482,7 @@ export default function SearchPage() {
                     <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
                       <img
                         src={photo.url}
-                        alt={photo.caption ?? "Photo"}
+                        alt="Photo"
                         className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
@@ -490,9 +490,6 @@ export default function SearchPage() {
                           <p className="text-xs text-white/80 font-medium truncate">
                             {photo.albumTitle}
                           </p>
-                        )}
-                        {photo.caption && (
-                          <p className="text-xs text-white truncate">{photo.caption}</p>
                         )}
                         {photo.tags && photo.tags.length > 0 && (
                           <div className="flex flex-wrap gap-0.5 mt-1">

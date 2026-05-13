@@ -627,14 +627,11 @@ export default function PhotoDetail() {
             <div className="rounded-xl overflow-hidden bg-muted aspect-[4/3]">
               <img
                 src={photo.url}
-                alt={photo.caption ?? "Photo"}
+                alt="Photo"
                 className="h-full w-full object-contain bg-black"
                 data-testid="photo-image"
               />
             </div>
-            {photo.caption && (
-              <p className="text-sm text-muted-foreground italic">{photo.caption}</p>
-            )}
             <div
               className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 space-y-2"
               data-testid="ai-description-block"
@@ -713,18 +710,13 @@ export default function PhotoDetail() {
           </div>
 
           <div className="space-y-6">
-            <div className="space-y-3">
-              <h1 className="text-lg font-semibold text-foreground" data-testid="photo-title">
-                {photo.caption ?? "Untitled Photo"}
-              </h1>
-              <div className="space-y-1.5 text-sm text-muted-foreground">
-                {photo.takenAt && (
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    <span>{new Date(photo.takenAt).toLocaleDateString()}</span>
-                  </div>
-                )}
-              </div>
+            <div className="space-y-1.5 text-sm text-muted-foreground">
+              {photo.takenAt && (
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  <span>{new Date(photo.takenAt).toLocaleDateString()}</span>
+                </div>
+              )}
             </div>
 
             {photo.ratingCount > 0 && (

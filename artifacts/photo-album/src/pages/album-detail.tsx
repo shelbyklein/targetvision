@@ -583,22 +583,13 @@ export default function AlbumDetail() {
                   <div className="aspect-[4/3] overflow-hidden">
                     <img
                       src={photo.url}
-                      alt={photo.caption ?? "Photo"}
+                      alt="Photo"
                       className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
                   </div>
                 </Link>
 
                 <div className="p-2 space-y-1">
-                  {photo.caption ? (
-                    <p className="text-xs font-medium text-foreground truncate">
-                      {photo.caption}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground/60 italic truncate">
-                      No caption
-                    </p>
-                  )}
                   {photo.aiDescription ? (
                     <p
                       className="text-[10px] text-muted-foreground line-clamp-2 flex items-start gap-1"
