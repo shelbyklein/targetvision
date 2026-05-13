@@ -12,6 +12,7 @@ import {
   useAcceptPhotoSuggestion,
   useDismissPhotoSuggestion,
   useRerunPhotoAnalysis,
+  useUpdatePhoto,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -44,7 +45,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -183,6 +185,9 @@ export default function PhotoDetail() {
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { mutate: rerunAnalysis, isPending: rerunning } = useRerunPhotoAnalysis();
+  const { mutate: updatePhoto, isPending: savingDescription } = useUpdatePhoto();
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
   const [downloading, setDownloading] = useState(false);
 
   const { data: albumPhotos } = useListAlbumPhotos(photo?.albumId ?? 0, {
@@ -192,6 +197,11 @@ export default function PhotoDetail() {
   const currentIndex = albumPhotos ? albumPhotos.findIndex((p) => p.id === photoId) : -1;
   const prevPhotoId = currentIndex > 0 ? albumPhotos![currentIndex - 1].id : null;
   const nextPhotoId = currentIndex >= 0 && albumPhotos && currentIndex < albumPhotos.length - 1 ? albumPhotos![currentIndex + 1].id : null;
+
+  useEffect(() => {
+    setEditingDescription(false);
+    setDescriptionDraft("");
+  }, [photoId]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -360,12 +370,38 @@ export default function PhotoDetail() {
     );
   }
 
+  function handleStartEditDescription() {
+    setDescriptionDraft(photo?.aiDescription ?? "");
+    setEditingDescription(true);
+  }
+
+  function handleCancelEditDescription() {
+    setEditingDescription(false);
+    setDescriptionDraft("");
+  }
+
+  function handleSaveDescription() {
+    updatePhoto(
+      { id: photoId, data: { aiDescription: descriptionDraft.trim() || null } },
+      {
+        onSuccess: () => {
+          toast({ title: "Description saved" });
+          setEditingDescription(false);
+          setDescriptionDraft("");
+          qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
+        },
+        onError: () => toast({ title: "Failed to save description", variant: "destructive" }),
+      }
+    );
+  }
+
   const availableCollections = allCollections?.filter(
     (col) => !photo?.photoCollections?.some((c) => c.id === col.id)
   );
 
   const canDelete = me && photo && (me.id === photo.uploaderId || me.role === "admin");
   const canRerunAnalysis = me && photo && (me.id === photo.uploaderId || me.role === "admin");
+  const canEditDescription = me && photo && (me.id === photo.uploaderId || me.role === "admin");
 
   if (isLoading) {
     return (
@@ -460,25 +496,76 @@ export default function PhotoDetail() {
                   <Sparkles className="h-3.5 w-3.5" />
                   AI description
                 </div>
-                {canRerunAnalysis && (
-                  <button
-                    type="button"
-                    onClick={handleRerunAnalysis}
-                    disabled={rerunning}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    data-testid="rerun-analysis-btn"
-                    title="Re-run AI analysis"
-                  >
-                    {rerunning ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3" />
-                    )}
-                    Re-run analysis
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canEditDescription && !editingDescription && (
+                    <button
+                      type="button"
+                      onClick={handleStartEditDescription}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid="edit-description-btn"
+                      title="Edit description"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit
+                    </button>
+                  )}
+                  {canRerunAnalysis && !editingDescription && (
+                    <button
+                      type="button"
+                      onClick={handleRerunAnalysis}
+                      disabled={rerunning}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      data-testid="rerun-analysis-btn"
+                      title="Re-run AI analysis"
+                    >
+                      {rerunning ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      Regenerate
+                    </button>
+                  )}
+                </div>
               </div>
-              {photo.aiDescription ? (
+              {editingDescription ? (
+                <div className="space-y-2" data-testid="description-edit-form">
+                  <Textarea
+                    value={descriptionDraft}
+                    onChange={(e) => setDescriptionDraft(e.target.value)}
+                    placeholder="Enter a description…"
+                    className="text-sm min-h-[80px] resize-none"
+                    disabled={savingDescription}
+                    autoFocus
+                    data-testid="description-textarea"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs px-3"
+                      onClick={handleSaveDescription}
+                      disabled={savingDescription}
+                      data-testid="save-description-btn"
+                    >
+                      {savingDescription ? (
+                        <><Loader2 className="h-3 w-3 animate-spin mr-1" />Saving…</>
+                      ) : (
+                        "Save"
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs px-3"
+                      onClick={handleCancelEditDescription}
+                      disabled={savingDescription}
+                      data-testid="cancel-description-btn"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : photo.aiDescription ? (
                 <p className="text-sm text-foreground" data-testid="ai-description-text">
                   {photo.aiDescription}
                 </p>
