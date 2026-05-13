@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable } from "@workspace/db";
+import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { logger } from "../lib/logger";
 import {
@@ -25,6 +25,10 @@ import {
   AcceptPhotoSuggestionResponse,
   DismissPhotoSuggestionParams,
   DismissPhotoSuggestionResponse,
+  AcceptPhotoNewCollectionSuggestionParams,
+  AcceptPhotoNewCollectionSuggestionResponse,
+  DismissPhotoNewCollectionSuggestionParams,
+  DismissPhotoNewCollectionSuggestionResponse,
   RerunPhotoAnalysisParams,
   RerunPhotoAnalysisResponse,
 } from "@workspace/api-zod";
@@ -368,6 +372,123 @@ router.post("/photos/:id/suggestions/:collectionId/dismiss", requireAuth, async 
 
   const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
   res.json(DismissPhotoSuggestionResponse.parse(full));
+});
+
+router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawSid = Array.isArray(req.params.suggestionId) ? req.params.suggestionId[0] : req.params.suggestionId;
+  const params = AcceptPhotoNewCollectionSuggestionParams.safeParse({
+    id: parseInt(rawId, 10),
+    suggestionId: parseInt(rawSid, 10),
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db
+    .select({ id: photosTable.id, uploaderId: photosTable.uploaderId })
+    .from(photosTable)
+    .where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const isAdmin = req.dbUser!.role === "admin";
+  const isOwner = photoExists.uploaderId === req.dbUser!.id;
+  if (!isAdmin && !isOwner) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [suggestion] = await db
+    .select()
+    .from(photoNewCollectionSuggestionsTable)
+    .where(
+      and(
+        eq(photoNewCollectionSuggestionsTable.id, params.data.suggestionId),
+        eq(photoNewCollectionSuggestionsTable.photoId, params.data.id),
+        eq(photoNewCollectionSuggestionsTable.status, "pending"),
+      ),
+    );
+  if (!suggestion) {
+    res.status(404).json({ error: "Pending suggestion not found" });
+    return;
+  }
+
+  const [newCollection] = await db
+    .insert(collectionsTable)
+    .values({
+      title: suggestion.suggestedName,
+      createdById: photoExists.uploaderId,
+    })
+    .returning();
+
+  await db
+    .insert(photoCollectionsTable)
+    .values({ collectionId: newCollection.id, photoId: params.data.id })
+    .onConflictDoNothing();
+
+  await db
+    .update(photoNewCollectionSuggestionsTable)
+    .set({ status: "accepted" })
+    .where(eq(photoNewCollectionSuggestionsTable.id, params.data.suggestionId));
+
+  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  res.json(AcceptPhotoNewCollectionSuggestionResponse.parse(full));
+});
+
+router.post("/photos/:id/new-collection-suggestions/:suggestionId/dismiss", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawSid = Array.isArray(req.params.suggestionId) ? req.params.suggestionId[0] : req.params.suggestionId;
+  const params = DismissPhotoNewCollectionSuggestionParams.safeParse({
+    id: parseInt(rawId, 10),
+    suggestionId: parseInt(rawSid, 10),
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [photoExists] = await db
+    .select({ id: photosTable.id, uploaderId: photosTable.uploaderId })
+    .from(photosTable)
+    .where(eq(photosTable.id, params.data.id));
+  if (!photoExists) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  const isAdmin = req.dbUser!.role === "admin";
+  const isOwner = photoExists.uploaderId === req.dbUser!.id;
+  if (!isAdmin && !isOwner) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [suggestion] = await db
+    .select({ id: photoNewCollectionSuggestionsTable.id })
+    .from(photoNewCollectionSuggestionsTable)
+    .where(
+      and(
+        eq(photoNewCollectionSuggestionsTable.id, params.data.suggestionId),
+        eq(photoNewCollectionSuggestionsTable.photoId, params.data.id),
+        eq(photoNewCollectionSuggestionsTable.status, "pending"),
+      ),
+    );
+  if (!suggestion) {
+    res.status(404).json({ error: "Pending suggestion not found" });
+    return;
+  }
+
+  await db
+    .update(photoNewCollectionSuggestionsTable)
+    .set({ status: "dismissed" })
+    .where(eq(photoNewCollectionSuggestionsTable.id, params.data.suggestionId));
+
+  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  res.json(DismissPhotoNewCollectionSuggestionResponse.parse(full));
 });
 
 router.post("/photos/:id/rerun-analysis", requireAuth, async (req, res): Promise<void> => {

@@ -58,6 +58,7 @@ export interface AnalysisRequest {
 export interface RawAnalysisResult {
   description: string;
   suggestedCollectionIds: number[];
+  suggestedNewCollectionNames?: string[];
 }
 
 export interface AnalysisProvider {

@@ -98,6 +98,11 @@ export interface SuggestedCollection {
   title: string;
 }
 
+export interface SuggestedNewCollection {
+  id: number;
+  suggestedName: string;
+}
+
 export interface PhotoRating {
   userId: number;
   /** @nullable */
@@ -127,6 +132,7 @@ export interface Photo {
   /** @nullable */
   aiDescription?: string | null;
   suggestedCollections?: SuggestedCollection[];
+  suggestedNewCollections?: SuggestedNewCollection[];
   ratings?: PhotoRating[];
 }
 

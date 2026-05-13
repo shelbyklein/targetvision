@@ -216,7 +216,7 @@ describe("AI provider routing on photo upload", () => {
 
     const result = await analyzePhoto(IMAGE, [], null);
 
-    expect(result).toBeNull();
+    expect(result.status).toBe("skipped");
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
     expect(hoisted.anthropicCreate).not.toHaveBeenCalled();
     expect(hoisted.geminiGenerate).not.toHaveBeenCalled();
@@ -292,7 +292,7 @@ describe("AI provider routing on photo upload", () => {
 
     const result = await analyzePhoto(IMAGE, [], null);
 
-    expect(result).toBeNull();
+    expect(result.status).toBe("skipped");
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
     expect(hoisted.anthropicCreate).not.toHaveBeenCalled();
     expect(hoisted.geminiGenerate).not.toHaveBeenCalled();
@@ -311,5 +311,118 @@ describe("AI provider routing on photo upload", () => {
     expect(hoisted.anthropicCreate).toHaveBeenCalledTimes(1);
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
     expect(hoisted.geminiGenerate).not.toHaveBeenCalled();
+  });
+});
+
+describe("new-collection name suggestions", () => {
+  beforeEach(() => {
+    hoisted.dbState.settings = baseSettings({ activeProvider: "openai" });
+  });
+
+  it("returns suggestedNewCollectionNames when no existing collections match", async () => {
+    hoisted.openaiCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              description: "A sunset over mountains",
+              suggestedCollectionIds: [],
+              suggestedTags: [],
+              suggestedNewCollectionNames: ["Landscape Photos", "Nature Scenes"],
+            }),
+          },
+        },
+      ],
+    });
+
+    const outcome = await analyzePhoto(IMAGE, [], null);
+
+    expect(outcome.status).toBe("success");
+    if (outcome.status !== "success") return;
+    expect(outcome.result.suggestedNewCollectionNames).toEqual([
+      "Landscape Photos",
+      "Nature Scenes",
+    ]);
+    expect(outcome.result.suggestedCollectionIds).toEqual([]);
+  });
+
+  it("clears suggestedNewCollectionNames when existing collection IDs match (priority rule)", async () => {
+    hoisted.openaiCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              description: "Team event photo",
+              suggestedCollectionIds: [42],
+              suggestedTags: [],
+              suggestedNewCollectionNames: ["Team Events", "Office Life"],
+            }),
+          },
+        },
+      ],
+    });
+
+    const collections = [{ id: 42, title: "Events", description: null }];
+    const outcome = await analyzePhoto(IMAGE, collections, null);
+
+    expect(outcome.status).toBe("success");
+    if (outcome.status !== "success") return;
+    expect(outcome.result.suggestedCollectionIds).toEqual([42]);
+    expect(outcome.result.suggestedNewCollectionNames).toEqual([]);
+  });
+
+  it("sanitizes names: drops empty/overly-long strings and caps at 2", async () => {
+    const longName = "A".repeat(81);
+    hoisted.openaiCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              description: "misc photo",
+              suggestedCollectionIds: [],
+              suggestedTags: [],
+              suggestedNewCollectionNames: [
+                "",
+                longName,
+                "Valid Name One",
+                "Valid Name Two",
+                "Valid Name Three",
+              ],
+            }),
+          },
+        },
+      ],
+    });
+
+    const outcome = await analyzePhoto(IMAGE, [], null);
+
+    expect(outcome.status).toBe("success");
+    if (outcome.status !== "success") return;
+    expect(outcome.result.suggestedNewCollectionNames).toEqual([
+      "Valid Name One",
+      "Valid Name Two",
+    ]);
+  });
+
+  it("returns empty suggestedNewCollectionNames when AI omits the field", async () => {
+    hoisted.openaiCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              description: "photo with no new suggestions",
+              suggestedCollectionIds: [],
+              suggestedTags: [],
+            }),
+          },
+        },
+      ],
+    });
+
+    const outcome = await analyzePhoto(IMAGE, [], null);
+
+    expect(outcome.status).toBe("success");
+    if (outcome.status !== "success") return;
+    expect(outcome.result.suggestedNewCollectionNames).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, usersTable } from "@workspace/db";
+import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable } from "@workspace/db";
 import { eq, and, avg, count } from "drizzle-orm";
 
 export async function buildPhotoResponse(photoId: number, currentUserId?: number) {
@@ -13,7 +13,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
 
   if (!photo) return null;
 
-  const [photoCollections, ratingDataArr, ratingsList, suggestedCollections] = await Promise.all([
+  const [photoCollections, ratingDataArr, ratingsList, suggestedCollections, suggestedNewCollections] = await Promise.all([
     db
       .select({
         id: collectionsTable.id,
@@ -51,6 +51,18 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
         and(
           eq(photoCollectionSuggestionsTable.photoId, photoId),
           eq(photoCollectionSuggestionsTable.status, "pending"),
+        ),
+      ),
+    db
+      .select({
+        id: photoNewCollectionSuggestionsTable.id,
+        suggestedName: photoNewCollectionSuggestionsTable.suggestedName,
+      })
+      .from(photoNewCollectionSuggestionsTable)
+      .where(
+        and(
+          eq(photoNewCollectionSuggestionsTable.photoId, photoId),
+          eq(photoNewCollectionSuggestionsTable.status, "pending"),
         ),
       ),
   ]);
@@ -91,6 +103,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     })),
     suggestedCollections,
+    suggestedNewCollections,
   };
 }
 

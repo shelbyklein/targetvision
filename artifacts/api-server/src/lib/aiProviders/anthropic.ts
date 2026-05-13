@@ -61,7 +61,7 @@ export class AnthropicProvider implements AnalysisProvider {
           {
             name: TOOL_NAME,
             description:
-              "Submit a photo description and a list of suggested collection ids.",
+              "Submit a photo description, a list of suggested existing collection ids, and optionally suggested new collection names.",
             input_schema: {
               type: "object",
               properties: {
@@ -71,8 +71,13 @@ export class AnthropicProvider implements AnalysisProvider {
                   items: { type: "integer" },
                   maxItems: 3,
                 },
+                suggestedNewCollectionNames: {
+                  type: "array",
+                  items: { type: "string" },
+                  maxItems: 2,
+                },
               },
-              required: ["description", "suggestedCollectionIds"],
+              required: ["description", "suggestedCollectionIds", "suggestedNewCollectionNames"],
             },
           },
         ],
@@ -94,6 +99,9 @@ export class AnthropicProvider implements AnalysisProvider {
         description: String(input.description ?? "").trim(),
         suggestedCollectionIds: Array.isArray(input.suggestedCollectionIds)
           ? input.suggestedCollectionIds
+          : [],
+        suggestedNewCollectionNames: Array.isArray(input.suggestedNewCollectionNames)
+          ? input.suggestedNewCollectionNames.map((n: unknown) => String(n).trim()).filter(Boolean)
           : [],
       };
     } catch (err) {

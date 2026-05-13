@@ -3397,6 +3397,172 @@ export const useDismissPhotoSuggestion = <
   return useMutation(getDismissPhotoSuggestionMutationOptions(options));
 };
 
+/**
+ * @summary Accept a new-category suggestion for a photo
+ */
+export const getAcceptPhotoNewCollectionSuggestionUrl = (
+  id: number,
+  suggestionId: number,
+) => {
+  return `/api/photos/${id}/new-collection-suggestions/${suggestionId}/accept`;
+};
+
+export const acceptPhotoNewCollectionSuggestion = async (
+  id: number,
+  suggestionId: number,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getAcceptPhotoNewCollectionSuggestionUrl(id, suggestionId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
+    TError,
+    { id: number; suggestionId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
+  TError,
+  { id: number; suggestionId: number },
+  TContext
+> => {
+  const mutationKey = ["acceptPhotoNewCollectionSuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
+    { id: number; suggestionId: number }
+  > = (props) => {
+    const { id, suggestionId } = props ?? {};
+    return acceptPhotoNewCollectionSuggestion(id, suggestionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AcceptPhotoNewCollectionSuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>
+>;
+export type AcceptPhotoNewCollectionSuggestionMutationError = ErrorType<void>;
+
+export const useAcceptPhotoNewCollectionSuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
+    TError,
+    { id: number; suggestionId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
+  TError,
+  { id: number; suggestionId: number },
+  TContext
+> => {
+  return useMutation(getAcceptPhotoNewCollectionSuggestionMutationOptions(options));
+};
+
+/**
+ * @summary Dismiss a new-category suggestion for a photo
+ */
+export const getDismissPhotoNewCollectionSuggestionUrl = (
+  id: number,
+  suggestionId: number,
+) => {
+  return `/api/photos/${id}/new-collection-suggestions/${suggestionId}/dismiss`;
+};
+
+export const dismissPhotoNewCollectionSuggestion = async (
+  id: number,
+  suggestionId: number,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getDismissPhotoNewCollectionSuggestionUrl(id, suggestionId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getDismissPhotoNewCollectionSuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissPhotoNewCollectionSuggestion>>,
+    TError,
+    { id: number; suggestionId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dismissPhotoNewCollectionSuggestion>>,
+  TError,
+  { id: number; suggestionId: number },
+  TContext
+> => {
+  const mutationKey = ["dismissPhotoNewCollectionSuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dismissPhotoNewCollectionSuggestion>>,
+    { id: number; suggestionId: number }
+  > = (props) => {
+    const { id, suggestionId } = props ?? {};
+    return dismissPhotoNewCollectionSuggestion(id, suggestionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DismissPhotoNewCollectionSuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dismissPhotoNewCollectionSuggestion>>
+>;
+export type DismissPhotoNewCollectionSuggestionMutationError = ErrorType<void>;
+
+export const useDismissPhotoNewCollectionSuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissPhotoNewCollectionSuggestion>>,
+    TError,
+    { id: number; suggestionId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dismissPhotoNewCollectionSuggestion>>,
+  TError,
+  { id: number; suggestionId: number },
+  TContext
+> => {
+  return useMutation(getDismissPhotoNewCollectionSuggestionMutationOptions(options));
+};
+
 export const getRerunPhotoAnalysisUrl = (id: number) => {
   return `/api/photos/${id}/rerun-analysis`;
 };

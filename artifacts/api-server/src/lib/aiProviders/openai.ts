@@ -47,8 +47,13 @@ export class OpenAIProvider implements AnalysisProvider {
                   items: { type: "integer" },
                   maxItems: 3,
                 },
+                suggestedNewCollectionNames: {
+                  type: "array",
+                  items: { type: "string" },
+                  maxItems: 2,
+                },
               },
-              required: ["description", "suggestedCollectionIds"],
+              required: ["description", "suggestedCollectionIds", "suggestedNewCollectionNames"],
             },
           },
         },
@@ -61,6 +66,9 @@ export class OpenAIProvider implements AnalysisProvider {
         description: String(parsed.description ?? "").trim(),
         suggestedCollectionIds: Array.isArray(parsed.suggestedCollectionIds)
           ? parsed.suggestedCollectionIds
+          : [],
+        suggestedNewCollectionNames: Array.isArray(parsed.suggestedNewCollectionNames)
+          ? parsed.suggestedNewCollectionNames.map((n) => String(n).trim()).filter(Boolean)
           : [],
       };
     } catch (err) {

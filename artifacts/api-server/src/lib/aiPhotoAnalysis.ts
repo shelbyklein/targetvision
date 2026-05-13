@@ -4,6 +4,7 @@ import {
   photosTable,
   collectionsTable,
   photoCollectionSuggestionsTable,
+  photoNewCollectionSuggestionsTable,
   aiAnalysisEventsTable,
   type AiAnalysisEvent,
 } from "@workspace/db";
@@ -52,6 +53,7 @@ export interface CollectionForSuggestion {
 export interface PhotoAnalysisResult {
   description: string;
   suggestedCollectionIds: number[];
+  suggestedNewCollectionNames: string[];
 }
 
 export type AnalyzePhotoOutcome =
@@ -79,13 +81,13 @@ export async function analyzePhoto(
     .join("\n");
 
   const systemPrompt =
-    "You are a photo describer for a team photo album. Look at the photo and (1) write one plain-English description (max 60 words) of what is in it — for every person visible include their approximate age range (child/teen/adult/elderly), sex, race/ethnicity, pose (e.g. standing, sitting, crouching), and general disposition or expression (e.g. smiling, laughing, serious, focused); also describe the setting and overall scene; if no people are present, describe the subject, objects, and environment in detail; (2) from the user's existing collections, pick up to 3 that this photo would naturally belong in (only clear thematic matches, otherwise empty; never invent collection ids).";
+    "You are a photo describer for a team photo album. Look at the photo and (1) write one plain-English description (max 60 words) of what is in it — for every person visible include their approximate age range (child/teen/adult/elderly), sex, race/ethnicity, pose (e.g. standing, sitting, crouching), and general disposition or expression (e.g. smiling, laughing, serious, focused); also describe the setting and overall scene; if no people are present, describe the subject, objects, and environment in detail; (2) from the user's existing collections, pick up to 3 that this photo would naturally belong in (only clear thematic matches, otherwise empty; never invent collection ids); (3) if no existing collections match well, suggest 1–2 short new category names (2–4 words each, title case) that would suit this photo — only when existing collections don't already cover it well.";
 
   const collectionsText = collections.length
     ? `Existing collections:\n${collectionsBlock}`
-    : "The user has no collections yet; return an empty list of suggested collection ids.";
+    : "The user has no collections yet.";
 
-  const userText = `${collectionsText}\n\nDescribe the photo and pick up to 3 fitting collection ids.`;
+  const userText = `${collectionsText}\n\nDescribe the photo, pick up to 3 fitting existing collection ids (empty array if none match well), and if no existing collections are a good fit, suggest 1–2 short new collection names (empty array otherwise).`;
 
   let image: ResolvedImage;
   let result: Awaited<ReturnType<typeof provider.analyze>>;
@@ -117,12 +119,24 @@ export async function analyzePhoto(
     ),
   ).slice(0, 3);
 
+  const rawNewNames = Array.isArray(result.suggestedNewCollectionNames)
+    ? result.suggestedNewCollectionNames
+    : [];
+
+  const suggestedNewCollectionNames = suggestedCollectionIds.length > 0
+    ? []
+    : rawNewNames
+        .map((n) => String(n).trim())
+        .filter((n) => n.length > 0 && n.length <= 80)
+        .slice(0, 2);
+
   return {
     status: "success",
     provider: provider.id,
     result: {
       description: result.description,
       suggestedCollectionIds,
+      suggestedNewCollectionNames,
     },
   };
 }
@@ -131,6 +145,7 @@ export async function analyzePhoto(
  * Run AI analysis for an existing photo and persist the outcome:
  * - Updates `photos.aiDescription` on success
  * - Inserts pending collection suggestions on success
+ * - Inserts pending new-collection-name suggestions when no existing collections match
  * - Always records an `ai_analysis_events` row describing the attempt
  *
  * Used by the upload flow and by the admin "Retry" action on failed events.
@@ -200,6 +215,15 @@ export async function runAndRecordPhotoAnalysis(
         );
 
       await tx
+        .delete(photoNewCollectionSuggestionsTable)
+        .where(
+          and(
+            eq(photoNewCollectionSuggestionsTable.photoId, photo.id),
+            eq(photoNewCollectionSuggestionsTable.status, "pending"),
+          ),
+        );
+
+      await tx
         .update(photosTable)
         .set({ aiDescription: result.description || null })
         .where(eq(photosTable.id, photo.id));
@@ -215,6 +239,18 @@ export async function runAndRecordPhotoAnalysis(
             })),
           )
           .onConflictDoNothing();
+      }
+
+      if (result.suggestedNewCollectionNames.length > 0) {
+        await tx
+          .insert(photoNewCollectionSuggestionsTable)
+          .values(
+            result.suggestedNewCollectionNames.map((name) => ({
+              photoId: photo.id,
+              suggestedName: name,
+              status: "pending" as const,
+            })),
+          );
       }
 
       const [row] = await tx

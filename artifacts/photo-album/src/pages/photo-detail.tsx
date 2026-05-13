@@ -11,6 +11,8 @@ import {
   useRemovePhotoFromCollection,
   useAcceptPhotoSuggestion,
   useDismissPhotoSuggestion,
+  useAcceptPhotoNewCollectionSuggestion,
+  useDismissPhotoNewCollectionSuggestion,
   useRerunPhotoAnalysis,
   useUpdatePhoto,
   getGetPhotoQueryKey,
@@ -18,6 +20,7 @@ import {
   getListPhotosQueryKey,
   getGetRecentPhotosQueryKey,
   getGetTopRatedPhotosQueryKey,
+  getListCollectionsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
@@ -183,6 +186,8 @@ export default function PhotoDetail() {
   const { mutate: removeFromCollection } = useRemovePhotoFromCollection();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
+  const { mutate: acceptNewCollectionSuggestion } = useAcceptPhotoNewCollectionSuggestion();
+  const { mutate: dismissNewCollectionSuggestion } = useDismissPhotoNewCollectionSuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { mutate: rerunAnalysis, isPending: rerunning } = useRerunPhotoAnalysis();
   const { mutate: updatePhoto, isPending: savingDescription } = useUpdatePhoto();
@@ -244,6 +249,27 @@ export default function PhotoDetail() {
   function handleDismissSuggestion(collectionId: number) {
     dismissSuggestion(
       { id: photoId, collectionId },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }) }
+    );
+  }
+
+  function handleAcceptNewCollectionSuggestion(suggestionId: number) {
+    acceptNewCollectionSuggestion(
+      { id: photoId, suggestionId },
+      {
+        onSuccess: () => {
+          invalidate();
+          qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
+          toast({ title: "Collection created and photo added" });
+        },
+        onError: () => toast({ title: "Failed to accept suggestion", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleDismissNewCollectionSuggestion(suggestionId: number) {
+    dismissNewCollectionSuggestion(
+      { id: photoId, suggestionId },
       { onSuccess: invalidate, onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }) }
     );
   }
@@ -604,6 +630,42 @@ export default function PhotoDetail() {
                           className="rounded-full p-0.5 hover:bg-muted-foreground/15 text-muted-foreground"
                           aria-label="Dismiss suggestion"
                           data-testid={`dismiss-suggestion-${s.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Create new collection
+                  </p>
+                  <div className="flex flex-wrap gap-1.5" data-testid="suggested-new-collections">
+                    {photo.suggestedNewCollections.map((s) => (
+                      <div
+                        key={s.id}
+                        className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-2.5 pr-1 py-0.5 text-xs"
+                        data-testid={`suggested-new-collection-${s.id}`}
+                      >
+                        <Sparkles className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-foreground">{s.suggestedName}</span>
+                        <button
+                          onClick={() => handleAcceptNewCollectionSuggestion(s.id)}
+                          className="rounded-full p-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
+                          aria-label="Create collection and add photo"
+                          title="Create this collection and add photo"
+                          data-testid={`accept-new-collection-suggestion-${s.id}`}
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDismissNewCollectionSuggestion(s.id)}
+                          className="rounded-full p-0.5 hover:bg-muted-foreground/15 text-muted-foreground"
+                          aria-label="Dismiss suggestion"
+                          data-testid={`dismiss-new-collection-suggestion-${s.id}`}
                         >
                           <X className="h-3 w-3" />
                         </button>
