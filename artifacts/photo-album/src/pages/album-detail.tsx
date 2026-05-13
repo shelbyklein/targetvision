@@ -13,6 +13,7 @@ import {
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
+  useGetMe,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUpload } from "@workspace/object-storage-web";
@@ -354,6 +355,7 @@ export default function AlbumDetail() {
     },
   });
   const { mutate: setCover } = useSetAlbumCover();
+  const { data: me } = useGetMe();
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
@@ -511,37 +513,39 @@ export default function AlbumDetail() {
           <div className="flex items-center gap-2 shrink-0">
             <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  data-testid="delete-album-btn"
-                  title="Delete album"
-                >
-                  <Trash2 className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this album?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete "{album.title}" and all its photos. This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDeleteAlbum}
-                    disabled={deletingAlbum}
-                    className="bg-destructive hover:bg-destructive/90"
-                    data-testid="confirm-delete-album"
+            {me?.role === "admin" && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    data-testid="delete-album-btn"
+                    title="Delete album"
                   >
-                    {deletingAlbum ? "Deleting…" : "Delete Album"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this album?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete "{album.title}" and all its photos. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAlbum}
+                      disabled={deletingAlbum}
+                      className="bg-destructive hover:bg-destructive/90"
+                      data-testid="confirm-delete-album"
+                    >
+                      {deletingAlbum ? "Deleting…" : "Delete Album"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
 
