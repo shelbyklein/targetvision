@@ -47,18 +47,8 @@ export class OpenAIProvider implements AnalysisProvider {
                   items: { type: "integer" },
                   maxItems: 3,
                 },
-                suggestedTags: {
-                  type: "array",
-                  items: { type: "string" },
-                  maxItems: 5,
-                },
-                suggestedCategoryIds: {
-                  type: "array",
-                  items: { type: "integer" },
-                  maxItems: 2,
-                },
               },
-              required: ["description", "suggestedCollectionIds", "suggestedTags", "suggestedCategoryIds"],
+              required: ["description", "suggestedCollectionIds"],
             },
           },
         },
@@ -71,12 +61,6 @@ export class OpenAIProvider implements AnalysisProvider {
         description: String(parsed.description ?? "").trim(),
         suggestedCollectionIds: Array.isArray(parsed.suggestedCollectionIds)
           ? parsed.suggestedCollectionIds
-          : [],
-        suggestedTags: Array.isArray(parsed.suggestedTags)
-          ? parsed.suggestedTags
-          : [],
-        suggestedCategoryIds: Array.isArray(parsed.suggestedCategoryIds)
-          ? parsed.suggestedCategoryIds
           : [],
       };
     } catch (err) {

@@ -5,36 +5,23 @@ import {
   useListAlbumPhotos,
   useRatePhoto,
   useClearPhotoRating,
-  useAddPhotoTag,
-  useRemovePhotoTag,
-  useListCategories,
-  useAddPhotoCategory,
-  useRemovePhotoCategory,
   useDeletePhoto,
-  useListTags,
   useListCollections,
   useAddPhotoToCollection,
   useRemovePhotoFromCollection,
   useAcceptPhotoSuggestion,
   useDismissPhotoSuggestion,
-  useAcceptPhotoTagSuggestion,
-  useDismissPhotoTagSuggestion,
-  useAcceptPhotoCategorySuggestion,
-  useDismissPhotoCategorySuggestion,
   useRerunPhotoAnalysis,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
   getGetRecentPhotosQueryKey,
   getGetTopRatedPhotosQueryKey,
-  getGetTagCloudQueryKey,
-  getListTagsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +44,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -168,122 +155,6 @@ function StarRating({ photoId, myRating, currentUserId, onRated }: {
   );
 }
 
-function TagAutocomplete({ photoId, existingTagIds, onTagAdded }: {
-  photoId: number;
-  existingTagIds: number[];
-  onTagAdded: () => void;
-}) {
-  const [input, setInput] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { mutate: addTag, isPending } = useAddPhotoTag();
-  const { data: allTags } = useListTags();
-  const { toast } = useToast();
-
-  const suggestions = allTags
-    ? allTags.filter(
-        (t) =>
-          t.name.toLowerCase().includes(input.toLowerCase()) &&
-          !existingTagIds.includes(t.id) &&
-          input.length > 0
-      )
-    : [];
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  function submit(tagName: string) {
-    const trimmed = tagName.trim().toLowerCase();
-    if (!trimmed) return;
-    addTag(
-      { id: photoId, data: { tagName: trimmed } },
-      {
-        onSuccess: () => {
-          setInput("");
-          setShowSuggestions(false);
-          onTagAdded();
-        },
-        onError: () => toast({ title: "Failed to add tag", variant: "destructive" }),
-      }
-    );
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      submit(input);
-    } else if (e.key === "Escape") {
-      setShowSuggestions(false);
-    }
-  }
-
-  return (
-    <div ref={containerRef} className="relative mt-1">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit(input);
-        }}
-        className="flex gap-2"
-      >
-        <div className="relative flex-1">
-          <Input
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              setShowSuggestions(true);
-            }}
-            onFocus={() => setShowSuggestions(true)}
-            onKeyDown={handleKeyDown}
-            placeholder="Add tag..."
-            className="h-8 text-sm"
-            data-testid="add-tag-input"
-            autoComplete="off"
-          />
-          {showSuggestions && suggestions.length > 0 && (
-            <div
-              className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-border bg-popover shadow-md overflow-hidden"
-              data-testid="tag-suggestions"
-            >
-              {suggestions.slice(0, 6).map((tag) => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    submit(tag.name);
-                  }}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                  data-testid={`tag-suggestion-${tag.id}`}
-                >
-                  {tag.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <Button
-          type="submit"
-          size="sm"
-          variant="outline"
-          className="h-8 px-2"
-          disabled={!input.trim() || isPending}
-          data-testid="add-tag-submit"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-      </form>
-    </div>
-  );
-}
-
 export default function PhotoDetail() {
   const { id } = useParams<{ id: string }>();
   const photoId = parseInt(id, 10);
@@ -305,19 +176,11 @@ export default function PhotoDetail() {
     },
   });
   const { data: me } = useGetMe();
-  const { data: allCategories } = useListCategories();
   const { data: allCollections } = useListCollections();
-  const { mutate: removeTag } = useRemovePhotoTag();
-  const { mutate: addCategory } = useAddPhotoCategory();
-  const { mutate: removeCategory } = useRemovePhotoCategory();
   const { mutate: addToCollection } = useAddPhotoToCollection();
   const { mutate: removeFromCollection } = useRemovePhotoFromCollection();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
-  const { mutate: acceptTagSuggestion } = useAcceptPhotoTagSuggestion();
-  const { mutate: dismissTagSuggestion } = useDismissPhotoTagSuggestion();
-  const { mutate: acceptCategorySuggestion } = useAcceptPhotoCategorySuggestion();
-  const { mutate: dismissCategorySuggestion } = useDismissPhotoCategorySuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { mutate: rerunAnalysis, isPending: rerunning } = useRerunPhotoAnalysis();
   const [downloading, setDownloading] = useState(false);
@@ -361,34 +224,35 @@ export default function PhotoDetail() {
     qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
   }
 
-  function invalidateWithTags() {
-    invalidate();
-    qc.invalidateQueries({ queryKey: getListTagsQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetTagCloudQueryKey() });
-  }
-
-  function handleRemoveTag(tagId: number) {
-    removeTag(
-      { id: photoId, tagId },
-      { onSuccess: invalidateWithTags, onError: () => toast({ title: "Failed to remove tag", variant: "destructive" }) }
+  function handleAcceptSuggestion(collectionId: number) {
+    acceptSuggestion(
+      { id: photoId, collectionId },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to accept suggestion", variant: "destructive" }) }
     );
   }
 
-  function handleAddCategory(categoryId: string) {
-    addCategory(
-      { id: photoId, data: { categoryId: parseInt(categoryId, 10) } },
-      { onSuccess: invalidate, onError: () => toast({ title: "Failed to add category", variant: "destructive" }) }
+  function handleDismissSuggestion(collectionId: number) {
+    dismissSuggestion(
+      { id: photoId, collectionId },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }) }
     );
   }
 
-  function handleRemoveCategory(categoryId: number) {
-    removeCategory(
-      { id: photoId, categoryId },
-      { onSuccess: invalidate, onError: () => toast({ title: "Failed to remove category", variant: "destructive" }) }
+  function handleAddCollection(collectionId: string) {
+    addToCollection(
+      { id: parseInt(collectionId, 10), data: { photoId } },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to add to collection", variant: "destructive" }) }
     );
   }
 
-  function deriveFilename(url: string, name?: string | null, fallbackId?: number): string {
+  function handleRemoveFromCollection(collectionId: number) {
+    removeFromCollection(
+      { id: collectionId, photoId },
+      { onSuccess: invalidate, onError: () => toast({ title: "Failed to remove from collection", variant: "destructive" }) }
+    );
+  }
+
+  function deriveFilename(url: string, caption?: string | null, fallbackId?: number): string {
     let extension = "jpg";
     let urlBase = "";
     try {
@@ -414,10 +278,9 @@ export default function PhotoDetail() {
         .slice(0, 80);
     }
 
-    const nameBase = name ? sanitize(name) : "";
+    const nameBase = caption ? sanitize(caption) : "";
     const cleanedUrlBase = urlBase ? sanitize(urlBase) : "";
-    const base =
-      nameBase || cleanedUrlBase || `photo-${fallbackId ?? "image"}`;
+    const base = nameBase || cleanedUrlBase || `photo-${fallbackId ?? "image"}`;
     return `${base}.${extension}`;
   }
 
@@ -433,7 +296,7 @@ export default function PhotoDetail() {
 
   async function handleDownload() {
     if (!photo) return;
-    const filename = deriveFilename(photo.url, photo.name, photo.id);
+    const filename = deriveFilename(photo.url, photo.caption, photo.id);
     setDownloading(true);
     try {
       let isSameOrigin = true;
@@ -471,110 +334,6 @@ export default function PhotoDetail() {
     }
   }
 
-  function handleAcceptSuggestion(collectionId: number) {
-    acceptSuggestion(
-      { id: photoId, collectionId },
-      { onSuccess: invalidate, onError: () => toast({ title: "Failed to accept suggestion", variant: "destructive" }) }
-    );
-  }
-
-  function handleDismissSuggestion(collectionId: number) {
-    dismissSuggestion(
-      { id: photoId, collectionId },
-      { onSuccess: invalidate, onError: () => toast({ title: "Failed to dismiss suggestion", variant: "destructive" }) }
-    );
-  }
-
-  function handleAcceptTagSuggestion(tagName: string) {
-    acceptTagSuggestion(
-      { id: photoId, tagName },
-      {
-        onSuccess: invalidateWithTags,
-        onError: () => toast({ title: "Failed to accept tag", variant: "destructive" }),
-      }
-    );
-  }
-
-  const [acceptingAllTags, setAcceptingAllTags] = useState(false);
-
-  async function handleAcceptAllTagSuggestions() {
-    if (!photo?.suggestedTags || photo.suggestedTags.length === 0) return;
-    const names = photo.suggestedTags.map((s) => s.name);
-    setAcceptingAllTags(true);
-    let failed = 0;
-    await Promise.all(
-      names.map(
-        (tagName) =>
-          new Promise<void>((resolve) => {
-            acceptTagSuggestion(
-              { id: photoId, tagName },
-              {
-                onSuccess: () => resolve(),
-                onError: () => {
-                  failed += 1;
-                  resolve();
-                },
-              }
-            );
-          })
-      )
-    );
-    invalidateWithTags();
-    setAcceptingAllTags(false);
-    if (failed > 0) {
-      toast({
-        title: failed === names.length ? "Failed to accept tags" : `Failed to accept ${failed} tag${failed !== 1 ? "s" : ""}`,
-        variant: "destructive",
-      });
-    } else {
-      toast({ title: `Accepted ${names.length} tags` });
-    }
-  }
-
-  function handleDismissTagSuggestion(tagName: string) {
-    dismissTagSuggestion(
-      { id: photoId, tagName },
-      {
-        onSuccess: invalidate,
-        onError: () => toast({ title: "Failed to dismiss tag", variant: "destructive" }),
-      }
-    );
-  }
-
-  function handleAcceptCategorySuggestion(categoryId: number) {
-    acceptCategorySuggestion(
-      { id: photoId, categoryId },
-      {
-        onSuccess: invalidate,
-        onError: () => toast({ title: "Failed to accept category", variant: "destructive" }),
-      }
-    );
-  }
-
-  function handleDismissCategorySuggestion(categoryId: number) {
-    dismissCategorySuggestion(
-      { id: photoId, categoryId },
-      {
-        onSuccess: invalidate,
-        onError: () => toast({ title: "Failed to dismiss category", variant: "destructive" }),
-      }
-    );
-  }
-
-  function handleAddCollection(collectionId: string) {
-    addToCollection(
-      { id: parseInt(collectionId, 10), data: { photoId } },
-      { onSuccess: invalidate, onError: () => toast({ title: "Failed to add to collection", variant: "destructive" }) }
-    );
-  }
-
-  function handleRemoveFromCollection(collectionId: number) {
-    removeFromCollection(
-      { id: collectionId, photoId },
-      { onSuccess: invalidate, onError: () => toast({ title: "Failed to remove from collection", variant: "destructive" }) }
-    );
-  }
-
   function handleDelete() {
     deletePhoto(
       { id: photoId },
@@ -601,10 +360,6 @@ export default function PhotoDetail() {
       }
     );
   }
-
-  const availableCategories = allCategories?.filter(
-    (cat) => !photo?.categories?.some((c) => c.id === cat.id)
-  );
 
   const availableCollections = allCollections?.filter(
     (col) => !photo?.photoCollections?.some((c) => c.id === col.id)
@@ -692,7 +447,7 @@ export default function PhotoDetail() {
             <div className="rounded-xl overflow-hidden bg-muted aspect-[4/3]">
               <img
                 src={photo.url}
-                alt={photo.name ?? "Photo"}
+                alt={photo.caption ?? "Photo"}
                 className="h-full w-full object-contain bg-black"
                 data-testid="photo-image"
               />
@@ -777,7 +532,7 @@ export default function PhotoDetail() {
           <div className="space-y-6">
             <div className="space-y-3">
               <h1 className="text-lg font-semibold text-foreground" data-testid="photo-title">
-                {photo.name ?? "Untitled Photo"}
+                {photo.caption ?? "Untitled Photo"}
               </h1>
               <div className="space-y-1.5 text-sm text-muted-foreground">
                 {photo.takenAt && (
@@ -821,7 +576,7 @@ export default function PhotoDetail() {
                       data-testid={`rating-row-${r.userId}`}
                     >
                       <span className="text-foreground truncate">
-                        {r.userName ?? "Unknown"}
+                        {r.userName ?? `User ${r.userId}`}
                         {me?.id === r.userId && (
                           <span className="ml-1 text-xs text-muted-foreground">(you)</span>
                         )}
@@ -837,153 +592,6 @@ export default function PhotoDetail() {
             )}
 
             <Separator />
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-muted-foreground">Tags</Label>
-              <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="photo-tags">
-                {photo.tags?.map((tag) => (
-                  <Badge key={tag.id} variant="secondary" className="gap-1 pr-1">
-                    {tag.name}
-                    <button
-                      onClick={() => handleRemoveTag(tag.id)}
-                      className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 p-0.5"
-                      data-testid={`remove-tag-${tag.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-                {(!photo.tags || photo.tags.length === 0) && (
-                  <span className="text-xs text-muted-foreground">No tags yet</span>
-                )}
-              </div>
-              {photo.suggestedTags && photo.suggestedTags.length > 0 && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                      <Sparkles className="h-3 w-3" /> Suggested
-                    </p>
-                    {photo.suggestedTags.length >= 2 && (
-                      <button
-                        type="button"
-                        onClick={handleAcceptAllTagSuggestions}
-                        disabled={acceptingAllTags}
-                        className="text-[11px] font-medium text-primary hover:underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
-                        data-testid="accept-all-suggested-tags"
-                      >
-                        {acceptingAllTags ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Check className="h-3 w-3" />
-                        )}
-                        Accept all
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5" data-testid="suggested-tags">
-                    {photo.suggestedTags.map((s) => (
-                      <div
-                        key={s.name}
-                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-2.5 pr-1 py-0.5 text-xs"
-                        data-testid={`suggested-tag-${s.name}`}
-                      >
-                        <span className="text-foreground">{s.name}</span>
-                        <button
-                          onClick={() => handleAcceptTagSuggestion(s.name)}
-                          className="rounded-full p-0.5 hover:bg-primary/15 text-primary"
-                          aria-label={`Accept tag ${s.name}`}
-                          data-testid={`accept-suggested-tag-${s.name}`}
-                        >
-                          <Check className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDismissTagSuggestion(s.name)}
-                          className="rounded-full p-0.5 hover:bg-muted-foreground/15 text-muted-foreground"
-                          aria-label={`Dismiss tag ${s.name}`}
-                          data-testid={`dismiss-suggested-tag-${s.name}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <TagAutocomplete
-                photoId={photoId}
-                existingTagIds={photo.tags?.map((t) => t.id) ?? []}
-                onTagAdded={invalidateWithTags}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-muted-foreground">Categories</Label>
-              <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="photo-categories">
-                {photo.categories?.map((cat) => (
-                  <Badge key={cat.id} variant="outline" className="gap-1 pr-1">
-                    {cat.name}
-                    <button
-                      onClick={() => handleRemoveCategory(cat.id)}
-                      className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 p-0.5"
-                      data-testid={`remove-category-${cat.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-                {(!photo.categories || photo.categories.length === 0) && (
-                  <span className="text-xs text-muted-foreground">No categories</span>
-                )}
-              </div>
-              {photo.suggestedCategories && photo.suggestedCategories.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" /> Suggested
-                  </p>
-                  <div className="flex flex-wrap gap-1.5" data-testid="suggested-categories">
-                    {photo.suggestedCategories.map((s) => (
-                      <div
-                        key={s.id}
-                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-2.5 pr-1 py-0.5 text-xs"
-                        data-testid={`suggested-category-${s.id}`}
-                      >
-                        <span className="text-foreground">{s.name}</span>
-                        <button
-                          onClick={() => handleAcceptCategorySuggestion(s.id)}
-                          className="rounded-full p-0.5 hover:bg-primary/15 text-primary"
-                          aria-label={`Accept category ${s.name}`}
-                          data-testid={`accept-suggested-category-${s.id}`}
-                        >
-                          <Check className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDismissCategorySuggestion(s.id)}
-                          className="rounded-full p-0.5 hover:bg-muted-foreground/15 text-muted-foreground"
-                          aria-label={`Dismiss category ${s.name}`}
-                          data-testid={`dismiss-suggested-category-${s.id}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {availableCategories && availableCategories.length > 0 && (
-                <Select onValueChange={handleAddCategory} data-testid="add-category-select">
-                  <SelectTrigger className="h-8 text-sm w-full">
-                    <SelectValue placeholder="Add category..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCategories.map((cat) => (
-                      <SelectItem key={cat.id} value={String(cat.id)} data-testid={`category-option-${cat.id}`}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
 
             <div className="space-y-2">
               <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
@@ -1039,30 +647,28 @@ export default function PhotoDetail() {
             </Button>
 
             {canDelete && (
-              <>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" className="gap-2 w-full" data-testid="delete-photo-btn">
-                      <Trash2 className="h-4 w-4" />
-                      Delete Photo
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. The photo will be permanently removed.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90" data-testid="confirm-delete-photo">
-                        {deleting ? "Deleting..." : "Delete"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-2 w-full" data-testid="delete-photo-btn">
+                    <Trash2 className="h-4 w-4" />
+                    Delete Photo
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. The photo will be permanently removed.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90" data-testid="confirm-delete-photo">
+                      {deleting ? "Deleting..." : "Delete"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         </div>

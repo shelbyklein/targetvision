@@ -160,22 +160,6 @@ export const GetAlbumTopRatedResponseItem = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -202,23 +186,9 @@ export const GetAlbumTopRatedResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -269,22 +239,6 @@ export const ListAlbumPhotosResponseItem = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -311,23 +265,9 @@ export const ListAlbumPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -353,8 +293,6 @@ export const UploadPhotoBody = zod.object({
  */
 export const SearchPhotosQueryParams = zod.object({
   q: zod.coerce.string(),
-  tag: zod.coerce.string().optional(),
-  categoryId: zod.coerce.number().optional(),
   ratingMin: zod.coerce.number().optional(),
   ratingMax: zod.coerce.number().optional(),
   dateFrom: zod.coerce.string().optional(),
@@ -375,22 +313,6 @@ export const SearchPhotosResponseItem = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -417,23 +339,9 @@ export const SearchPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -444,8 +352,6 @@ export const SearchPhotosResponse = zod.array(SearchPhotosResponseItem);
  * @summary List all photos with optional filters
  */
 export const ListPhotosQueryParams = zod.object({
-  tag: zod.coerce.string().optional(),
-  categoryId: zod.coerce.number().optional(),
   ratingMin: zod.coerce.number().optional(),
   ratingMax: zod.coerce.number().optional(),
   dateFrom: zod.coerce.string().optional(),
@@ -466,22 +372,6 @@ export const ListPhotosResponseItem = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -508,23 +398,9 @@ export const ListPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -551,22 +427,6 @@ export const GetPhotoResponse = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -593,23 +453,9 @@ export const GetPhotoResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -641,22 +487,6 @@ export const UpdatePhotoResponse = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -683,23 +513,9 @@ export const UpdatePhotoResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -710,352 +526,6 @@ export const UpdatePhotoResponse = zod.object({
  */
 export const DeletePhotoParams = zod.object({
   id: zod.coerce.number(),
-});
-
-/**
- * @summary Add a tag to a photo (creates tag if needed)
- */
-export const AddPhotoTagParams = zod.object({
-  id: zod.coerce.number(),
-});
-
-export const AddPhotoTagBody = zod.object({
-  tagName: zod.string().min(1),
-});
-
-export const AddPhotoTagResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary Remove a tag from a photo
- */
-export const RemovePhotoTagParams = zod.object({
-  id: zod.coerce.number(),
-  tagId: zod.coerce.number(),
-});
-
-export const RemovePhotoTagResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary Add a category to a photo
- */
-export const AddPhotoCategoryParams = zod.object({
-  id: zod.coerce.number(),
-});
-
-export const AddPhotoCategoryBody = zod.object({
-  categoryId: zod.number(),
-});
-
-export const AddPhotoCategoryResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary Remove a category from a photo
- */
-export const RemovePhotoCategoryParams = zod.object({
-  id: zod.coerce.number(),
-  categoryId: zod.coerce.number(),
-});
-
-export const RemovePhotoCategoryResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
 });
 
 /**
@@ -1084,22 +554,6 @@ export const RatePhotoResponse = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -1126,23 +580,9 @@ export const RatePhotoResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -1168,22 +608,6 @@ export const ClearPhotoRatingResponse = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -1210,67 +634,12 @@ export const ClearPhotoRatingResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
     )
     .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary List all tags
- */
-export const ListTagsResponseItem = zod.object({
-  id: zod.number(),
-  name: zod.string(),
-});
-export const ListTagsResponse = zod.array(ListTagsResponseItem);
-
-/**
- * @summary Create a new tag
- */
-
-export const CreateTagBody = zod.object({
-  name: zod.string().min(1),
-});
-
-/**
- * @summary List all categories
- */
-export const ListCategoriesResponseItem = zod.object({
-  id: zod.number(),
-  name: zod.string(),
-});
-export const ListCategoriesResponse = zod.array(ListCategoriesResponseItem);
-
-/**
- * @summary Create a new category (admin only)
- */
-
-export const CreateCategoryBody = zod.object({
-  name: zod.string().min(1),
-});
-
-/**
- * @summary Delete a category (admin only)
- */
-export const DeleteCategoryParams = zod.object({
-  id: zod.coerce.number(),
 });
 
 /**
@@ -1574,7 +943,7 @@ export const GetDashboardStatsResponse = zod.object({
   totalAlbums: zod.number(),
   totalPhotos: zod.number(),
   totalUsers: zod.number(),
-  totalTags: zod.number(),
+  totalCollections: zod.number(),
   recentActivity: zod.array(
     zod.object({
       id: zod.number(),
@@ -1589,22 +958,6 @@ export const GetDashboardStatsResponse = zod.object({
       averageRating: zod.number().nullish(),
       ratingCount: zod.number(),
       myRating: zod.number().nullish(),
-      tags: zod
-        .array(
-          zod.object({
-            id: zod.number(),
-            name: zod.string(),
-          }),
-        )
-        .optional(),
-      categories: zod
-        .array(
-          zod.object({
-            id: zod.number(),
-            name: zod.string(),
-          }),
-        )
-        .optional(),
       photoCollections: zod
         .array(
           zod.object({
@@ -1631,23 +984,9 @@ export const GetDashboardStatsResponse = zod.object({
         .array(
           zod.object({
             userId: zod.number(),
+            userName: zod.string().nullish(),
             score: zod.number(),
             createdAt: zod.coerce.date(),
-          }),
-        )
-        .optional(),
-      suggestedTags: zod
-        .array(
-          zod.object({
-            name: zod.string(),
-          }),
-        )
-        .optional(),
-      suggestedCategories: zod
-        .array(
-          zod.object({
-            id: zod.number(),
-            name: zod.string(),
           }),
         )
         .optional(),
@@ -1671,22 +1010,6 @@ export const GetRecentPhotosResponseItem = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -1713,23 +1036,9 @@ export const GetRecentPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -1752,22 +1061,6 @@ export const GetTopRatedPhotosResponseItem = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -1794,23 +1087,9 @@ export const GetTopRatedPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -1865,6 +1144,7 @@ export const ListCollectionsResponseItem = zod.object({
   photoCount: zod.number(),
   coverPhotoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
+  tags: zod.array(zod.string()).optional(),
 });
 export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem);
 
@@ -1892,6 +1172,7 @@ export const GetCollectionResponse = zod.object({
   photoCount: zod.number(),
   coverPhotoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
+  tags: zod.array(zod.string()).optional(),
   photos: zod
     .array(
       zod.object({
@@ -1907,22 +1188,6 @@ export const GetCollectionResponse = zod.object({
         averageRating: zod.number().nullish(),
         ratingCount: zod.number(),
         myRating: zod.number().nullish(),
-        tags: zod
-          .array(
-            zod.object({
-              id: zod.number(),
-              name: zod.string(),
-            }),
-          )
-          .optional(),
-        categories: zod
-          .array(
-            zod.object({
-              id: zod.number(),
-              name: zod.string(),
-            }),
-          )
-          .optional(),
         photoCollections: zod
           .array(
             zod.object({
@@ -1949,23 +1214,9 @@ export const GetCollectionResponse = zod.object({
           .array(
             zod.object({
               userId: zod.number(),
+              userName: zod.string().nullish(),
               score: zod.number(),
               createdAt: zod.coerce.date(),
-            }),
-          )
-          .optional(),
-        suggestedTags: zod
-          .array(
-            zod.object({
-              name: zod.string(),
-            }),
-          )
-          .optional(),
-        suggestedCategories: zod
-          .array(
-            zod.object({
-              id: zod.number(),
-              name: zod.string(),
             }),
           )
           .optional(),
@@ -2009,22 +1260,6 @@ export const UpdateCollectionResponse = zod.object({
         averageRating: zod.number().nullish(),
         ratingCount: zod.number(),
         myRating: zod.number().nullish(),
-        tags: zod
-          .array(
-            zod.object({
-              id: zod.number(),
-              name: zod.string(),
-            }),
-          )
-          .optional(),
-        categories: zod
-          .array(
-            zod.object({
-              id: zod.number(),
-              name: zod.string(),
-            }),
-          )
-          .optional(),
         photoCollections: zod
           .array(
             zod.object({
@@ -2051,23 +1286,9 @@ export const UpdateCollectionResponse = zod.object({
           .array(
             zod.object({
               userId: zod.number(),
+              userName: zod.string().nullish(),
               score: zod.number(),
               createdAt: zod.coerce.date(),
-            }),
-          )
-          .optional(),
-        suggestedTags: zod
-          .array(
-            zod.object({
-              name: zod.string(),
-            }),
-          )
-          .optional(),
-        suggestedCategories: zod
-          .array(
-            zod.object({
-              id: zod.number(),
-              name: zod.string(),
             }),
           )
           .optional(),
@@ -2123,22 +1344,6 @@ export const AcceptPhotoSuggestionResponse = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -2165,23 +1370,9 @@ export const AcceptPhotoSuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -2208,22 +1399,6 @@ export const DismissPhotoSuggestionResponse = zod.object({
   averageRating: zod.number().nullish(),
   ratingCount: zod.number(),
   myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
   photoCollections: zod
     .array(
       zod.object({
@@ -2250,363 +1425,9 @@ export const DismissPhotoSuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary Accept a suggested tag for a photo (adds the tag to the photo)
- */
-export const AcceptPhotoTagSuggestionParams = zod.object({
-  id: zod.coerce.number(),
-  tagName: zod.coerce.string(),
-});
-
-export const AcceptPhotoTagSuggestionResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary Dismiss a suggested tag for a photo
- */
-export const DismissPhotoTagSuggestionParams = zod.object({
-  id: zod.coerce.number(),
-  tagName: zod.coerce.string(),
-});
-
-export const DismissPhotoTagSuggestionResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary Accept a suggested category for a photo (links the category to the photo)
- */
-export const AcceptPhotoCategorySuggestionParams = zod.object({
-  id: zod.coerce.number(),
-  categoryId: zod.coerce.number(),
-});
-
-export const AcceptPhotoCategorySuggestionResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-});
-
-/**
- * @summary Dismiss a suggested category for a photo
- */
-export const DismissPhotoCategorySuggestionParams = zod.object({
-  id: zod.coerce.number(),
-  categoryId: zod.coerce.number(),
-});
-
-export const DismissPhotoCategorySuggestionResponse = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  caption: zod.string().nullish(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  tags: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  categories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  suggestedTags: zod
-    .array(
-      zod.object({
-        name: zod.string(),
-      }),
-    )
-    .optional(),
-  suggestedCategories: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        name: zod.string(),
       }),
     )
     .optional(),
@@ -2630,12 +1451,3 @@ export const RerunPhotoAnalysisResponse = zod.object({
   createdAt: zod.coerce.date(),
 });
 
-/**
- * @summary Get tag usage counts for tag cloud display
- */
-export const GetTagCloudResponseItem = zod.object({
-  id: zod.number(),
-  name: zod.string(),
-  count: zod.number(),
-});
-export const GetTagCloudResponse = zod.array(GetTagCloudResponseItem);

@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetCollection,
   useUpdateCollection,
   useDeleteCollection,
+  useListCollections,
   getGetCollectionQueryKey,
   getListCollectionsQueryKey,
+  useListCollectionTags,
+  useAddCollectionTag,
+  useRemoveCollectionTag,
+  getListCollectionTagsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
@@ -15,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +39,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, FolderOpen, Pencil, Trash2, Star } from "lucide-react";
+import { ArrowLeft, FolderOpen, Pencil, Trash2, Star, Tag, X, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function RenameCollectionDialog({
@@ -122,6 +128,162 @@ function RenameCollectionDialog({
   );
 }
 
+function TagsSection({
+  collectionId,
+  canManage,
+}: {
+  collectionId: number;
+  canManage: boolean;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [tagInput, setTagInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { data: tags = [] } = useListCollectionTags(collectionId);
+  const { data: allCollections } = useListCollections();
+  const { mutate: addTag, isPending: adding } = useAddCollectionTag();
+  const { mutate: removeTag } = useRemoveCollectionTag();
+
+  const existingTagsSet = new Set(tags);
+
+  const allKnownTags = Array.from(
+    new Set(
+      (allCollections ?? []).flatMap((c) => c.tags ?? [])
+    )
+  ).filter((t) => !existingTagsSet.has(t) && t.includes(tagInput.toLowerCase()));
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function invalidateTags() {
+    qc.invalidateQueries({ queryKey: getListCollectionTagsQueryKey(collectionId) });
+    qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+  }
+
+  function handleAddTag(name?: string) {
+    const tagName = (name ?? tagInput).trim().toLowerCase();
+    if (!tagName) return;
+    addTag(
+      { id: collectionId, tagName },
+      {
+        onSuccess: () => {
+          setTagInput("");
+          setShowSuggestions(false);
+          invalidateTags();
+        },
+        onError: () => toast({ title: "Failed to add tag", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleRemoveTag(tagName: string) {
+    removeTag(
+      { id: collectionId, tagName },
+      {
+        onSuccess: invalidateTags,
+        onError: () => toast({ title: "Failed to remove tag", variant: "destructive" }),
+      }
+    );
+  }
+
+  return (
+    <div className="space-y-2" data-testid="collection-tags-section">
+      <div className="flex items-center gap-1.5">
+        <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-sm font-medium text-muted-foreground">Tags</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5 min-h-[24px]" data-testid="collection-tags">
+        {tags.map((tag) => (
+          <Badge key={tag} variant="secondary" className="gap-1 pr-1 text-xs" data-testid={`tag-badge-${tag}`}>
+            {tag}
+            {canManage && (
+              <button
+                onClick={() => handleRemoveTag(tag)}
+                className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 p-0.5"
+                aria-label={`Remove tag ${tag}`}
+                data-testid={`remove-tag-${tag}`}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </Badge>
+        ))}
+        {tags.length === 0 && (
+          <span className="text-xs text-muted-foreground">No tags yet</span>
+        )}
+      </div>
+
+      {canManage && (
+        <div ref={containerRef} className="relative">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAddTag();
+            }}
+            className="flex gap-2"
+          >
+            <div className="relative flex-1">
+              <Input
+                value={tagInput}
+                onChange={(e) => {
+                  setTagInput(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setShowSuggestions(false);
+                }}
+                placeholder="Add tag..."
+                className="h-8 text-sm"
+                data-testid="add-tag-input"
+                autoComplete="off"
+              />
+              {showSuggestions && tagInput.length > 0 && allKnownTags.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-border bg-popover shadow-md overflow-hidden" data-testid="tag-suggestions">
+                  {allKnownTags.slice(0, 6).map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleAddTag(tag);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                      data-testid={`tag-suggestion-${tag}`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              className="h-8 px-2"
+              disabled={!tagInput.trim() || adding}
+              data-testid="add-tag-submit"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CollectionDetail() {
   const { id } = useParams<{ id: string }>();
   const collectionId = parseInt(id, 10);
@@ -202,18 +364,19 @@ export default function CollectionDetail() {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
-            <div>
+            <div className="space-y-1">
               <h1 className="text-2xl font-bold text-foreground" data-testid="collection-title">
                 {collection.title}
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground">
                 {collection.photoCount} photo{collection.photoCount !== 1 ? "s" : ""}
-                              </p>
+              </p>
               {collection.description && (
-                <p className="text-sm text-muted-foreground mt-2 max-w-xl">
+                <p className="text-sm text-muted-foreground max-w-xl">
                   {collection.description}
                 </p>
               )}
+              <TagsSection collectionId={collectionId} canManage={!!canManage} />
             </div>
           </div>
 
@@ -287,7 +450,7 @@ export default function CollectionDetail() {
                   <div className="aspect-[4/3] overflow-hidden">
                     <img
                       src={photo.url}
-                      alt={photo.name ?? "Photo"}
+                      alt={photo.caption ?? "Photo"}
                       className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
                   </div>

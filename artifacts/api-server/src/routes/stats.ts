@@ -1,11 +1,10 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, count, avg, sql } from "drizzle-orm";
-import { db, albumsTable, photosTable, usersTable, tagsTable, photoTagsTable, ratingsTable } from "@workspace/db";
+import { desc, count, avg, eq } from "drizzle-orm";
+import { db, albumsTable, photosTable, usersTable, ratingsTable, collectionsTable } from "@workspace/db";
 import {
   GetDashboardStatsResponse,
   GetRecentPhotosResponse,
   GetTopRatedPhotosResponse,
-  GetTagCloudResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -13,10 +12,12 @@ import { buildPhotoResponse } from "../lib/photoHelpers";
 const router: IRouter = Router();
 
 router.get("/stats/dashboard", requireAuth, async (req, res): Promise<void> => {
-  const [albumCount] = await db.select({ count: count() }).from(albumsTable);
-  const [photoCount] = await db.select({ count: count() }).from(photosTable);
-  const [userCount] = await db.select({ count: count() }).from(usersTable);
-  const [tagCount] = await db.select({ count: count() }).from(tagsTable);
+  const [albumCount, photoCount, userCount, collectionCount] = await Promise.all([
+    db.select({ count: count() }).from(albumsTable),
+    db.select({ count: count() }).from(photosTable),
+    db.select({ count: count() }).from(usersTable),
+    db.select({ count: count() }).from(collectionsTable),
+  ]);
 
   const recentPhotoRows = await db
     .select({ id: photosTable.id })
@@ -30,10 +31,10 @@ router.get("/stats/dashboard", requireAuth, async (req, res): Promise<void> => {
 
   res.json(
     GetDashboardStatsResponse.parse({
-      totalAlbums: Number(albumCount.count),
-      totalPhotos: Number(photoCount.count),
-      totalUsers: Number(userCount.count),
-      totalTags: Number(tagCount.count),
+      totalAlbums: Number(albumCount[0].count),
+      totalPhotos: Number(photoCount[0].count),
+      totalUsers: Number(userCount[0].count),
+      totalCollections: Number(collectionCount[0].count),
       recentActivity: recentActivity.filter(Boolean),
     })
   );
@@ -64,25 +65,6 @@ router.get("/stats/top-rated", requireAuth, async (req, res): Promise<void> => {
 
   const photos = await Promise.all(rows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
   res.json(GetTopRatedPhotosResponse.parse(photos.filter(Boolean)));
-});
-
-router.get("/stats/tag-cloud", requireAuth, async (req, res): Promise<void> => {
-  const tagCounts = await db
-    .select({
-      id: tagsTable.id,
-      name: tagsTable.name,
-      count: count(photoTagsTable.photoId),
-    })
-    .from(tagsTable)
-    .leftJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
-    .groupBy(tagsTable.id, tagsTable.name)
-    .orderBy(desc(count(photoTagsTable.photoId)));
-
-  res.json(
-    GetTagCloudResponse.parse(
-      tagCounts.map((t) => ({ id: t.id, name: t.name, count: Number(t.count) }))
-    )
-  );
 });
 
 export default router;

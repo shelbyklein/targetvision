@@ -3,11 +3,10 @@ import {
   useGetDashboardStats,
   useGetRecentPhotos,
   useGetTopRatedPhotos,
-  useGetTagCloud,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Images, Camera, Users, Tag, Star } from "lucide-react";
+import { Images, Camera, Users, FolderOpen, Star } from "lucide-react";
 
 function StatCard({
   label,
@@ -75,9 +74,6 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentPhotos, isLoading: recentLoading } = useGetRecentPhotos();
   const { data: topRated, isLoading: topLoading } = useGetTopRatedPhotos();
-  const { data: tagCloud, isLoading: tagsLoading } = useGetTagCloud();
-
-  const maxTagCount = Math.max(...(tagCloud?.map((t) => t.count) ?? [1]), 1);
 
   return (
     <AppLayout>
@@ -91,7 +87,7 @@ export default function Dashboard() {
           <StatCard label="Albums" value={stats?.totalAlbums} icon={Images} loading={statsLoading} />
           <StatCard label="Photos" value={stats?.totalPhotos} icon={Camera} loading={statsLoading} />
           <StatCard label="Team Members" value={stats?.totalUsers} icon={Users} loading={statsLoading} />
-          <StatCard label="Tags" value={stats?.totalTags} icon={Tag} loading={statsLoading} />
+          <StatCard label="Collections" value={stats?.totalCollections} icon={FolderOpen} loading={statsLoading} />
         </div>
 
         <section>
@@ -103,36 +99,6 @@ export default function Dashboard() {
           <h2 className="text-base font-semibold text-foreground mb-3">Top Rated</h2>
           <PhotoStrip photos={topRated ?? []} loading={topLoading} />
         </section>
-
-        {(tagsLoading || (tagCloud && tagCloud.length > 0)) && (
-          <section data-testid="tag-cloud-section">
-            <h2 className="text-base font-semibold text-foreground mb-3">Tag Cloud</h2>
-            {tagsLoading ? (
-              <div className="flex flex-wrap gap-2">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className="h-6 w-16 rounded-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2 p-4 rounded-xl border border-border bg-card">
-                {tagCloud?.map((tag) => {
-                  const scale = 0.8 + (tag.count / maxTagCount) * 0.8;
-                  return (
-                    <Link key={tag.id} href={`/photos?tag=${encodeURIComponent(tag.name)}`}>
-                      <span
-                        className="inline-block rounded-full bg-primary/10 text-primary px-3 py-1 cursor-pointer hover:bg-primary/20 transition-colors font-medium"
-                        style={{ fontSize: `${Math.round(12 * scale)}px` }}
-                        data-testid="tag-cloud-item"
-                      >
-                        {tag.name}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
       </div>
     </AppLayout>
   );

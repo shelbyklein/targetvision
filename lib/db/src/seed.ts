@@ -5,10 +5,6 @@ import {
   usersTable,
   albumsTable,
   photosTable,
-  tagsTable,
-  photoTagsTable,
-  categoriesTable,
-  photoCategoriesTable,
   ratingsTable,
 } from "./schema/index.js";
 
@@ -23,40 +19,6 @@ const db = drizzle(pool);
 
 async function seed() {
   console.log("Seeding database…");
-
-  const categories = [
-    { name: "Team Event" },
-    { name: "Offsite" },
-    { name: "Celebration" },
-    { name: "Day-to-Day" },
-    { name: "Product Launch" },
-  ];
-
-  const tags = [
-    { name: "funny" },
-    { name: "candid" },
-    { name: "group" },
-    { name: "portrait" },
-    { name: "outdoor" },
-    { name: "indoor" },
-    { name: "food" },
-    { name: "milestone" },
-  ];
-
-  const insertedCategories = await db
-    .insert(categoriesTable)
-    .values(categories)
-    .onConflictDoNothing()
-    .returning();
-
-  const insertedTags = await db
-    .insert(tagsTable)
-    .values(tags)
-    .onConflictDoNothing()
-    .returning();
-
-  console.log(`  ${insertedCategories.length} categories seeded`);
-  console.log(`  ${insertedTags.length} tags seeded`);
 
   const [seedUser] = await db
     .insert(usersTable)
@@ -191,53 +153,6 @@ async function seed() {
 
   const photos = await db.insert(photosTable).values(photoData).returning();
   console.log(`  ${photos.length} photos seeded`);
-
-  const tagMap = Object.fromEntries(insertedTags.map((t) => [t.name, t.id]));
-  const catMap = Object.fromEntries(insertedCategories.map((c) => [c.name, c.id]));
-
-  const photoTagData = [
-    { photoId: photos[0].id, tagId: tagMap["indoor"] },
-    { photoId: photos[0].id, tagId: tagMap["group"] },
-    { photoId: photos[1].id, tagId: tagMap["food"] },
-    { photoId: photos[1].id, tagId: tagMap["candid"] },
-    { photoId: photos[2].id, tagId: tagMap["group"] },
-    { photoId: photos[2].id, tagId: tagMap["indoor"] },
-    { photoId: photos[3].id, tagId: tagMap["outdoor"] },
-    { photoId: photos[3].id, tagId: tagMap["candid"] },
-    { photoId: photos[4].id, tagId: tagMap["outdoor"] },
-    { photoId: photos[4].id, tagId: tagMap["group"] },
-    { photoId: photos[5].id, tagId: tagMap["food"] },
-    { photoId: photos[5].id, tagId: tagMap["outdoor"] },
-    { photoId: photos[6].id, tagId: tagMap["milestone"] },
-    { photoId: photos[6].id, tagId: tagMap["indoor"] },
-    { photoId: photos[7].id, tagId: tagMap["milestone"] },
-    { photoId: photos[7].id, tagId: tagMap["candid"] },
-    { photoId: photos[8].id, tagId: tagMap["group"] },
-    { photoId: photos[8].id, tagId: tagMap["indoor"] },
-    { photoId: photos[9].id, tagId: tagMap["group"] },
-    { photoId: photos[9].id, tagId: tagMap["milestone"] },
-  ].filter((r) => r.tagId !== undefined);
-
-  if (photoTagData.length) {
-    await db.insert(photoTagsTable).values(photoTagData as { photoId: number; tagId: number }[]).onConflictDoNothing();
-  }
-
-  const photoCatData = [
-    { photoId: photos[0].id, categoryId: catMap["Team Event"] },
-    { photoId: photos[1].id, categoryId: catMap["Team Event"] },
-    { photoId: photos[2].id, categoryId: catMap["Team Event"] },
-    { photoId: photos[3].id, categoryId: catMap["Offsite"] },
-    { photoId: photos[4].id, categoryId: catMap["Offsite"] },
-    { photoId: photos[5].id, categoryId: catMap["Offsite"] },
-    { photoId: photos[6].id, categoryId: catMap["Product Launch"] },
-    { photoId: photos[7].id, categoryId: catMap["Celebration"] },
-    { photoId: photos[8].id, categoryId: catMap["Celebration"] },
-    { photoId: photos[9].id, categoryId: catMap["Team Event"] },
-  ].filter((r) => r.categoryId !== undefined);
-
-  if (photoCatData.length) {
-    await db.insert(photoCategoriesTable).values(photoCatData as { photoId: number; categoryId: number }[]).onConflictDoNothing();
-  }
 
   const ratingData = [
     { photoId: photos[0].id, userId: seedUser.id, score: 4 },

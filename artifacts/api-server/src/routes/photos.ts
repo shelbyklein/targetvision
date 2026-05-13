@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, usersTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable } from "@workspace/db";
+import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { logger } from "../lib/logger";
 import {
@@ -16,16 +16,6 @@ import {
   UpdatePhotoBody,
   UpdatePhotoResponse,
   DeletePhotoParams,
-  AddPhotoTagParams,
-  AddPhotoTagBody,
-  AddPhotoTagResponse,
-  RemovePhotoTagParams,
-  RemovePhotoTagResponse,
-  AddPhotoCategoryParams,
-  AddPhotoCategoryBody,
-  AddPhotoCategoryResponse,
-  RemovePhotoCategoryParams,
-  RemovePhotoCategoryResponse,
   RatePhotoParams,
   RatePhotoBody,
   RatePhotoResponse,
@@ -35,14 +25,6 @@ import {
   AcceptPhotoSuggestionResponse,
   DismissPhotoSuggestionParams,
   DismissPhotoSuggestionResponse,
-  AcceptPhotoTagSuggestionParams,
-  AcceptPhotoTagSuggestionResponse,
-  DismissPhotoTagSuggestionParams,
-  DismissPhotoTagSuggestionResponse,
-  AcceptPhotoCategorySuggestionParams,
-  AcceptPhotoCategorySuggestionResponse,
-  DismissPhotoCategorySuggestionParams,
-  DismissPhotoCategorySuggestionResponse,
   RerunPhotoAnalysisParams,
   RerunPhotoAnalysisResponse,
 } from "@workspace/api-zod";
@@ -84,7 +66,6 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
     })
     .returning();
 
-  // Fire-and-forget AI analysis. Failures are swallowed so the upload still succeeds.
   void runAndRecordPhotoAnalysis(photo.id).catch((err) => {
     logger.error({ err, photoId: photo.id }, "Background AI analysis failed");
   });
@@ -124,11 +105,9 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     .orderBy(photosTable.createdAt);
 
   const allIds = allPhotos.map((p) => p.id);
-  const { tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = query.data;
+  const { ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = query.data;
 
   const filteredIds = await applyFiltersAndFetchIds(allIds, {
-    tag,
-    categoryId,
     ratingMin,
     ratingMax,
     dateFrom,
@@ -216,121 +195,6 @@ router.delete("/photos/:id", requireAuth, async (req, res): Promise<void> => {
 
   await db.delete(photosTable).where(eq(photosTable.id, params.data.id));
   res.sendStatus(204);
-});
-
-router.post("/photos/:id/tags", requireAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = AddPhotoTagParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const body = AddPhotoTagBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: body.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  let [tag] = await db.select().from(tagsTable).where(eq(tagsTable.name, body.data.tagName));
-  if (!tag) {
-    [tag] = await db.insert(tagsTable).values({ name: body.data.tagName }).returning();
-  }
-
-  await db
-    .insert(photoTagsTable)
-    .values({ photoId: params.data.id, tagId: tag.id })
-    .onConflictDoNothing();
-
-  const photo = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(AddPhotoTagResponse.parse(photo));
-});
-
-router.delete("/photos/:id/tags/:tagId", requireAuth, async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const rawTagId = Array.isArray(req.params.tagId) ? req.params.tagId[0] : req.params.tagId;
-  const params = RemovePhotoTagParams.safeParse({ id: parseInt(rawId, 10), tagId: parseInt(rawTagId, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  await db
-    .delete(photoTagsTable)
-    .where(and(eq(photoTagsTable.photoId, params.data.id), eq(photoTagsTable.tagId, params.data.tagId)));
-
-  const photo = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(RemovePhotoTagResponse.parse(photo));
-});
-
-router.post("/photos/:id/categories", requireAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = AddPhotoCategoryParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const body = AddPhotoCategoryBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: body.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  const [catExists] = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.id, body.data.categoryId));
-  if (!catExists) {
-    res.status(404).json({ error: "Category not found" });
-    return;
-  }
-
-  await db
-    .insert(photoCategoriesTable)
-    .values({ photoId: params.data.id, categoryId: body.data.categoryId })
-    .onConflictDoNothing();
-
-  const photo = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(AddPhotoCategoryResponse.parse(photo));
-});
-
-router.delete("/photos/:id/categories/:categoryId", requireAuth, async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const rawCatId = Array.isArray(req.params.categoryId) ? req.params.categoryId[0] : req.params.categoryId;
-  const params = RemovePhotoCategoryParams.safeParse({ id: parseInt(rawId, 10), categoryId: parseInt(rawCatId, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  await db
-    .delete(photoCategoriesTable)
-    .where(and(eq(photoCategoriesTable.photoId, params.data.id), eq(photoCategoriesTable.categoryId, params.data.categoryId)));
-
-  const photo = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(RemovePhotoCategoryResponse.parse(photo));
 });
 
 router.post("/photos/:id/rating", requireAuth, async (req, res): Promise<void> => {
@@ -503,215 +367,6 @@ router.post("/photos/:id/suggestions/:collectionId/dismiss", requireAuth, async 
 
   const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
   res.json(DismissPhotoSuggestionResponse.parse(full));
-});
-
-router.post("/photos/:id/tag-suggestions/:tagName/accept", requireAuth, async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const rawTag = Array.isArray(req.params.tagName) ? req.params.tagName[0] : req.params.tagName;
-  const params = AcceptPhotoTagSuggestionParams.safeParse({
-    id: parseInt(rawId, 10),
-    tagName: rawTag,
-  });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  const tagName = params.data.tagName.trim().toLowerCase();
-
-  const [suggestion] = await db
-    .select({ status: photoTagSuggestionsTable.status })
-    .from(photoTagSuggestionsTable)
-    .where(
-      and(
-        eq(photoTagSuggestionsTable.photoId, params.data.id),
-        eq(photoTagSuggestionsTable.tagName, tagName),
-      ),
-    );
-  if (!suggestion || suggestion.status !== "pending") {
-    res.status(404).json({ error: "Pending suggestion not found" });
-    return;
-  }
-
-  let [tag] = await db.select().from(tagsTable).where(eq(tagsTable.name, tagName));
-  if (!tag) {
-    [tag] = await db.insert(tagsTable).values({ name: tagName }).returning();
-  }
-
-  await db
-    .insert(photoTagsTable)
-    .values({ photoId: params.data.id, tagId: tag.id })
-    .onConflictDoNothing();
-
-  await db
-    .update(photoTagSuggestionsTable)
-    .set({ status: "accepted" })
-    .where(
-      and(
-        eq(photoTagSuggestionsTable.photoId, params.data.id),
-        eq(photoTagSuggestionsTable.tagName, tagName),
-      ),
-    );
-
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(AcceptPhotoTagSuggestionResponse.parse(full));
-});
-
-router.post("/photos/:id/tag-suggestions/:tagName/dismiss", requireAuth, async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const rawTag = Array.isArray(req.params.tagName) ? req.params.tagName[0] : req.params.tagName;
-  const params = DismissPhotoTagSuggestionParams.safeParse({
-    id: parseInt(rawId, 10),
-    tagName: rawTag,
-  });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  const tagName = params.data.tagName.trim().toLowerCase();
-
-  const [existing] = await db
-    .select({ status: photoTagSuggestionsTable.status })
-    .from(photoTagSuggestionsTable)
-    .where(
-      and(
-        eq(photoTagSuggestionsTable.photoId, params.data.id),
-        eq(photoTagSuggestionsTable.tagName, tagName),
-      ),
-    );
-  if (!existing || existing.status !== "pending") {
-    res.status(404).json({ error: "Pending suggestion not found" });
-    return;
-  }
-
-  await db
-    .update(photoTagSuggestionsTable)
-    .set({ status: "dismissed" })
-    .where(
-      and(
-        eq(photoTagSuggestionsTable.photoId, params.data.id),
-        eq(photoTagSuggestionsTable.tagName, tagName),
-      ),
-    );
-
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(DismissPhotoTagSuggestionResponse.parse(full));
-});
-
-router.post("/photos/:id/category-suggestions/:categoryId/accept", requireAuth, async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const rawCat = Array.isArray(req.params.categoryId) ? req.params.categoryId[0] : req.params.categoryId;
-  const params = AcceptPhotoCategorySuggestionParams.safeParse({
-    id: parseInt(rawId, 10),
-    categoryId: parseInt(rawCat, 10),
-  });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  const [catExists] = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.id, params.data.categoryId));
-  if (!catExists) {
-    res.status(404).json({ error: "Category not found" });
-    return;
-  }
-
-  const [suggestion] = await db
-    .select({ status: photoCategorySuggestionsTable.status })
-    .from(photoCategorySuggestionsTable)
-    .where(
-      and(
-        eq(photoCategorySuggestionsTable.photoId, params.data.id),
-        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
-      ),
-    );
-  if (!suggestion || suggestion.status !== "pending") {
-    res.status(404).json({ error: "Pending suggestion not found" });
-    return;
-  }
-
-  await db
-    .insert(photoCategoriesTable)
-    .values({ photoId: params.data.id, categoryId: params.data.categoryId })
-    .onConflictDoNothing();
-
-  await db
-    .update(photoCategorySuggestionsTable)
-    .set({ status: "accepted" })
-    .where(
-      and(
-        eq(photoCategorySuggestionsTable.photoId, params.data.id),
-        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
-      ),
-    );
-
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(AcceptPhotoCategorySuggestionResponse.parse(full));
-});
-
-router.post("/photos/:id/category-suggestions/:categoryId/dismiss", requireAuth, async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const rawCat = Array.isArray(req.params.categoryId) ? req.params.categoryId[0] : req.params.categoryId;
-  const params = DismissPhotoCategorySuggestionParams.safeParse({
-    id: parseInt(rawId, 10),
-    categoryId: parseInt(rawCat, 10),
-  });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [photoExists] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
-  if (!photoExists) {
-    res.status(404).json({ error: "Photo not found" });
-    return;
-  }
-
-  const [existing] = await db
-    .select({ status: photoCategorySuggestionsTable.status })
-    .from(photoCategorySuggestionsTable)
-    .where(
-      and(
-        eq(photoCategorySuggestionsTable.photoId, params.data.id),
-        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
-      ),
-    );
-  if (!existing || existing.status !== "pending") {
-    res.status(404).json({ error: "Pending suggestion not found" });
-    return;
-  }
-
-  await db
-    .update(photoCategorySuggestionsTable)
-    .set({ status: "dismissed" })
-    .where(
-      and(
-        eq(photoCategorySuggestionsTable.photoId, params.data.id),
-        eq(photoCategorySuggestionsTable.categoryId, params.data.categoryId),
-      ),
-    );
-
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
-  res.json(DismissPhotoCategorySuggestionResponse.parse(full));
 });
 
 router.post("/photos/:id/rerun-analysis", requireAuth, async (req, res): Promise<void> => {

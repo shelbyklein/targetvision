@@ -3,13 +3,7 @@ import {
   db,
   photosTable,
   collectionsTable,
-  categoriesTable,
-  photoCategoriesTable,
-  tagsTable,
-  photoTagsTable,
   photoCollectionSuggestionsTable,
-  photoTagSuggestionsTable,
-  photoCategorySuggestionsTable,
   aiAnalysisEventsTable,
   type AiAnalysisEvent,
 } from "@workspace/db";
@@ -55,16 +49,9 @@ export interface CollectionForSuggestion {
   description: string | null;
 }
 
-export interface CategoryForSuggestion {
-  id: number;
-  name: string;
-}
-
 export interface PhotoAnalysisResult {
   description: string;
   suggestedCollectionIds: number[];
-  suggestedTags: string[];
-  suggestedCategoryIds: number[];
 }
 
 export type AnalyzePhotoOutcome =
@@ -75,7 +62,6 @@ export type AnalyzePhotoOutcome =
 export async function analyzePhoto(
   imageUrl: string,
   collections: CollectionForSuggestion[],
-  categories: CategoryForSuggestion[],
   storageKey: string | null,
 ): Promise<AnalyzePhotoOutcome> {
   const { provider, reason } = await getActiveProvider();
@@ -85,28 +71,21 @@ export async function analyzePhoto(
   }
 
   const allowedCollectionIds = collections.map((c) => c.id);
-  const allowedCategoryIds = categories.map((c) => c.id);
   const collectionsBlock = collections
     .map(
       (c) =>
         `- id=${c.id} | "${c.title}"${c.description ? ` — ${c.description}` : ""}`,
     )
     .join("\n");
-  const categoriesBlock = categories
-    .map((c) => `- id=${c.id} | "${c.name}"`)
-    .join("\n");
 
   const systemPrompt =
-    "You are a photo describer for a team photo album. Look at the photo and (1) write one plain-English description (max 60 words) of what is in it — for every person visible include their approximate age range (child/teen/adult/elderly), sex, race/ethnicity, pose (e.g. standing, sitting, crouching), and general disposition or expression (e.g. smiling, laughing, serious, focused); also describe the setting and overall scene; if no people are present, describe the subject, objects, and environment in detail; (2) from the user's existing collections, pick up to 3 that this photo would naturally belong in (only clear thematic matches, otherwise empty; never invent collection ids); (3) suggest 3-5 short, lowercase, single-or-two-word tags describing the photo's subject, setting, mood, or activity (no '#', no punctuation); and (4) from the user's existing categories, pick up to 2 best-fit category ids (only clear matches, otherwise empty; never invent category ids).";
+    "You are a photo describer for a team photo album. Look at the photo and (1) write one plain-English description (max 60 words) of what is in it — for every person visible include their approximate age range (child/teen/adult/elderly), sex, race/ethnicity, pose (e.g. standing, sitting, crouching), and general disposition or expression (e.g. smiling, laughing, serious, focused); also describe the setting and overall scene; if no people are present, describe the subject, objects, and environment in detail; (2) from the user's existing collections, pick up to 3 that this photo would naturally belong in (only clear thematic matches, otherwise empty; never invent collection ids).";
 
   const collectionsText = collections.length
     ? `Existing collections:\n${collectionsBlock}`
     : "The user has no collections yet; return an empty list of suggested collection ids.";
-  const categoriesText = categories.length
-    ? `Existing categories:\n${categoriesBlock}`
-    : "The user has no categories yet; return an empty list of suggested category ids.";
 
-  const userText = `${collectionsText}\n\n${categoriesText}\n\nDescribe the photo, pick up to 3 fitting collection ids, suggest 3-5 short tags, and pick up to 2 fitting category ids.`;
+  const userText = `${collectionsText}\n\nDescribe the photo and pick up to 3 fitting collection ids.`;
 
   let image: ResolvedImage;
   let result: Awaited<ReturnType<typeof provider.analyze>>;
@@ -138,36 +117,12 @@ export async function analyzePhoto(
     ),
   ).slice(0, 3);
 
-  const suggestedTags = Array.from(
-    new Set(
-      result.suggestedTags
-        .map((t) =>
-          String(t ?? "")
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, "")
-            .trim()
-            .replace(/\s+/g, "-"),
-        )
-        .filter((t) => t.length > 0 && t.length <= 32),
-    ),
-  ).slice(0, 5);
-
-  const suggestedCategoryIds = Array.from(
-    new Set(
-      result.suggestedCategoryIds
-        .map((id) => Number(id))
-        .filter((id) => Number.isInteger(id) && allowedCategoryIds.includes(id)),
-    ),
-  ).slice(0, 2);
-
   return {
     status: "success",
     provider: provider.id,
     result: {
       description: result.description,
       suggestedCollectionIds,
-      suggestedTags,
-      suggestedCategoryIds,
     },
   };
 }
@@ -175,7 +130,7 @@ export async function analyzePhoto(
 /**
  * Run AI analysis for an existing photo and persist the outcome:
  * - Updates `photos.aiDescription` on success
- * - Inserts pending suggestions (collections, tags, categories) on success
+ * - Inserts pending collection suggestions on success
  * - Always records an `ai_analysis_events` row describing the attempt
  *
  * Used by the upload flow and by the admin "Retry" action on failed events.
@@ -191,24 +146,18 @@ export async function runAndRecordPhotoAnalysis(
   if (!photo) return null;
 
   try {
-    const [collections, categories] = await Promise.all([
-      db
-        .select({
-          id: collectionsTable.id,
-          title: collectionsTable.title,
-          description: collectionsTable.description,
-        })
-        .from(collectionsTable)
-        .where(eq(collectionsTable.createdById, photo.uploaderId)),
-      db
-        .select({ id: categoriesTable.id, name: categoriesTable.name })
-        .from(categoriesTable),
-    ]);
+    const collections = await db
+      .select({
+        id: collectionsTable.id,
+        title: collectionsTable.title,
+        description: collectionsTable.description,
+      })
+      .from(collectionsTable)
+      .where(eq(collectionsTable.createdById, photo.uploaderId));
 
     const outcome = await analyzePhoto(
       photo.url,
       collections,
-      categories,
       photo.storageKey,
     );
 
@@ -241,32 +190,14 @@ export async function runAndRecordPhotoAnalysis(
     const result = outcome.result;
 
     const ev = await db.transaction(async (tx) => {
-      await Promise.all([
-        tx
-          .delete(photoCollectionSuggestionsTable)
-          .where(
-            and(
-              eq(photoCollectionSuggestionsTable.photoId, photo.id),
-              eq(photoCollectionSuggestionsTable.status, "pending"),
-            ),
+      await tx
+        .delete(photoCollectionSuggestionsTable)
+        .where(
+          and(
+            eq(photoCollectionSuggestionsTable.photoId, photo.id),
+            eq(photoCollectionSuggestionsTable.status, "pending"),
           ),
-        tx
-          .delete(photoTagSuggestionsTable)
-          .where(
-            and(
-              eq(photoTagSuggestionsTable.photoId, photo.id),
-              eq(photoTagSuggestionsTable.status, "pending"),
-            ),
-          ),
-        tx
-          .delete(photoCategorySuggestionsTable)
-          .where(
-            and(
-              eq(photoCategorySuggestionsTable.photoId, photo.id),
-              eq(photoCategorySuggestionsTable.status, "pending"),
-            ),
-          ),
-      ]);
+        );
 
       await tx
         .update(photosTable)
@@ -284,54 +215,6 @@ export async function runAndRecordPhotoAnalysis(
             })),
           )
           .onConflictDoNothing();
-      }
-
-      if (result.suggestedCategoryIds.length > 0) {
-        const existingCats = await tx
-          .select({ categoryId: photoCategoriesTable.categoryId })
-          .from(photoCategoriesTable)
-          .where(eq(photoCategoriesTable.photoId, photo.id));
-        const existingCatIds = new Set(existingCats.map((c) => c.categoryId));
-        const newCatSuggestions = result.suggestedCategoryIds.filter(
-          (cid) => !existingCatIds.has(cid),
-        );
-        if (newCatSuggestions.length > 0) {
-          await tx
-            .insert(photoCategorySuggestionsTable)
-            .values(
-              newCatSuggestions.map((cid) => ({
-                photoId: photo.id,
-                categoryId: cid,
-                status: "pending" as const,
-              })),
-            )
-            .onConflictDoNothing();
-        }
-      }
-
-      if (result.suggestedTags.length > 0) {
-        const existingTags = await tx
-          .select({ name: tagsTable.name })
-          .from(tagsTable)
-          .innerJoin(photoTagsTable, eq(tagsTable.id, photoTagsTable.tagId))
-          .where(eq(photoTagsTable.photoId, photo.id));
-        const existingNames = new Set(existingTags.map((t) => t.name));
-        const newSuggestions = result.suggestedTags.filter(
-          (t) => !existingNames.has(t),
-        );
-
-        if (newSuggestions.length > 0) {
-          await tx
-            .insert(photoTagSuggestionsTable)
-            .values(
-              newSuggestions.map((tagName) => ({
-                photoId: photo.id,
-                tagName,
-                status: "pending" as const,
-              })),
-            )
-            .onConflictDoNothing();
-        }
       }
 
       const [row] = await tx

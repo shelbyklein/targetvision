@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, FolderOpen, Camera } from "lucide-react";
+import { Plus, FolderOpen, Camera, Tag, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function CreateCollectionDialog({ onCreated, testId = "create-collection-btn" }: { onCreated: () => void; testId?: string }) {
@@ -103,6 +104,19 @@ function CreateCollectionDialog({ onCreated, testId = "create-collection-btn" }:
 export default function Collections() {
   const qc = useQueryClient();
   const { data: collections, isLoading } = useListCollections();
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  const allTags = Array.from(
+    new Set(
+      (collections ?? []).flatMap((c) => c.tags ?? [])
+    )
+  ).sort();
+
+  const filtered = activeTag
+    ? (collections ?? []).filter((c) =>
+        (c.tags ?? []).includes(activeTag)
+      )
+    : collections;
 
   function refetch() {
     qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
@@ -121,6 +135,29 @@ export default function Collections() {
           <CreateCollectionDialog onCreated={refetch} />
         </div>
 
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 items-center" data-testid="tag-filter">
+            <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground mr-1">Filter:</span>
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                  activeTag === tag
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                }`}
+                data-testid={`tag-filter-${tag}`}
+              >
+                {tag}
+                {activeTag === tag && <X className="h-2.5 w-2.5" />}
+              </button>
+            ))}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -133,44 +170,59 @@ export default function Collections() {
               </div>
             ))}
           </div>
-        ) : collections && collections.length > 0 ? (
+        ) : filtered && filtered.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="collections-grid">
-            {collections.map((collection) => (
-              <Link key={collection.id} href={`/collections/${collection.id}`}>
-                <div
-                  className="rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow"
-                  data-testid="collection-card"
-                >
-                  <div className="aspect-[4/3] bg-muted overflow-hidden">
-                    {collection.coverPhotoUrl ? (
-                      <img
-                        src={collection.coverPhotoUrl}
-                        alt={collection.title}
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
-                        <FolderOpen className="h-10 w-10" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="font-medium text-foreground text-sm truncate">{collection.title}</p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Camera className="h-3 w-3" />
-                        {collection.photoCount} photo{collection.photoCount !== 1 ? "s" : ""}
-                      </span>
+            {filtered.map((collection) => {
+              const tags = collection.tags ?? [];
+              return (
+                <Link key={collection.id} href={`/collections/${collection.id}`}>
+                  <div
+                    className="rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow"
+                    data-testid="collection-card"
+                  >
+                    <div className="aspect-[4/3] bg-muted overflow-hidden">
+                      {collection.coverPhotoUrl ? (
+                        <img
+                          src={collection.coverPhotoUrl}
+                          alt={collection.title}
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
+                          <FolderOpen className="h-10 w-10" />
+                        </div>
+                      )}
                     </div>
-                    {collection.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {collection.description}
-                      </p>
-                    )}
+                    <div className="p-3">
+                      <p className="font-medium text-foreground text-sm truncate">{collection.title}</p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Camera className="h-3 w-3" />
+                          {collection.photoCount} photo{collection.photoCount !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      {collection.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                          {collection.description}
+                        </p>
+                      )}
+                      {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {tags.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {tags.length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">+{tags.length - 3}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <div
@@ -180,11 +232,21 @@ export default function Collections() {
             <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <FolderOpen className="h-7 w-7 text-muted-foreground" />
             </div>
-            <h3 className="text-base font-medium text-foreground mb-1">No collections yet</h3>
+            <h3 className="text-base font-medium text-foreground mb-1">
+              {activeTag ? `No collections tagged "${activeTag}"` : "No collections yet"}
+            </h3>
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
-              Create a collection to group photos by subject or context across multiple albums.
+              {activeTag
+                ? "Try a different tag filter or clear the filter to see all collections."
+                : "Create a collection to group photos by subject or context across multiple albums."}
             </p>
-            <CreateCollectionDialog onCreated={refetch} testId="create-collection-btn-empty" />
+            {activeTag ? (
+              <Button variant="outline" size="sm" onClick={() => setActiveTag(null)}>
+                Clear filter
+              </Button>
+            ) : (
+              <CreateCollectionDialog onCreated={refetch} testId="create-collection-btn-empty" />
+            )}
           </div>
         )}
       </div>

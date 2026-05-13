@@ -3,8 +3,6 @@ import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
   useListUsers,
-  useListCategories,
-  useGetTagCloud,
   useGetMe,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -27,8 +25,6 @@ const PAGE_SIZE = 24;
 function parseSearch(search: string) {
   const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   return {
-    tag: p.get("tag") ?? "",
-    categoryId: p.get("categoryId") ?? "",
     ratingMin: p.get("ratingMin") ?? "",
     uploaderId: p.get("uploaderId") ?? "",
     dateFrom: p.get("dateFrom") ?? "",
@@ -83,17 +79,13 @@ export default function PhotosPage() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const urlParams = parseSearch(searchString);
-  const { tag, categoryId, ratingMin, uploaderId, dateFrom, dateTo, page } = urlParams;
+  const { ratingMin, uploaderId, dateFrom, dateTo, page } = urlParams;
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
-  const { data: categories } = useListCategories();
-  const { data: tagCloud } = useGetTagCloud();
 
   const apiParams = {
-    ...(tag && { tag }),
-    ...(categoryId && { categoryId: parseInt(categoryId, 10) }),
     ...(ratingMin && { ratingMin: parseFloat(ratingMin) }),
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
     ...(dateFrom && { dateFrom }),
@@ -104,7 +96,7 @@ export default function PhotosPage() {
     Object.keys(apiParams).length > 0 ? apiParams : undefined
   );
 
-  const hasActiveFilters = !!(tag || categoryId || ratingMin || uploaderId || dateFrom || dateTo);
+  const hasActiveFilters = !!(ratingMin || uploaderId || dateFrom || dateTo);
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const totalPhotos = photos?.length ?? 0;
@@ -123,8 +115,6 @@ export default function PhotosPage() {
 
   function clearFilters() {
     navigate({
-      tag: "",
-      categoryId: "",
       ratingMin: "",
       uploaderId: "",
       dateFrom: "",
@@ -161,7 +151,7 @@ export default function PhotosPage() {
             Filters
             {hasActiveFilters && (
               <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                {[tag, categoryId, ratingMin, uploaderId, dateFrom, dateTo].filter(Boolean).length}
+                {[ratingMin, uploaderId, dateFrom, dateTo].filter(Boolean).length}
               </span>
             )}
           </Button>
@@ -185,46 +175,6 @@ export default function PhotosPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tag</label>
-                <Select
-                  value={tag || "__all__"}
-                  onValueChange={(v) => handleFilterChange("tag", v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger className="h-9 text-sm" data-testid="filter-tag">
-                    <SelectValue placeholder="Any tag" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Any tag</SelectItem>
-                    {tagCloud?.map((t) => (
-                      <SelectItem key={t.id} value={t.name}>
-                        {t.name} ({t.count})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</label>
-                <Select
-                  value={categoryId || "__all__"}
-                  onValueChange={(v) => handleFilterChange("categoryId", v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger className="h-9 text-sm" data-testid="filter-category">
-                    <SelectValue placeholder="Any category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Any category</SelectItem>
-                    {categories?.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Minimum rating</label>
                 <StarRatingFilter
@@ -282,22 +232,6 @@ export default function PhotosPage() {
 
             {hasActiveFilters && (
               <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
-                {tag && (
-                  <Badge variant="secondary" className="gap-1 text-xs">
-                    Tag: {tag}
-                    <button type="button" onClick={() => handleFilterChange("tag", "")} className="ml-1 hover:text-destructive">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                )}
-                {categoryId && (
-                  <Badge variant="secondary" className="gap-1 text-xs">
-                    Category: {categories?.find((c) => String(c.id) === categoryId)?.name ?? categoryId}
-                    <button type="button" onClick={() => handleFilterChange("categoryId", "")} className="ml-1 hover:text-destructive">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                )}
                 {ratingMin && (
                   <Badge variant="secondary" className="gap-1 text-xs">
                     Min rating: {ratingMin}+
@@ -352,22 +286,13 @@ export default function PhotosPage() {
                   <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
                     <img
                       src={photo.url}
-                      alt={photo.name ?? "Photo"}
+                      alt={photo.caption ?? "Photo"}
                       className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                       loading="lazy"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
                       {photo.albumTitle && (
                         <p className="text-xs text-white/80 truncate">{photo.albumTitle}</p>
-                      )}
-                      {photo.tags && photo.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-0.5 mt-1">
-                          {photo.tags.slice(0, 3).map((t) => (
-                            <span key={t.id} className="text-[10px] bg-white/20 text-white px-1 rounded">
-                              {t.name}
-                            </span>
-                          ))}
-                        </div>
                       )}
                       {photo.averageRating != null && (
                         <div className="flex items-center gap-0.5 mt-1">

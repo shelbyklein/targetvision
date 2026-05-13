@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, count, sql, and } from "drizzle-orm";
-import { db, collectionsTable, photoCollectionsTable, photosTable } from "@workspace/db";
+import { db, collectionsTable, photoCollectionsTable, photosTable, collectionTagsTable, tagsTable } from "@workspace/db";
 import {
   ListCollectionsResponse,
   CreateCollectionBody,
@@ -19,6 +19,16 @@ import { buildPhotoResponse } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
+async function getCollectionTags(collectionId: number): Promise<string[]> {
+  const rows = await db
+    .select({ name: tagsTable.name })
+    .from(collectionTagsTable)
+    .innerJoin(tagsTable, eq(collectionTagsTable.tagId, tagsTable.id))
+    .where(eq(collectionTagsTable.collectionId, collectionId))
+    .orderBy(tagsTable.name);
+  return rows.map((r) => r.name);
+}
+
 async function buildCollectionResponse(collectionId: number) {
   const [row] = await db
     .select({
@@ -32,19 +42,23 @@ async function buildCollectionResponse(collectionId: number) {
 
   if (!row) return null;
 
-  const coverPhotoRow = await db
-    .select({ url: photosTable.url })
-    .from(photoCollectionsTable)
-    .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
-    .where(eq(photoCollectionsTable.collectionId, collectionId))
-    .orderBy(sql`${photoCollectionsTable.photoId} asc`)
-    .limit(1);
+  const [coverPhotoRow, tags] = await Promise.all([
+    db
+      .select({ url: photosTable.url })
+      .from(photoCollectionsTable)
+      .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
+      .where(eq(photoCollectionsTable.collectionId, collectionId))
+      .orderBy(sql`${photoCollectionsTable.photoId} asc`)
+      .limit(1),
+    getCollectionTags(collectionId),
+  ]);
 
   return {
     ...row.collection,
     createdAt: row.collection.createdAt.toISOString(),
     photoCount: Number(row.photoCount),
     coverPhotoUrl: coverPhotoRow[0]?.url ?? null,
+    tags,
   };
 }
 
@@ -61,19 +75,23 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
 
   const collections = await Promise.all(
     rows.map(async (row) => {
-      const coverPhotoRow = await db
-        .select({ url: photosTable.url })
-        .from(photoCollectionsTable)
-        .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
-        .where(eq(photoCollectionsTable.collectionId, row.collection.id))
-        .orderBy(sql`${photoCollectionsTable.photoId} asc`)
-        .limit(1);
+      const [coverPhotoRow, tags] = await Promise.all([
+        db
+          .select({ url: photosTable.url })
+          .from(photoCollectionsTable)
+          .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
+          .where(eq(photoCollectionsTable.collectionId, row.collection.id))
+          .orderBy(sql`${photoCollectionsTable.photoId} asc`)
+          .limit(1),
+        getCollectionTags(row.collection.id),
+      ]);
 
       return {
         ...row.collection,
         createdAt: row.collection.createdAt.toISOString(),
         photoCount: Number(row.photoCount),
         coverPhotoUrl: coverPhotoRow[0]?.url ?? null,
+        tags,
       };
     })
   );

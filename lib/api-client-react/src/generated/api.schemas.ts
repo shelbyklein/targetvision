@@ -74,12 +74,7 @@ export interface AlbumCoverUpdate {
   photoId: number;
 }
 
-export interface Tag {
-  id: number;
-  name: string;
-}
-
-export interface Category {
+export interface CollectionTag {
   id: number;
   name: string;
 }
@@ -103,17 +98,10 @@ export interface SuggestedCollection {
 
 export interface PhotoRating {
   userId: number;
+  /** @nullable */
+  userName?: string | null;
   score: number;
   createdAt: string;
-}
-
-export interface SuggestedTag {
-  name: string;
-}
-
-export interface SuggestedCategory {
-  id: number;
-  name: string;
 }
 
 export interface Photo {
@@ -135,15 +123,11 @@ export interface Photo {
   ratingCount: number;
   /** @nullable */
   myRating?: number | null;
-  tags?: Tag[];
-  categories?: Category[];
   photoCollections?: CollectionSummary[];
   /** @nullable */
   aiDescription?: string | null;
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
-  suggestedTags?: SuggestedTag[];
-  suggestedCategories?: SuggestedCategory[];
 }
 
 export interface Collection {
@@ -156,6 +140,7 @@ export interface Collection {
   /** @nullable */
   coverPhotoUrl?: string | null;
   createdAt: string;
+  tags?: string[];
   photos?: Photo[];
 }
 
@@ -192,29 +177,9 @@ export interface PhotoUploadInput {
   takenAt?: string;
 }
 
-export interface PhotoTagInput {
+export interface CollectionTagInput {
   /** @minLength 1 */
   tagName: string;
-}
-
-export interface PhotoCategoryInput {
-  categoryId: number;
-}
-
-export interface TagInput {
-  /** @minLength 1 */
-  name: string;
-}
-
-export interface TagCount {
-  id: number;
-  name: string;
-  count: number;
-}
-
-export interface CategoryInput {
-  /** @minLength 1 */
-  name: string;
 }
 
 export interface RatingInput {
@@ -229,7 +194,7 @@ export interface DashboardStats {
   totalAlbums: number;
   totalPhotos: number;
   totalUsers: number;
-  totalTags: number;
+  totalCollections: number;
   recentActivity: Photo[];
 }
 
@@ -366,8 +331,6 @@ export interface AiAnalysisEvent {
 
 export type SearchPhotosParams = {
   q: string;
-  tag?: string;
-  categoryId?: number;
   ratingMin?: number;
   ratingMax?: number;
   dateFrom?: string;
@@ -376,8 +339,6 @@ export type SearchPhotosParams = {
 };
 
 export type ListPhotosParams = {
-  tag?: string;
-  categoryId?: number;
   ratingMin?: number;
   ratingMax?: number;
   dateFrom?: string;

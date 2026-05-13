@@ -1,64 +1,140 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, tagsTable, categoriesTable } from "@workspace/db";
-import {
-  ListTagsResponse,
-  CreateTagBody,
-  ListCategoriesResponse,
-  CreateCategoryBody,
-  DeleteCategoryParams,
-} from "@workspace/api-zod";
-import { requireAuth, requireAdmin } from "../middlewares/requireAuth";
+import { and, eq } from "drizzle-orm";
+import { db, collectionsTable, tagsTable, collectionTagsTable } from "@workspace/db";
+import { requireAuth } from "../middlewares/requireAuth";
+import { z } from "zod";
 
 const router: IRouter = Router();
 
-router.get("/tags", requireAuth, async (req, res): Promise<void> => {
-  const tags = await db.select().from(tagsTable).orderBy(tagsTable.name);
-  res.json(ListTagsResponse.parse(tags));
-});
+const CollectionTagParams = z.object({ id: z.coerce.number() });
+const AddCollectionTagBody = z.object({ tagName: z.string().min(1).max(50) });
+const RemoveCollectionTagParams = z.object({ id: z.coerce.number(), tagName: z.string().min(1) });
 
-router.post("/tags", requireAuth, async (req, res): Promise<void> => {
-  const body = CreateTagBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: body.error.message });
-    return;
-  }
-
-  const [existing] = await db.select().from(tagsTable).where(eq(tagsTable.name, body.data.name));
-  if (existing) {
-    res.status(201).json(existing);
-    return;
-  }
-
-  const [tag] = await db.insert(tagsTable).values(body.data).returning();
-  res.status(201).json(tag);
-});
-
-router.get("/categories", requireAuth, async (req, res): Promise<void> => {
-  const categories = await db.select().from(categoriesTable).orderBy(categoriesTable.name);
-  res.json(ListCategoriesResponse.parse(categories));
-});
-
-router.post("/categories", requireAdmin, async (req, res): Promise<void> => {
-  const body = CreateCategoryBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: body.error.message });
-    return;
-  }
-
-  const [category] = await db.insert(categoriesTable).values(body.data).returning();
-  res.status(201).json(category);
-});
-
-router.delete("/categories/:id", requireAdmin, async (req, res): Promise<void> => {
+router.get("/collections/:id/tags", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = DeleteCategoryParams.safeParse({ id: parseInt(raw, 10) });
+  const params = CollectionTagParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
 
-  await db.delete(categoriesTable).where(eq(categoriesTable.id, params.data.id));
+  const [collection] = await db
+    .select({ id: collectionsTable.id })
+    .from(collectionsTable)
+    .where(eq(collectionsTable.id, params.data.id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+
+  const rows = await db
+    .select({ name: tagsTable.name })
+    .from(collectionTagsTable)
+    .innerJoin(tagsTable, eq(collectionTagsTable.tagId, tagsTable.id))
+    .where(eq(collectionTagsTable.collectionId, params.data.id))
+    .orderBy(tagsTable.name);
+
+  res.json(rows.map((r) => r.name));
+});
+
+router.post("/collections/:id/tags", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = CollectionTagParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const body = AddCollectionTagBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [collection] = await db
+    .select({ id: collectionsTable.id, createdById: collectionsTable.createdById })
+    .from(collectionsTable)
+    .where(eq(collectionsTable.id, params.data.id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const tagName = body.data.tagName.trim().toLowerCase();
+
+  const [existingTag] = await db
+    .insert(tagsTable)
+    .values({ name: tagName })
+    .onConflictDoNothing()
+    .returning();
+
+  const tag = existingTag ?? (await db
+    .select({ id: tagsTable.id })
+    .from(tagsTable)
+    .where(eq(tagsTable.name, tagName))
+    .then(([r]) => r));
+
+  if (!tag) {
+    res.status(500).json({ error: "Failed to resolve tag" });
+    return;
+  }
+
+  await db
+    .insert(collectionTagsTable)
+    .values({ collectionId: params.data.id, tagId: tag.id })
+    .onConflictDoNothing();
+
+  res.sendStatus(204);
+});
+
+router.delete("/collections/:id/tags/:tagName", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawTagName = Array.isArray(req.params.tagName) ? req.params.tagName[0] : req.params.tagName;
+
+  const params = RemoveCollectionTagParams.safeParse({
+    id: parseInt(rawId, 10),
+    tagName: rawTagName,
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [collection] = await db
+    .select({ id: collectionsTable.id, createdById: collectionsTable.createdById })
+    .from(collectionsTable)
+    .where(eq(collectionsTable.id, params.data.id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [tag] = await db
+    .select({ id: tagsTable.id })
+    .from(tagsTable)
+    .where(eq(tagsTable.name, params.data.tagName));
+
+  if (tag) {
+    await db
+      .delete(collectionTagsTable)
+      .where(
+        and(
+          eq(collectionTagsTable.collectionId, params.data.id),
+          eq(collectionTagsTable.tagId, tag.id),
+        ),
+      );
+  }
+
   res.sendStatus(204);
 });
 
