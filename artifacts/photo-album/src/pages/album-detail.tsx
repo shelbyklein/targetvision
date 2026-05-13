@@ -658,11 +658,6 @@ export default function AlbumDetail() {
                       ))}
                     </div>
                   )}
-                  {photo.uploaderName && (
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      by {photo.uploaderName}
-                    </p>
-                  )}
                 </div>
 
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />

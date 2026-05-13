@@ -56,7 +56,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, User, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw } from "lucide-react";
+import { Star, X, Plus, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -718,12 +718,6 @@ export default function PhotoDetail() {
                 {photo.caption ?? "Untitled Photo"}
               </h1>
               <div className="space-y-1.5 text-sm text-muted-foreground">
-                {photo.uploaderName && (
-                  <div className="flex items-center gap-2">
-                    <User className="h-3.5 w-3.5" />
-                    <span>Uploaded by {photo.uploaderName}</span>
-                  </div>
-                )}
                 {photo.takenAt && (
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-3.5 w-3.5" />

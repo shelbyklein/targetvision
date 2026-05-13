@@ -208,8 +208,7 @@ export default function CollectionDetail() {
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {collection.photoCount} photo{collection.photoCount !== 1 ? "s" : ""}
-                {collection.creatorName && ` · created by ${collection.creatorName}`}
-              </p>
+                              </p>
               {collection.description && (
                 <p className="text-sm text-muted-foreground mt-2 max-w-xl">
                   {collection.description}
@@ -299,11 +298,6 @@ export default function CollectionDetail() {
                     <p className="text-xs font-medium text-foreground truncate">{photo.caption}</p>
                   ) : (
                     <p className="text-xs text-muted-foreground/60 italic truncate">No caption</p>
-                  )}
-                  {photo.uploaderName && (
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      by {photo.uploaderName}
-                    </p>
                   )}
                 </div>
 
