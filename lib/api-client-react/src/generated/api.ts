@@ -19,6 +19,7 @@ import type {
 import type {
   AiAnalysisEvent,
   AiProviderKeyInput,
+  BulkRetryAiAnalysisEventsResult,
   AiSettings,
   AiSettingsUpdate,
   Album,
@@ -2977,6 +2978,90 @@ export const useRetryAiAnalysisEvent = <
   TContext
 > => {
   return useMutation(getRetryAiAnalysisEventMutationOptions(options));
+};
+
+/**
+ * @summary Bulk retry all failed AI analysis events (admin only)
+ */
+export const getBulkRetryAiAnalysisEventsUrl = () => {
+  return `/api/admin/ai-analysis-events/retry-all`;
+};
+
+export const bulkRetryAiAnalysisEvents = async (
+  options?: RequestInit,
+): Promise<BulkRetryAiAnalysisEventsResult> => {
+  return customFetch<BulkRetryAiAnalysisEventsResult>(
+    getBulkRetryAiAnalysisEventsUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getBulkRetryAiAnalysisEventsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkRetryAiAnalysisEvents>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkRetryAiAnalysisEvents>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["bulkRetryAiAnalysisEvents"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkRetryAiAnalysisEvents>>,
+    void
+  > = () => {
+    return bulkRetryAiAnalysisEvents(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkRetryAiAnalysisEventsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkRetryAiAnalysisEvents>>
+>;
+
+export type BulkRetryAiAnalysisEventsMutationError = ErrorType<void>;
+
+/**
+ * @summary Bulk retry all failed AI analysis events (admin only)
+ */
+export const useBulkRetryAiAnalysisEvents = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkRetryAiAnalysisEvents>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkRetryAiAnalysisEvents>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getBulkRetryAiAnalysisEventsMutationOptions(options));
 };
 
 /**

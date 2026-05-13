@@ -19,6 +19,7 @@ import {
   ListAiAnalysisEventsResponse,
   RetryAiAnalysisEventParams,
   RetryAiAnalysisEventResponse,
+  BulkRetryAiAnalysisEventsResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -209,6 +210,47 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
     ),
   );
 });
+
+router.post(
+  "/admin/ai-analysis-events/retry-all",
+  requireAdmin,
+  async (_req, res): Promise<void> => {
+    const recentEvents = await db
+      .select({
+        id: aiAnalysisEventsTable.id,
+        photoId: aiAnalysisEventsTable.photoId,
+        status: aiAnalysisEventsTable.status,
+      })
+      .from(aiAnalysisEventsTable)
+      .orderBy(desc(aiAnalysisEventsTable.createdAt))
+      .limit(20);
+
+    const failedPhotoIds = Array.from(
+      new Set(
+        recentEvents
+          .filter((e) => e.status === "failed" && e.photoId != null)
+          .map((e) => e.photoId as number),
+      ),
+    );
+
+    let succeeded = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const photoId of failedPhotoIds) {
+      const newEvent = await runAndRecordPhotoAnalysis(photoId);
+      if (!newEvent || newEvent.status === "failed") {
+        failed++;
+      } else if (newEvent.status === "skipped") {
+        skipped++;
+      } else {
+        succeeded++;
+      }
+    }
+
+    res.json(BulkRetryAiAnalysisEventsResponse.parse({ succeeded, skipped, failed }));
+  },
+);
 
 router.post(
   "/admin/ai-analysis-events/:id/retry",

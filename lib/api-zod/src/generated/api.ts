@@ -1595,6 +1595,15 @@ export const RetryAiAnalysisEventResponse = zod.object({
 });
 
 /**
+ * @summary Bulk retry all failed AI analysis events (admin only)
+ */
+export const BulkRetryAiAnalysisEventsResponse = zod.object({
+  succeeded: zod.number(),
+  skipped: zod.number(),
+  failed: zod.number(),
+});
+
+/**
  * @summary Get dashboard summary statistics
  */
 export const GetDashboardStatsResponse = zod.object({

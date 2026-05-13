@@ -377,6 +377,12 @@ export type SearchPhotosParams = {
   uploaderId?: number;
 };
 
+export interface BulkRetryAiAnalysisEventsResult {
+  succeeded: number;
+  skipped: number;
+  failed: number;
+}
+
 export type ListPhotosParams = {
   tag?: string;
   categoryId?: number;

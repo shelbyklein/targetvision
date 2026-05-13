@@ -6,6 +6,7 @@ import {
   useClearAiProviderKey,
   useListAiAnalysisEvents,
   useRetryAiAnalysisEvent,
+  useBulkRetryAiAnalysisEvents,
   getGetAiSettingsQueryKey,
   getListAiAnalysisEventsQueryKey,
   type AiSettings,
@@ -207,7 +208,13 @@ function RecentActivityPanel() {
   });
   const { mutate: retry, isPending: retrying, variables: retryingVars } =
     useRetryAiAnalysisEvent();
+  const { mutate: bulkRetry, isPending: bulkRetrying } =
+    useBulkRetryAiAnalysisEvents();
   const retryingId = retrying ? retryingVars?.id : null;
+
+  const failedCount = events
+    ? events.filter((e) => e.status === "failed" && e.photoId != null).length
+    : 0;
 
   function handleRetry(id: number) {
     retry(
@@ -230,6 +237,32 @@ function RecentActivityPanel() {
     );
   }
 
+  function handleBulkRetry() {
+    bulkRetry(undefined, {
+      onSuccess: (result) => {
+        qc.invalidateQueries({ queryKey: getListAiAnalysisEventsQueryKey() });
+        const parts: string[] = [];
+        if (result.succeeded > 0)
+          parts.push(`${result.succeeded} succeeded`);
+        if (result.skipped > 0)
+          parts.push(`${result.skipped} skipped`);
+        if (result.failed > 0)
+          parts.push(`${result.failed} failed`);
+        const total = result.succeeded + result.skipped + result.failed;
+        toast({
+          title:
+            total === 0
+              ? "No failed photos to retry"
+              : result.failed === 0
+                ? "All retries succeeded"
+                : `Retries complete: ${parts.join(", ")}`,
+        });
+      },
+      onError: () =>
+        toast({ title: "Bulk retry failed", variant: "destructive" }),
+    });
+  }
+
   return (
     <div
       className="rounded-lg border border-border bg-background/30 overflow-hidden"
@@ -243,6 +276,20 @@ function RecentActivityPanel() {
             Last 20 photo analysis attempts. Use this to spot key or quota issues.
           </p>
         </div>
+        {failedCount > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 px-3 text-xs shrink-0"
+            onClick={handleBulkRetry}
+            disabled={bulkRetrying || retrying}
+            data-testid="ai-activity-retry-all"
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            {bulkRetrying ? "Retrying all…" : `Retry all failed (${failedCount})`}
+          </Button>
+        )}
       </div>
       <div className="p-3">
         {isLoading ? (
