@@ -388,7 +388,7 @@ export default function PhotoDetail() {
     );
   }
 
-  function deriveFilename(url: string, caption?: string | null, fallbackId?: number): string {
+  function deriveFilename(url: string, name?: string | null, fallbackId?: number): string {
     let extension = "jpg";
     let urlBase = "";
     try {
@@ -406,18 +406,18 @@ export default function PhotoDetail() {
       // ignore
     }
 
-    function sanitize(name: string): string {
-      return name
+    function sanitize(n: string): string {
+      return n
         .trim()
         .replace(/[^a-zA-Z0-9-_ ]+/g, "")
         .replace(/\s+/g, "-")
         .slice(0, 80);
     }
 
-    const captionBase = caption ? sanitize(caption) : "";
+    const nameBase = name ? sanitize(name) : "";
     const cleanedUrlBase = urlBase ? sanitize(urlBase) : "";
     const base =
-      captionBase || cleanedUrlBase || `photo-${fallbackId ?? "image"}`;
+      nameBase || cleanedUrlBase || `photo-${fallbackId ?? "image"}`;
     return `${base}.${extension}`;
   }
 
@@ -433,7 +433,7 @@ export default function PhotoDetail() {
 
   async function handleDownload() {
     if (!photo) return;
-    const filename = deriveFilename(photo.url, photo.caption, photo.id);
+    const filename = deriveFilename(photo.url, photo.name, photo.id);
     setDownloading(true);
     try {
       let isSameOrigin = true;
@@ -692,7 +692,7 @@ export default function PhotoDetail() {
             <div className="rounded-xl overflow-hidden bg-muted aspect-[4/3]">
               <img
                 src={photo.url}
-                alt="Photo"
+                alt={photo.name ?? "Photo"}
                 className="h-full w-full object-contain bg-black"
                 data-testid="photo-image"
               />
@@ -775,13 +775,18 @@ export default function PhotoDetail() {
           </div>
 
           <div className="space-y-6">
-            <div className="space-y-1.5 text-sm text-muted-foreground">
-              {photo.takenAt && (
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  <span>{new Date(photo.takenAt).toLocaleDateString()}</span>
-                </div>
-              )}
+            <div className="space-y-3">
+              <h1 className="text-lg font-semibold text-foreground" data-testid="photo-title">
+                {photo.name ?? "Untitled Photo"}
+              </h1>
+              <div className="space-y-1.5 text-sm text-muted-foreground">
+                {photo.takenAt && (
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    <span>{new Date(photo.takenAt).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {photo.ratingCount > 0 && (

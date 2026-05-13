@@ -76,7 +76,6 @@ type SortOption = "newest" | "oldest" | "top-rated";
 interface FileItem {
   file: File;
   preview: string;
-  caption: string;
   status: "pending" | "uploading" | "done" | "error";
   progress: number;
 }
@@ -97,7 +96,6 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
     const newItems: FileItem[] = selected.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
-      caption: "",
       status: "pending",
       progress: 0,
     }));
@@ -110,12 +108,6 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
       URL.revokeObjectURL(prev[index].preview);
       return prev.filter((_, i) => i !== index);
     });
-  }
-
-  function updateCaption(index: number, caption: string) {
-    setFiles((prev) =>
-      prev.map((f, i) => (i === index ? { ...f, caption } : f))
-    );
   }
 
   function handleClose(nextOpen: boolean) {
@@ -157,7 +149,6 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
             data: {
               url: `/api/storage${result.objectPath}`,
               storageKey: result.objectPath,
-              caption: item.caption.trim() || undefined,
             },
           });
 
@@ -260,14 +251,6 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
 
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <p className="text-xs text-muted-foreground truncate">{item.file.name}</p>
-                    <Input
-                      value={item.caption}
-                      onChange={(e) => updateCaption(index, e.target.value)}
-                      placeholder="Caption (optional)"
-                      className="h-7 text-xs"
-                      disabled={item.status !== "pending" || isSubmitting}
-                      data-testid="photo-caption-input"
-                    />
                     {item.status === "uploading" && (
                       <Progress value={item.progress} className="h-1" />
                     )}
@@ -583,7 +566,7 @@ export default function AlbumDetail() {
                   <div className="aspect-[4/3] overflow-hidden">
                     <img
                       src={photo.url}
-                      alt="Photo"
+                      alt={photo.name ?? "Photo"}
                       className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
                   </div>

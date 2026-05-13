@@ -287,19 +287,11 @@ export default function CollectionDetail() {
                   <div className="aspect-[4/3] overflow-hidden">
                     <img
                       src={photo.url}
-                      alt={photo.caption ?? "Photo"}
+                      alt={photo.name ?? "Photo"}
                       className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
                   </div>
                 </Link>
-
-                <div className="p-2 space-y-0.5">
-                  {photo.caption ? (
-                    <p className="text-xs font-medium text-foreground truncate">{photo.caption}</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground/60 italic truncate">No caption</p>
-                  )}
-                </div>
 
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
 

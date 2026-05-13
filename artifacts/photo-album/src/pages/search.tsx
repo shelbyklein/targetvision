@@ -148,7 +148,7 @@ export default function SearchPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Search Photos</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Search across photo captions, album titles, tags, and uploaders.
+            Search across album titles, tags, and uploaders.
           </p>
         </div>
 
@@ -426,8 +426,7 @@ export default function SearchPage() {
               Search your photo library
             </h3>
             <p className="text-sm text-muted-foreground max-w-sm">
-              Enter a keyword to search across photo captions, album titles, tags, and uploader
-              names.
+              Enter a keyword to search across album titles, tags, and uploader names.
             </p>
           </div>
         )}
@@ -482,7 +481,7 @@ export default function SearchPage() {
                     <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
                       <img
                         src={photo.url}
-                        alt="Photo"
+                        alt={photo.name ?? "Photo"}
                         className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
