@@ -1,0 +1,128 @@
+import sharp from "sharp";
+import { randomUUID } from "crypto";
+import { objectStorageClient } from "./objectStorage";
+import { db, photosTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { logger } from "./logger";
+
+const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+const THUMBNAIL_WIDTH = 600;
+
+function parseObjectPath(path: string): { bucketName: string; objectName: string } {
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+  const parts = path.split("/");
+  if (parts.length < 3) {
+    throw new Error("Invalid path: must contain at least a bucket name");
+  }
+  return {
+    bucketName: parts[1],
+    objectName: parts.slice(2).join("/"),
+  };
+}
+
+async function signObjectURL({
+  bucketName,
+  objectName,
+  method,
+  ttlSec,
+}: {
+  bucketName: string;
+  objectName: string;
+  method: "GET" | "PUT" | "DELETE" | "HEAD";
+  ttlSec: number;
+}): Promise<string> {
+  const request = {
+    bucket_name: bucketName,
+    object_name: objectName,
+    method,
+    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
+  };
+  const response = await fetch(`${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to sign object URL, status: ${response.status}`);
+  }
+  const { signed_url: signedURL } = (await response.json()) as { signed_url: string };
+  return signedURL;
+}
+
+function getPrivateObjectDir(): string {
+  const dir = process.env.PRIVATE_OBJECT_DIR || "";
+  if (!dir) {
+    throw new Error("PRIVATE_OBJECT_DIR not set");
+  }
+  return dir;
+}
+
+export async function generateAndStoreThumbnail(photoId: number, storageKey: string): Promise<void> {
+  try {
+    if (!storageKey.startsWith("/objects/")) {
+      logger.warn({ photoId, storageKey }, "Cannot generate thumbnail: unexpected storageKey format");
+      return;
+    }
+
+    const privateObjectDir = getPrivateObjectDir();
+    const entityId = storageKey.slice("/objects/".length);
+    let entityDir = privateObjectDir;
+    if (!entityDir.endsWith("/")) {
+      entityDir = `${entityDir}/`;
+    }
+    const objectEntityPath = `${entityDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectEntityPath);
+
+    const bucket = objectStorageClient.bucket(bucketName);
+    const sourceFile = bucket.file(objectName);
+
+    const [exists] = await sourceFile.exists();
+    if (!exists) {
+      logger.warn({ photoId, storageKey }, "Source file not found, skipping thumbnail generation");
+      return;
+    }
+
+    const [sourceBuffer] = await sourceFile.download();
+
+    const thumbnailBuffer = await sharp(sourceBuffer)
+      .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
+      .jpeg({ quality: 80, progressive: true })
+      .toBuffer();
+
+    const thumbnailId = randomUUID();
+    const thumbnailPath = `${entityDir}thumbnails/${thumbnailId}`;
+    const { bucketName: thumbBucket, objectName: thumbObject } = parseObjectPath(thumbnailPath);
+
+    const uploadURL = await signObjectURL({
+      bucketName: thumbBucket,
+      objectName: thumbObject,
+      method: "PUT",
+      ttlSec: 900,
+    });
+
+    const uploadResponse = await fetch(uploadURL, {
+      method: "PUT",
+      headers: { "Content-Type": "image/jpeg" },
+      body: thumbnailBuffer,
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Thumbnail upload failed with status ${uploadResponse.status}`);
+    }
+
+    const thumbnailKey = `/objects/thumbnails/${thumbnailId}`;
+
+    await db
+      .update(photosTable)
+      .set({ thumbnailKey })
+      .where(eq(photosTable.id, photoId));
+
+    logger.info({ photoId, thumbnailKey }, "Thumbnail generated and stored");
+  } catch (err) {
+    logger.error({ err, photoId, storageKey }, "Thumbnail generation failed");
+  }
+}

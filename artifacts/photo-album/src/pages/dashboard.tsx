@@ -54,7 +54,7 @@ function PhotoStrip({ photos, loading }: { photos?: { id: number; url: string; n
       {photos.map((photo) => (
         <Link key={photo.id} href={`/photos/${photo.id}`}>
           <div className="relative h-40 w-40 shrink-0 rounded-lg overflow-hidden group cursor-pointer" data-testid="photo-strip-item">
-            <img src={photo.url} alt={photo.name ?? "Photo"} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
+            <img src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url} alt={photo.name ?? "Photo"} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
               {photo.averageRating != null && (
                 <div className="flex items-center gap-0.5 ml-auto">

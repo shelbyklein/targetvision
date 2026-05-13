@@ -10,6 +10,7 @@ export const photosTable = pgTable("photos", {
   albumId: integer("album_id").notNull().references(() => albumsTable.id, { onDelete: "cascade" }),
   uploaderId: integer("uploader_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   storageKey: text("storage_key"),
+  thumbnailKey: text("thumbnail_key"),
   url: text("url").notNull(),
   aiDescription: text("ai_description"),
   takenAt: timestamp("taken_at", { withTimezone: true }),

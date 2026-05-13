@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
+import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { logger } from "../lib/logger";
 import {
   ListAlbumPhotosParams,
@@ -72,6 +73,12 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
   void runAndRecordPhotoAnalysis(photo.id).catch((err) => {
     logger.error({ err, photoId: photo.id }, "Background AI analysis failed");
   });
+
+  if (photo.storageKey) {
+    void generateAndStoreThumbnail(photo.id, photo.storageKey).catch((err) => {
+      logger.error({ err, photoId: photo.id }, "Background thumbnail generation failed");
+    });
+  }
 
   const full = await buildPhotoResponse(photo.id, req.dbUser?.id);
   res.status(201).json(GetPhotoResponse.parse(full));

@@ -332,7 +332,7 @@ export default function PhotosPage() {
                   <Link key={photo.id} href={`/photos/${photo.id}`} data-testid="photo-grid-item">
                     <div className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer">
                       <img
-                        src={photo.url}
+                        src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
                         className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                         loading="lazy"
