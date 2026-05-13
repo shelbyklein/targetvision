@@ -424,10 +424,13 @@ router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requi
     return;
   }
 
+  const bodyName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const collectionTitle = bodyName || suggestion.suggestedName;
+
   const [newCollection] = await db
     .insert(collectionsTable)
     .values({
-      title: suggestion.suggestedName,
+      title: collectionTitle,
       createdById: photoExists.uploaderId,
     })
     .returning();

@@ -332,6 +332,11 @@ export default function AlbumDetail() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [sort, setSort] = useState<SortOption>("newest");
+  const [confirmNewCollection, setConfirmNewCollection] = useState<{
+    photoId: number;
+    suggestionId: number;
+    name: string;
+  } | null>(null);
 
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
@@ -359,7 +364,7 @@ export default function AlbumDetail() {
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
-  const { mutate: acceptNewCollectionSuggestion } = useAcceptPhotoNewCollectionSuggestion();
+  const { mutate: acceptNewCollectionSuggestion, isPending: acceptingNewCollection } = useAcceptPhotoNewCollectionSuggestion();
   const { mutate: dismissNewCollectionSuggestion } = useDismissPhotoNewCollectionSuggestion();
 
   function handleAcceptSuggestion(photoId: number, collectionId: number) {
@@ -382,11 +387,14 @@ export default function AlbumDetail() {
     );
   }
 
-  function handleAcceptNewCollectionSuggestion(photoId: number, suggestionId: number) {
+  function handleAcceptNewCollectionSuggestion(photoId: number, suggestionId: number, name: string) {
     acceptNewCollectionSuggestion(
-      { id: photoId, suggestionId },
+      { id: photoId, suggestionId, name },
       {
-        onSuccess: invalidate,
+        onSuccess: () => {
+          setConfirmNewCollection(null);
+          invalidate();
+        },
         onError: () => toast({ title: "Failed to create collection", variant: "destructive" }),
       },
     );
@@ -681,7 +689,7 @@ export default function AlbumDetail() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleAcceptNewCollectionSuggestion(photo.id, s.id);
+                              setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
                             }}
                             className="rounded-full p-0.5 hover:bg-emerald-200/60 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-400"
                             aria-label={`Accept new collection suggestion ${s.suggestedName}`}
@@ -769,6 +777,64 @@ export default function AlbumDetail() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={confirmNewCollection !== null}
+        onOpenChange={(open) => { if (!open) setConfirmNewCollection(null); }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Create new collection</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Edit the name before creating this collection.
+          </p>
+          <Input
+            value={confirmNewCollection?.name ?? ""}
+            onChange={(e) =>
+              setConfirmNewCollection((prev) =>
+                prev ? { ...prev, name: e.target.value } : prev
+              )
+            }
+            placeholder="Collection name"
+            data-testid="confirm-new-collection-name-input"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && confirmNewCollection?.name.trim()) {
+                handleAcceptNewCollectionSuggestion(
+                  confirmNewCollection.photoId,
+                  confirmNewCollection.suggestionId,
+                  confirmNewCollection.name.trim(),
+                );
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmNewCollection(null)}
+              disabled={acceptingNewCollection}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirmNewCollection?.name.trim()) {
+                  handleAcceptNewCollectionSuggestion(
+                    confirmNewCollection.photoId,
+                    confirmNewCollection.suggestionId,
+                    confirmNewCollection.name.trim(),
+                  );
+                }
+              }}
+              disabled={acceptingNewCollection || !confirmNewCollection?.name.trim()}
+              data-testid="confirm-new-collection-btn"
+            >
+              {acceptingNewCollection ? "Creating…" : "Create collection"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

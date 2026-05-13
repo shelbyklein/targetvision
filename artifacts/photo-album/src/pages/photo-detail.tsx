@@ -49,6 +49,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -188,7 +194,7 @@ export default function PhotoDetail() {
   const { mutate: removeFromCollection } = useRemovePhotoFromCollection();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
-  const { mutate: acceptNewCollectionSuggestion } = useAcceptPhotoNewCollectionSuggestion();
+  const { mutate: acceptNewCollectionSuggestion, isPending: acceptingNewCollection } = useAcceptPhotoNewCollectionSuggestion();
   const { mutate: dismissNewCollectionSuggestion } = useDismissPhotoNewCollectionSuggestion();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { mutate: rerunAnalysis, isPending: rerunning } = useRerunPhotoAnalysis();
@@ -198,6 +204,10 @@ export default function PhotoDetail() {
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
+  const [confirmNewCollection, setConfirmNewCollection] = useState<{
+    suggestionId: number;
+    name: string;
+  } | null>(null);
 
   const { data: albumPhotos } = useListAlbumPhotos(photo?.albumId ?? 0, {
     query: { enabled: !!photo?.albumId },
@@ -257,11 +267,12 @@ export default function PhotoDetail() {
     );
   }
 
-  function handleAcceptNewCollectionSuggestion(suggestionId: number) {
+  function handleAcceptNewCollectionSuggestion(suggestionId: number, name: string) {
     acceptNewCollectionSuggestion(
-      { id: photoId, suggestionId },
+      { id: photoId, suggestionId, name },
       {
         onSuccess: () => {
+          setConfirmNewCollection(null);
           invalidate();
           qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
           toast({ title: "Collection created and photo added" });
@@ -683,7 +694,7 @@ export default function PhotoDetail() {
                         <Sparkles className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                         <span className="text-foreground">{s.suggestedName}</span>
                         <button
-                          onClick={() => handleAcceptNewCollectionSuggestion(s.id)}
+                          onClick={() => setConfirmNewCollection({ suggestionId: s.id, name: s.suggestedName })}
                           className="rounded-full p-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
                           aria-label="Create collection and add photo"
                           title="Create this collection and add photo"
@@ -876,6 +887,61 @@ export default function PhotoDetail() {
           </div>
         </div>
       </div>
+      <Dialog
+        open={confirmNewCollection !== null}
+        onOpenChange={(open) => { if (!open) setConfirmNewCollection(null); }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Create new collection</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Edit the name before creating this collection.
+          </p>
+          <Input
+            value={confirmNewCollection?.name ?? ""}
+            onChange={(e) =>
+              setConfirmNewCollection((prev) =>
+                prev ? { ...prev, name: e.target.value } : prev
+              )
+            }
+            placeholder="Collection name"
+            data-testid="confirm-new-collection-name-input"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && confirmNewCollection?.name.trim()) {
+                handleAcceptNewCollectionSuggestion(
+                  confirmNewCollection.suggestionId,
+                  confirmNewCollection.name.trim(),
+                );
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmNewCollection(null)}
+              disabled={acceptingNewCollection}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirmNewCollection?.name.trim()) {
+                  handleAcceptNewCollectionSuggestion(
+                    confirmNewCollection.suggestionId,
+                    confirmNewCollection.name.trim(),
+                  );
+                }
+              }}
+              disabled={acceptingNewCollection || !confirmNewCollection?.name.trim()}
+              data-testid="confirm-new-collection-btn"
+            >
+              {acceptingNewCollection ? "Creating…" : "Create collection"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

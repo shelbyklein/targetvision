@@ -3410,11 +3410,14 @@ export const getAcceptPhotoNewCollectionSuggestionUrl = (
 export const acceptPhotoNewCollectionSuggestion = async (
   id: number,
   suggestionId: number,
+  name?: string,
   options?: RequestInit,
 ): Promise<Photo> => {
   return customFetch<Photo>(getAcceptPhotoNewCollectionSuggestionUrl(id, suggestionId), {
     ...options,
     method: "POST",
+    headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) },
+    body: JSON.stringify({ name: name ?? "" }),
   });
 };
 
@@ -3425,14 +3428,14 @@ export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
     TError,
-    { id: number; suggestionId: number },
+    { id: number; suggestionId: number; name?: string },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
   TError,
-  { id: number; suggestionId: number },
+  { id: number; suggestionId: number; name?: string },
   TContext
 > => {
   const mutationKey = ["acceptPhotoNewCollectionSuggestion"];
@@ -3446,10 +3449,10 @@ export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
-    { id: number; suggestionId: number }
+    { id: number; suggestionId: number; name?: string }
   > = (props) => {
-    const { id, suggestionId } = props ?? {};
-    return acceptPhotoNewCollectionSuggestion(id, suggestionId, requestOptions);
+    const { id, suggestionId, name } = props ?? {};
+    return acceptPhotoNewCollectionSuggestion(id, suggestionId, name, requestOptions as RequestInit | undefined);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -3467,14 +3470,14 @@ export const useAcceptPhotoNewCollectionSuggestion = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
     TError,
-    { id: number; suggestionId: number },
+    { id: number; suggestionId: number; name?: string },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>,
   TError,
-  { id: number; suggestionId: number },
+  { id: number; suggestionId: number; name?: string },
   TContext
 > => {
   return useMutation(getAcceptPhotoNewCollectionSuggestionMutationOptions(options));
