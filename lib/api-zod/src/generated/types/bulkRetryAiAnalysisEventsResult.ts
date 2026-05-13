@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface PhotoRating {
-  userId: number;
-  score: number;
-  createdAt: Date;
+export interface BulkRetryAiAnalysisEventsResult {
+  succeeded: number;
+  skipped: number;
+  failed: number;
 }

@@ -837,6 +837,23 @@ paths:
         "403":
           description: Forbidden
 
+  /admin/ai-analysis-events/retry-all:
+    post:
+      operationId: bulkRetryAiAnalysisEvents
+      tags: [admin]
+      summary: Re-run AI analysis for all recently failed events (admin only)
+      responses:
+        "200":
+          description: Bulk retry result summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkRetryAiAnalysisEventsResult"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
   /admin/ai-analysis-events/{id}/retry:
     post:
       operationId: retryAiAnalysisEvent
@@ -1462,8 +1479,6 @@ components:
       properties:
         userId:
           type: integer
-        userName:
-          type: ["string", "null"]
         score:
           type: integer
         createdAt:
@@ -1786,6 +1801,17 @@ components:
         apiKey:
           type: string
           minLength: 4
+
+    BulkRetryAiAnalysisEventsResult:
+      type: object
+      required: [succeeded, skipped, failed]
+      properties:
+        succeeded:
+          type: integer
+        skipped:
+          type: integer
+        failed:
+          type: integer
 
     AiAnalysisEvent:
       type: object

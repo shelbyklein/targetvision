@@ -202,7 +202,6 @@ export const GetAlbumTopRatedResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -312,7 +311,6 @@ export const ListAlbumPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -419,7 +417,6 @@ export const SearchPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -511,7 +508,6 @@ export const ListPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -597,7 +593,6 @@ export const GetPhotoResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -688,7 +683,6 @@ export const UpdatePhotoResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -784,7 +778,6 @@ export const AddPhotoTagResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -870,7 +863,6 @@ export const RemovePhotoTagResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -959,7 +951,6 @@ export const AddPhotoCategoryResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1045,7 +1036,6 @@ export const RemovePhotoCategoryResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1136,7 +1126,6 @@ export const RatePhotoResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1221,7 +1210,6 @@ export const ClearPhotoRatingResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1553,6 +1541,15 @@ export const ListAiAnalysisEventsResponse = zod.array(
 );
 
 /**
+ * @summary Re-run AI analysis for all recently failed events (admin only)
+ */
+export const BulkRetryAiAnalysisEventsResponse = zod.object({
+  succeeded: zod.number(),
+  skipped: zod.number(),
+  failed: zod.number(),
+});
+
+/**
  * @summary Re-run AI analysis for the photo of a failed event (admin only)
  */
 export const RetryAiAnalysisEventParams = zod.object({
@@ -1568,15 +1565,6 @@ export const RetryAiAnalysisEventResponse = zod.object({
   status: zod.enum(["success", "skipped", "failed"]),
   errorMessage: zod.string().nullish(),
   createdAt: zod.coerce.date(),
-});
-
-/**
- * @summary Bulk retry all failed AI analysis events (admin only)
- */
-export const BulkRetryAiAnalysisEventsResponse = zod.object({
-  succeeded: zod.number(),
-  skipped: zod.number(),
-  failed: zod.number(),
 });
 
 /**
@@ -1643,7 +1631,6 @@ export const GetDashboardStatsResponse = zod.object({
         .array(
           zod.object({
             userId: zod.number(),
-            userName: zod.string().nullish(),
             score: zod.number(),
             createdAt: zod.coerce.date(),
           }),
@@ -1726,7 +1713,6 @@ export const GetRecentPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1808,7 +1794,6 @@ export const GetTopRatedPhotosResponseItem = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1964,7 +1949,6 @@ export const GetCollectionResponse = zod.object({
           .array(
             zod.object({
               userId: zod.number(),
-              userName: zod.string().nullish(),
               score: zod.number(),
               createdAt: zod.coerce.date(),
             }),
@@ -2067,7 +2051,6 @@ export const UpdateCollectionResponse = zod.object({
           .array(
             zod.object({
               userId: zod.number(),
-              userName: zod.string().nullish(),
               score: zod.number(),
               createdAt: zod.coerce.date(),
             }),
@@ -2182,7 +2165,6 @@ export const AcceptPhotoSuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2268,7 +2250,6 @@ export const DismissPhotoSuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2354,7 +2335,6 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2440,7 +2420,6 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2526,7 +2505,6 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2612,7 +2590,6 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
     .array(
       zod.object({
         userId: zod.number(),
-        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),

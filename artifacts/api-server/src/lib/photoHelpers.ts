@@ -1,4 +1,4 @@
-import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, usersTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable } from "@workspace/db";
+import { db, photosTable, tagsTable, photoTagsTable, categoriesTable, photoCategoriesTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoTagSuggestionsTable, photoCategorySuggestionsTable } from "@workspace/db";
 import { eq, and, avg, count, sql } from "drizzle-orm";
 
 export async function buildPhotoResponse(photoId: number, currentUserId?: number) {
@@ -45,12 +45,10 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     db
       .select({
         userId: ratingsTable.userId,
-        userName: usersTable.name,
         score: ratingsTable.score,
         createdAt: ratingsTable.createdAt,
       })
       .from(ratingsTable)
-      .leftJoin(usersTable, eq(ratingsTable.userId, usersTable.id))
       .where(eq(ratingsTable.photoId, photoId))
       .orderBy(ratingsTable.createdAt),
     db
@@ -117,7 +115,6 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     myRating,
     ratings: ratingsList.map((r) => ({
       userId: r.userId,
-      userName: r.userName ?? null,
       score: r.score,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     })),

@@ -103,8 +103,6 @@ export interface SuggestedCollection {
 
 export interface PhotoRating {
   userId: number;
-  /** @nullable */
-  userName?: string | null;
   score: number;
   createdAt: string;
 }
@@ -335,6 +333,12 @@ export interface AiProviderKeyInput {
   apiKey: string;
 }
 
+export interface BulkRetryAiAnalysisEventsResult {
+  succeeded: number;
+  skipped: number;
+  failed: number;
+}
+
 export type AiAnalysisEventStatus =
   (typeof AiAnalysisEventStatus)[keyof typeof AiAnalysisEventStatus];
 
@@ -370,12 +374,6 @@ export type SearchPhotosParams = {
   dateTo?: string;
   uploaderId?: number;
 };
-
-export interface BulkRetryAiAnalysisEventsResult {
-  succeeded: number;
-  skipped: number;
-  failed: number;
-}
 
 export type ListPhotosParams = {
   tag?: string;

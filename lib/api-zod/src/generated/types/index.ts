@@ -22,6 +22,7 @@ export * from "./album";
 export * from "./albumCoverUpdate";
 export * from "./albumInput";
 export * from "./albumUpdate";
+export * from "./bulkRetryAiAnalysisEventsResult";
 export * from "./category";
 export * from "./categoryInput";
 export * from "./collection";
