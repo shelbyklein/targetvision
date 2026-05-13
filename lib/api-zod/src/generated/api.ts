@@ -348,6 +348,9 @@ export const SearchPhotosResponse = zod.array(SearchPhotosResponseItem);
  * @summary List all photos with optional filters
  */
 export const ListPhotosQueryParams = zod.object({
+  search: zod.string().optional(),
+  tag: zod.string().optional(),
+  categoryId: zod.coerce.number().optional(),
   ratingMin: zod.coerce.number().optional(),
   ratingMax: zod.coerce.number().optional(),
   dateFrom: zod.coerce.string().optional(),

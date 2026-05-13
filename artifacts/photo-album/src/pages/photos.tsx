@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 24;
@@ -25,6 +25,7 @@ const PAGE_SIZE = 24;
 function parseSearch(search: string) {
   const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   return {
+    search: p.get("search") ?? "",
     ratingMin: p.get("ratingMin") ?? "",
     uploaderId: p.get("uploaderId") ?? "",
     dateFrom: p.get("dateFrom") ?? "",
@@ -79,13 +80,19 @@ export default function PhotosPage() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const urlParams = parseSearch(searchString);
-  const { ratingMin, uploaderId, dateFrom, dateTo, page } = urlParams;
+  const { search, ratingMin, uploaderId, dateFrom, dateTo, page } = urlParams;
+  const [inputValue, setInputValue] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    setInputValue(search);
+  }, [search]);
 
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
 
   const apiParams = {
+    ...(search && { search }),
     ...(ratingMin && { ratingMin: parseFloat(ratingMin) }),
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
     ...(dateFrom && { dateFrom }),
@@ -109,6 +116,11 @@ export default function PhotosPage() {
     setLocation(`/photos${buildQs(merged)}`, { replace: true });
   }
 
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    navigate({ search: inputValue.trim(), page: "1" });
+  }
+
   function handleFilterChange(field: string, value: string) {
     navigate({ [field]: value, page: "1" });
   }
@@ -121,6 +133,11 @@ export default function PhotosPage() {
       dateTo: "",
       page: "1",
     });
+  }
+
+  function clearSearch() {
+    setInputValue("");
+    navigate({ search: "", page: "1" });
   }
 
   function goToPage(p: number) {
@@ -156,6 +173,32 @@ export default function PhotosPage() {
             )}
           </Button>
         </div>
+
+        <form onSubmit={handleSearch} className="flex gap-2" data-testid="search-form">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Search photos by caption, album, uploader…"
+              className="pl-9"
+              data-testid="search-input"
+            />
+          </div>
+          <Button type="submit" data-testid="search-submit">Search</Button>
+          {search && (
+            <Button type="button" variant="outline" onClick={clearSearch} data-testid="clear-search">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </form>
+
+        {search && (
+          <p className="text-sm text-muted-foreground" data-testid="search-query-label">
+            Showing results for &ldquo;{search}&rdquo;
+            {hasActiveFilters && " with active filters"}
+          </p>
+        )}
 
         {showFilters && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4" data-testid="filter-panel">

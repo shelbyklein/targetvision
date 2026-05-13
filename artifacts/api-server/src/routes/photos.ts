@@ -104,9 +104,12 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     .orderBy(photosTable.createdAt);
 
   const allIds = allPhotos.map((p) => p.id);
-  const { ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = query.data;
+  const { search, tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = query.data;
 
   const filteredIds = await applyFiltersAndFetchIds(allIds, {
+    search,
+    tag,
+    categoryId,
     ratingMin,
     ratingMax,
     dateFrom,

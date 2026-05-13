@@ -1,10 +1,14 @@
 import { Router, type IRouter } from "express";
-import { and, avg, eq, gte, ilike, lte } from "drizzle-orm";
+import { and, avg, eq, gte, ilike, inArray, lte } from "drizzle-orm";
 import {
   db,
   albumsTable,
   photosTable,
   ratingsTable,
+  usersTable,
+  tagsTable,
+  collectionTagsTable,
+  photoCollectionsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -12,6 +16,9 @@ import { buildPhotoResponse } from "../lib/photoHelpers";
 const router: IRouter = Router();
 
 interface PhotoFilterOptions {
+  search?: string;
+  tag?: string;
+  categoryId?: number;
   ratingMin?: number;
   ratingMax?: number;
   dateFrom?: string;
@@ -24,6 +31,53 @@ async function applyFiltersAndFetchIds(
   filters: PhotoFilterOptions,
 ): Promise<number[]> {
   let ids = baseIds;
+
+  if (filters.search) {
+    const pattern = `%${filters.search}%`;
+    const [byCaption, byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
+      db.select({ id: photosTable.id }).from(photosTable).where(ilike(photosTable.caption, pattern)),
+      db
+        .select({ id: photosTable.id })
+        .from(photosTable)
+        .innerJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
+        .where(ilike(albumsTable.title, pattern)),
+      db
+        .select({ id: photosTable.id })
+        .from(photosTable)
+        .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
+        .where(ilike(usersTable.name, pattern)),
+      db.select({ id: photosTable.id }).from(photosTable).where(ilike(photosTable.aiDescription, pattern)),
+    ]);
+    const searchIds = new Set([
+      ...byCaption.map((r) => r.id),
+      ...byAlbumTitle.map((r) => r.id),
+      ...byUploader.map((r) => r.id),
+      ...byAiDescription.map((r) => r.id),
+    ]);
+    ids = ids.filter((id) => searchIds.has(id));
+  }
+
+  if (filters.tag) {
+    const tagName = filters.tag.trim().toLowerCase();
+    const [tagRow] = await db.select({ id: tagsTable.id }).from(tagsTable).where(eq(tagsTable.name, tagName));
+    if (!tagRow) {
+      return [];
+    }
+    const collectionsWithTag = await db
+      .select({ collectionId: collectionTagsTable.collectionId })
+      .from(collectionTagsTable)
+      .where(eq(collectionTagsTable.tagId, tagRow.id));
+    const collectionIds = collectionsWithTag.map((r) => r.collectionId);
+    if (collectionIds.length === 0) {
+      return [];
+    }
+    const photosInCollections = await db
+      .select({ photoId: photoCollectionsTable.photoId })
+      .from(photoCollectionsTable)
+      .where(inArray(photoCollectionsTable.collectionId, collectionIds));
+    const tagPhotoIds = new Set(photosInCollections.map((r) => r.photoId));
+    ids = ids.filter((id) => tagPhotoIds.has(id));
+  }
 
   if (filters.dateFrom || filters.dateTo) {
     const conditions = [];

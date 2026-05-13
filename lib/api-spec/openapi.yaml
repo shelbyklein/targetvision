@@ -375,6 +375,11 @@ paths:
       tags: [photos]
       summary: List all photos with optional filters
       parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
         - name: tag
           in: query
           required: false
