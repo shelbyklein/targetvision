@@ -4,6 +4,7 @@ export const APP_SETTINGS_SINGLETON_ID = 1;
 
 export const appSettingsTable = pgTable("app_settings", {
   id: integer("id").primaryKey(),
+  registrationEnabled: boolean("registration_enabled").notNull().default(true),
   aiEnabled: boolean("ai_enabled").notNull().default(true),
   activeProvider: text("active_provider").notNull().default("openai"),
 

@@ -8,6 +8,8 @@
 
 export type ListPhotosParams = {
   search?: string;
+  tag?: string;
+  categoryId?: number;
   ratingMin?: number;
   ratingMax?: number;
   dateFrom?: string;

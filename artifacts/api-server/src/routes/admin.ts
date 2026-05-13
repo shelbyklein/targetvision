@@ -8,6 +8,9 @@ import {
   photosTable,
 } from "@workspace/db";
 import {
+  GetRegistrationSettingsResponse,
+  UpdateRegistrationSettingsBody,
+  UpdateRegistrationSettingsResponse,
   GetAiSettingsResponse,
   UpdateAiSettingsBody,
   UpdateAiSettingsResponse,
@@ -33,6 +36,28 @@ import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 
 const router: IRouter = Router();
+
+router.get("/registration-settings", async (_req, res): Promise<void> => {
+  const settings = await loadAppSettings();
+  res.json(GetRegistrationSettingsResponse.parse({ registrationEnabled: settings.registrationEnabled }));
+});
+
+router.patch("/admin/registration-settings", requireAdmin, async (req, res): Promise<void> => {
+  const body = UpdateRegistrationSettingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  await loadAppSettings();
+  const [updated] = await db
+    .update(appSettingsTable)
+    .set({ registrationEnabled: body.data.registrationEnabled, updatedAt: new Date() })
+    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
+    .returning();
+
+  res.json(UpdateRegistrationSettingsResponse.parse({ registrationEnabled: updated.registrationEnabled }));
+});
 
 router.get("/admin/ai-settings", requireAdmin, async (_req, res): Promise<void> => {
   const settings = await loadAppSettings();

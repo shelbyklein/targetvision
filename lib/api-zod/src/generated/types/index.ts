@@ -40,6 +40,8 @@ export * from "./photoTagInput";
 export * from "./photoUpdate";
 export * from "./photoUploadInput";
 export * from "./ratingInput";
+export * from "./registrationSettings";
+export * from "./registrationSettingsUpdate";
 export * from "./searchPhotosParams";
 export * from "./suggestedCategory";
 export * from "./suggestedCollection";

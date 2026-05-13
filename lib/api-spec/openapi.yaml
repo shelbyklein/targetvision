@@ -370,6 +370,16 @@ paths:
           required: false
           schema:
             type: string
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: integer
         - name: ratingMin
           in: query
           required: false
@@ -708,6 +718,43 @@ paths:
       responses:
         "204":
           description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+  /registration-settings:
+    get:
+      operationId: getRegistrationSettings
+      tags: [admin]
+      summary: Get registration settings (public)
+      description: Returns whether public self-registration is currently enabled. No authentication required.
+      responses:
+        "200":
+          description: Current registration settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationSettings"
+
+  /admin/registration-settings:
+    patch:
+      operationId: updateRegistrationSettings
+      tags: [admin]
+      summary: Update registration settings (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationSettingsUpdate"
+      responses:
+        "200":
+          description: Updated registration settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationSettings"
         "401":
           description: Unauthorized
         "403":
@@ -1263,6 +1310,62 @@ paths:
         "404":
           description: Not found
 
+  /photos/{id}/new-collection-suggestions/{suggestionId}/accept:
+    post:
+      operationId: acceptPhotoNewCollectionSuggestion
+      tags: [photos]
+      summary: Accept a suggested new collection for a photo (creates collection and adds photo)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: suggestionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /photos/{id}/new-collection-suggestions/{suggestionId}/dismiss:
+    post:
+      operationId: dismissPhotoNewCollectionSuggestion
+      tags: [photos]
+      summary: Dismiss a suggested new collection for a photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: suggestionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
   /photos/{id}/rerun-analysis:
     post:
       operationId: rerunPhotoAnalysis
@@ -1689,6 +1792,20 @@ components:
           description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
         metadata:
           $ref: '#/components/schemas/UploadUrlRequest'
+
+    RegistrationSettings:
+      type: object
+      required: [registrationEnabled]
+      properties:
+        registrationEnabled:
+          type: boolean
+
+    RegistrationSettingsUpdate:
+      type: object
+      required: [registrationEnabled]
+      properties:
+        registrationEnabled:
+          type: boolean
 
     AiModelOption:
       type: object

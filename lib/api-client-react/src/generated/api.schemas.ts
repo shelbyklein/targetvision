@@ -74,11 +74,6 @@ export interface AlbumCoverUpdate {
   photoId: number;
 }
 
-export interface CollectionTag {
-  id: number;
-  name: string;
-}
-
 export interface CollectionSummary {
   id: number;
   title: string;
@@ -98,15 +93,8 @@ export interface SuggestedCollection {
   title: string;
 }
 
-export interface SuggestedNewCollection {
-  id: number;
-  suggestedName: string;
-}
-
 export interface PhotoRating {
   userId: number;
-  /** @nullable */
-  userName?: string | null;
   score: number;
   createdAt: string;
 }
@@ -132,7 +120,6 @@ export interface Photo {
   /** @nullable */
   aiDescription?: string | null;
   suggestedCollections?: SuggestedCollection[];
-  suggestedNewCollections?: SuggestedNewCollection[];
   ratings?: PhotoRating[];
 }
 
@@ -148,7 +135,6 @@ export interface Collection {
   /** @nullable */
   coverPhotoUrl?: string | null;
   createdAt: string;
-  tags?: string[];
   photos?: Photo[];
 }
 
@@ -178,6 +164,15 @@ export interface PhotoUpdate {
   takenAt?: string | null;
 }
 
+export interface SuggestedTag {
+  name: string;
+}
+
+export interface SuggestedCategory {
+  id: number;
+  name: string;
+}
+
 export interface PhotoUploadInput {
   /** @minLength 1 */
   url: string;
@@ -185,9 +180,39 @@ export interface PhotoUploadInput {
   takenAt?: string;
 }
 
-export interface CollectionTagInput {
+export interface PhotoTagInput {
   /** @minLength 1 */
   tagName: string;
+}
+
+export interface PhotoCategoryInput {
+  categoryId: number;
+}
+
+export interface Tag {
+  id: number;
+  name: string;
+}
+
+export interface TagInput {
+  /** @minLength 1 */
+  name: string;
+}
+
+export interface TagCount {
+  id: number;
+  name: string;
+  count: number;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+}
+
+export interface CategoryInput {
+  /** @minLength 1 */
+  name: string;
 }
 
 export interface RatingInput {
@@ -202,7 +227,7 @@ export interface DashboardStats {
   totalAlbums: number;
   totalPhotos: number;
   totalUsers: number;
-  totalCollections: number;
+  totalTags: number;
   recentActivity: Photo[];
 }
 
@@ -230,6 +255,14 @@ export interface UploadUrlResponse {
   /** Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database. */
   objectPath: string;
   metadata?: UploadUrlRequest;
+}
+
+export interface RegistrationSettings {
+  registrationEnabled: boolean;
+}
+
+export interface RegistrationSettingsUpdate {
+  registrationEnabled: boolean;
 }
 
 export interface AiModelOption {
@@ -347,6 +380,9 @@ export type SearchPhotosParams = {
 };
 
 export type ListPhotosParams = {
+  search?: string;
+  tag?: string;
+  categoryId?: number;
   ratingMin?: number;
   ratingMax?: number;
   dateFrom?: string;

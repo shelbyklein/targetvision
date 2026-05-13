@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { AiServicesSection } from "@/components/admin/AiServicesSection";
+import { RegistrationSection } from "@/components/admin/RegistrationSection";
 
 export default function Admin() {
   const qc = useQueryClient();
@@ -78,6 +79,8 @@ export default function Admin() {
             <p className="text-sm text-muted-foreground">Manage team member roles and AI services.</p>
           </div>
         </div>
+
+        <RegistrationSection />
 
         <AiServicesSection />
 

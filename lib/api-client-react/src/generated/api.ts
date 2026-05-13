@@ -26,21 +26,28 @@ import type {
   AlbumInput,
   AlbumUpdate,
   BulkRetryAiAnalysisEventsResult,
+  Category,
+  CategoryInput,
   Collection,
   CollectionInput,
   CollectionPhotoInput,
   CollectionSummary,
-  CollectionTag,
-  CollectionTagInput,
   CollectionUpdate,
   DashboardStats,
   HealthStatus,
   ListPhotosParams,
   Photo,
+  PhotoCategoryInput,
+  PhotoTagInput,
   PhotoUpdate,
   PhotoUploadInput,
   RatingInput,
+  RegistrationSettings,
+  RegistrationSettingsUpdate,
   SearchPhotosParams,
+  Tag,
+  TagCount,
+  TagInput,
   UploadUrlRequest,
   UploadUrlResponse,
   User,
@@ -1111,7 +1118,7 @@ export const useUploadPhoto = <
 };
 
 /**
- * @summary Search photos by keyword across caption, album title, tags, and uploader name
+ * @summary Search photos by keyword across caption, album title, and AI description
  */
 export const getSearchPhotosUrl = (params: SearchPhotosParams) => {
   const normalizedParams = new URLSearchParams();
@@ -1178,7 +1185,7 @@ export type SearchPhotosQueryResult = NonNullable<
 export type SearchPhotosQueryError = ErrorType<void>;
 
 /**
- * @summary Search photos by keyword across caption, album title, tags, and uploader name
+ * @summary Search photos by keyword across caption, album title, and AI description
  */
 
 export function useSearchPhotos<
@@ -1554,6 +1561,353 @@ export const useDeletePhoto = <
   return useMutation(getDeletePhotoMutationOptions(options));
 };
 
+/**
+ * @summary Add a tag to a photo (creates tag if needed)
+ */
+export const getAddPhotoTagUrl = (id: number) => {
+  return `/api/photos/${id}/tags`;
+};
+
+export const addPhotoTag = async (
+  id: number,
+  photoTagInput: PhotoTagInput,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getAddPhotoTagUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(photoTagInput),
+  });
+};
+
+export const getAddPhotoTagMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPhotoTag>>,
+    TError,
+    { id: number; data: BodyType<PhotoTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addPhotoTag>>,
+  TError,
+  { id: number; data: BodyType<PhotoTagInput> },
+  TContext
+> => {
+  const mutationKey = ["addPhotoTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addPhotoTag>>,
+    { id: number; data: BodyType<PhotoTagInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addPhotoTag(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddPhotoTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addPhotoTag>>
+>;
+export type AddPhotoTagMutationBody = BodyType<PhotoTagInput>;
+export type AddPhotoTagMutationError = ErrorType<void>;
+
+/**
+ * @summary Add a tag to a photo (creates tag if needed)
+ */
+export const useAddPhotoTag = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPhotoTag>>,
+    TError,
+    { id: number; data: BodyType<PhotoTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addPhotoTag>>,
+  TError,
+  { id: number; data: BodyType<PhotoTagInput> },
+  TContext
+> => {
+  return useMutation(getAddPhotoTagMutationOptions(options));
+};
+
+/**
+ * @summary Remove a tag from a photo
+ */
+export const getRemovePhotoTagUrl = (id: number, tagId: number) => {
+  return `/api/photos/${id}/tags/${tagId}`;
+};
+
+export const removePhotoTag = async (
+  id: number,
+  tagId: number,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getRemovePhotoTagUrl(id, tagId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getRemovePhotoTagMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removePhotoTag>>,
+    TError,
+    { id: number; tagId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removePhotoTag>>,
+  TError,
+  { id: number; tagId: number },
+  TContext
+> => {
+  const mutationKey = ["removePhotoTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removePhotoTag>>,
+    { id: number; tagId: number }
+  > = (props) => {
+    const { id, tagId } = props ?? {};
+
+    return removePhotoTag(id, tagId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemovePhotoTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removePhotoTag>>
+>;
+
+export type RemovePhotoTagMutationError = ErrorType<void>;
+
+/**
+ * @summary Remove a tag from a photo
+ */
+export const useRemovePhotoTag = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removePhotoTag>>,
+    TError,
+    { id: number; tagId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removePhotoTag>>,
+  TError,
+  { id: number; tagId: number },
+  TContext
+> => {
+  return useMutation(getRemovePhotoTagMutationOptions(options));
+};
+
+/**
+ * @summary Add a category to a photo
+ */
+export const getAddPhotoCategoryUrl = (id: number) => {
+  return `/api/photos/${id}/categories`;
+};
+
+export const addPhotoCategory = async (
+  id: number,
+  photoCategoryInput: PhotoCategoryInput,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getAddPhotoCategoryUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(photoCategoryInput),
+  });
+};
+
+export const getAddPhotoCategoryMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPhotoCategory>>,
+    TError,
+    { id: number; data: BodyType<PhotoCategoryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addPhotoCategory>>,
+  TError,
+  { id: number; data: BodyType<PhotoCategoryInput> },
+  TContext
+> => {
+  const mutationKey = ["addPhotoCategory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addPhotoCategory>>,
+    { id: number; data: BodyType<PhotoCategoryInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addPhotoCategory(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddPhotoCategoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addPhotoCategory>>
+>;
+export type AddPhotoCategoryMutationBody = BodyType<PhotoCategoryInput>;
+export type AddPhotoCategoryMutationError = ErrorType<void>;
+
+/**
+ * @summary Add a category to a photo
+ */
+export const useAddPhotoCategory = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPhotoCategory>>,
+    TError,
+    { id: number; data: BodyType<PhotoCategoryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addPhotoCategory>>,
+  TError,
+  { id: number; data: BodyType<PhotoCategoryInput> },
+  TContext
+> => {
+  return useMutation(getAddPhotoCategoryMutationOptions(options));
+};
+
+/**
+ * @summary Remove a category from a photo
+ */
+export const getRemovePhotoCategoryUrl = (id: number, categoryId: number) => {
+  return `/api/photos/${id}/categories/${categoryId}`;
+};
+
+export const removePhotoCategory = async (
+  id: number,
+  categoryId: number,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getRemovePhotoCategoryUrl(id, categoryId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getRemovePhotoCategoryMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removePhotoCategory>>,
+    TError,
+    { id: number; categoryId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removePhotoCategory>>,
+  TError,
+  { id: number; categoryId: number },
+  TContext
+> => {
+  const mutationKey = ["removePhotoCategory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removePhotoCategory>>,
+    { id: number; categoryId: number }
+  > = (props) => {
+    const { id, categoryId } = props ?? {};
+
+    return removePhotoCategory(id, categoryId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemovePhotoCategoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removePhotoCategory>>
+>;
+
+export type RemovePhotoCategoryMutationError = ErrorType<void>;
+
+/**
+ * @summary Remove a category from a photo
+ */
+export const useRemovePhotoCategory = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removePhotoCategory>>,
+    TError,
+    { id: number; categoryId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removePhotoCategory>>,
+  TError,
+  { id: number; categoryId: number },
+  TContext
+> => {
+  return useMutation(getRemovePhotoCategoryMutationOptions(options));
+};
+
+/**
+ * @summary Rate a photo (1-5 stars)
+ */
 export const getRatePhotoUrl = (id: number) => {
   return `/api/photos/${id}/rating`;
 };
@@ -1602,13 +1956,16 @@ export const getRatePhotoMutationOptions = <
     { id: number; data: BodyType<RatingInput> }
   > = (props) => {
     const { id, data } = props ?? {};
+
     return ratePhoto(id, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type RatePhotoMutationResult = NonNullable<Awaited<ReturnType<typeof ratePhoto>>>;
+export type RatePhotoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof ratePhoto>>
+>;
 export type RatePhotoMutationBody = BodyType<RatingInput>;
 export type RatePhotoMutationError = ErrorType<void>;
 
@@ -1717,6 +2074,566 @@ export const useClearPhotoRating = <
   TContext
 > => {
   return useMutation(getClearPhotoRatingMutationOptions(options));
+};
+
+/**
+ * @summary List all tags
+ */
+export const getListTagsUrl = () => {
+  return `/api/tags`;
+};
+
+export const listTags = async (options?: RequestInit): Promise<Tag[]> => {
+  return customFetch<Tag[]>(getListTagsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTagsQueryKey = () => {
+  return [`/api/tags`] as const;
+};
+
+export const getListTagsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTags>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTagsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTags>>> = ({
+    signal,
+  }) => listTags({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTags>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTagsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTags>>
+>;
+export type ListTagsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all tags
+ */
+
+export function useListTags<
+  TData = Awaited<ReturnType<typeof listTags>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTagsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new tag
+ */
+export const getCreateTagUrl = () => {
+  return `/api/tags`;
+};
+
+export const createTag = async (
+  tagInput: TagInput,
+  options?: RequestInit,
+): Promise<Tag> => {
+  return customFetch<Tag>(getCreateTagUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(tagInput),
+  });
+};
+
+export const getCreateTagMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTag>>,
+    TError,
+    { data: BodyType<TagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createTag>>,
+  TError,
+  { data: BodyType<TagInput> },
+  TContext
+> => {
+  const mutationKey = ["createTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createTag>>,
+    { data: BodyType<TagInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createTag(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createTag>>
+>;
+export type CreateTagMutationBody = BodyType<TagInput>;
+export type CreateTagMutationError = ErrorType<void>;
+
+/**
+ * @summary Create a new tag
+ */
+export const useCreateTag = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTag>>,
+    TError,
+    { data: BodyType<TagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createTag>>,
+  TError,
+  { data: BodyType<TagInput> },
+  TContext
+> => {
+  return useMutation(getCreateTagMutationOptions(options));
+};
+
+/**
+ * @summary List all categories
+ */
+export const getListCategoriesUrl = () => {
+  return `/api/categories`;
+};
+
+export const listCategories = async (
+  options?: RequestInit,
+): Promise<Category[]> => {
+  return customFetch<Category[]>(getListCategoriesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCategoriesQueryKey = () => {
+  return [`/api/categories`] as const;
+};
+
+export const getListCategoriesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCategories>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCategories>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCategoriesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCategories>>> = ({
+    signal,
+  }) => listCategories({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCategories>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCategoriesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCategories>>
+>;
+export type ListCategoriesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all categories
+ */
+
+export function useListCategories<
+  TData = Awaited<ReturnType<typeof listCategories>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listCategories>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCategoriesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new category (admin only)
+ */
+export const getCreateCategoryUrl = () => {
+  return `/api/categories`;
+};
+
+export const createCategory = async (
+  categoryInput: CategoryInput,
+  options?: RequestInit,
+): Promise<Category> => {
+  return customFetch<Category>(getCreateCategoryUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(categoryInput),
+  });
+};
+
+export const getCreateCategoryMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCategory>>,
+    TError,
+    { data: BodyType<CategoryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCategory>>,
+  TError,
+  { data: BodyType<CategoryInput> },
+  TContext
+> => {
+  const mutationKey = ["createCategory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCategory>>,
+    { data: BodyType<CategoryInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCategory(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCategoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCategory>>
+>;
+export type CreateCategoryMutationBody = BodyType<CategoryInput>;
+export type CreateCategoryMutationError = ErrorType<void>;
+
+/**
+ * @summary Create a new category (admin only)
+ */
+export const useCreateCategory = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCategory>>,
+    TError,
+    { data: BodyType<CategoryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCategory>>,
+  TError,
+  { data: BodyType<CategoryInput> },
+  TContext
+> => {
+  return useMutation(getCreateCategoryMutationOptions(options));
+};
+
+/**
+ * @summary Delete a category (admin only)
+ */
+export const getDeleteCategoryUrl = (id: number) => {
+  return `/api/categories/${id}`;
+};
+
+export const deleteCategory = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteCategoryUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteCategoryMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCategory>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCategory>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteCategory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCategory>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteCategory(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCategoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCategory>>
+>;
+
+export type DeleteCategoryMutationError = ErrorType<void>;
+
+/**
+ * @summary Delete a category (admin only)
+ */
+export const useDeleteCategory = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCategory>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCategory>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteCategoryMutationOptions(options));
+};
+
+/**
+ * Returns whether public self-registration is currently enabled. No authentication required.
+ * @summary Get registration settings (public)
+ */
+export const getGetRegistrationSettingsUrl = () => {
+  return `/api/registration-settings`;
+};
+
+export const getRegistrationSettings = async (
+  options?: RequestInit,
+): Promise<RegistrationSettings> => {
+  return customFetch<RegistrationSettings>(getGetRegistrationSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRegistrationSettingsQueryKey = () => {
+  return [`/api/registration-settings`] as const;
+};
+
+export const getGetRegistrationSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRegistrationSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRegistrationSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetRegistrationSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRegistrationSettings>>
+  > = ({ signal }) => getRegistrationSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRegistrationSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRegistrationSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRegistrationSettings>>
+>;
+export type GetRegistrationSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get registration settings (public)
+ */
+
+export function useGetRegistrationSettings<
+  TData = Awaited<ReturnType<typeof getRegistrationSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRegistrationSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRegistrationSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update registration settings (admin only)
+ */
+export const getUpdateRegistrationSettingsUrl = () => {
+  return `/api/admin/registration-settings`;
+};
+
+export const updateRegistrationSettings = async (
+  registrationSettingsUpdate: RegistrationSettingsUpdate,
+  options?: RequestInit,
+): Promise<RegistrationSettings> => {
+  return customFetch<RegistrationSettings>(getUpdateRegistrationSettingsUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(registrationSettingsUpdate),
+  });
+};
+
+export const getUpdateRegistrationSettingsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRegistrationSettings>>,
+    TError,
+    { data: BodyType<RegistrationSettingsUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateRegistrationSettings>>,
+  TError,
+  { data: BodyType<RegistrationSettingsUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateRegistrationSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateRegistrationSettings>>,
+    { data: BodyType<RegistrationSettingsUpdate> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateRegistrationSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateRegistrationSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateRegistrationSettings>>
+>;
+export type UpdateRegistrationSettingsMutationBody =
+  BodyType<RegistrationSettingsUpdate>;
+export type UpdateRegistrationSettingsMutationError = ErrorType<void>;
+
+/**
+ * @summary Update registration settings (admin only)
+ */
+export const useUpdateRegistrationSettings = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRegistrationSettings>>,
+    TError,
+    { data: BodyType<RegistrationSettingsUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateRegistrationSettings>>,
+  TError,
+  { data: BodyType<RegistrationSettingsUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateRegistrationSettingsMutationOptions(options));
 };
 
 /**
@@ -3398,7 +4315,362 @@ export const useDismissPhotoSuggestion = <
 };
 
 /**
- * @summary Accept a new-category suggestion for a photo
+ * @summary Accept a suggested tag for a photo (adds the tag to the photo)
+ */
+export const getAcceptPhotoTagSuggestionUrl = (id: number, tagName: string) => {
+  return `/api/photos/${id}/tag-suggestions/${tagName}/accept`;
+};
+
+export const acceptPhotoTagSuggestion = async (
+  id: number,
+  tagName: string,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getAcceptPhotoTagSuggestionUrl(id, tagName), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAcceptPhotoTagSuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptPhotoTagSuggestion>>,
+    TError,
+    { id: number; tagName: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptPhotoTagSuggestion>>,
+  TError,
+  { id: number; tagName: string },
+  TContext
+> => {
+  const mutationKey = ["acceptPhotoTagSuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptPhotoTagSuggestion>>,
+    { id: number; tagName: string }
+  > = (props) => {
+    const { id, tagName } = props ?? {};
+
+    return acceptPhotoTagSuggestion(id, tagName, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AcceptPhotoTagSuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptPhotoTagSuggestion>>
+>;
+
+export type AcceptPhotoTagSuggestionMutationError = ErrorType<void>;
+
+/**
+ * @summary Accept a suggested tag for a photo (adds the tag to the photo)
+ */
+export const useAcceptPhotoTagSuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptPhotoTagSuggestion>>,
+    TError,
+    { id: number; tagName: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof acceptPhotoTagSuggestion>>,
+  TError,
+  { id: number; tagName: string },
+  TContext
+> => {
+  return useMutation(getAcceptPhotoTagSuggestionMutationOptions(options));
+};
+
+/**
+ * @summary Dismiss a suggested tag for a photo
+ */
+export const getDismissPhotoTagSuggestionUrl = (
+  id: number,
+  tagName: string,
+) => {
+  return `/api/photos/${id}/tag-suggestions/${tagName}/dismiss`;
+};
+
+export const dismissPhotoTagSuggestion = async (
+  id: number,
+  tagName: string,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(getDismissPhotoTagSuggestionUrl(id, tagName), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getDismissPhotoTagSuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissPhotoTagSuggestion>>,
+    TError,
+    { id: number; tagName: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dismissPhotoTagSuggestion>>,
+  TError,
+  { id: number; tagName: string },
+  TContext
+> => {
+  const mutationKey = ["dismissPhotoTagSuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dismissPhotoTagSuggestion>>,
+    { id: number; tagName: string }
+  > = (props) => {
+    const { id, tagName } = props ?? {};
+
+    return dismissPhotoTagSuggestion(id, tagName, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DismissPhotoTagSuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dismissPhotoTagSuggestion>>
+>;
+
+export type DismissPhotoTagSuggestionMutationError = ErrorType<void>;
+
+/**
+ * @summary Dismiss a suggested tag for a photo
+ */
+export const useDismissPhotoTagSuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissPhotoTagSuggestion>>,
+    TError,
+    { id: number; tagName: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dismissPhotoTagSuggestion>>,
+  TError,
+  { id: number; tagName: string },
+  TContext
+> => {
+  return useMutation(getDismissPhotoTagSuggestionMutationOptions(options));
+};
+
+/**
+ * @summary Accept a suggested category for a photo (links the category to the photo)
+ */
+export const getAcceptPhotoCategorySuggestionUrl = (
+  id: number,
+  categoryId: number,
+) => {
+  return `/api/photos/${id}/category-suggestions/${categoryId}/accept`;
+};
+
+export const acceptPhotoCategorySuggestion = async (
+  id: number,
+  categoryId: number,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(
+    getAcceptPhotoCategorySuggestionUrl(id, categoryId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getAcceptPhotoCategorySuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptPhotoCategorySuggestion>>,
+    TError,
+    { id: number; categoryId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptPhotoCategorySuggestion>>,
+  TError,
+  { id: number; categoryId: number },
+  TContext
+> => {
+  const mutationKey = ["acceptPhotoCategorySuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptPhotoCategorySuggestion>>,
+    { id: number; categoryId: number }
+  > = (props) => {
+    const { id, categoryId } = props ?? {};
+
+    return acceptPhotoCategorySuggestion(id, categoryId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AcceptPhotoCategorySuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptPhotoCategorySuggestion>>
+>;
+
+export type AcceptPhotoCategorySuggestionMutationError = ErrorType<void>;
+
+/**
+ * @summary Accept a suggested category for a photo (links the category to the photo)
+ */
+export const useAcceptPhotoCategorySuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptPhotoCategorySuggestion>>,
+    TError,
+    { id: number; categoryId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof acceptPhotoCategorySuggestion>>,
+  TError,
+  { id: number; categoryId: number },
+  TContext
+> => {
+  return useMutation(getAcceptPhotoCategorySuggestionMutationOptions(options));
+};
+
+/**
+ * @summary Dismiss a suggested category for a photo
+ */
+export const getDismissPhotoCategorySuggestionUrl = (
+  id: number,
+  categoryId: number,
+) => {
+  return `/api/photos/${id}/category-suggestions/${categoryId}/dismiss`;
+};
+
+export const dismissPhotoCategorySuggestion = async (
+  id: number,
+  categoryId: number,
+  options?: RequestInit,
+): Promise<Photo> => {
+  return customFetch<Photo>(
+    getDismissPhotoCategorySuggestionUrl(id, categoryId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getDismissPhotoCategorySuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissPhotoCategorySuggestion>>,
+    TError,
+    { id: number; categoryId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dismissPhotoCategorySuggestion>>,
+  TError,
+  { id: number; categoryId: number },
+  TContext
+> => {
+  const mutationKey = ["dismissPhotoCategorySuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dismissPhotoCategorySuggestion>>,
+    { id: number; categoryId: number }
+  > = (props) => {
+    const { id, categoryId } = props ?? {};
+
+    return dismissPhotoCategorySuggestion(id, categoryId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DismissPhotoCategorySuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dismissPhotoCategorySuggestion>>
+>;
+
+export type DismissPhotoCategorySuggestionMutationError = ErrorType<void>;
+
+/**
+ * @summary Dismiss a suggested category for a photo
+ */
+export const useDismissPhotoCategorySuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissPhotoCategorySuggestion>>,
+    TError,
+    { id: number; categoryId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dismissPhotoCategorySuggestion>>,
+  TError,
+  { id: number; categoryId: number },
+  TContext
+> => {
+  return useMutation(getDismissPhotoCategorySuggestionMutationOptions(options));
+};
+
+/**
+ * @summary Accept a suggested new collection for a photo (creates collection and adds photo)
  */
 export const getAcceptPhotoNewCollectionSuggestionUrl = (
   id: number,
@@ -3461,8 +4733,12 @@ export const getAcceptPhotoNewCollectionSuggestionMutationOptions = <
 export type AcceptPhotoNewCollectionSuggestionMutationResult = NonNullable<
   Awaited<ReturnType<typeof acceptPhotoNewCollectionSuggestion>>
 >;
+
 export type AcceptPhotoNewCollectionSuggestionMutationError = ErrorType<void>;
 
+/**
+ * @summary Accept a suggested new collection for a photo (creates collection and adds photo)
+ */
 export const useAcceptPhotoNewCollectionSuggestion = <
   TError = ErrorType<void>,
   TContext = unknown,
@@ -3480,11 +4756,13 @@ export const useAcceptPhotoNewCollectionSuggestion = <
   { id: number; suggestionId: number; name?: string },
   TContext
 > => {
-  return useMutation(getAcceptPhotoNewCollectionSuggestionMutationOptions(options));
+  return useMutation(
+    getAcceptPhotoNewCollectionSuggestionMutationOptions(options),
+  );
 };
 
 /**
- * @summary Dismiss a new-category suggestion for a photo
+ * @summary Dismiss a suggested new collection for a photo
  */
 export const getDismissPhotoNewCollectionSuggestionUrl = (
   id: number,
@@ -3498,10 +4776,13 @@ export const dismissPhotoNewCollectionSuggestion = async (
   suggestionId: number,
   options?: RequestInit,
 ): Promise<Photo> => {
-  return customFetch<Photo>(getDismissPhotoNewCollectionSuggestionUrl(id, suggestionId), {
-    ...options,
-    method: "POST",
-  });
+  return customFetch<Photo>(
+    getDismissPhotoNewCollectionSuggestionUrl(id, suggestionId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
 };
 
 export const getDismissPhotoNewCollectionSuggestionMutationOptions = <
@@ -3535,7 +4816,12 @@ export const getDismissPhotoNewCollectionSuggestionMutationOptions = <
     { id: number; suggestionId: number }
   > = (props) => {
     const { id, suggestionId } = props ?? {};
-    return dismissPhotoNewCollectionSuggestion(id, suggestionId, requestOptions);
+
+    return dismissPhotoNewCollectionSuggestion(
+      id,
+      suggestionId,
+      requestOptions,
+    );
   };
 
   return { mutationFn, ...mutationOptions };
@@ -3544,8 +4830,12 @@ export const getDismissPhotoNewCollectionSuggestionMutationOptions = <
 export type DismissPhotoNewCollectionSuggestionMutationResult = NonNullable<
   Awaited<ReturnType<typeof dismissPhotoNewCollectionSuggestion>>
 >;
+
 export type DismissPhotoNewCollectionSuggestionMutationError = ErrorType<void>;
 
+/**
+ * @summary Dismiss a suggested new collection for a photo
+ */
 export const useDismissPhotoNewCollectionSuggestion = <
   TError = ErrorType<void>,
   TContext = unknown,
@@ -3563,9 +4853,14 @@ export const useDismissPhotoNewCollectionSuggestion = <
   { id: number; suggestionId: number },
   TContext
 > => {
-  return useMutation(getDismissPhotoNewCollectionSuggestionMutationOptions(options));
+  return useMutation(
+    getDismissPhotoNewCollectionSuggestionMutationOptions(options),
+  );
 };
 
+/**
+ * @summary Re-run AI analysis for a photo (admin or uploader only)
+ */
 export const getRerunPhotoAnalysisUrl = (id: number) => {
   return `/api/photos/${id}/rerun-analysis`;
 };
@@ -3611,13 +4906,17 @@ export const getRerunPhotoAnalysisMutationOptions = <
     { id: number }
   > = (props) => {
     const { id } = props ?? {};
+
     return rerunPhotoAnalysis(id, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type RerunPhotoAnalysisMutationResult = NonNullable<Awaited<ReturnType<typeof rerunPhotoAnalysis>>>;
+export type RerunPhotoAnalysisMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rerunPhotoAnalysis>>
+>;
+
 export type RerunPhotoAnalysisMutationError = ErrorType<void>;
 
 /**
@@ -3643,3 +4942,77 @@ export const useRerunPhotoAnalysis = <
   return useMutation(getRerunPhotoAnalysisMutationOptions(options));
 };
 
+/**
+ * @summary Get tag usage counts for tag cloud display
+ */
+export const getGetTagCloudUrl = () => {
+  return `/api/stats/tag-cloud`;
+};
+
+export const getTagCloud = async (
+  options?: RequestInit,
+): Promise<TagCount[]> => {
+  return customFetch<TagCount[]>(getGetTagCloudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTagCloudQueryKey = () => {
+  return [`/api/stats/tag-cloud`] as const;
+};
+
+export const getGetTagCloudQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTagCloud>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTagCloud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetTagCloudQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTagCloud>>> = ({
+    signal,
+  }) => getTagCloud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTagCloud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTagCloudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTagCloud>>
+>;
+export type GetTagCloudQueryError = ErrorType<void>;
+
+/**
+ * @summary Get tag usage counts for tag cloud display
+ */
+
+export function useGetTagCloud<
+  TData = Awaited<ReturnType<typeof getTagCloud>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTagCloud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTagCloudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

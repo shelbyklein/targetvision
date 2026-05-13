@@ -6,6 +6,7 @@ import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wo
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
+import { useGetRegistrationSettings } from "@workspace/api-client-react";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -123,6 +124,21 @@ function SignUpPage() {
       <PoweredByUSAA />
     </div>
   );
+}
+
+function SignUpGuard() {
+  const { data, isLoading } = useGetRegistrationSettings();
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+  if (data && !data.registrationEnabled) {
+    return <Redirect to="/" />;
+  }
+  return <SignUpPage />;
 }
 
 function LazyPage({ load }: { load: () => Promise<{ default: React.ComponentType }> }) {
@@ -285,7 +301,7 @@ function ClerkProviderWithRoutes() {
             )}
           </Route>
           <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/sign-up/*?" component={SignUpGuard} />
           <Route>
             <LazyPage load={() => import("@/pages/not-found")} />
           </Route>

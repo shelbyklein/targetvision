@@ -1,10 +1,14 @@
 import { Link } from "wouter";
 import { Camera, Image, Star, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useGetRegistrationSettings } from "@workspace/api-client-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function Home() {
+  const { data: regSettings } = useGetRegistrationSettings();
+  const registrationEnabled = regSettings?.registrationEnabled ?? true;
+
   return (
     <div className="min-h-screen bg-background" data-testid="home-page">
       <header className="border-b border-border px-6 py-4 flex items-center justify-between">
@@ -16,9 +20,11 @@ export default function Home() {
           <Link href="/sign-in">
             <Button variant="ghost" data-testid="sign-in-btn">Sign In</Button>
           </Link>
-          <Link href="/sign-up">
-            <Button data-testid="sign-up-btn" className="bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">Sign Up</Button>
-          </Link>
+          {registrationEnabled && (
+            <Link href="/sign-up">
+              <Button data-testid="sign-up-btn" className="bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">Sign Up</Button>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -44,11 +50,17 @@ export default function Home() {
               Sign In
             </Button>
           </Link>
-          <Link href="/sign-up">
-            <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">
-              Sign Up
-            </Button>
-          </Link>
+          {registrationEnabled ? (
+            <Link href="/sign-up">
+              <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">
+                Sign Up
+              </Button>
+            </Link>
+          ) : (
+            <p className="text-sm text-muted-foreground" data-testid="registration-disabled-msg">
+              Registration is by invitation only. Contact your administrator to get access.
+            </p>
+          )}
         </div>
 
         <div className="mt-24 grid grid-cols-3 gap-8 text-left">

@@ -34,8 +34,7 @@ async function applyFiltersAndFetchIds(
 
   if (filters.search) {
     const pattern = `%${filters.search}%`;
-    const [byCaption, byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
-      db.select({ id: photosTable.id }).from(photosTable).where(ilike(photosTable.caption, pattern)),
+    const [byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
       db
         .select({ id: photosTable.id })
         .from(photosTable)
@@ -49,7 +48,6 @@ async function applyFiltersAndFetchIds(
       db.select({ id: photosTable.id }).from(photosTable).where(ilike(photosTable.aiDescription, pattern)),
     ]);
     const searchIds = new Set([
-      ...byCaption.map((r) => r.id),
       ...byAlbumTitle.map((r) => r.id),
       ...byUploader.map((r) => r.id),
       ...byAiDescription.map((r) => r.id),
@@ -141,12 +139,18 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     db
       .select({ id: photosTable.id })
       .from(photosTable)
+      .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
+      .where(ilike(usersTable.name, pattern)),
+    db
+      .select({ id: photosTable.id })
+      .from(photosTable)
       .where(ilike(photosTable.aiDescription, pattern)),
   ]);
 
   const uniqueIds = [
     ...new Set([
       ...byAlbumTitle.map((r) => r.id),
+      ...byUploader.map((r) => r.id),
       ...byAiDescription.map((r) => r.id),
     ]),
   ];
