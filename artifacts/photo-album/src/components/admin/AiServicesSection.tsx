@@ -368,7 +368,7 @@ function ProviderCard({
               disabled={modelChangeDisabled}
             >
               <SelectTrigger
-                className="h-8 w-auto min-w-[180px] text-xs font-mono"
+                className="h-8 w-auto min-w-[220px] text-xs font-mono"
                 data-testid={`provider-model-trigger-${provider.id}`}
               >
                 <SelectValue />
@@ -376,12 +376,18 @@ function ProviderCard({
               <SelectContent>
                 {provider.availableModels.map((m) => (
                   <SelectItem
-                    key={m}
-                    value={m}
-                    className="font-mono text-xs"
-                    data-testid={`provider-model-option-${provider.id}-${m}`}
+                    key={m.id}
+                    value={m.id}
+                    textValue={m.id}
+                    className="text-xs"
+                    data-testid={`provider-model-option-${provider.id}-${m.id}`}
                   >
-                    {m}
+                    <div className="flex flex-col">
+                      <span className="font-mono">{m.id}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {m.label}
+                      </span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>

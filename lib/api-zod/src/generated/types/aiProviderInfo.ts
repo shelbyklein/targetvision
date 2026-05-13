@@ -5,13 +5,14 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
+import type { AiModelOption } from "./aiModelOption";
 import type { AiProviderInfoId } from "./aiProviderInfoId";
 
 export interface AiProviderInfo {
   id: AiProviderInfoId;
   label: string;
   model: string;
-  availableModels: string[];
+  availableModels: AiModelOption[];
   hasKey: boolean;
   /** @nullable */
   keyPreview?: string | null;

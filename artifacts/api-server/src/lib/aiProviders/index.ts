@@ -12,8 +12,10 @@ import { GeminiProvider } from "./gemini";
 import {
   AnalysisProvider,
   DEFAULT_PROVIDER_MODELS,
+  ModelOption,
   PROVIDER_IDS,
   PROVIDER_LABELS,
+  PROVIDER_MODEL_DETAILS,
   PROVIDER_MODEL_OPTIONS,
   ProviderId,
 } from "./types";
@@ -23,7 +25,9 @@ export {
   PROVIDER_IDS,
   PROVIDER_LABELS,
   PROVIDER_MODEL_OPTIONS,
+  PROVIDER_MODEL_DETAILS,
   DEFAULT_PROVIDER_MODELS,
+  type ModelOption,
   type ProviderId,
 } from "./types";
 
@@ -31,7 +35,7 @@ export interface ProviderStatus {
   id: ProviderId;
   label: string;
   model: string;
-  availableModels: string[];
+  availableModels: ModelOption[];
   hasKey: boolean;
   keyPreview: string | null;
   replitFallbackAvailable: boolean;
@@ -116,7 +120,7 @@ export function summarizeSettings(settings: AppSettings): ResolvedSettings {
       id,
       label: PROVIDER_LABELS[id],
       model: resolveProviderModel(settings, id),
-      availableModels: PROVIDER_MODEL_OPTIONS[id],
+      availableModels: PROVIDER_MODEL_DETAILS[id],
       hasKey,
       keyPreview: providerPreview(settings, id),
       replitFallbackAvailable: fallback,

@@ -8,15 +8,35 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
   gemini: "Google Gemini",
 };
 
-export const PROVIDER_MODEL_OPTIONS: Record<ProviderId, string[]> = {
-  openai: ["gpt-5.4", "gpt-5", "gpt-5-mini", "gpt-5-nano"],
-  anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
-  gemini: [
-    "gemini-3.1-pro-preview",
-    "gemini-3-flash-preview",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
+export interface ModelOption {
+  id: string;
+  label: string;
+}
+
+export const PROVIDER_MODEL_DETAILS: Record<ProviderId, ModelOption[]> = {
+  openai: [
+    { id: "gpt-5.4", label: "Best quality — slowest, most expensive" },
+    { id: "gpt-5", label: "High quality — balanced cost" },
+    { id: "gpt-5-mini", label: "Balanced — recommended" },
+    { id: "gpt-5-nano", label: "Fastest, cheapest" },
   ],
+  anthropic: [
+    { id: "claude-opus-4-7", label: "Best quality — slowest, most expensive" },
+    { id: "claude-sonnet-4-6", label: "Balanced — recommended" },
+    { id: "claude-haiku-4-5", label: "Fastest, cheapest" },
+  ],
+  gemini: [
+    { id: "gemini-3.1-pro-preview", label: "Best quality (preview) — slower" },
+    { id: "gemini-3-flash-preview", label: "Fast preview — newest" },
+    { id: "gemini-2.5-pro", label: "High quality — stable" },
+    { id: "gemini-2.5-flash", label: "Fastest, cheapest — recommended" },
+  ],
+};
+
+export const PROVIDER_MODEL_OPTIONS: Record<ProviderId, string[]> = {
+  openai: PROVIDER_MODEL_DETAILS.openai.map((m) => m.id),
+  anthropic: PROVIDER_MODEL_DETAILS.anthropic.map((m) => m.id),
+  gemini: PROVIDER_MODEL_DETAILS.gemini.map((m) => m.id),
 };
 
 export const DEFAULT_PROVIDER_MODELS: Record<ProviderId, string> = {

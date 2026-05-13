@@ -267,6 +267,11 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+export interface AiModelOption {
+  id: string;
+  label: string;
+}
+
 export type AiProviderInfoId =
   (typeof AiProviderInfoId)[keyof typeof AiProviderInfoId];
 
@@ -280,7 +285,7 @@ export interface AiProviderInfo {
   id: AiProviderInfoId;
   label: string;
   model: string;
-  availableModels: string[];
+  availableModels: AiModelOption[];
   hasKey: boolean;
   /** @nullable */
   keyPreview?: string | null;

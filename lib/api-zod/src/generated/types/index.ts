@@ -8,6 +8,7 @@
 
 export * from "./aiAnalysisEvent";
 export * from "./aiAnalysisEventStatus";
+export * from "./aiModelOption";
 export * from "./aiProviderInfo";
 export * from "./aiProviderInfoId";
 export * from "./aiProviderKeyInput";

@@ -1321,7 +1321,12 @@ export const GetAiSettingsResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1331,7 +1336,12 @@ export const GetAiSettingsResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1341,7 +1351,12 @@ export const GetAiSettingsResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1374,7 +1389,12 @@ export const UpdateAiSettingsResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1384,7 +1404,12 @@ export const UpdateAiSettingsResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1394,7 +1419,12 @@ export const UpdateAiSettingsResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1425,7 +1455,12 @@ export const SetAiProviderKeyResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1435,7 +1470,12 @@ export const SetAiProviderKeyResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1445,7 +1485,12 @@ export const SetAiProviderKeyResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1470,7 +1515,12 @@ export const ClearAiProviderKeyResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1480,7 +1530,12 @@ export const ClearAiProviderKeyResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),
@@ -1490,7 +1545,12 @@ export const ClearAiProviderKeyResponse = zod.object({
       id: zod.enum(["openai", "anthropic", "gemini"]),
       label: zod.string(),
       model: zod.string(),
-      availableModels: zod.array(zod.string()),
+      availableModels: zod.array(
+        zod.object({
+          id: zod.string(),
+          label: zod.string(),
+        }),
+      ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
       replitFallbackAvailable: zod.boolean(),

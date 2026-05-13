@@ -1660,6 +1660,15 @@ components:
         metadata:
           $ref: '#/components/schemas/UploadUrlRequest'
 
+    AiModelOption:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+
     AiProviderInfo:
       type: object
       required: [id, label, model, availableModels, hasKey, replitFallbackAvailable, usable]
@@ -1674,7 +1683,7 @@ components:
         availableModels:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/AiModelOption"
         hasKey:
           type: boolean
         keyPreview:
