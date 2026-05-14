@@ -341,30 +341,4 @@ router.post(
   },
 );
 
-router.post("/admin/run-migrations", async (req, res): Promise<void> => {
-  const secret = process.env.BOOTSTRAP_ADMIN_SECRET;
-  if (!secret || req.headers["x-bootstrap-secret"] !== secret) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-  const results: string[] = [];
-  const { pool } = await import("@workspace/db");
-
-  const migrations = [
-    `ALTER TABLE photos ADD COLUMN IF NOT EXISTS is_hidden boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS registration_enabled boolean NOT NULL DEFAULT true`,
-  ];
-
-  for (const sql of migrations) {
-    try {
-      await pool.query(sql);
-      results.push(`OK: ${sql}`);
-    } catch (e) {
-      results.push(`ERR: ${sql} — ${(e as Error).message}`);
-    }
-  }
-
-  res.json({ results });
-});
-
 export default router;
