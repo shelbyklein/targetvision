@@ -18,11 +18,11 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-3">
           <Link href="/sign-in">
-            <Button variant="ghost" data-testid="sign-in-btn">Sign In</Button>
+            <Button data-testid="sign-in-btn" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 focus-visible:ring-blue-600">Sign In</Button>
           </Link>
           {registrationEnabled && (
             <Link href="/sign-up">
-              <Button data-testid="sign-up-btn" className="bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">Sign Up</Button>
+              <Button data-testid="sign-up-btn" className="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 focus-visible:ring-red-600">Sign Up</Button>
             </Link>
           )}
         </div>
@@ -46,13 +46,13 @@ export default function Home() {
 
         <div className="flex items-center justify-center gap-4">
           <Link href="/sign-in">
-            <Button size="lg" variant="outline" data-testid="home-sign-in-btn" className="px-8">
+            <Button size="lg" data-testid="home-sign-in-btn" className="px-8 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 focus-visible:ring-blue-600">
               Sign In
             </Button>
           </Link>
           {registrationEnabled ? (
             <Link href="/sign-up">
-              <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-[#1c355e] border-[#1c355e] hover:bg-[#162b4b] hover:border-[#162b4b] focus-visible:ring-[#1c355e]">
+              <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 focus-visible:ring-red-600">
                 Sign Up
               </Button>
             </Link>
