@@ -91,8 +91,8 @@
   --primary: 354 69% 39%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 216 10% 90%;
-  --secondary-foreground: 216 14% 20%;
+  --secondary: 218 52% 21%;
+  --secondary-foreground: 0 0% 100%;
   
   --muted: 216 10% 92%;
   --muted-foreground: 216 10% 45%;
@@ -211,5 +211,13 @@
     text-transform: uppercase;
     display: inline-block;
     transform: skewX(-5deg);
+  }
+
+  h1 {
+    color: hsl(354 69% 39%) !important;
+  }
+
+  h2, h3, h4, h5, h6 {
+    color: hsl(218 52% 21%) !important;
   }
 }

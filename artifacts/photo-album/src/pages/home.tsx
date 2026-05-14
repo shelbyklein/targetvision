@@ -18,11 +18,11 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-3">
           <Link href="/sign-in">
-            <Button data-testid="sign-in-btn" className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 focus-visible:ring-blue-600">Sign In</Button>
+            <Button data-testid="sign-in-btn" className="bg-[#1a2f53] hover:bg-[#152541] text-white border-[#1a2f53] hover:border-[#152541] focus-visible:ring-[#1a2f53]">Sign In</Button>
           </Link>
           {registrationEnabled && (
             <Link href="/sign-up">
-              <Button data-testid="sign-up-btn" className="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 focus-visible:ring-red-600">Sign Up</Button>
+              <Button data-testid="sign-up-btn" className="bg-[#aa1f2e] hover:bg-[#8e1a26] text-white border-[#aa1f2e] hover:border-[#8e1a26] focus-visible:ring-[#aa1f2e]">Sign Up</Button>
             </Link>
           )}
         </div>
@@ -46,13 +46,13 @@ export default function Home() {
 
         <div className="flex items-center justify-center gap-4">
           <Link href="/sign-in">
-            <Button size="lg" data-testid="home-sign-in-btn" className="px-8 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 focus-visible:ring-blue-600">
+            <Button size="lg" data-testid="home-sign-in-btn" className="px-8 bg-[#1a2f53] hover:bg-[#152541] text-white border-[#1a2f53] hover:border-[#152541] focus-visible:ring-[#1a2f53]">
               Sign In
             </Button>
           </Link>
           {registrationEnabled ? (
             <Link href="/sign-up">
-              <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 focus-visible:ring-red-600">
+              <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-[#aa1f2e] hover:bg-[#8e1a26] text-white border-[#aa1f2e] hover:border-[#8e1a26] focus-visible:ring-[#aa1f2e]">
                 Sign Up
               </Button>
             </Link>
