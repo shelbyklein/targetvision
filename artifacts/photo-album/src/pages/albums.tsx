@@ -15,8 +15,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Images, CalendarDays, Camera } from "lucide-react";
+import { Plus, Images, CalendarDays, Camera, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useGetMe } from "@workspace/api-client-react";
 
 function CreateAlbumDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
@@ -105,6 +106,7 @@ function CreateAlbumDialog({ onCreated }: { onCreated: () => void }) {
 export default function Albums() {
   const qc = useQueryClient();
   const { data: albums, isLoading } = useListAlbums();
+  const { data: me } = useGetMe();
 
   function refetch() {
     qc.invalidateQueries({ queryKey: getListAlbumsQueryKey() });
@@ -160,6 +162,12 @@ export default function Albums() {
                         <Camera className="h-3 w-3" />
                         {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
                       </span>
+                      {me?.role === "admin" && !!album.hiddenCount && (
+                        <span className="flex items-center gap-0.5 text-muted-foreground/70">
+                          <EyeOff className="h-3 w-3" />
+                          {album.hiddenCount} hidden
+                        </span>
+                      )}
                       {album.eventDate && (
                         <span className="flex items-center gap-1">
                           <CalendarDays className="h-3 w-3" />
