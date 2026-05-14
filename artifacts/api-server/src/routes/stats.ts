@@ -35,6 +35,7 @@ router.get("/stats/dashboard", requireAuth, async (req, res): Promise<void> => {
       totalPhotos: Number(photoCount[0].count),
       totalUsers: Number(userCount[0].count),
       totalTags: 0,
+      totalCollections: Number(collectionCount[0].count),
       recentActivity: recentActivity.filter(Boolean),
     })
   );

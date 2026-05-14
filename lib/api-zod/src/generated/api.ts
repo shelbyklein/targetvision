@@ -1255,6 +1255,7 @@ export const GetDashboardStatsResponse = zod.object({
   totalPhotos: zod.number(),
   totalUsers: zod.number(),
   totalTags: zod.number(),
+  totalCollections: zod.number(),
   recentActivity: zod.array(
     zod.object({
       id: zod.number(),

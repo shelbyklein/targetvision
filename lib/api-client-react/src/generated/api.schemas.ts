@@ -231,6 +231,7 @@ export interface DashboardStats {
   totalPhotos: number;
   totalUsers: number;
   totalTags: number;
+  totalCollections: number;
   recentActivity: Photo[];
 }
 
