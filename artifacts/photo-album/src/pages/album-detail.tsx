@@ -76,7 +76,6 @@ import {
   Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
 
 type SortOption = "newest" | "oldest" | "top-rated";
 
@@ -341,14 +340,14 @@ export default function AlbumDetail() {
     suggestionId: number;
     name: string;
   } | null>(null);
-  const { showHidden } = useShowHiddenPhotos();
+  const [showHiddenLocal, setShowHiddenLocal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
 
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
-  const hiddenParams = showHidden ? { includeHidden: true } : undefined;
+  const hiddenParams = showHiddenLocal ? { includeHidden: true } : undefined;
   const { data: photos, isLoading: photosLoading } = useListAlbumPhotos(albumId, hiddenParams, {
     query: {
       enabled: !!albumId,
@@ -481,7 +480,9 @@ export default function AlbumDetail() {
     );
   }
 
-  const sortedPhotos = photos ? sortPhotos(photos, sort) : undefined;
+  const sortedPhotos = photos
+    ? sortPhotos(showHiddenLocal ? photos : photos.filter((p) => !p.isHidden), sort)
+    : undefined;
 
   if (albumLoading) {
     return (
@@ -546,13 +547,22 @@ export default function AlbumDetail() {
                   <Camera className="h-3.5 w-3.5" />
                   {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
                   {me?.role === "admin" && !!album.hiddenCount && (
-                    <span className="flex items-center gap-0.5 text-muted-foreground/70">
+                    <span className="flex items-center gap-1 text-muted-foreground/70">
                       <EyeOff className="h-3 w-3" />
                       {album.hiddenCount} hidden
+                      <button
+                        type="button"
+                        onClick={() => setShowHiddenLocal((v) => !v)}
+                        className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${showHiddenLocal ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground/70 hover:text-muted-foreground"}`}
+                        data-testid="toggle-hidden-photos"
+                        title={showHiddenLocal ? "Hide hidden photos" : "Show hidden photos"}
+                      >
+                        {showHiddenLocal ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                        {showHiddenLocal ? "hide" : "show"}
+                      </button>
                     </span>
                   )}
                 </span>
-                {album.ownerName && <span>by {album.ownerName}</span>}
               </div>
               {album.description && (
                 <p className="text-sm text-muted-foreground mt-2 max-w-xl">
@@ -669,28 +679,9 @@ export default function AlbumDetail() {
                   </div>
                 </Link>
 
-                {(photo.aiDescription ||
-                  (photo.createdAt && Date.now() - new Date(photo.createdAt).getTime() < 60_000) ||
-                  (photo.suggestedCollections && photo.suggestedCollections.length > 0) ||
+                {((photo.suggestedCollections && photo.suggestedCollections.length > 0) ||
                   (photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0)) && (
                 <div className="p-2 space-y-1">
-                  {photo.aiDescription ? (
-                    <p
-                      className="text-[10px] text-muted-foreground line-clamp-2 flex items-start gap-1"
-                      data-testid="card-ai-description"
-                    >
-                      <Sparkles className="h-2.5 w-2.5 text-primary mt-[2px] shrink-0" />
-                      <span>{photo.aiDescription}</span>
-                    </p>
-                  ) : photo.createdAt && Date.now() - new Date(photo.createdAt).getTime() < 60_000 ? (
-                    <p
-                      className="text-[10px] text-muted-foreground/70 flex items-center gap-1"
-                      data-testid="card-ai-loading"
-                    >
-                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                      Analyzing…
-                    </p>
-                  ) : null}
                   {photo.suggestedCollections && photo.suggestedCollections.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-0.5" data-testid="card-suggestions">
                       {photo.suggestedCollections.slice(0, 3).map((s) => (
