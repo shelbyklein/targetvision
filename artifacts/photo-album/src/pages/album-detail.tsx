@@ -176,19 +176,19 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
 
       setFiles((prev) =>
         prev.map((f, i) =>
-          i === index ? { ...f, status: "uploading", progress: 10 } : f
+          i === index ? { ...f, status: "uploading", progress: 0 } : f
         )
       );
 
       try {
-        const result = await uploadFile(item.file);
+        const result = await uploadFile(item.file, (pct) => {
+          setFiles((prev) =>
+            prev.map((f, i) =>
+              i === index ? { ...f, progress: pct } : f
+            )
+          );
+        });
         if (!result) throw new Error("Upload failed");
-
-        setFiles((prev) =>
-          prev.map((f, i) =>
-            i === index ? { ...f, progress: 70 } : f
-          )
-        );
 
         await uploadPhoto({
           id: albumId,

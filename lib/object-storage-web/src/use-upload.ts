@@ -84,36 +84,55 @@ export function useUpload(options: UseUploadOptions = {}) {
   );
 
   const uploadToPresignedUrl = useCallback(
-    async (file: File, uploadURL: string): Promise<void> => {
-      const response = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
-      });
+    (file: File, uploadURL: string, onProgress?: (percent: number) => void): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadURL);
+        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
-      if (!response.ok) {
-        throw new Error("Failed to upload file to storage");
-      }
+        if (onProgress) {
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              onProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          });
+        }
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error("Failed to upload file to storage"));
+          }
+        });
+
+        xhr.addEventListener("error", () => reject(new Error("Failed to upload file to storage")));
+        xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+
+        xhr.send(file);
+      });
     },
     []
   );
 
   const uploadFile = useCallback(
-    async (file: File): Promise<UploadResponse | null> => {
+    async (file: File, onProgress?: (percent: number) => void): Promise<UploadResponse | null> => {
       setIsUploading(true);
       setError(null);
       setProgress(0);
 
       try {
-        setProgress(10);
+        setProgress(5);
         const uploadResponse = await requestUploadUrl(file);
 
-        setProgress(30);
-        await uploadToPresignedUrl(file, uploadResponse.uploadURL);
+        setProgress(10);
+        await uploadToPresignedUrl(file, uploadResponse.uploadURL, (xhrPct) => {
+          setProgress(10 + Math.round(xhrPct * 0.85));
+          onProgress?.(xhrPct);
+        });
 
         setProgress(100);
+        onProgress?.(100);
         options.onSuccess?.(uploadResponse);
         return uploadResponse;
       } catch (err) {
