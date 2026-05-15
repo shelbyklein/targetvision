@@ -11,4 +11,5 @@ export interface PhotoUploadInput {
   url: string;
   storageKey?: string;
   takenAt?: string;
+  contentType?: string;
 }

@@ -1746,6 +1746,8 @@ components:
           type: string
         takenAt:
           type: string
+        contentType:
+          type: string
 
     PhotoTagInput:
       type: object

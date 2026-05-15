@@ -299,6 +299,7 @@ export const UploadPhotoBody = zod.object({
   url: zod.string().min(1),
   storageKey: zod.string().optional(),
   takenAt: zod.string().optional(),
+  contentType: zod.string().optional(),
 });
 
 /**

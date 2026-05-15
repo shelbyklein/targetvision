@@ -3,6 +3,7 @@ import { eq, and, inArray, desc } from "drizzle-orm";
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
+import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import {
   ListAlbumPhotosParams,
@@ -42,6 +43,7 @@ import { buildPhotoResponse } from "../lib/photoHelpers";
 import { applyFiltersAndFetchIds } from "./search";
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
 
 router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -54,6 +56,25 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
   const body = UploadPhotoBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  let mimeType: string | null = null;
+  if (body.data.storageKey) {
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(body.data.storageKey);
+      const [metadata] = await objectFile.getMetadata();
+      mimeType = (metadata.contentType as string) || null;
+    } catch {
+      res.status(400).json({ error: "Unable to verify uploaded file type" });
+      return;
+    }
+  } else {
+    mimeType = body.data.contentType ?? null;
+  }
+
+  if (!mimeType || !mimeType.startsWith("image/")) {
+    res.status(400).json({ error: "Only image files are allowed" });
     return;
   }
 

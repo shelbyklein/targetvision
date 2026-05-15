@@ -195,6 +195,7 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
           data: {
             url: `/api/storage${result.objectPath}`,
             storageKey: result.objectPath,
+            contentType: item.file.type,
           },
         });
 
