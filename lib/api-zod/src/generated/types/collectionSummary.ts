@@ -17,5 +17,7 @@ export interface CollectionSummary {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
+  /** @nullable */
+  coverPhotoThumbnailKey?: string | null;
   createdAt: Date;
 }

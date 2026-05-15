@@ -145,7 +145,7 @@ export default function Albums() {
                   <div className="aspect-[4/3] bg-muted overflow-hidden">
                     {album.coverPhotoUrl ? (
                       <img
-                        src={album.coverPhotoUrl}
+                        src={album.coverPhotoThumbnailKey ? `/api/storage${album.coverPhotoThumbnailKey}` : album.coverPhotoUrl}
                         alt={album.title}
                         className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
                       />

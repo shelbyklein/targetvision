@@ -84,12 +84,12 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
       const [coverPhotoRow, tags] = await Promise.all([
         row.collection.coverPhotoId
           ? db
-              .select({ url: photosTable.url })
+              .select({ url: photosTable.url, thumbnailKey: photosTable.thumbnailKey })
               .from(photosTable)
               .where(eq(photosTable.id, row.collection.coverPhotoId))
               .limit(1)
           : db
-              .select({ url: photosTable.url })
+              .select({ url: photosTable.url, thumbnailKey: photosTable.thumbnailKey })
               .from(photoCollectionsTable)
               .innerJoin(photosTable, eq(photoCollectionsTable.photoId, photosTable.id))
               .where(eq(photoCollectionsTable.collectionId, row.collection.id))
@@ -103,6 +103,7 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
         createdAt: row.collection.createdAt.toISOString(),
         photoCount: Number(row.photoCount),
         coverPhotoUrl: coverPhotoRow[0]?.url ?? null,
+        coverPhotoThumbnailKey: coverPhotoRow[0]?.thumbnailKey ?? null,
         tags,
       };
     })

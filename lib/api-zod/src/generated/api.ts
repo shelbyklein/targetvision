@@ -72,6 +72,7 @@ export const ListAlbumsResponseItem = zod.object({
   eventDate: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
   photoCount: zod.number(),
   hiddenCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
@@ -1461,6 +1462,7 @@ export const ListCollectionsResponseItem = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem);

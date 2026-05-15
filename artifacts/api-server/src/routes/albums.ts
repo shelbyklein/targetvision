@@ -73,12 +73,14 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
   const albums = await Promise.all(
     rows.map(async (row) => {
       let coverPhotoUrl: string | null = null;
+      let coverPhotoThumbnailKey: string | null = null;
       if (row.album.coverPhotoId) {
         const [cover] = await db
-          .select({ url: photosTable.url })
+          .select({ url: photosTable.url, thumbnailKey: photosTable.thumbnailKey })
           .from(photosTable)
           .where(eq(photosTable.id, row.album.coverPhotoId));
         coverPhotoUrl = cover?.url ?? null;
+        coverPhotoThumbnailKey = cover?.thumbnailKey ?? null;
       }
       return {
         ...row.album,
@@ -86,6 +88,7 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
         photoCount: Number(row.photoCount),
         hiddenCount: Number(row.hiddenCount),
         coverPhotoUrl,
+        coverPhotoThumbnailKey,
       };
     })
   );
