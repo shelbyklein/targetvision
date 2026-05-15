@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/select";
 import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Eye, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
 import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 24;
@@ -97,9 +96,10 @@ export default function PhotosPage() {
     setInputValue(search);
   }, [search]);
 
+  const [showHidden, setShowHidden] = useState(false);
+
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
-  const { showHidden } = useShowHiddenPhotos();
 
   const apiParams = {
     ...(search && { search }),
@@ -192,11 +192,23 @@ export default function PhotosPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">All Photos</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
               {isLoading
                 ? "Loading…"
                 : `${totalPhotos.toLocaleString()} photo${totalPhotos !== 1 ? "s" : ""} across all albums`}
-            </p>
+              {me?.role === "admin" && !isLoading && (
+                <button
+                  type="button"
+                  onClick={() => setShowHidden((v) => !v)}
+                  className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${showHidden ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground/70 hover:text-muted-foreground"}`}
+                  data-testid="toggle-hidden-photos"
+                  title={showHidden ? "Hide hidden photos" : "Show hidden photos"}
+                >
+                  {showHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                  {showHidden ? "hide hidden" : "show hidden"}
+                </button>
+              )}
+            </div>
           </div>
           <Button
             variant="outline"

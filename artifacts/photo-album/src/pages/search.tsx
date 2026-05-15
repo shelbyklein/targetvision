@@ -18,9 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Link } from "wouter";
-import { Search, SlidersHorizontal, X, Star, Images, EyeOff } from "lucide-react";
+import { Search, SlidersHorizontal, X, Star, Images, EyeOff, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useShowHiddenPhotos } from "@/hooks/use-show-hidden-photos";
 
 function parseSearch(search: string) {
   const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -90,9 +89,10 @@ export default function SearchPage() {
     setInputValue(q);
   }, [q]);
 
+  const [showHidden, setShowHidden] = useState(false);
+
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
-  const { showHidden } = useShowHiddenPhotos();
 
   const hasActiveFilters =
     !!ratingMin || !!ratingMax || !!dateFrom || !!dateTo || !!uploaderId;
@@ -140,9 +140,21 @@ export default function SearchPage() {
       <div className="space-y-6" data-testid="search-page">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Search Photos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
             Search across album titles, AI descriptions, and uploaders.
-          </p>
+            {me?.role === "admin" && (
+              <button
+                type="button"
+                onClick={() => setShowHidden((v) => !v)}
+                className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${showHidden ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground/70 hover:text-muted-foreground"}`}
+                data-testid="toggle-hidden-photos"
+                title={showHidden ? "Hide hidden photos" : "Show hidden photos"}
+              >
+                {showHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                {showHidden ? "hide hidden" : "show hidden"}
+              </button>
+            )}
+          </div>
         </div>
 
         <form onSubmit={handleSearch} className="flex gap-2" data-testid="search-form">
