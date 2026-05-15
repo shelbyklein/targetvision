@@ -25,6 +25,7 @@ import {
   RetryAiAnalysisEventResponse,
   BulkRetryAiAnalysisEventsResponse,
   BackfillThumbnailsResponse,
+  BackfillThumbnailsStatusResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -344,6 +345,15 @@ router.post(
     );
   },
 );
+
+router.get("/admin/thumbnails/backfill-status", requireAdmin, async (_req, res): Promise<void> => {
+  const photos = await db
+    .select({ id: photosTable.id })
+    .from(photosTable)
+    .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey)));
+
+  res.json(BackfillThumbnailsStatusResponse.parse({ missingCount: photos.length }));
+});
 
 router.post("/admin/thumbnails/backfill", requireAdmin, async (_req, res): Promise<void> => {
   const photos = await db

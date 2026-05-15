@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useBackfillThumbnails } from "@workspace/api-client-react";
+import { useBackfillThumbnails, useBackfillThumbnailsStatus } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, CheckCircle2, XCircle } from "lucide-react";
+import { ImageIcon, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type BackfillResult = {
@@ -14,6 +14,7 @@ type BackfillResult = {
 export function ThumbnailsSection() {
   const { toast } = useToast();
   const [lastResult, setLastResult] = useState<BackfillResult | null>(null);
+  const { data: statusData, isLoading: isStatusLoading } = useBackfillThumbnailsStatus();
   const { mutate: backfill, isPending } = useBackfillThumbnails();
 
   function handleBackfill() {
@@ -38,6 +39,8 @@ export function ThumbnailsSection() {
     });
   }
 
+  const missingCount = statusData?.missingCount ?? null;
+
   return (
     <div
       className="rounded-xl border border-border bg-card overflow-hidden"
@@ -58,6 +61,24 @@ export function ThumbnailsSection() {
           Album and collection cover cards load faster when photos have thumbnails. This action
           finds all photos without a thumbnail and generates one from the original image.
         </p>
+
+        <div className="text-sm" data-testid="backfill-status">
+          {isStatusLoading ? (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Checking…
+            </span>
+          ) : missingCount === 0 ? (
+            <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              All photos have thumbnails
+            </span>
+          ) : missingCount !== null ? (
+            <span className="text-amber-700 dark:text-amber-400 font-medium">
+              {missingCount} photo{missingCount !== 1 ? "s" : ""} need{missingCount === 1 ? "s" : ""} thumbnails
+            </span>
+          ) : null}
+        </div>
 
         {lastResult && (
           <div

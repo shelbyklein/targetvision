@@ -2125,3 +2125,10 @@ export const BackfillThumbnailsResponse = zod.object({
   skipped: zod.number(),
   failed: zod.number(),
 });
+
+/**
+ * @summary Count of photos that are missing thumbnails
+ */
+export const BackfillThumbnailsStatusResponse = zod.object({
+  missingCount: zod.number(),
+});
