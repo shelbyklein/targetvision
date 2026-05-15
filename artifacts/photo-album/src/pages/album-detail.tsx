@@ -106,6 +106,15 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
     const selected = Array.from(e.target.files ?? []);
     if (!selected.length) return;
     const newItems: FileItem[] = selected.map((file) => {
+      if (!file.type.startsWith("image/")) {
+        return {
+          file,
+          preview: "",
+          status: "error",
+          progress: 0,
+          errorMessage: "Only image files are supported",
+        };
+      }
       if (file.size > MAX_FILE_SIZE) {
         return {
           file,
