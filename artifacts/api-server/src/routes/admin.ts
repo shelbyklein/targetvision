@@ -353,7 +353,14 @@ router.post("/migrate/add-collection-cover-photo", async (req, res): Promise<voi
       ALTER TABLE collections
       ADD COLUMN IF NOT EXISTS cover_photo_id integer REFERENCES photos(id) ON DELETE SET NULL
     `);
-    res.json({ ok: true, message: "cover_photo_id column added to collections" });
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS collection_tags (
+        collection_id integer NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        tag_id integer NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+        PRIMARY KEY (collection_id, tag_id)
+      )
+    `);
+    res.json({ ok: true, message: "cover_photo_id and collection_tags applied" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
