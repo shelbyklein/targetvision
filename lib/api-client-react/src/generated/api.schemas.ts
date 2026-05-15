@@ -390,6 +390,8 @@ export interface AiAnalysisEvent {
 
 export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
+  limit?: number;
+  offset?: number;
 };
 
 export type SearchPhotosParams = {

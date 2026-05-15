@@ -97,15 +97,23 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
   const includeHidden = req.query.includeHidden === "true";
   const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
 
+  const rawLimit = req.query.limit !== undefined ? parseInt(req.query.limit as string, 10) : undefined;
+  const rawOffset = req.query.offset !== undefined ? parseInt(req.query.offset as string, 10) : 0;
+  const limit = rawLimit !== undefined && !isNaN(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
+  const offset = !isNaN(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+
   const conditions = canSeeHidden
     ? eq(photosTable.albumId, params.data.id)
     : and(eq(photosTable.albumId, params.data.id), eq(photosTable.isHidden, false));
 
-  const photos = await db
+  const baseQuery = db
     .select({ id: photosTable.id })
     .from(photosTable)
     .where(conditions)
-    .orderBy(photosTable.createdAt);
+    .orderBy(photosTable.createdAt)
+    .offset(offset);
+
+  const photos = limit !== undefined ? await baseQuery.limit(limit) : await baseQuery;
 
   const full = await Promise.all(photos.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
   res.json(ListAlbumPhotosResponse.parse(full.filter(Boolean)));

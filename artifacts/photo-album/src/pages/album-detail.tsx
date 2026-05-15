@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetAlbum,
@@ -16,6 +16,7 @@ import {
   getListAlbumsQueryKey,
   useGetMe,
 } from "@workspace/api-client-react";
+import type { Photo } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUpload } from "@workspace/object-storage-web";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -78,6 +79,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 type SortOption = "newest" | "oldest" | "top-rated";
+
+const PAGE_SIZE = 50;
 
 interface FileItem {
   file: File;
@@ -342,16 +345,21 @@ export default function AlbumDetail() {
   } | null>(null);
   const [showHiddenLocal, setShowHiddenLocal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [offset, setOffset] = useState(0);
+  const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
 
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
-  const hiddenParams = showHiddenLocal ? { includeHidden: true } : undefined;
-  const { data: photos, isLoading: photosLoading } = useListAlbumPhotos(albumId, hiddenParams, {
+
+  const photosParams = showHiddenLocal
+    ? { includeHidden: true as const, limit: PAGE_SIZE, offset }
+    : { limit: PAGE_SIZE, offset };
+  const { data: photosPage, isLoading: photosPageLoading, isFetching: photosFetching } = useListAlbumPhotos(albumId, photosParams, {
     query: {
       enabled: !!albumId,
-      queryKey: getListAlbumPhotosQueryKey(albumId, hiddenParams),
+      queryKey: getListAlbumPhotosQueryKey(albumId, photosParams),
       refetchInterval: (q) => {
         const data = q.state.data as Array<{ aiDescription?: string | null; createdAt?: string }> | undefined;
         if (!data) return false;
@@ -362,10 +370,31 @@ export default function AlbumDetail() {
             p.createdAt &&
             now - new Date(p.createdAt).getTime() < 60_000,
         );
-        return stillAnalyzing ? 3000 : false;
+        return stillAnalyzing ? 10_000 : false;
       },
     },
   });
+
+  const photosLoading = photosPageLoading && allPhotos.length === 0;
+  const loadingMore = photosFetching && allPhotos.length > 0;
+  const hasMore = photosPage ? photosPage.length === PAGE_SIZE : false;
+
+  useEffect(() => {
+    if (photosPage === undefined) return;
+    if (offset === 0) {
+      setAllPhotos(photosPage);
+    } else {
+      setAllPhotos((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        return [...prev, ...photosPage.filter((p) => !existingIds.has(p.id))];
+      });
+    }
+  }, [photosPage, offset]);
+
+  useEffect(() => {
+    setOffset(0);
+    setAllPhotos([]);
+  }, [albumId, showHiddenLocal]);
   const { mutate: setCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
@@ -418,8 +447,9 @@ export default function AlbumDetail() {
   }
 
   function invalidate() {
+    setOffset(0);
     qc.invalidateQueries({ queryKey: getGetAlbumQueryKey(albumId) });
-    qc.invalidateQueries({ queryKey: getListAlbumPhotosQueryKey(albumId) });
+    qc.invalidateQueries({ queryKey: [`/api/albums/${albumId}/photos`] });
     qc.invalidateQueries({ queryKey: getListAlbumsQueryKey() });
   }
 
@@ -480,9 +510,10 @@ export default function AlbumDetail() {
     );
   }
 
-  const sortedPhotos = photos
-    ? sortPhotos(showHiddenLocal ? photos : photos.filter((p) => !p.isHidden), sort)
-    : undefined;
+  const sortedPhotos = sortPhotos(
+    showHiddenLocal ? allPhotos : allPhotos.filter((p) => !p.isHidden),
+    sort,
+  );
 
   if (albumLoading) {
     return (
@@ -611,10 +642,10 @@ export default function AlbumDetail() {
           </div>
         </div>
 
-        {photos && photos.length > 0 && (
+        {allPhotos.length > 0 && (
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
-              {photos.length} photo{photos.length !== 1 ? "s" : ""}
+              {allPhotos.length} photo{allPhotos.length !== 1 ? "s" : ""}
             </p>
             <div className="flex items-center gap-2">
               <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -641,7 +672,8 @@ export default function AlbumDetail() {
               <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
             ))}
           </div>
-        ) : sortedPhotos && sortedPhotos.length > 0 ? (
+        ) : sortedPhotos.length > 0 ? (
+          <>
           <div
             className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
             data-testid="photo-grid"
@@ -674,6 +706,7 @@ export default function AlbumDetail() {
                     <img
                       src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                       alt={photo.name ?? "Photo"}
+                      loading="lazy"
                       className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
                   </div>
@@ -827,6 +860,26 @@ export default function AlbumDetail() {
               );
             })}
           </div>
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                disabled={loadingMore}
+                data-testid="load-more-btn"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Loading…
+                  </>
+                ) : (
+                  "Load more"
+                )}
+              </Button>
+            </div>
+          )}
+          </>
         ) : (
           <div
             className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-xl"

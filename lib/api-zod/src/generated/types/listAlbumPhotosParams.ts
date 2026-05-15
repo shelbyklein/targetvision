@@ -8,4 +8,6 @@
 
 export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
+  limit?: number;
+  offset?: number;
 };
