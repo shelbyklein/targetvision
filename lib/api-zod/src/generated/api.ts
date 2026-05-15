@@ -282,6 +282,11 @@ export const ListAlbumPhotosResponseItem = zod.object({
 });
 export const ListAlbumPhotosResponse = zod.array(ListAlbumPhotosResponseItem);
 
+export const ListAlbumPhotosPagedResponse = zod.object({
+  photos: zod.array(ListAlbumPhotosResponseItem),
+  hasMore: zod.boolean(),
+});
+
 /**
  * @summary Add a photo to an album (URL-based)
  */

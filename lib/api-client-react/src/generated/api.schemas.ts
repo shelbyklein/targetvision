@@ -394,6 +394,11 @@ export type ListAlbumPhotosParams = {
   offset?: number;
 };
 
+export interface ListAlbumPhotosPage {
+  photos: Photo[];
+  hasMore: boolean;
+}
+
 export type SearchPhotosParams = {
   q: string;
   ratingMin?: number;

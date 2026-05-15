@@ -1,12 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { logger } from "../lib/logger";
 import {
   ListAlbumPhotosParams,
-  ListAlbumPhotosResponse,
+  ListAlbumPhotosPagedResponse,
   UploadPhotoParams,
   UploadPhotoBody,
   ListPhotosQueryParams,
@@ -97,26 +97,33 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
   const includeHidden = req.query.includeHidden === "true";
   const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
 
+  const DEFAULT_LIMIT = 50;
+  const MAX_LIMIT = 200;
   const rawLimit = req.query.limit !== undefined ? parseInt(req.query.limit as string, 10) : undefined;
   const rawOffset = req.query.offset !== undefined ? parseInt(req.query.offset as string, 10) : 0;
-  const limit = rawLimit !== undefined && !isNaN(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
+  const limit = rawLimit !== undefined && !isNaN(rawLimit) && rawLimit > 0
+    ? Math.min(rawLimit, MAX_LIMIT)
+    : DEFAULT_LIMIT;
   const offset = !isNaN(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
   const conditions = canSeeHidden
     ? eq(photosTable.albumId, params.data.id)
     : and(eq(photosTable.albumId, params.data.id), eq(photosTable.isHidden, false));
 
-  const baseQuery = db
+  const rows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
     .where(conditions)
-    .orderBy(photosTable.createdAt)
-    .offset(offset);
+    .orderBy(desc(photosTable.createdAt))
+    .offset(offset)
+    .limit(limit + 1);
 
-  const photos = limit !== undefined ? await baseQuery.limit(limit) : await baseQuery;
+  const hasMore = rows.length > limit;
+  const photoRows = hasMore ? rows.slice(0, limit) : rows;
 
-  const full = await Promise.all(photos.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
-  res.json(ListAlbumPhotosResponse.parse(full.filter(Boolean)));
+  const full = await Promise.all(photoRows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
+  const photoList = full.filter(Boolean);
+  res.json(ListAlbumPhotosPagedResponse.parse({ photos: photoList, hasMore }));
 });
 
 router.get("/photos", requireAuth, async (req, res): Promise<void> => {

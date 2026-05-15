@@ -361,7 +361,8 @@ export default function AlbumDetail() {
       enabled: !!albumId,
       queryKey: getListAlbumPhotosQueryKey(albumId, photosParams),
       refetchInterval: (q) => {
-        const data = q.state.data as Array<{ aiDescription?: string | null; createdAt?: string }> | undefined;
+        const page = q.state.data as { photos?: Array<{ aiDescription?: string | null; createdAt?: string }> } | undefined;
+        const data = page?.photos;
         if (!data) return false;
         const now = Date.now();
         const stillAnalyzing = data.some(
@@ -377,16 +378,17 @@ export default function AlbumDetail() {
 
   const photosLoading = photosPageLoading && allPhotos.length === 0;
   const loadingMore = photosFetching && allPhotos.length > 0;
-  const hasMore = photosPage ? photosPage.length === PAGE_SIZE : false;
+  const hasMore = photosPage?.hasMore ?? false;
 
   useEffect(() => {
     if (photosPage === undefined) return;
+    const newPhotos = photosPage.photos;
     if (offset === 0) {
-      setAllPhotos(photosPage);
+      setAllPhotos(newPhotos);
     } else {
       setAllPhotos((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
-        return [...prev, ...photosPage.filter((p) => !existingIds.has(p.id))];
+        return [...prev, ...newPhotos.filter((p) => !existingIds.has(p.id))];
       });
     }
   }, [photosPage, offset]);
