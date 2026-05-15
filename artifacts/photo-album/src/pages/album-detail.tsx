@@ -387,8 +387,11 @@ export default function AlbumDetail() {
       setAllPhotos(newPhotos);
     } else {
       setAllPhotos((prev) => {
+        const newMap = new Map(newPhotos.map((p) => [p.id, p]));
         const existingIds = new Set(prev.map((p) => p.id));
-        return [...prev, ...newPhotos.filter((p) => !existingIds.has(p.id))];
+        const updated = prev.map((p) => newMap.get(p.id) ?? p);
+        const appended = newPhotos.filter((p) => !existingIds.has(p.id));
+        return [...updated, ...appended];
       });
     }
   }, [photosPage, offset]);
