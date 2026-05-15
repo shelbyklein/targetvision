@@ -5,6 +5,7 @@ import {
   useListUsers,
   useGetMe,
   useBulkUpdatePhotos,
+  useBulkDeletePhotos,
   getListPhotosQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,13 +15,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Eye, Check } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Eye, Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -88,9 +99,11 @@ export default function PhotosPage() {
   const [inputValue, setInputValue] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
+  const { mutateAsync: bulkDeletePhotos, isPending: bulkDeleting } = useBulkDeletePhotos();
 
   useEffect(() => {
     setInputValue(search);
@@ -154,6 +167,22 @@ export default function PhotosPage() {
       qc.invalidateQueries({ queryKey: getListPhotosQueryKey() });
     } catch {
       toast({ title: "Bulk action failed", variant: "destructive" });
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    setConfirmBulkDelete(false);
+    try {
+      const result = await bulkDeletePhotos({ data: { ids } });
+      const count = result?.deleted ?? ids.length;
+      toast({
+        title: `${count} photo${count !== 1 ? "s" : ""} deleted`,
+      });
+      clearSelection();
+      qc.invalidateQueries({ queryKey: getListPhotosQueryKey() });
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
     }
   }
 
@@ -554,7 +583,7 @@ export default function PhotosPage() {
             variant="ghost"
             className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
             onClick={() => handleBulkVisibility(true)}
-            disabled={bulkUpdating}
+            disabled={bulkUpdating || bulkDeleting}
             data-testid="bulk-hide-btn"
           >
             <EyeOff className="h-3.5 w-3.5" />
@@ -565,11 +594,22 @@ export default function PhotosPage() {
             variant="ghost"
             className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
             onClick={() => handleBulkVisibility(false)}
-            disabled={bulkUpdating}
+            disabled={bulkUpdating || bulkDeleting}
             data-testid="bulk-unhide-btn"
           >
             <Eye className="h-3.5 w-3.5" />
             Unhide selected
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-3 text-red-400 hover:bg-red-500/20 hover:text-red-300 gap-1.5"
+            onClick={() => setConfirmBulkDelete(true)}
+            disabled={bulkUpdating || bulkDeleting}
+            data-testid="bulk-delete-btn"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete selected
           </Button>
           <div className="w-px h-4 bg-background/30" />
           <button
@@ -582,6 +622,30 @@ export default function PhotosPage() {
           </button>
         </div>
       )}
+
+      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected photo{selectedIds.size !== 1 ? "s" : ""}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting || selectedIds.size === 0}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="bulk-delete-confirm-btn"
+            >
+              {bulkDeleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

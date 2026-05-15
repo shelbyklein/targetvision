@@ -1418,6 +1418,89 @@ export const useBulkUpdatePhotos = <
   return useMutation(getBulkUpdatePhotosMutationOptions(options));
 };
 
+export const getBulkDeletePhotosUrl = () => {
+  return `/api/photos/bulk`;
+};
+
+export const bulkDeletePhotos = async (
+  bulkPhotoDelete: BulkPhotoDelete,
+  options?: RequestInit,
+): Promise<BulkPhotoDeleteResult> => {
+  return customFetch<BulkPhotoDeleteResult>(getBulkDeletePhotosUrl(), {
+    ...options,
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkPhotoDelete),
+  });
+};
+
+export const getBulkDeletePhotosMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkDeletePhotos>>,
+    TError,
+    { data: BodyType<BulkPhotoDelete> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkDeletePhotos>>,
+  TError,
+  { data: BodyType<BulkPhotoDelete> },
+  TContext
+> => {
+  const mutationKey = ["bulkDeletePhotos"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkDeletePhotos>>,
+    { data: BodyType<BulkPhotoDelete> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkDeletePhotos(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkDeletePhotosMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkDeletePhotos>>
+>;
+export type BulkDeletePhotosMutationBody = BodyType<BulkPhotoDelete>;
+export type BulkDeletePhotosMutationError = ErrorType<void>;
+
+/**
+ * @summary Bulk delete photos (admin only)
+ */
+export const useBulkDeletePhotos = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkDeletePhotos>>,
+    TError,
+    { data: BodyType<BulkPhotoDelete> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkDeletePhotos>>,
+  TError,
+  { data: BodyType<BulkPhotoDelete> },
+  TContext
+> => {
+  return useMutation(getBulkDeletePhotosMutationOptions(options));
+};
+
 /**
  * @summary Get a single photo by ID
  */

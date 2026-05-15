@@ -11,6 +11,7 @@ import {
   useAcceptPhotoNewCollectionSuggestion,
   useDismissPhotoNewCollectionSuggestion,
   useBulkUpdatePhotos,
+  useBulkDeletePhotos,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -412,9 +413,11 @@ export default function AlbumDetail() {
   } | null>(null);
   const [showHiddenLocal, setShowHiddenLocal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
+  const { mutateAsync: bulkDeletePhotos, isPending: bulkDeleting } = useBulkDeletePhotos();
 
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
@@ -552,6 +555,22 @@ export default function AlbumDetail() {
       invalidate();
     } catch {
       toast({ title: "Bulk action failed", variant: "destructive" });
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    setConfirmBulkDelete(false);
+    try {
+      const result = await bulkDeletePhotos({ data: { ids } });
+      const count = result?.deleted ?? ids.length;
+      toast({
+        title: `${count} photo${count !== 1 ? "s" : ""} deleted`,
+      });
+      clearSelection();
+      invalidate();
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
     }
   }
 
@@ -981,7 +1000,7 @@ export default function AlbumDetail() {
             variant="ghost"
             className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
             onClick={() => handleBulkVisibility(true)}
-            disabled={bulkUpdating}
+            disabled={bulkUpdating || bulkDeleting}
             data-testid="bulk-hide-btn"
           >
             <EyeOff className="h-3.5 w-3.5" />
@@ -992,11 +1011,22 @@ export default function AlbumDetail() {
             variant="ghost"
             className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
             onClick={() => handleBulkVisibility(false)}
-            disabled={bulkUpdating}
+            disabled={bulkUpdating || bulkDeleting}
             data-testid="bulk-unhide-btn"
           >
             <Eye className="h-3.5 w-3.5" />
             Unhide selected
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-3 text-red-400 hover:bg-red-500/20 hover:text-red-300 gap-1.5"
+            onClick={() => setConfirmBulkDelete(true)}
+            disabled={bulkUpdating || bulkDeleting}
+            data-testid="bulk-delete-btn"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete selected
           </Button>
           <div className="w-px h-4 bg-background/30" />
           <button
@@ -1009,6 +1039,30 @@ export default function AlbumDetail() {
           </button>
         </div>
       )}
+
+      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected photo{selectedIds.size !== 1 ? "s" : ""}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting || selectedIds.size === 0}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="bulk-delete-confirm-btn"
+            >
+              {bulkDeleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={confirmNewCollection !== null}

@@ -34,6 +34,8 @@ import {
   RerunPhotoAnalysisResponse,
   BulkUpdatePhotosBody,
   BulkUpdatePhotosResponse,
+  BulkDeletePhotosBody,
+  BulkDeletePhotosResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -181,6 +183,28 @@ router.patch("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
     .returning({ id: photosTable.id });
 
   res.json(BulkUpdatePhotosResponse.parse({ updated: updated.length }));
+});
+
+router.delete("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
+  if (req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const body = BulkDeletePhotosBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const { ids } = body.data;
+
+  const deleted = await db
+    .delete(photosTable)
+    .where(inArray(photosTable.id, ids))
+    .returning({ id: photosTable.id });
+
+  res.json(BulkDeletePhotosResponse.parse({ deleted: deleted.length }));
 });
 
 router.get("/photos/:id", requireAuth, async (req, res): Promise<void> => {

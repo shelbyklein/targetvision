@@ -439,6 +439,18 @@ export const BulkUpdatePhotosResponse = zod.object({
 });
 
 /**
+ * @summary Bulk delete photos (admin only)
+ */
+
+export const BulkDeletePhotosBody = zod.object({
+  ids: zod.array(zod.number()).min(1),
+});
+
+export const BulkDeletePhotosResponse = zod.object({
+  deleted: zod.number(),
+});
+
+/**
  * @summary Get a single photo by ID
  */
 export const GetPhotoParams = zod.object({

@@ -361,6 +361,15 @@ export interface BulkPhotoUpdateResult {
   updated: number;
 }
 
+export interface BulkPhotoDelete {
+  /** @minItems 1 */
+  ids: number[];
+}
+
+export interface BulkPhotoDeleteResult {
+  deleted: number;
+}
+
 export interface BulkRetryAiAnalysisEventsResult {
   succeeded: number;
   skipped: number;
