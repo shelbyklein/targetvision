@@ -76,6 +76,7 @@ import {
   Check,
   EyeOff,
   Eye,
+  RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -144,6 +145,76 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
     });
   }
 
+  async function processIndices(indices: number[]): Promise<{ successCount: number; errorCount: number }> {
+    if (!indices.length || isSubmitting) return { successCount: 0, errorCount: 0 };
+    setIsSubmitting(true);
+
+    const fileRefs = indices.map((index) => ({ index, file: files[index].file }));
+
+    let successCount = 0;
+    let errorCount = 0;
+    const CONCURRENCY = 4;
+    let cursor = 0;
+
+    async function runNext(): Promise<void> {
+      if (cursor >= fileRefs.length) return;
+      const { index, file } = fileRefs[cursor++];
+
+      setFiles((prev) =>
+        prev.map((f, i) =>
+          i === index ? { ...f, status: "uploading", progress: 10, errorMessage: undefined } : f
+        )
+      );
+
+      try {
+        const result = await uploadFile(file);
+        if (!result) throw new Error("Upload failed");
+
+        setFiles((prev) =>
+          prev.map((f, i) => (i === index ? { ...f, progress: 70 } : f))
+        );
+
+        await uploadPhoto({
+          id: albumId,
+          data: {
+            url: `/api/storage${result.objectPath}`,
+            storageKey: result.objectPath,
+            contentType: file.type,
+          },
+        });
+
+        setFiles((prev) =>
+          prev.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f))
+        );
+        successCount++;
+      } catch {
+        setFiles((prev) =>
+          prev.map((f, i) => (i === index ? { ...f, status: "error", progress: 0 } : f))
+        );
+        errorCount++;
+      }
+
+      await runNext();
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, fileRefs.length) }, runNext)
+    );
+
+    setIsSubmitting(false);
+    return { successCount, errorCount };
+  }
+
+  async function retryFile(index: number) {
+    const { successCount, errorCount } = await processIndices([index]);
+    onAdded();
+    if (errorCount === 0) {
+      toast({ title: successCount === 1 ? "Photo uploaded" : `${successCount} photos uploaded` });
+    } else {
+      toast({ title: "Photo failed to upload", variant: "destructive" });
+    }
+  }
+
   function handleClose(nextOpen: boolean) {
     if (!nextOpen && !isSubmitting) {
       files.forEach((f) => URL.revokeObjectURL(f.preview));
@@ -156,84 +227,27 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!files.length || isSubmitting) return;
-    setIsSubmitting(true);
 
-    let successCount = 0;
-    let errorCount = 0;
+    const pendingIndices = files
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.status === "pending")
+      .map(({ index }) => index);
 
-    const uploadableFiles = files.map((item, index) => ({ item, index })).filter(
-      ({ item }) => item.status !== "error"
-    );
+    const preErrorCount = files.filter((item) => item.status === "error").length;
+    const { successCount, errorCount: uploadErrorCount } = await processIndices(pendingIndices);
+    const totalErrors = preErrorCount + uploadErrorCount;
 
-    setBatchIndices(new Set(uploadableFiles.map(({ index }) => index)));
-
-    const CONCURRENCY = 4;
-    let cursor = 0;
-
-    async function runNext(): Promise<void> {
-      if (cursor >= uploadableFiles.length) return;
-      const { item, index } = uploadableFiles[cursor++];
-
-      setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "uploading", progress: 0 } : f
-        )
-      );
-
-      try {
-        const result = await uploadFile(item.file, (pct) => {
-          setFiles((prev) =>
-            prev.map((f, i) =>
-              i === index ? { ...f, progress: pct } : f
-            )
-          );
-        });
-        if (!result) throw new Error("Upload failed");
-
-        await uploadPhoto({
-          id: albumId,
-          data: {
-            url: `/api/storage${result.objectPath}`,
-            storageKey: result.objectPath,
-            contentType: item.file.type,
-          },
-        });
-
-        setFiles((prev) =>
-          prev.map((f, i) =>
-            i === index ? { ...f, status: "done", progress: 100 } : f
-          )
-        );
-        successCount++;
-      } catch {
-        setFiles((prev) =>
-          prev.map((f, i) =>
-            i === index ? { ...f, status: "error", progress: 0 } : f
-          )
-        );
-        errorCount++;
-      }
-
-      await runNext();
-    }
-
-    errorCount += files.filter((item) => item.status === "error").length;
-
-    await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, uploadableFiles.length) }, runNext)
-    );
-
-    setIsSubmitting(false);
+    setBatchIndices(new Set(pendingIndices));
     onAdded();
 
-    if (errorCount === 0) {
+    if (totalErrors === 0) {
       toast({
         title: successCount === 1 ? "Photo uploaded" : `${successCount} photos uploaded`,
       });
       handleClose(false);
     } else {
       toast({
-        title: `${errorCount} photo${errorCount !== 1 ? "s" : ""} failed to upload`,
+        title: `${totalErrors} photo${totalErrors !== 1 ? "s" : ""} failed to upload`,
         variant: "destructive",
       });
     }
@@ -332,6 +346,17 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
                       aria-label="Remove"
                     >
                       <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  {item.status === "error" && !isSubmitting && (
+                    <button
+                      type="button"
+                      onClick={() => retryFile(index)}
+                      className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                      aria-label="Retry"
+                      data-testid="retry-file-btn"
+                    >
+                      <RefreshCw className="h-4 w-4" />
                     </button>
                   )}
                 </div>
