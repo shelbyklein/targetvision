@@ -63,13 +63,13 @@ const clerkAppearance = {
     socialButtonsBlockButton: "border border-border bg-background hover:bg-accent transition-colors",
     formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90 font-medium",
     formFieldInput: "border border-input bg-background text-foreground focus:ring-ring",
-    header: "!mb-2",
-    footerAction: "bg-transparent",
+    header: "!pb-0 !mb-4",
+    footerAction: "bg-transparent !pt-4",
     dividerLine: "bg-border",
     alert: "border border-border bg-accent/20 rounded-md",
     otpCodeFieldInput: "border border-input bg-background text-foreground text-center",
-    formFieldRow: "gap-2",
-    main: "gap-4",
+    formFieldRow: "gap-3",
+    main: "!gap-5",
   },
 };
 
