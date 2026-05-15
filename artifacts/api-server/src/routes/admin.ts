@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import {
   db,
+  pool,
   appSettingsTable,
   APP_SETTINGS_SINGLETON_ID,
   aiAnalysisEventsTable,
@@ -340,5 +341,22 @@ router.post(
     );
   },
 );
+
+router.post("/migrate/add-collection-cover-photo", async (req, res): Promise<void> => {
+  const secret = process.env.BOOTSTRAP_ADMIN_SECRET;
+  if (!secret || req.headers["x-bootstrap-secret"] !== secret) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  try {
+    await pool.query(`
+      ALTER TABLE collections
+      ADD COLUMN IF NOT EXISTS cover_photo_id integer REFERENCES photos(id) ON DELETE SET NULL
+    `);
+    res.json({ ok: true, message: "cover_photo_id column added to collections" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 export default router;
