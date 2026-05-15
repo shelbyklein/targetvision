@@ -96,6 +96,7 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [batchIndices, setBatchIndices] = useState<ReadonlySet<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { mutateAsync: uploadPhoto } = useUploadPhoto();
   const { toast } = useToast();
@@ -146,6 +147,7 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
     if (!nextOpen && !isSubmitting) {
       files.forEach((f) => URL.revokeObjectURL(f.preview));
       setFiles([]);
+      setBatchIndices(new Set());
     }
     setOpen(nextOpen);
   }
@@ -161,6 +163,8 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
     const uploadableFiles = files.map((item, index) => ({ item, index })).filter(
       ({ item }) => item.status !== "error"
     );
+
+    setBatchIndices(new Set(uploadableFiles.map(({ index }) => index)));
 
     const CONCURRENCY = 4;
     let cursor = 0;
@@ -235,6 +239,17 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
 
   const pendingCount = files.filter((f) => f.status === "pending").length;
   const canSubmit = pendingCount > 0 && !isSubmitting;
+
+  const batchCount = batchIndices.size;
+  const completedInBatch = files.filter(
+    (f, i) => batchIndices.has(i) && (f.status === "done" || f.status === "error")
+  ).length;
+  const allTerminal = batchCount > 0 && completedInBatch === batchCount;
+  const overallProgress = allTerminal
+    ? 100
+    : batchCount > 0
+    ? Math.min(99, Math.floor((completedInBatch / batchCount) * 100))
+    : 0;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -319,6 +334,16 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {isSubmitting && batchCount > 0 && (
+            <div className="space-y-1.5 shrink-0" data-testid="overall-progress">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="font-medium">Overall progress</span>
+                <span>{completedInBatch} / {batchCount} photos uploaded</span>
+              </div>
+              <Progress value={overallProgress} className="h-2" />
             </div>
           )}
 
