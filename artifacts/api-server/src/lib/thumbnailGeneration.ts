@@ -62,7 +62,15 @@ function getPrivateObjectDir(): string {
 
 export type ThumbnailResult = "success" | "skipped" | "failed";
 
+const inProgressPhotoIds = new Set<number>();
+
 export async function generateAndStoreThumbnail(photoId: number, storageKey: string): Promise<ThumbnailResult> {
+  if (inProgressPhotoIds.has(photoId)) {
+    logger.info({ photoId }, "Thumbnail generation already in progress for photo, skipping duplicate");
+    return "skipped";
+  }
+
+  inProgressPhotoIds.add(photoId);
   try {
     if (!storageKey.startsWith("/objects/")) {
       logger.warn({ photoId, storageKey }, "Cannot generate thumbnail: unexpected storageKey format");
@@ -128,5 +136,7 @@ export async function generateAndStoreThumbnail(photoId: number, storageKey: str
   } catch (err) {
     logger.error({ err, photoId, storageKey }, "Thumbnail generation failed");
     return "failed";
+  } finally {
+    inProgressPhotoIds.delete(photoId);
   }
 }
