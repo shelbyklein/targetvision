@@ -60,11 +60,13 @@ function getPrivateObjectDir(): string {
   return dir;
 }
 
-export async function generateAndStoreThumbnail(photoId: number, storageKey: string): Promise<void> {
+export type ThumbnailResult = "success" | "skipped" | "failed";
+
+export async function generateAndStoreThumbnail(photoId: number, storageKey: string): Promise<ThumbnailResult> {
   try {
     if (!storageKey.startsWith("/objects/")) {
       logger.warn({ photoId, storageKey }, "Cannot generate thumbnail: unexpected storageKey format");
-      return;
+      return "skipped";
     }
 
     const privateObjectDir = getPrivateObjectDir();
@@ -82,7 +84,7 @@ export async function generateAndStoreThumbnail(photoId: number, storageKey: str
     const [exists] = await sourceFile.exists();
     if (!exists) {
       logger.warn({ photoId, storageKey }, "Source file not found, skipping thumbnail generation");
-      return;
+      return "skipped";
     }
 
     const [sourceBuffer] = await sourceFile.download();
@@ -122,7 +124,9 @@ export async function generateAndStoreThumbnail(photoId: number, storageKey: str
       .where(eq(photosTable.id, photoId));
 
     logger.info({ photoId, thumbnailKey }, "Thumbnail generated and stored");
+    return "success";
   } catch (err) {
     logger.error({ err, photoId, storageKey }, "Thumbnail generation failed");
+    return "failed";
   }
 }

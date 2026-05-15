@@ -2115,3 +2115,13 @@ export const GetTagCloudResponseItem = zod.object({
   count: zod.number(),
 });
 export const GetTagCloudResponse = zod.array(GetTagCloudResponseItem);
+
+/**
+ * @summary Generate thumbnails for all photos that don't have one yet (admin only)
+ */
+export const BackfillThumbnailsResponse = zod.object({
+  processed: zod.number(),
+  succeeded: zod.number(),
+  skipped: zod.number(),
+  failed: zod.number(),
+});

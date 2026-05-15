@@ -424,3 +424,10 @@ export type ListPhotosParams = {
   uploaderId?: number;
   includeHidden?: boolean;
 };
+
+export interface BackfillThumbnailsResult {
+  processed: number;
+  succeeded: number;
+  skipped: number;
+  failed: number;
+}

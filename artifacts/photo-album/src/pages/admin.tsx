@@ -21,6 +21,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { AiServicesSection } from "@/components/admin/AiServicesSection";
 import { RegistrationSection } from "@/components/admin/RegistrationSection";
+import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
 
 export default function Admin() {
   const qc = useQueryClient();
@@ -83,6 +84,8 @@ export default function Admin() {
         <RegistrationSection />
 
         <AiServicesSection />
+
+        <ThumbnailsSection />
 
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull, isNotNull, and } from "drizzle-orm";
 import {
   db,
   pool,
@@ -24,6 +24,7 @@ import {
   RetryAiAnalysisEventParams,
   RetryAiAnalysisEventResponse,
   BulkRetryAiAnalysisEventsResponse,
+  BackfillThumbnailsResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -35,6 +36,8 @@ import {
 } from "../lib/aiProviders";
 import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
+import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -341,6 +344,32 @@ router.post(
     );
   },
 );
+
+router.post("/admin/thumbnails/backfill", requireAdmin, async (_req, res): Promise<void> => {
+  const photos = await db
+    .select({ id: photosTable.id, storageKey: photosTable.storageKey })
+    .from(photosTable)
+    .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey)));
+
+  let succeeded = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const photo of photos) {
+    if (!photo.storageKey) continue;
+    const result = await generateAndStoreThumbnail(photo.id, photo.storageKey);
+    if (result === "success") {
+      succeeded++;
+    } else if (result === "skipped") {
+      skipped++;
+    } else {
+      failed++;
+      logger.warn({ photoId: photo.id }, "Thumbnail backfill failed for photo");
+    }
+  }
+
+  res.json(BackfillThumbnailsResponse.parse({ processed: photos.length, succeeded, skipped, failed }));
+});
 
 router.post("/migrate/add-collection-cover-photo", async (req, res): Promise<void> => {
   const secret = process.env.BOOTSTRAP_ADMIN_SECRET;
