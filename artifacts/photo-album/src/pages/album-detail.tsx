@@ -82,11 +82,14 @@ type SortOption = "newest" | "oldest" | "top-rated";
 
 const PAGE_SIZE = 50;
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
 interface FileItem {
   file: File;
   preview: string;
   status: "pending" | "uploading" | "done" | "error";
   progress: number;
+  errorMessage?: string;
 }
 
 function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => void }) {
@@ -102,12 +105,23 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
     if (!selected.length) return;
-    const newItems: FileItem[] = selected.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-      status: "pending",
-      progress: 0,
-    }));
+    const newItems: FileItem[] = selected.map((file) => {
+      if (file.size > MAX_FILE_SIZE) {
+        return {
+          file,
+          preview: URL.createObjectURL(file),
+          status: "error",
+          progress: 0,
+          errorMessage: "File too large — max 100MB",
+        };
+      }
+      return {
+        file,
+        preview: URL.createObjectURL(file),
+        status: "pending",
+        progress: 0,
+      };
+    });
     setFiles((prev) => [...prev, ...newItems]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -135,47 +149,63 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
     let successCount = 0;
     let errorCount = 0;
 
-    await Promise.all(
-      files.map(async (item, index) => {
+    const uploadableFiles = files.map((item, index) => ({ item, index })).filter(
+      ({ item }) => item.status !== "error"
+    );
+
+    const CONCURRENCY = 4;
+    let cursor = 0;
+
+    async function runNext(): Promise<void> {
+      if (cursor >= uploadableFiles.length) return;
+      const { item, index } = uploadableFiles[cursor++];
+
+      setFiles((prev) =>
+        prev.map((f, i) =>
+          i === index ? { ...f, status: "uploading", progress: 10 } : f
+        )
+      );
+
+      try {
+        const result = await uploadFile(item.file);
+        if (!result) throw new Error("Upload failed");
+
         setFiles((prev) =>
           prev.map((f, i) =>
-            i === index ? { ...f, status: "uploading", progress: 10 } : f
+            i === index ? { ...f, progress: 70 } : f
           )
         );
 
-        try {
-          const result = await uploadFile(item.file);
-          if (!result) throw new Error("Upload failed");
+        await uploadPhoto({
+          id: albumId,
+          data: {
+            url: `/api/storage${result.objectPath}`,
+            storageKey: result.objectPath,
+          },
+        });
 
-          setFiles((prev) =>
-            prev.map((f, i) =>
-              i === index ? { ...f, progress: 70 } : f
-            )
-          );
+        setFiles((prev) =>
+          prev.map((f, i) =>
+            i === index ? { ...f, status: "done", progress: 100 } : f
+          )
+        );
+        successCount++;
+      } catch {
+        setFiles((prev) =>
+          prev.map((f, i) =>
+            i === index ? { ...f, status: "error", progress: 0 } : f
+          )
+        );
+        errorCount++;
+      }
 
-          await uploadPhoto({
-            id: albumId,
-            data: {
-              url: `/api/storage${result.objectPath}`,
-              storageKey: result.objectPath,
-            },
-          });
+      await runNext();
+    }
 
-          setFiles((prev) =>
-            prev.map((f, i) =>
-              i === index ? { ...f, status: "done", progress: 100 } : f
-            )
-          );
-          successCount++;
-        } catch {
-          setFiles((prev) =>
-            prev.map((f, i) =>
-              i === index ? { ...f, status: "error", progress: 0 } : f
-            )
-          );
-          errorCount++;
-        }
-      })
+    errorCount += files.filter((item) => item.status === "error").length;
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, uploadableFiles.length) }, runNext)
     );
 
     setIsSubmitting(false);
@@ -262,6 +292,9 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
                     <p className="text-xs text-muted-foreground truncate">{item.file.name}</p>
                     {item.status === "uploading" && (
                       <Progress value={item.progress} className="h-1" />
+                    )}
+                    {item.status === "error" && item.errorMessage && (
+                      <p className="text-xs text-red-500">{item.errorMessage}</p>
                     )}
                   </div>
 
