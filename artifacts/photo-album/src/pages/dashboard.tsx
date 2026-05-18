@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FadeImage } from "@/components/ui/fade-image";
 import {
   useGetDashboardStats,
   useGetRecentPhotos,
@@ -68,7 +69,7 @@ function PhotoStrip({
           data-testid="photo-strip-item"
           aria-label={`Preview ${photo.name ?? "photo"}`}
         >
-          <img
+          <FadeImage
             src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
             alt={photo.name ?? "Photo"}
             className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { FadeImage } from "@/components/ui/fade-image";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetCollection,
@@ -453,7 +454,7 @@ export default function CollectionDetail() {
                 >
                   <Link href={`/photos/${photo.id}`}>
                     <div className="aspect-[4/3] overflow-hidden">
-                      <img
+                      <FadeImage
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt={photo.caption ?? "Photo"}
                         className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { FadeImage } from "@/components/ui/fade-image";
 import { useListAlbums, useCreateAlbum, getListAlbumsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -144,7 +145,7 @@ export default function Albums() {
                 <div className="rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow" data-testid="album-card">
                   <div className="aspect-[4/3] bg-muted overflow-hidden">
                     {album.coverPhotoUrl ? (
-                      <img
+                      <FadeImage
                         src={album.coverPhotoThumbnailKey ? `/api/storage${album.coverPhotoThumbnailKey}` : album.coverPhotoUrl}
                         alt={album.title}
                         className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { FadeImage } from "@/components/ui/fade-image";
 import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
@@ -437,7 +438,7 @@ export default function PhotosPage() {
                       </button>
                     )}
                     <Link href={`/photos/${photo.id}`} className="block h-full w-full cursor-pointer">
-                      <img
+                      <FadeImage
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
                         className={cn(

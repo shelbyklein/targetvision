@@ -213,9 +213,10 @@ export default function PhotoDetail() {
     query: { enabled: !!photo?.albumId },
   });
 
-  const currentIndex = albumPhotos ? albumPhotos.findIndex((p) => p.id === photoId) : -1;
-  const prevPhotoId = currentIndex > 0 ? albumPhotos![currentIndex - 1].id : null;
-  const nextPhotoId = currentIndex >= 0 && albumPhotos && currentIndex < albumPhotos.length - 1 ? albumPhotos![currentIndex + 1].id : null;
+  const albumPhotosList = albumPhotos?.photos ?? [];
+  const currentIndex = albumPhotosList.length > 0 ? albumPhotosList.findIndex((p) => p.id === photoId) : -1;
+  const prevPhotoId = currentIndex > 0 ? albumPhotosList[currentIndex - 1].id : null;
+  const nextPhotoId = currentIndex >= 0 && currentIndex < albumPhotosList.length - 1 ? albumPhotosList[currentIndex + 1].id : null;
 
   useEffect(() => {
     setEditingDescription(false);

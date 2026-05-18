@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { FadeImage } from "@/components/ui/fade-image";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetAlbum,
@@ -820,7 +821,7 @@ export default function AlbumDetail() {
                 )}
                 <Link href={`/photos/${photo.id}`}>
                   <div className={`aspect-[4/3] overflow-hidden${photo.isHidden ? " opacity-60" : ""}`}>
-                    <img
+                    <FadeImage
                       src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                       alt={photo.name ?? "Photo"}
                       loading="lazy"

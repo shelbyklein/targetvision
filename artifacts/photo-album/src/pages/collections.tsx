@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { FadeImage } from "@/components/ui/fade-image";
 import {
   useListCollections,
   useCreateCollection,
@@ -295,7 +296,7 @@ export default function Collections() {
                     >
                       <div className="aspect-[4/3] bg-muted overflow-hidden">
                         {collection.coverPhotoUrl ? (
-                          <img
+                          <FadeImage
                             src={collection.coverPhotoThumbnailKey ? `/api/storage${collection.coverPhotoThumbnailKey}` : collection.coverPhotoUrl}
                             alt={collection.title}
                             className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"

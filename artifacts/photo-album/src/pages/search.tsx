@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { FadeImage } from "@/components/ui/fade-image";
 import { useLocation, useSearch } from "wouter";
 import {
   useSearchPhotos,
@@ -418,7 +419,7 @@ export default function SearchPage() {
                       "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
                       photo.isHidden && "opacity-60"
                     )}>
-                      <img
+                      <FadeImage
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
                         className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
