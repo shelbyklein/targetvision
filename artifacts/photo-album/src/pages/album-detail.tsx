@@ -443,6 +443,8 @@ export default function AlbumDetail() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
+  const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
+  const [hoveredSuggestions, setHoveredSuggestions] = useState<Set<number>>(new Set());
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
   const { mutateAsync: bulkDeletePhotos, isPending: bulkDeleting } = useBulkDeletePhotos();
 
@@ -830,121 +832,168 @@ export default function AlbumDetail() {
                   </div>
                 </Link>
 
-                {((photo.suggestedCollections && photo.suggestedCollections.length > 0) ||
-                  (photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0)) && (
-                <div className="absolute bottom-2 left-2 right-2 z-10 flex flex-col gap-1">
-                  {photo.suggestedCollections && photo.suggestedCollections.length > 0 && (
-                    <div className="flex flex-wrap gap-1" data-testid="card-suggestions">
-                      {photo.suggestedCollections.slice(0, 3).map((s) => (
-                        <div
-                          key={s.id}
-                          role="button"
-                          tabIndex={0}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-primary/5 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-primary/10 backdrop-blur-sm cursor-pointer"
-                          data-testid={`card-suggested-collection-${s.id}`}
+                {(() => {
+                  const existingSuggestions = photo.suggestedCollections ?? [];
+                  const newSuggestions = photo.suggestedNewCollections ?? [];
+                  if (existingSuggestions.length === 0 && newSuggestions.length === 0) return null;
+
+                  const MAX_VISIBLE = 2;
+                  const isExpanded = expandedSuggestions.has(photo.id) || hoveredSuggestions.has(photo.id);
+
+                  type PillItem =
+                    | { kind: "existing"; s: (typeof existingSuggestions)[0] }
+                    | { kind: "new"; s: (typeof newSuggestions)[0] };
+
+                  const allItems: PillItem[] = [
+                    ...existingSuggestions.map((s) => ({ kind: "existing" as const, s })),
+                    ...newSuggestions.map((s) => ({ kind: "new" as const, s })),
+                  ];
+
+                  const visibleItems = isExpanded ? allItems : allItems.slice(0, MAX_VISIBLE);
+                  const hiddenCount = allItems.length - MAX_VISIBLE;
+
+                  return (
+                    <div
+                      className="absolute bottom-2 left-2 right-2 z-10 flex flex-wrap gap-1"
+                      data-testid="card-suggestions"
+                      onMouseLeave={() => {
+                        setHoveredSuggestions((prev) => {
+                          const next = new Set(prev);
+                          next.delete(photo.id);
+                          return next;
+                        });
+                      }}
+                    >
+                      {visibleItems.map((item) => {
+                        if (item.kind === "existing") {
+                          const s = item.s;
+                          return (
+                            <div
+                              key={`existing-${s.id}`}
+                              role="button"
+                              tabIndex={0}
+                              className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-primary/5 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-primary/10 backdrop-blur-sm cursor-pointer"
+                              data-testid={`card-suggested-collection-${s.id}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleAcceptSuggestion(photo.id, s.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAcceptSuggestion(photo.id, s.id);
+                                }
+                              }}
+                              aria-label={`Accept suggestion ${s.title}`}
+                            >
+                              <Sparkles className="h-2 w-2 text-primary" />
+                              <span>Add to {s.title}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleAcceptSuggestion(photo.id, s.id);
+                                }}
+                                className="rounded-full p-0.5 hover:bg-primary/20 text-primary"
+                                aria-label={`Accept suggestion ${s.title}`}
+                                data-testid={`card-accept-suggestion-${s.id}`}
+                              >
+                                <Check className="h-2 w-2" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDismissSuggestion(photo.id, s.id);
+                                }}
+                                className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
+                                aria-label={`Dismiss suggestion ${s.title}`}
+                                data-testid={`card-dismiss-suggestion-${s.id}`}
+                              >
+                                <X className="h-2 w-2" />
+                              </button>
+                            </div>
+                          );
+                        } else {
+                          const s = item.s;
+                          return (
+                            <div
+                              key={`new-${s.id}`}
+                              role="button"
+                              tabIndex={0}
+                              className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 backdrop-blur-sm cursor-pointer"
+                              data-testid={`card-suggested-new-collection-${s.id}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
+                                }
+                              }}
+                              aria-label={`Accept new collection suggestion ${s.suggestedName}`}
+                            >
+                              <Sparkles className="h-2 w-2 text-emerald-600 dark:text-emerald-400" />
+                              <span>New: {s.suggestedName}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
+                                }}
+                                className="rounded-full p-0.5 hover:bg-emerald-200/60 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-400"
+                                aria-label={`Accept new collection suggestion ${s.suggestedName}`}
+                                data-testid={`card-accept-new-collection-suggestion-${s.id}`}
+                              >
+                                <Check className="h-2 w-2" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleDismissNewCollectionSuggestion(photo.id, s.id);
+                                }}
+                                className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
+                                aria-label={`Dismiss new collection suggestion ${s.suggestedName}`}
+                                data-testid={`card-dismiss-new-collection-suggestion-${s.id}`}
+                              >
+                                <X className="h-2 w-2" />
+                              </button>
+                            </div>
+                          );
+                        }
+                      })}
+                      {!isExpanded && hiddenCount > 0 && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center rounded-full border border-muted-foreground/30 bg-background/70 px-1.5 py-px text-[9px] text-muted-foreground backdrop-blur-sm hover:bg-background/90 hover:text-foreground transition-colors"
+                          data-testid="card-suggestions-show-more"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            handleAcceptSuggestion(photo.id, s.id);
+                            setExpandedSuggestions((prev) => new Set([...prev, photo.id]));
                           }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleAcceptSuggestion(photo.id, s.id);
-                            }
+                          onMouseEnter={() => {
+                            setHoveredSuggestions((prev) => new Set([...prev, photo.id]));
                           }}
-                          aria-label={`Accept suggestion ${s.title}`}
+                          aria-label={`Show ${hiddenCount} more suggestion${hiddenCount > 1 ? "s" : ""}`}
                         >
-                          <Sparkles className="h-2 w-2 text-primary" />
-                          <span>Add to {s.title}</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleAcceptSuggestion(photo.id, s.id);
-                            }}
-                            className="rounded-full p-0.5 hover:bg-primary/20 text-primary"
-                            aria-label={`Accept suggestion ${s.title}`}
-                            data-testid={`card-accept-suggestion-${s.id}`}
-                          >
-                            <Check className="h-2 w-2" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDismissSuggestion(photo.id, s.id);
-                            }}
-                            className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
-                            aria-label={`Dismiss suggestion ${s.title}`}
-                            data-testid={`card-dismiss-suggestion-${s.id}`}
-                          >
-                            <X className="h-2 w-2" />
-                          </button>
-                        </div>
-                      ))}
+                          +{hiddenCount} more
+                        </button>
+                      )}
                     </div>
-                  )}
-                  {photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0 && (
-                    <div className="flex flex-wrap gap-1" data-testid="card-new-collection-suggestions">
-                      {photo.suggestedNewCollections.slice(0, 2).map((s) => (
-                        <div
-                          key={s.id}
-                          role="button"
-                          tabIndex={0}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 backdrop-blur-sm cursor-pointer"
-                          data-testid={`card-suggested-new-collection-${s.id}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
-                            }
-                          }}
-                          aria-label={`Accept new collection suggestion ${s.suggestedName}`}
-                        >
-                          <Sparkles className="h-2 w-2 text-emerald-600 dark:text-emerald-400" />
-                          <span>New: {s.suggestedName}</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
-                            }}
-                            className="rounded-full p-0.5 hover:bg-emerald-200/60 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-400"
-                            aria-label={`Accept new collection suggestion ${s.suggestedName}`}
-                            data-testid={`card-accept-new-collection-suggestion-${s.id}`}
-                          >
-                            <Check className="h-2 w-2" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDismissNewCollectionSuggestion(photo.id, s.id);
-                            }}
-                            className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
-                            aria-label={`Dismiss new collection suggestion ${s.suggestedName}`}
-                            data-testid={`card-dismiss-new-collection-suggestion-${s.id}`}
-                          >
-                            <X className="h-2 w-2" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                )}
+                  );
+                })()}
 
                 {photo.isHidden && (
                   <div
