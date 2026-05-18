@@ -478,6 +478,11 @@ export default function AlbumDetail() {
   const hasMore = photosPage?.hasMore ?? false;
 
   useEffect(() => {
+    setOffset(0);
+    setAllPhotos([]);
+  }, [albumId, showHiddenLocal]);
+
+  useEffect(() => {
     if (photosPage === undefined) return;
     const newPhotos = photosPage.photos;
     if (offset === 0) {
@@ -492,11 +497,6 @@ export default function AlbumDetail() {
       });
     }
   }, [photosPage, offset]);
-
-  useEffect(() => {
-    setOffset(0);
-    setAllPhotos([]);
-  }, [albumId, showHiddenLocal]);
   const { mutate: setCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
