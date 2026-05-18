@@ -832,16 +832,29 @@ export default function AlbumDetail() {
 
                 {((photo.suggestedCollections && photo.suggestedCollections.length > 0) ||
                   (photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0)) && (
-                <div className="p-2 space-y-1">
+                <div className="absolute bottom-2 left-2 right-2 z-10 flex flex-col gap-1">
                   {photo.suggestedCollections && photo.suggestedCollections.length > 0 && (
-                    <div className="flex flex-wrap gap-1 pt-0.5" data-testid="card-suggestions">
+                    <div className="flex flex-wrap gap-1" data-testid="card-suggestions">
                       {photo.suggestedCollections.slice(0, 3).map((s) => (
-                        <span
+                        <div
                           key={s.id}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-primary/5 pl-1.5 pr-0.5 py-px text-[9px] text-foreground"
+                          role="button"
+                          tabIndex={0}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-primary/5 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-primary/10 backdrop-blur-sm cursor-pointer"
                           data-testid={`card-suggested-collection-${s.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAcceptSuggestion(photo.id, s.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAcceptSuggestion(photo.id, s.id);
+                            }
+                          }}
+                          aria-label={`Accept suggestion ${s.title}`}
                         >
                           <Sparkles className="h-2 w-2 text-primary" />
                           <span>Add to {s.title}</span>
@@ -871,19 +884,32 @@ export default function AlbumDetail() {
                           >
                             <X className="h-2 w-2" />
                           </button>
-                        </span>
+                        </div>
                       ))}
                     </div>
                   )}
                   {photo.suggestedNewCollections && photo.suggestedNewCollections.length > 0 && (
-                    <div className="flex flex-wrap gap-1 pt-0.5" data-testid="card-new-collection-suggestions">
+                    <div className="flex flex-wrap gap-1" data-testid="card-new-collection-suggestions">
                       {photo.suggestedNewCollections.slice(0, 2).map((s) => (
-                        <span
+                        <div
                           key={s.id}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-0.5 py-px text-[9px] text-foreground"
+                          role="button"
+                          tabIndex={0}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 backdrop-blur-sm cursor-pointer"
                           data-testid={`card-suggested-new-collection-${s.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
+                            }
+                          }}
+                          aria-label={`Accept new collection suggestion ${s.suggestedName}`}
                         >
                           <Sparkles className="h-2 w-2 text-emerald-600 dark:text-emerald-400" />
                           <span>New: {s.suggestedName}</span>
@@ -913,7 +939,7 @@ export default function AlbumDetail() {
                           >
                             <X className="h-2 w-2" />
                           </button>
-                        </span>
+                        </div>
                       ))}
                     </div>
                   )}
