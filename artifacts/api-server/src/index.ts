@@ -2,7 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { generateAndStoreThumbnail } from "./lib/thumbnailGeneration";
 import { db, photosTable } from "@workspace/db";
-import { isNull, isNotNull, and } from "drizzle-orm";
+import { isNull, isNotNull, and, eq } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
 
@@ -23,7 +23,7 @@ async function backfillMissingThumbnails(): Promise<void> {
     const photos = await db
       .select({ id: photosTable.id, storageKey: photosTable.storageKey })
       .from(photosTable)
-      .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey)));
+      .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey), eq(photosTable.thumbnailGenerating, false)));
 
     if (photos.length === 0) {
       logger.info("Startup thumbnail backfill: no photos missing thumbnails");

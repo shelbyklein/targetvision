@@ -14,6 +14,7 @@ export const photosTable = pgTable("photos", {
   url: text("url").notNull(),
   aiDescription: text("ai_description"),
   isHidden: boolean("is_hidden").notNull().default(false),
+  thumbnailGenerating: boolean("thumbnail_generating").notNull().default(false),
   takenAt: timestamp("taken_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

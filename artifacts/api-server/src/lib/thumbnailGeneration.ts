@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { randomUUID } from "crypto";
 import { objectStorageClient } from "./objectStorage";
 import { db, photosTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { logger } from "./logger";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
@@ -67,6 +67,17 @@ const inProgressPhotoIds = new Set<number>();
 export async function generateAndStoreThumbnail(photoId: number, storageKey: string): Promise<ThumbnailResult> {
   if (inProgressPhotoIds.has(photoId)) {
     logger.info({ photoId }, "Thumbnail generation already in progress for photo, skipping duplicate");
+    return "skipped";
+  }
+
+  const claimed = await db
+    .update(photosTable)
+    .set({ thumbnailGenerating: true })
+    .where(and(eq(photosTable.id, photoId), eq(photosTable.thumbnailGenerating, false)))
+    .returning({ id: photosTable.id });
+
+  if (claimed.length === 0) {
+    logger.info({ photoId }, "Thumbnail generation already claimed by another process, skipping duplicate");
     return "skipped";
   }
 
@@ -138,5 +149,9 @@ export async function generateAndStoreThumbnail(photoId: number, storageKey: str
     return "failed";
   } finally {
     inProgressPhotoIds.delete(photoId);
+    await db
+      .update(photosTable)
+      .set({ thumbnailGenerating: false })
+      .where(eq(photosTable.id, photoId));
   }
 }
