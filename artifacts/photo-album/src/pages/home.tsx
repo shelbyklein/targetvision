@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Camera, Image, Star, Tag } from "lucide-react";
+import { Image, Star, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGetRegistrationSettings } from "@workspace/api-client-react";
 
@@ -29,10 +29,6 @@ export default function Home() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-20 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm text-primary font-medium mb-8">
-          <Camera className="h-4 w-4" />
-          Internal Marketing Tool
-        </div>
 
         <h1 className="text-5xl font-bold tracking-tight text-foreground mb-6 leading-tight">
           Pick the right photos<br />for marketing, together.
