@@ -872,7 +872,7 @@ export default function AlbumDetail() {
                               key={`existing-${s.id}`}
                               role="button"
                               tabIndex={0}
-                              className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-primary/5 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-primary/10 backdrop-blur-sm cursor-pointer"
+                              className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-rose-50 dark:bg-rose-950 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-rose-100 dark:hover:bg-rose-900 cursor-pointer"
                               data-testid={`card-suggested-collection-${s.id}`}
                               onClick={(e) => {
                                 e.preventDefault();
@@ -897,7 +897,7 @@ export default function AlbumDetail() {
                                   e.stopPropagation();
                                   handleAcceptSuggestion(photo.id, s.id);
                                 }}
-                                className="rounded-full p-0.5 hover:bg-primary/20 text-primary"
+                                className="rounded-full p-0.5 hover:bg-rose-100 dark:hover:bg-rose-900 text-primary"
                                 aria-label={`Accept suggestion ${s.title}`}
                                 data-testid={`card-accept-suggestion-${s.id}`}
                               >
@@ -925,7 +925,7 @@ export default function AlbumDetail() {
                               key={`new-${s.id}`}
                               role="button"
                               tabIndex={0}
-                              className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 backdrop-blur-sm cursor-pointer"
+                              className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-100 dark:bg-emerald-900 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-emerald-200 dark:hover:bg-emerald-800 cursor-pointer"
                               data-testid={`card-suggested-new-collection-${s.id}`}
                               onClick={(e) => {
                                 e.preventDefault();
@@ -950,7 +950,7 @@ export default function AlbumDetail() {
                                   e.stopPropagation();
                                   setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
                                 }}
-                                className="rounded-full p-0.5 hover:bg-emerald-200/60 dark:hover:bg-emerald-800/40 text-emerald-700 dark:text-emerald-400"
+                                className="rounded-full p-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-800 text-emerald-700 dark:text-emerald-400"
                                 aria-label={`Accept new collection suggestion ${s.suggestedName}`}
                                 data-testid={`card-accept-new-collection-suggestion-${s.id}`}
                               >

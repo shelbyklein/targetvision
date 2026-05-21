@@ -679,14 +679,14 @@ export default function PhotoDetail() {
                     {photo.suggestedCollections.map((s) => (
                       <div
                         key={s.id}
-                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-2.5 pr-1 py-0.5 text-xs"
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-rose-50 dark:bg-rose-950 pl-2.5 pr-1 py-0.5 text-xs"
                         data-testid={`suggested-collection-${s.id}`}
                       >
                         <Sparkles className="h-3 w-3 text-primary" />
                         <span className="text-foreground">{s.title}</span>
                         <button
                           onClick={() => handleAcceptSuggestion(s.id)}
-                          className="rounded-full p-0.5 hover:bg-primary/15 text-primary"
+                          className="rounded-full p-0.5 hover:bg-rose-100 dark:hover:bg-rose-900 text-primary"
                           aria-label="Accept suggestion"
                           data-testid={`accept-suggestion-${s.id}`}
                         >
@@ -714,14 +714,14 @@ export default function PhotoDetail() {
                     {photo.suggestedNewCollections.map((s) => (
                       <div
                         key={s.id}
-                        className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-50/60 dark:bg-emerald-950/30 pl-2.5 pr-1 py-0.5 text-xs"
+                        className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-100 dark:bg-emerald-900 pl-2.5 pr-1 py-0.5 text-xs"
                         data-testid={`suggested-new-collection-${s.id}`}
                       >
                         <Sparkles className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                         <span className="text-foreground">{s.suggestedName}</span>
                         <button
                           onClick={() => setConfirmNewCollection({ suggestionId: s.id, name: s.suggestedName })}
-                          className="rounded-full p-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
+                          className="rounded-full p-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-800 text-emerald-600 dark:text-emerald-400"
                           aria-label="Create collection and add photo"
                           title="Create this collection and add photo"
                           data-testid={`accept-new-collection-suggestion-${s.id}`}
