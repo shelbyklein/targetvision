@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Link } from "wouter";
 import {
@@ -7,21 +7,16 @@ import {
   useListCollections,
   useAddPhotoToCollection,
   useRemovePhotoFromCollection,
+  useUpdatePhoto,
+  useGetMe,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
+  getListPhotosQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { FadeImage } from "@/components/ui/fade-image";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export interface LightboxPhoto {
   id: number;
@@ -41,7 +36,7 @@ interface PhotoLightboxProps {
   hasNext?: boolean;
 }
 
-function CollectionManager({ photoId, albumId }: { photoId: number; albumId?: number | null }) {
+function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: number | null }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data: fullPhoto, isLoading: photoLoading } = useGetPhoto(photoId, {
@@ -50,12 +45,15 @@ function CollectionManager({ photoId, albumId }: { photoId: number; albumId?: nu
   const { data: allCollections, isLoading: collectionsLoading } = useListCollections();
   const { mutate: addToCollection, isPending: adding } = useAddPhotoToCollection();
   const { mutate: removeFromCollection, isPending: removing } = useRemovePhotoFromCollection();
+  const { mutate: updatePhoto, isPending: updatingVisibility } = useUpdatePhoto();
+  const { data: me } = useGetMe();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
     if (albumId) {
       qc.invalidateQueries({ queryKey: getListAlbumPhotosQueryKey(albumId) });
     }
+    qc.invalidateQueries({ queryKey: getListPhotosQueryKey().slice(0, 1) });
   }
 
   function handleAdd(collectionId: string) {
@@ -84,10 +82,22 @@ function CollectionManager({ photoId, albumId }: { photoId: number; albumId?: nu
     );
   }
 
+  function handleToggleHidden() {
+    const next = !fullPhoto?.isHidden;
+    updatePhoto(
+      { id: photoId, data: { isHidden: next } },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: next ? "Photo hidden" : "Photo visible again" });
+        },
+        onError: () => toast({ title: "Failed to update photo", variant: "destructive" }),
+      }
+    );
+  }
+
   const currentCollections = fullPhoto?.photoCollections ?? [];
-  const availableCollections = (allCollections ?? []).filter(
-    (col) => !currentCollections.some((c) => c.id === col.id)
-  );
+  const isHidden = fullPhoto?.isHidden ?? false;
 
   if (photoLoading || collectionsLoading) {
     return (
@@ -98,58 +108,63 @@ function CollectionManager({ photoId, albumId }: { photoId: number; albumId?: nu
   }
 
   return (
-    <div className="space-y-3" data-testid="lightbox-collection-manager">
-      <div className="flex items-center gap-1.5 text-white/80">
-        <FolderOpen className="h-4 w-4" />
-        <span className="text-sm font-medium">Collections</span>
-      </div>
+    <div className="space-y-4" data-testid="lightbox-collection-manager">
+      {me?.role === "admin" && (
+        <button
+          type="button"
+          onClick={handleToggleHidden}
+          disabled={updatingVisibility}
+          className={cn(
+            "flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50",
+            isHidden
+              ? "bg-amber-500/20 border-amber-400/40 text-amber-300 hover:bg-amber-500/30"
+              : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20"
+          )}
+          data-testid="lightbox-toggle-hidden"
+        >
+          {isHidden ? <Eye className="h-4 w-4 shrink-0" /> : <EyeOff className="h-4 w-4 shrink-0" />}
+          {isHidden ? "Unhide photo" : "Hide photo"}
+        </button>
+      )}
 
-      {currentCollections.length > 0 ? (
-        <div className="flex flex-wrap gap-2" data-testid="lightbox-current-collections">
-          {currentCollections.map((col) => (
-            <Badge
-              key={col.id}
-              variant="secondary"
-              className="gap-1.5 pl-2.5 pr-1 py-1 bg-white/15 text-white border-white/20 hover:bg-white/20"
-              data-testid={`lightbox-collection-badge-${col.id}`}
-            >
-              {col.title}
-              <button
-                type="button"
-                onClick={() => handleRemove(col.id, col.title)}
-                disabled={removing}
-                className="rounded-full p-0.5 hover:bg-white/20 transition-colors disabled:opacity-50"
-                aria-label={`Remove from ${col.title}`}
-                data-testid={`lightbox-remove-collection-${col.id}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-white/70">
+          <FolderOpen className="h-3.5 w-3.5" />
+          <span className="text-xs font-semibold uppercase tracking-wide">Collections</span>
         </div>
-      ) : (
-        <p className="text-xs text-white/50" data-testid="lightbox-no-collections">
-          Not in any collection yet.
-        </p>
-      )}
 
-      {availableCollections.length > 0 && (
-        <Select onValueChange={handleAdd} disabled={adding} value="">
-          <SelectTrigger
-            className="h-8 text-xs bg-white/10 border-white/20 text-white w-48 data-[placeholder]:text-white/60"
-            data-testid="lightbox-add-collection-select"
-          >
-            <SelectValue placeholder="Add to collection…" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableCollections.map((col) => (
-              <SelectItem key={col.id} value={String(col.id)}>
-                {col.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+        {allCollections && allCollections.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5" data-testid="lightbox-collection-pills">
+            {allCollections.map((col) => {
+              const isIn = currentCollections.some((c) => c.id === col.id);
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  onClick={() =>
+                    isIn ? handleRemove(col.id, col.title) : handleAdd(String(col.id))
+                  }
+                  disabled={adding || removing}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50",
+                    isIn
+                      ? "bg-white text-gray-900 border border-white hover:bg-white/85"
+                      : "bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
+                  )}
+                  data-testid={`lightbox-collection-pill-${col.id}`}
+                  aria-label={isIn ? `Remove from ${col.title}` : `Add to ${col.title}`}
+                  aria-pressed={isIn}
+                >
+                  {isIn ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
+                  {col.title}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-white/40">No collections yet.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -271,7 +286,7 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
               </div>
 
               <div
-                className="lg:w-64 shrink-0 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 p-4 space-y-4"
+                className="lg:w-64 shrink-0 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 p-4 space-y-3 lg:max-h-[85vh] lg:overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
                 data-testid="lightbox-sidebar"
               >
@@ -284,7 +299,23 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                   <ExternalLink className="h-4 w-4 shrink-0" />
                   View full details
                 </Link>
-                <CollectionManager photoId={photo.id} albumId={photo.albumId} />
+
+                <a
+                  href={photo.url}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 w-full rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-2 text-sm font-medium text-white transition-colors"
+                  data-testid="lightbox-download"
+                >
+                  <Download className="h-4 w-4 shrink-0" />
+                  Download
+                </a>
+
+                <div className="border-t border-white/10 pt-3">
+                  <PhotoSidebarContent photoId={photo.id} albumId={photo.albumId} />
+                </div>
               </div>
             </div>
           )}
