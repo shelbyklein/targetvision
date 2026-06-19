@@ -1,5 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2 } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 import {
   useGetPhoto,
   useListCollections,
@@ -205,10 +206,19 @@ export function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
               </div>
 
               <div
-                className="lg:w-64 shrink-0 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 p-4"
+                className="lg:w-64 shrink-0 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 p-4 space-y-4"
                 onClick={(e) => e.stopPropagation()}
                 data-testid="lightbox-sidebar"
               >
+                <Link
+                  href={`/photos/${photo.id}`}
+                  onClick={onClose}
+                  className="flex items-center gap-2 w-full rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-2 text-sm font-medium text-white transition-colors"
+                  data-testid="lightbox-view-details-link"
+                >
+                  <ExternalLink className="h-4 w-4 shrink-0" />
+                  View full details
+                </Link>
                 <CollectionManager photoId={photo.id} albumId={photo.albumId} />
               </div>
             </div>
