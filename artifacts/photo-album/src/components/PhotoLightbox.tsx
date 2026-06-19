@@ -1,5 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect } from "react";
 import { Link } from "wouter";
 import {
   useGetPhoto,
@@ -34,6 +35,10 @@ export interface LightboxPhoto {
 interface PhotoLightboxProps {
   photo: LightboxPhoto | null;
   onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
 }
 
 function CollectionManager({ photoId, albumId }: { photoId: number; albumId?: number | null }) {
@@ -149,8 +154,23 @@ function CollectionManager({ photoId, albumId }: { photoId: number; albumId?: nu
   );
 }
 
-export function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
+
+  useEffect(() => {
+    if (!photo) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft" && hasPrev && onPrev) {
+        e.preventDefault();
+        onPrev();
+      } else if (e.key === "ArrowRight" && hasNext && onNext) {
+        e.preventDefault();
+        onNext();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [photo, hasPrev, hasNext, onPrev, onNext]);
 
   return (
     <DialogPrimitive.Root open={photo !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -177,6 +197,30 @@ export function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
           >
             <X className="h-5 w-5" />
           </button>
+
+          {onPrev && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPrev(); }}
+              disabled={!hasPrev}
+              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors focus:outline-none focus:ring-2 focus:ring-white z-10 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous photo"
+              data-testid="lightbox-prev"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+
+          {onNext && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onNext(); }}
+              disabled={!hasNext}
+              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors focus:outline-none focus:ring-2 focus:ring-white z-10 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next photo"
+              data-testid="lightbox-next"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
 
           {photo && (
             <div className="flex flex-col lg:flex-row items-center lg:items-start gap-6 max-w-6xl w-full max-h-[90vh]">

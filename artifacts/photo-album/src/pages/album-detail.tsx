@@ -1243,6 +1243,24 @@ export default function AlbumDetail() {
       <PhotoLightbox
         photo={selectedPhoto}
         onClose={() => setSelectedPhoto(null)}
+        hasPrev={selectedPhoto !== null && sortedPhotos.findIndex((p) => p.id === selectedPhoto.id) > 0}
+        hasNext={selectedPhoto !== null && sortedPhotos.findIndex((p) => p.id === selectedPhoto.id) < sortedPhotos.length - 1}
+        onPrev={() => {
+          if (!selectedPhoto) return;
+          const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
+          if (idx > 0) {
+            const p = sortedPhotos[idx - 1];
+            setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId });
+          }
+        }}
+        onNext={() => {
+          if (!selectedPhoto) return;
+          const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
+          if (idx < sortedPhotos.length - 1) {
+            const p = sortedPhotos[idx + 1];
+            setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId });
+          }
+        }}
       />
     </AppLayout>
   );
