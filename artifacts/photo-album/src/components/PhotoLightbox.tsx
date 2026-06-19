@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "wouter";
 import {
   useGetPhoto,
@@ -154,8 +154,11 @@ function CollectionManager({ photoId, albumId }: { photoId: number; albumId?: nu
   );
 }
 
+const SWIPE_THRESHOLD = 50;
+
 export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     if (!photo) return;
@@ -172,6 +175,22 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
     return () => window.removeEventListener("keydown", handleKey);
   }, [photo, hasPrev, hasNext, onPrev, onNext]);
 
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+    if (deltaX < 0 && hasNext && onNext) {
+      onNext();
+    } else if (deltaX > 0 && hasPrev && onPrev) {
+      onPrev();
+    }
+  }
+
   return (
     <DialogPrimitive.Root open={photo !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogPrimitive.Portal>
@@ -184,6 +203,8 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
           data-testid="photo-lightbox"
           aria-label={photo?.name ?? "Photo preview"}
           onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           <DialogPrimitive.Title className="sr-only">
             {photo?.name ?? "Photo preview"}
