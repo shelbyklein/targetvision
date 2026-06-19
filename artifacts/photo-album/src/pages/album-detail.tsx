@@ -21,6 +21,8 @@ import {
 import type { Photo } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUpload } from "@workspace/object-storage-web";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
+import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -445,6 +447,7 @@ export default function AlbumDetail() {
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
   const [hoveredSuggestions, setHoveredSuggestions] = useState<Set<number>>(new Set());
+  const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
   const { mutateAsync: bulkDeletePhotos, isPending: bulkDeleting } = useBulkDeletePhotos();
 
@@ -821,16 +824,29 @@ export default function AlbumDetail() {
                     {isSelected && <Check className="h-3 w-3" />}
                   </button>
                 )}
-                <Link href={`/photos/${photo.id}`}>
-                  <div className={`aspect-[4/3] overflow-hidden${photo.isHidden ? " opacity-60" : ""}`}>
-                    <FadeImage
-                      src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
-                      alt={photo.name ?? "Photo"}
-                      loading="lazy"
-                      className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
-                    />
-                  </div>
-                </Link>
+                <button
+                  type="button"
+                  className={`aspect-[4/3] overflow-hidden w-full block${photo.isHidden ? " opacity-60" : ""}`}
+                  onClick={() =>
+                    setSelectedPhoto({
+                      id: photo.id,
+                      url: photo.url,
+                      thumbnailKey: photo.thumbnailKey,
+                      name: photo.name,
+                      averageRating: photo.averageRating,
+                      albumId,
+                    })
+                  }
+                  aria-label={`Open ${photo.name ?? "photo"} in lightbox`}
+                  data-testid="photo-thumbnail-btn"
+                >
+                  <FadeImage
+                    src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
+                    alt={photo.name ?? "Photo"}
+                    loading="lazy"
+                    className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                  />
+                </button>
 
                 {(() => {
                   const existingSuggestions = photo.suggestedCollections ?? [];
@@ -1223,6 +1239,11 @@ export default function AlbumDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PhotoLightbox
+        photo={selectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
+      />
     </AppLayout>
   );
 }
