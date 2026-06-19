@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
-import { useLocation, useSearch, Link } from "wouter";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
+import type { LightboxPhoto } from "@/components/PhotoLightbox";
+import { useLocation, useSearch } from "wouter";
 import {
   useListPhotos,
   useListUsers,
@@ -101,6 +103,7 @@ export default function PhotosPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
@@ -437,7 +440,20 @@ export default function PhotosPage() {
                         {isSelected && <Check className="h-3 w-3" />}
                       </button>
                     )}
-                    <Link href={`/photos/${photo.id}`} className="block h-full w-full cursor-pointer">
+                    <button
+                      type="button"
+                      className="block h-full w-full cursor-pointer"
+                      onClick={() =>
+                        setSelectedPhoto({
+                          id: photo.id,
+                          url: photo.url,
+                          thumbnailKey: photo.thumbnailKey,
+                          name: photo.name,
+                          averageRating: photo.averageRating,
+                          albumId: photo.albumId,
+                        })
+                      }
+                    >
                       <FadeImage
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
@@ -463,7 +479,7 @@ export default function PhotosPage() {
                           </div>
                         )}
                       </div>
-                    </Link>
+                    </button>
                     {photo.isHidden && (
                       <div
                         className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow pointer-events-none"
@@ -647,6 +663,11 @@ export default function PhotosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PhotoLightbox
+        photo={selectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
+      />
     </AppLayout>
   );
 }
