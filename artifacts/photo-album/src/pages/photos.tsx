@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
-import { useLocation, useSearch } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
   useListUsers,
@@ -463,23 +463,33 @@ export default function PhotosPage() {
                         )}
                         loading="lazy"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
-                        {photo.albumTitle && (
-                          <p className="text-xs text-white/80 truncate">{photo.albumTitle}</p>
-                        )}
-                        {photo.averageRating != null && (
-                          <div className="flex items-center gap-0.5 mt-1">
-                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                            <span className="text-xs text-white font-medium">
-                              {photo.averageRating.toFixed(1)}
-                            </span>
-                            <span className="text-[10px] text-white/80 ml-0.5">
-                              ({photo.ratingCount})
-                            </span>
-                          </div>
-                        )}
-                      </div>
                     </button>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5 pointer-events-none">
+                      {photo.albumTitle && (
+                        photo.albumId ? (
+                          <Link
+                            href={`/albums/${photo.albumId}`}
+                            className="text-xs text-white/80 truncate hover:text-white hover:underline pointer-events-auto"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {photo.albumTitle}
+                          </Link>
+                        ) : (
+                          <p className="text-xs text-white/80 truncate">{photo.albumTitle}</p>
+                        )
+                      )}
+                      {photo.averageRating != null && (
+                        <div className="flex items-center gap-0.5 mt-1">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                          <span className="text-xs text-white font-medium">
+                            {photo.averageRating.toFixed(1)}
+                          </span>
+                          <span className="text-[10px] text-white/80 ml-0.5">
+                            ({photo.ratingCount})
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     {photo.isHidden && (
                       <div
                         className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow pointer-events-none"
