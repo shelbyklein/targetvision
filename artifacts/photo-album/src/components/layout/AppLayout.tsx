@@ -2,7 +2,7 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play, CheckCircle2 } from "lucide-react";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play, CheckCircle2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -44,26 +44,39 @@ function BulkUploadBanner() {
   if (!ctx || location === "/bulk-upload") return null;
   if (ctx.phase !== "uploading" && ctx.phase !== "complete") return null;
 
-  const { totalFiles, completedFiles, overallProgress, isPaused, speedBps, togglePause, phase, queueFiles } = ctx;
+  const { totalFiles, completedFiles, overallProgress, isPaused, speedBps, togglePause, phase, queueFiles, resetQueue } = ctx;
 
   if (phase === "complete") {
     const totalDone = queueFiles.filter((f) => f.status === "done").length;
     const totalFailed = queueFiles.filter((f) => f.status === "error").length;
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg">
-        <Link href="/bulk-upload" className="block">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
-            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-medium text-foreground">Upload complete — </span>
-              <span className="text-sm text-muted-foreground">
-                {totalDone} photo{totalDone !== 1 ? "s" : ""} uploaded
-                {totalFailed > 0 && `, ${totalFailed} failed`}
-              </span>
-            </div>
-            <span className="text-xs text-primary font-medium whitespace-nowrap shrink-0">View results →</span>
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium text-foreground">Upload complete — </span>
+            <span className="text-sm text-muted-foreground">
+              {totalDone} photo{totalDone !== 1 ? "s" : ""} uploaded
+              {totalFailed > 0 && `, ${totalFailed} failed`}
+            </span>
           </div>
-        </Link>
+          <Link
+            href="/bulk-upload"
+            className="text-xs text-primary font-medium whitespace-nowrap shrink-0 hover:text-primary/80"
+          >
+            View results →
+          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 shrink-0"
+            onClick={resetQueue}
+            title="Dismiss"
+            data-testid="dismiss-upload-banner"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
     );
   }
