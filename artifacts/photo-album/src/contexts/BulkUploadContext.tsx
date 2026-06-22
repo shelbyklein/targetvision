@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect } from "react";
-import { uploadPhoto, createAlbum } from "@workspace/api-client-react";
+import { uploadPhoto, createAlbum, createBulkUploadBatch } from "@workspace/api-client-react";
 import { useUpload } from "@workspace/object-storage-web";
 
 const CONCURRENCY = 4;
@@ -163,9 +163,11 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
   async function runQueue(
     pendingFiles: QueueFile[],
     groupAlbumMap: Map<string, number>
-  ): Promise<void> {
-    if (pendingFiles.length === 0) return;
+  ): Promise<{ successCount: number; failedCount: number }> {
+    if (pendingFiles.length === 0) return { successCount: 0, failedCount: 0 };
     let cursor = 0;
+    let successCount = 0;
+    let failedCount = 0;
 
     async function runNext(): Promise<void> {
       if (cursor >= pendingFiles.length) return;
@@ -200,6 +202,7 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
               : f
           )
         );
+        failedCount++;
         await runNext();
         return;
       }
@@ -237,6 +240,7 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
             f.id === qFile.id ? { ...f, status: "done", progress: 100 } : f
           )
         );
+        successCount++;
       } catch {
         if (!isCancelledRef.current.has(qFile.groupId)) {
           setQueueFiles((prev) =>
@@ -246,6 +250,7 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
                 : f
             )
           );
+          failedCount++;
         }
       }
 
@@ -255,6 +260,8 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
     await Promise.all(
       Array.from({ length: Math.min(CONCURRENCY, pendingFiles.length) }, runNext)
     );
+
+    return { successCount, failedCount };
   }
 
   const startQueue = useCallback(
@@ -346,10 +353,18 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
       });
 
       const pendingFiles = initialQueue.filter((f) => f.status === "pending");
-      await runQueue(pendingFiles, groupAlbumMap);
+      const { successCount, failedCount } = await runQueue(pendingFiles, groupAlbumMap);
 
       setPhase("complete");
       isRunningRef.current = false;
+
+      void createBulkUploadBatch({
+        groupNames: resolvedList.map((g) => g.name),
+        albumIds: resolvedList.map((g) => g.albumId),
+        totalUploaded: successCount,
+        failedCount,
+      }).catch(() => {});
+
       return { success: true };
     },
     []

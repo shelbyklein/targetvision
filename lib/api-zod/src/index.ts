@@ -1,4 +1,5 @@
 export * from "./generated/api";
+export * from "./bulkUploadBatches";
 // Re-export types from generated types, excluding names that conflict with Zod schemas exported above
 export type {
   AiAnalysisEvent,

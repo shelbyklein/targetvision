@@ -6,3 +6,4 @@ export * from "./ratings";
 export * from "./collections";
 export * from "./appSettings";
 export * from "./aiAnalysisEvents";
+export * from "./bulkUploadBatches";
