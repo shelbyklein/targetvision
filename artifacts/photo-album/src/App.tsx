@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { BulkUploadProvider } from "@/contexts/BulkUploadContext";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
@@ -179,6 +180,7 @@ function ClerkProviderWithRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <BulkUploadProvider>
         <ClerkQueryClientCacheInvalidator />
         <Switch>
           <Route path="/">
@@ -222,6 +224,18 @@ function ClerkProviderWithRoutes() {
               <>
                 <Show when="signed-in">
                   <LazyPage load={() => import("@/pages/album-detail")} />
+                </Show>
+                <Show when="signed-out">
+                  <Redirect to="/sign-in" />
+                </Show>
+              </>
+            )}
+          </Route>
+          <Route path="/bulk-upload">
+            {() => (
+              <>
+                <Show when="signed-in">
+                  <LazyPage load={() => import("@/pages/bulk-upload")} />
                 </Show>
                 <Show when="signed-out">
                   <Redirect to="/sign-in" />
@@ -320,6 +334,7 @@ function ClerkProviderWithRoutes() {
           </Route>
         </Switch>
         <Toaster />
+        </BulkUploadProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );

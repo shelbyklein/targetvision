@@ -300,6 +300,16 @@ export const UploadPhotoBody = zod.object({
   storageKey: zod.string().optional(),
   takenAt: zod.string().optional(),
   contentType: zod.string().optional(),
+  filename: zod.string().optional(),
+  filesize: zod.number().optional(),
+});
+
+export const CheckDuplicatesBody = zod.object({
+  files: zod.array(zod.object({ name: zod.string(), size: zod.number() })),
+});
+
+export const CheckDuplicatesResponse = zod.object({
+  duplicates: zod.array(zod.object({ name: zod.string(), size: zod.number(), photoId: zod.number() })),
 });
 
 /**

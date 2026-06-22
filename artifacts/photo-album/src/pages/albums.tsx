@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { FadeImage } from "@/components/ui/fade-image";
 import { useListAlbums, useCreateAlbum, getListAlbumsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Images, CalendarDays, Camera, EyeOff } from "lucide-react";
+import { Plus, Images, CalendarDays, Camera, EyeOff, FolderInput } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 
@@ -106,6 +106,7 @@ function CreateAlbumDialog({ onCreated }: { onCreated: () => void }) {
 
 export default function Albums() {
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const { data: albums, isLoading } = useListAlbums();
   const { data: me } = useGetMe();
 
@@ -123,7 +124,13 @@ export default function Albums() {
               {albums?.length ?? 0} album{albums?.length !== 1 ? "s" : ""} ready to review
             </p>
           </div>
-          <CreateAlbumDialog onCreated={refetch} />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => navigate("/bulk-upload")} data-testid="bulk-upload-btn">
+              <FolderInput className="h-4 w-4" />
+              Bulk Upload
+            </Button>
+            <CreateAlbumDialog onCreated={refetch} />
+          </div>
         </div>
 
         {isLoading ? (

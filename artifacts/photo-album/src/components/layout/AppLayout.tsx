@@ -2,7 +2,7 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings } from "lucide-react";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { useBulkUploadOptional } from "@/contexts/BulkUploadContext";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -22,6 +24,56 @@ const navItems = [
   { href: "/photos", label: "Photos", icon: Grid2x2 },
   { href: "/collections", label: "Collections", icon: FolderOpen },
 ];
+
+function humanSpeed(bps: number): string {
+  if (bps < 1024) return `${Math.round(bps)} B/s`;
+  if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(1)} KB/s`;
+  return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+}
+
+function BulkUploadBanner() {
+  const [location] = useLocation();
+  const ctx = useBulkUploadOptional();
+
+  if (!ctx || ctx.phase !== "uploading" || location === "/bulk-upload") return null;
+
+  const { totalFiles, completedFiles, overallProgress, isPaused, speedBps, togglePause } = ctx;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg">
+      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+        <Upload className="h-4 w-4 text-primary shrink-0" />
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Uploading photos…</span>
+            <span>
+              {completedFiles} / {totalFiles}
+              {speedBps > 0 && <span className="ml-2">{humanSpeed(speedBps)}</span>}
+            </span>
+          </div>
+          <Progress value={overallProgress} className="h-1.5" />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={togglePause}
+            title={isPaused ? "Resume" : "Pause"}
+          >
+            {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+          </Button>
+          <Link
+            href="/bulk-upload"
+            className="text-xs text-primary hover:text-primary/80 font-medium whitespace-nowrap"
+          >
+            View progress
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function GlobalSearchBar() {
   const [, setLocation] = useLocation();
@@ -159,6 +211,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
         {children}
       </main>
+
+      <BulkUploadBanner />
 
       <footer className="border-t border-border py-6 text-sm text-muted-foreground">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">

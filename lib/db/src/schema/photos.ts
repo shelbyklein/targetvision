@@ -12,6 +12,8 @@ export const photosTable = pgTable("photos", {
   storageKey: text("storage_key"),
   thumbnailKey: text("thumbnail_key"),
   url: text("url").notNull(),
+  filename: text("filename"),
+  filesize: integer("filesize"),
   aiDescription: text("ai_description"),
   isHidden: boolean("is_hidden").notNull().default(false),
   thumbnailGenerating: boolean("thumbnail_generating").notNull().default(false),

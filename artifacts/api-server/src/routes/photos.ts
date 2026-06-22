@@ -10,6 +10,8 @@ import {
   ListAlbumPhotosPagedResponse,
   UploadPhotoParams,
   UploadPhotoBody,
+  CheckDuplicatesBody,
+  CheckDuplicatesResponse,
   ListPhotosQueryParams,
   ListPhotosResponse,
   GetPhotoParams,
@@ -92,6 +94,8 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
       url: body.data.url,
       storageKey: body.data.storageKey,
       takenAt: body.data.takenAt ? new Date(body.data.takenAt) : null,
+      filename: body.data.filename ?? null,
+      filesize: body.data.filesize ?? null,
     })
     .returning();
 
@@ -107,6 +111,43 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
 
   const full = await buildPhotoResponse(photo.id, req.dbUser?.id);
   res.status(201).json(GetPhotoResponse.parse(full));
+});
+
+router.post("/albums/:id/photos/check-duplicates", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = UploadPhotoParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const body = CheckDuplicatesBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  if (!album) {
+    res.status(404).json({ error: "Album not found" });
+    return;
+  }
+
+  const existing = await db
+    .select({ id: photosTable.id, filename: photosTable.filename, filesize: photosTable.filesize })
+    .from(photosTable)
+    .where(eq(photosTable.albumId, params.data.id));
+
+  const duplicates = body.data.files
+    .map((f) => {
+      const match = existing.find(
+        (p) => p.filename === f.name && p.filesize === f.size
+      );
+      return match ? { name: f.name, size: f.size, photoId: match.id } : null;
+    })
+    .filter(Boolean) as Array<{ name: string; size: number; photoId: number }>;
+
+  res.json(CheckDuplicatesResponse.parse({ duplicates }));
 });
 
 router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> => {
