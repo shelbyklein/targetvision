@@ -2,7 +2,7 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play } from "lucide-react";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -31,13 +31,42 @@ function humanSpeed(bps: number): string {
   return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
 }
 
+function useBannerVisible() {
+  const [location] = useLocation();
+  const ctx = useBulkUploadOptional();
+  return !!(ctx && (ctx.phase === "uploading" || ctx.phase === "complete") && location !== "/bulk-upload");
+}
+
 function BulkUploadBanner() {
   const [location] = useLocation();
   const ctx = useBulkUploadOptional();
 
-  if (!ctx || ctx.phase !== "uploading" || location === "/bulk-upload") return null;
+  if (!ctx || location === "/bulk-upload") return null;
+  if (ctx.phase !== "uploading" && ctx.phase !== "complete") return null;
 
-  const { totalFiles, completedFiles, overallProgress, isPaused, speedBps, togglePause } = ctx;
+  const { totalFiles, completedFiles, overallProgress, isPaused, speedBps, togglePause, phase, queueFiles } = ctx;
+
+  if (phase === "complete") {
+    const totalDone = queueFiles.filter((f) => f.status === "done").length;
+    const totalFailed = queueFiles.filter((f) => f.status === "error").length;
+    return (
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg">
+        <Link href="/bulk-upload" className="block">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-medium text-foreground">Upload complete — </span>
+              <span className="text-sm text-muted-foreground">
+                {totalDone} photo{totalDone !== 1 ? "s" : ""} uploaded
+                {totalFailed > 0 && `, ${totalFailed} failed`}
+              </span>
+            </div>
+            <span className="text-xs text-primary font-medium whitespace-nowrap shrink-0">View results →</span>
+          </div>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg">
@@ -58,7 +87,7 @@ function BulkUploadBanner() {
             variant="ghost"
             size="sm"
             className="h-7 w-7 p-0"
-            onClick={togglePause}
+            onClick={(e) => { e.stopPropagation(); togglePause(); }}
             title={isPaused ? "Resume" : "Pause"}
           >
             {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
@@ -109,6 +138,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { data: me } = useGetMe();
+  const bannerVisible = useBannerVisible();
 
   return (
     <div className="min-h-screen bg-background flex flex-col" data-testid="app-layout">
@@ -208,22 +238,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+      <main className={cn("flex-1 max-w-7xl mx-auto w-full px-6 py-8", bannerVisible && "pb-20")}>
         {children}
       </main>
 
       <BulkUploadBanner />
 
-      <footer className="border-t border-border py-6 text-sm text-muted-foreground">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span>Copyright</span>
+      {!bannerVisible && (
+        <footer className="border-t border-border py-6 text-sm text-muted-foreground">
+          <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span>Copyright</span>
+              <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+              <span>{new Date().getFullYear()}</span>
+            </div>
             <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-            <span>{new Date().getFullYear()}</span>
           </div>
-          <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }
