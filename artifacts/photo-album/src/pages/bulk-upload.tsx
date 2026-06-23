@@ -152,6 +152,7 @@ export default function BulkUpload() {
   const { data: batchHistory, isLoading: batchHistoryLoading } = useListBulkUploadBatches();
 
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const reattachInputRef = useRef<HTMLInputElement>(null);
 
   function autoGroupNewFolders(newFolders: FolderEntry[]) {
     setGroups((prev) => {
@@ -410,11 +411,29 @@ export default function BulkUpload() {
   );
 
   if (ctx.phase === "complete") {
-    const { queueFiles, resolvedGroups, canRetry } = ctx;
+    const { queueFiles, resolvedGroups, canRetry, orphanedCount } = ctx;
     const totalDone = queueFiles.filter((f) => f.status === "done").length;
     const totalFailed = queueFiles.filter((f) => f.status === "error").length;
     const totalSkipped = queueFiles.filter((f) => f.status === "skipped").length;
     const totalCancelled = queueFiles.filter((f) => f.status === "cancelled").length;
+
+    function handleReattachInput(e: React.ChangeEvent<HTMLInputElement>) {
+      const files = Array.from(e.target.files ?? []);
+      if (!files.length) return;
+      const matched = ctx.reattachAndRetry(files);
+      if (matched === 0) {
+        toast({
+          title: "No matching files found",
+          description: "Select the same files from the interrupted upload.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: `Retrying ${matched} file${matched !== 1 ? "s" : ""}…`,
+        });
+      }
+      if (reattachInputRef.current) reattachInputRef.current.value = "";
+    }
 
     return (
       <AppLayout>
@@ -447,6 +466,33 @@ export default function BulkUpload() {
                 <RefreshCw className="h-3.5 w-3.5" />
                 Retry {totalFailed} failed
               </Button>
+            )}
+            {orphanedCount > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-left space-y-2 max-w-sm mx-auto">
+                <p className="text-sm font-medium text-amber-900">
+                  {orphanedCount} file{orphanedCount !== 1 ? "s" : ""} interrupted
+                </p>
+                <p className="text-xs text-amber-700">
+                  These files were uploading when the tab was closed. Re-select them to retry.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-amber-300 text-amber-800 hover:bg-amber-100"
+                  onClick={() => reattachInputRef.current?.click()}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Re-select files to retry
+                </Button>
+                <input
+                  ref={reattachInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleReattachInput}
+                />
+              </div>
             )}
           </div>
 

@@ -53,6 +53,7 @@ interface BulkUploadContextValue {
   completedFiles: number;
   overallProgress: number;
   canRetry: boolean;
+  orphanedCount: number;
   startQueue: (
     groups: GroupSpec[],
     folderFiles: Map<string, File[]>,
@@ -62,6 +63,7 @@ interface BulkUploadContextValue {
   cancelGroup: (groupId: string) => void;
   togglePause: () => void;
   retryFailed: (groupId?: string) => void;
+  reattachAndRetry: (files: File[]) => number;
   resetQueue: () => void;
 }
 
@@ -73,13 +75,13 @@ function genId() {
 
 function saveSession(state: SessionQueueState) {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(state));
   } catch {}
 }
 
 function loadSession(): SessionQueueState | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SessionQueueState;
     if (!parsed.phase || !parsed.queueFiles || !parsed.resolvedGroups) return null;
@@ -98,6 +100,7 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
   const [isPaused, setIsPaused] = useState(false);
   const [speedBps, setSpeedBps] = useState(0);
   const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
+  const [orphanedCount, setOrphanedCount] = useState(0);
 
   const isPausedRef = useRef(false);
   const isCancelledRef = useRef<Set<string>>(new Set());
@@ -118,14 +121,16 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
     if (!session) return;
     const now = Date.now();
     if (now - session.savedAt > 24 * 60 * 60 * 1000) {
-      sessionStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_KEY);
       return;
     }
     const restored = session.queueFiles.map((f) =>
       f.status === "uploading" || f.status === "pending"
-        ? { ...f, status: "error" as FileStatus, errorMessage: "Interrupted (page refresh)" }
+        ? { ...f, status: "error" as FileStatus, errorMessage: "Interrupted (tab closed or refreshed)" }
         : f
     );
+    const interruptedCount = restored.filter((f) => f.status === "error").length;
+    setOrphanedCount(interruptedCount);
     setQueueFiles(restored);
     setResolvedGroups(session.resolvedGroups);
     resolvedGroupsRef.current = session.resolvedGroups;
@@ -434,6 +439,56 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
     });
   }, []);
 
+  const reattachAndRetry = useCallback((files: File[]): number => {
+    const errorFiles = queueFiles.filter(
+      (f) => f.status === "error" && !fileStoreRef.current.has(f.id)
+    );
+    let matchedCount = 0;
+    for (const qf of errorFiles) {
+      const match = files.find(
+        (f) => f.name === qf.filename && f.size === qf.filesize
+      );
+      if (match) {
+        fileStoreRef.current.set(qf.id, match);
+        matchedCount++;
+      }
+    }
+    if (matchedCount > 0) {
+      setOrphanedCount((prev) => Math.max(0, prev - matchedCount));
+      const groupAlbumMap = new Map<string, number>(
+        resolvedGroupsRef.current.map((g) => [g.id, g.albumId])
+      );
+      if (isRunningRef.current) return matchedCount;
+      isRunningRef.current = true;
+      bytesUploadedRef.current = 0;
+      speedWindowRef.current = [];
+      totalBytesRef.current = errorFiles
+        .filter((f) => fileStoreRef.current.has(f.id))
+        .reduce((s, f) => s + f.filesize, 0);
+      setPhase("uploading");
+      setSpeedBps(0);
+      setEtaSeconds(null);
+      setQueueFiles((prev) => {
+        const toRetry = prev.filter(
+          (f) => f.status === "error" && fileStoreRef.current.has(f.id)
+        );
+        const retryIds = new Set(toRetry.map((f) => f.id));
+        const requeued = prev.map((f) =>
+          retryIds.has(f.id)
+            ? { ...f, status: "pending" as FileStatus, progress: 0, errorMessage: undefined }
+            : f
+        );
+        const pendingToRetry = requeued.filter((f) => retryIds.has(f.id));
+        runQueue(pendingToRetry, groupAlbumMap).then(() => {
+          setPhase("complete");
+          isRunningRef.current = false;
+        });
+        return requeued;
+      });
+    }
+    return matchedCount;
+  }, [queueFiles]);
+
   const resetQueue = useCallback(() => {
     isRunningRef.current = false;
     isCancelledRef.current.clear();
@@ -448,7 +503,8 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
     setIsPaused(false);
     setSpeedBps(0);
     setEtaSeconds(null);
-    sessionStorage.removeItem(SESSION_KEY);
+    setOrphanedCount(0);
+    localStorage.removeItem(SESSION_KEY);
   }, []);
 
   useEffect(() => {
@@ -469,10 +525,12 @@ export function BulkUploadProvider({ children }: { children: React.ReactNode }) 
         completedFiles,
         overallProgress,
         canRetry,
+        orphanedCount,
         startQueue,
         cancelGroup,
         togglePause,
         retryFailed,
+        reattachAndRetry,
         resetQueue,
       }}
     >
