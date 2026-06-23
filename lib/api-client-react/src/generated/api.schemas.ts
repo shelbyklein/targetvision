@@ -51,8 +51,6 @@ export interface Album {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
-  /** @nullable */
-  coverPhotoThumbnailKey?: string | null;
   photoCount: number;
   hiddenCount?: number;
   createdAt: string;
@@ -88,8 +86,6 @@ export interface CollectionSummary {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
-  /** @nullable */
-  coverPhotoThumbnailKey?: string | null;
   createdAt: string;
 }
 
@@ -236,7 +232,6 @@ export interface DashboardStats {
   totalPhotos: number;
   totalUsers: number;
   totalTags: number;
-  totalCollections: number;
   recentActivity: Photo[];
 }
 
@@ -404,14 +399,7 @@ export interface AiAnalysisEvent {
 
 export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
-  limit?: number;
-  offset?: number;
 };
-
-export interface ListAlbumPhotosPage {
-  photos: Photo[];
-  hasMore: boolean;
-}
 
 export type SearchPhotosParams = {
   q: string;
@@ -433,11 +421,5 @@ export type ListPhotosParams = {
   dateTo?: string;
   uploaderId?: number;
   includeHidden?: boolean;
+  albumId?: number;
 };
-
-export interface BackfillThumbnailsResult {
-  processed: number;
-  succeeded: number;
-  skipped: number;
-  failed: number;
-}

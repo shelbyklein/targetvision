@@ -26,6 +26,8 @@ import type {
   AlbumCoverUpdate,
   AlbumInput,
   AlbumUpdate,
+  BulkPhotoDelete,
+  BulkPhotoDeleteResult,
   BulkPhotoUpdate,
   BulkPhotoUpdateResult,
   BulkRetryAiAnalysisEventsResult,
@@ -38,7 +40,6 @@ import type {
   CollectionUpdate,
   DashboardStats,
   HealthStatus,
-  ListAlbumPhotosPage,
   ListAlbumPhotosParams,
   ListPhotosParams,
   Photo,
@@ -974,8 +975,8 @@ export const listAlbumPhotos = async (
   id: number,
   params?: ListAlbumPhotosParams,
   options?: RequestInit,
-): Promise<ListAlbumPhotosPage> => {
-  return customFetch<ListAlbumPhotosPage>(getListAlbumPhotosUrl(id, params), {
+): Promise<Photo[]> => {
+  return customFetch<Photo[]>(getListAlbumPhotosUrl(id, params), {
     ...options,
     method: "GET",
   });
@@ -1418,6 +1419,9 @@ export const useBulkUpdatePhotos = <
   return useMutation(getBulkUpdatePhotosMutationOptions(options));
 };
 
+/**
+ * @summary Bulk delete photos (admin only)
+ */
 export const getBulkDeletePhotosUrl = () => {
   return `/api/photos/bulk`;
 };

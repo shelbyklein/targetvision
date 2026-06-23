@@ -6,6 +6,7 @@ import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
   useListUsers,
+  useListAlbums,
   useGetMe,
   useBulkUpdatePhotos,
   useBulkDeletePhotos,
@@ -46,6 +47,7 @@ function parseSearch(search: string) {
     search: p.get("search") ?? "",
     ratingMin: p.get("ratingMin") ?? "",
     uploaderId: p.get("uploaderId") ?? "",
+    albumId: p.get("albumId") ?? "",
     dateFrom: p.get("dateFrom") ?? "",
     dateTo: p.get("dateTo") ?? "",
     page: p.get("page") ?? "1",
@@ -98,7 +100,7 @@ export default function PhotosPage() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const urlParams = parseSearch(searchString);
-  const { search, ratingMin, uploaderId, dateFrom, dateTo, page } = urlParams;
+  const { search, ratingMin, uploaderId, albumId, dateFrom, dateTo, page } = urlParams;
   const [inputValue, setInputValue] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -117,11 +119,13 @@ export default function PhotosPage() {
 
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
+  const { data: albums } = useListAlbums();
 
   const apiParams = {
     ...(search && { search }),
     ...(ratingMin && { ratingMin: parseFloat(ratingMin) }),
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
+    ...(albumId && { albumId: parseInt(albumId, 10) }),
     ...(dateFrom && { dateFrom }),
     ...(dateTo && { dateTo }),
     ...(showHidden && { includeHidden: true }),
@@ -131,7 +135,7 @@ export default function PhotosPage() {
     Object.keys(apiParams).length > 0 ? apiParams : undefined
   );
 
-  const hasActiveFilters = !!(ratingMin || uploaderId || dateFrom || dateTo);
+  const hasActiveFilters = !!(ratingMin || uploaderId || albumId || dateFrom || dateTo);
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const totalPhotos = photos?.length ?? 0;
@@ -203,6 +207,7 @@ export default function PhotosPage() {
     navigate({
       ratingMin: "",
       uploaderId: "",
+      albumId: "",
       dateFrom: "",
       dateTo: "",
       page: "1",
@@ -254,7 +259,7 @@ export default function PhotosPage() {
             Filters
             {hasActiveFilters && (
               <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                {[ratingMin, uploaderId, dateFrom, dateTo].filter(Boolean).length}
+                {[ratingMin, uploaderId, albumId, dateFrom, dateTo].filter(Boolean).length}
               </span>
             )}
           </Button>
@@ -334,6 +339,30 @@ export default function PhotosPage() {
                 />
               </div>
 
+              {albums && albums.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Album</label>
+                  <Select
+                    value={albumId || "__all__"}
+                    onValueChange={(v) =>
+                      handleFilterChange("albumId", v === "__all__" ? "" : v)
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-sm" data-testid="filter-album">
+                      <SelectValue placeholder="Any album" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Any album</SelectItem>
+                      {albums.map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {me?.role === "admin" && users && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uploader</label>
@@ -365,6 +394,14 @@ export default function PhotosPage() {
                   <Badge variant="secondary" className="gap-1 text-xs">
                     Min rating: {ratingMin}+
                     <button type="button" onClick={() => handleFilterChange("ratingMin", "")} className="ml-1 hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                {albumId && (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    Album: {albums?.find((a) => String(a.id) === albumId)?.title ?? albumId}
+                    <button type="button" onClick={() => handleFilterChange("albumId", "")} className="ml-1 hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>

@@ -24,6 +24,7 @@ interface PhotoFilterOptions {
   dateFrom?: string;
   dateTo?: string;
   uploaderId?: number;
+  albumId?: number;
 }
 
 async function applyFiltersAndFetchIds(
@@ -96,6 +97,15 @@ async function applyFiltersAndFetchIds(
       .where(eq(photosTable.uploaderId, filters.uploaderId));
     const uploaderIds = new Set(uploaderFiltered.map((r) => r.id));
     ids = ids.filter((id) => uploaderIds.has(id));
+  }
+
+  if (filters.albumId != null) {
+    const albumFiltered = await db
+      .select({ id: photosTable.id })
+      .from(photosTable)
+      .where(eq(photosTable.albumId, filters.albumId));
+    const albumPhotoIds = new Set(albumFiltered.map((r) => r.id));
+    ids = ids.filter((id) => albumPhotoIds.has(id));
   }
 
   if (filters.ratingMin != null || filters.ratingMax != null) {

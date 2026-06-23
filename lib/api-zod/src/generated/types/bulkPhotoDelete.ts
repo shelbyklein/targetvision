@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListAlbumPhotosParams = {
-  includeHidden?: boolean;
-};
+export interface BulkPhotoDelete {
+  /** @minItems 1 */
+  ids: number[];
+}

@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
-import type { BackfillThumbnailsResult } from "./generated/api.schemas";
+
+type BackfillThumbnailsResult = {
+  processed: number;
+  succeeded: number;
+  skipped: number;
+  failed: number;
+};
 
 const BACKFILL_STATUS_KEY = ["admin", "thumbnails", "backfill-status"] as const;
 

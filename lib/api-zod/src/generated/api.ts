@@ -72,7 +72,6 @@ export const ListAlbumsResponseItem = zod.object({
   eventDate: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
-  coverPhotoThumbnailKey: zod.string().nullish(),
   photoCount: zod.number(),
   hiddenCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
@@ -283,11 +282,6 @@ export const ListAlbumPhotosResponseItem = zod.object({
 });
 export const ListAlbumPhotosResponse = zod.array(ListAlbumPhotosResponseItem);
 
-export const ListAlbumPhotosPagedResponse = zod.object({
-  photos: zod.array(ListAlbumPhotosResponseItem),
-  hasMore: zod.boolean(),
-});
-
 /**
  * @summary Add a photo to an album (URL-based)
  */
@@ -300,16 +294,6 @@ export const UploadPhotoBody = zod.object({
   storageKey: zod.string().optional(),
   takenAt: zod.string().optional(),
   contentType: zod.string().optional(),
-  filename: zod.string().optional(),
-  filesize: zod.number().optional(),
-});
-
-export const CheckDuplicatesBody = zod.object({
-  files: zod.array(zod.object({ name: zod.string(), size: zod.number() })),
-});
-
-export const CheckDuplicatesResponse = zod.object({
-  duplicates: zod.array(zod.object({ name: zod.string(), size: zod.number(), photoId: zod.number() })),
 });
 
 /**
@@ -386,6 +370,7 @@ export const ListPhotosQueryParams = zod.object({
   dateTo: zod.coerce.string().optional(),
   uploaderId: zod.coerce.number().optional(),
   includeHidden: zod.coerce.boolean().optional(),
+  albumId: zod.coerce.number().optional(),
 });
 
 export const ListPhotosResponseItem = zod.object({
@@ -1284,7 +1269,6 @@ export const GetDashboardStatsResponse = zod.object({
   totalPhotos: zod.number(),
   totalUsers: zod.number(),
   totalTags: zod.number(),
-  totalCollections: zod.number(),
   recentActivity: zod.array(
     zod.object({
       id: zod.number(),
@@ -1485,7 +1469,6 @@ export const ListCollectionsResponseItem = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
-  coverPhotoThumbnailKey: zod.string().nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem);
@@ -2138,20 +2121,3 @@ export const GetTagCloudResponseItem = zod.object({
   count: zod.number(),
 });
 export const GetTagCloudResponse = zod.array(GetTagCloudResponseItem);
-
-/**
- * @summary Generate thumbnails for all photos that don't have one yet (admin only)
- */
-export const BackfillThumbnailsResponse = zod.object({
-  processed: zod.number(),
-  succeeded: zod.number(),
-  skipped: zod.number(),
-  failed: zod.number(),
-});
-
-/**
- * @summary Count of photos that are missing thumbnails
- */
-export const BackfillThumbnailsStatusResponse = zod.object({
-  missingCount: zod.number(),
-});

@@ -16,4 +16,5 @@ export type ListPhotosParams = {
   dateTo?: string;
   uploaderId?: number;
   includeHidden?: boolean;
+  albumId?: number;
 };

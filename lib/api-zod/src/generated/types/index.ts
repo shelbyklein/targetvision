@@ -23,6 +23,8 @@ export * from "./album";
 export * from "./albumCoverUpdate";
 export * from "./albumInput";
 export * from "./albumUpdate";
+export * from "./bulkPhotoDelete";
+export * from "./bulkPhotoDeleteResult";
 export * from "./bulkPhotoUpdate";
 export * from "./bulkPhotoUpdateResult";
 export * from "./bulkRetryAiAnalysisEventsResult";
