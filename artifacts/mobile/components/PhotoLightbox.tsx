@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 
-import type { Photo } from "@workspace/api-client-react";
+import { useRatePhoto, type Photo } from "@workspace/api-client-react";
 import colors from "@/constants/colors";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -30,21 +30,50 @@ interface PhotoLightboxProps {
   onClose: () => void;
 }
 
-function StarRating({ rating }: { rating: number }) {
+interface RatingOverride {
+  myRating: number | null;
+  averageRating: number | null;
+}
+
+function InteractiveStarRating({
+  photoId,
+  myRating,
+  averageRating,
+  onRate,
+}: {
+  photoId: number;
+  myRating: number | null | undefined;
+  averageRating: number | null | undefined;
+  onRate: (photoId: number, score: number) => void;
+}) {
+  const displayRating = myRating ?? 0;
+
   return (
-    <View style={styles.starsRow}>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Ionicons
-          key={star}
-          name={star <= Math.round(rating) ? "star" : "star-outline"}
-          size={14}
-          color={
-            star <= Math.round(rating) ? "#f59e0b" : "rgba(255,255,255,0.4)"
-          }
-          style={{ marginRight: 2 }}
-        />
-      ))}
-      <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+    <View style={styles.ratingContainer}>
+      <View style={styles.starsRow}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Pressable
+            key={star}
+            onPress={() => onRate(photoId, star)}
+            hitSlop={6}
+            testID={`rate-star-${star}`}
+          >
+            <Ionicons
+              name={star <= displayRating ? "star" : "star-outline"}
+              size={28}
+              color={star <= displayRating ? "#f59e0b" : "rgba(255,255,255,0.5)"}
+              style={{ marginRight: 4 }}
+            />
+          </Pressable>
+        ))}
+      </View>
+      {typeof averageRating === "number" && averageRating > 0 ? (
+        <Text style={styles.ratingText}>
+          avg {averageRating.toFixed(1)}
+        </Text>
+      ) : (
+        <Text style={styles.ratingHint}>Tap to rate</Text>
+      )}
     </View>
   );
 }
@@ -58,6 +87,11 @@ export function PhotoLightbox({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const translateX = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  const [ratingOverrides, setRatingOverrides] = useState<
+    Record<number, RatingOverride>
+  >({});
+
+  const { mutate: ratePhoto } = useRatePhoto();
 
   useEffect(() => {
     if (visible) {
@@ -108,6 +142,55 @@ export function PhotoLightbox({
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
 
+  const handleRate = useCallback(
+    (photoId: number, score: number) => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const photo = photos.find((p) => p.id === photoId);
+      const prevMyRating = ratingOverrides[photoId]?.myRating ?? photo?.myRating ?? null;
+      const prevAverage = ratingOverrides[photoId]?.averageRating ?? photo?.averageRating ?? null;
+      const prevCount = photo?.ratingCount ?? 0;
+
+      const newAverage = prevMyRating
+        ? prevCount > 1
+          ? ((prevAverage ?? 0) * prevCount - prevMyRating + score) / prevCount
+          : score
+        : prevCount > 0
+        ? ((prevAverage ?? 0) * prevCount + score) / (prevCount + 1)
+        : score;
+
+      setRatingOverrides((prev) => ({
+        ...prev,
+        [photoId]: { myRating: score, averageRating: newAverage },
+      }));
+
+      ratePhoto(
+        { id: photoId, data: { score } },
+        {
+          onSuccess: (updatedPhoto) => {
+            setRatingOverrides((prev) => ({
+              ...prev,
+              [photoId]: {
+                myRating: updatedPhoto.myRating ?? score,
+                averageRating: updatedPhoto.averageRating ?? newAverage,
+              },
+            }));
+          },
+          onError: () => {
+            setRatingOverrides((prev) => ({
+              ...prev,
+              [photoId]: {
+                myRating: prevMyRating,
+                averageRating: prevAverage,
+              },
+            }));
+          },
+        }
+      );
+    },
+    [photos, ratingOverrides, ratePhoto]
+  );
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -155,8 +238,10 @@ export function PhotoLightbox({
   const photo = photos[currentIndex];
   if (!photo) return null;
 
-  const hasRating =
-    typeof photo.averageRating === "number" && photo.averageRating > 0;
+  const override = ratingOverrides[photo.id];
+  const displayMyRating = override !== undefined ? override.myRating : photo.myRating;
+  const displayAvgRating =
+    override !== undefined ? override.averageRating : photo.averageRating;
 
   return (
     <Modal
@@ -199,7 +284,12 @@ export function PhotoLightbox({
 
         <SafeAreaView style={styles.bottomSafeArea}>
           <View style={styles.infoBar}>
-            {hasRating && <StarRating rating={photo.averageRating!} />}
+            <InteractiveStarRating
+              photoId={photo.id}
+              myRating={displayMyRating}
+              averageRating={displayAvgRating}
+              onRate={handleRate}
+            />
             {photo.aiDescription ? (
               <Text style={styles.aiDesc} numberOfLines={2}>
                 {photo.aiDescription}
@@ -317,15 +407,24 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.5)",
     fontSize: 12,
   },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 2,
+    marginBottom: 2,
+  },
   starsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 2,
   },
   ratingText: {
     color: "rgba(255,255,255,0.7)",
+    fontSize: 13,
+  },
+  ratingHint: {
+    color: "rgba(255,255,255,0.4)",
     fontSize: 12,
-    marginLeft: 4,
   },
   navBtn: {
     position: "absolute",
