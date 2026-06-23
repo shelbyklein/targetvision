@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
@@ -12,12 +12,15 @@ import {
   useClearPhotoRating,
   useGetMe,
   useCreateCollection,
+  useSetAlbumCover,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
   getGetRecentPhotosQueryKey,
   getGetTopRatedPhotosQueryKey,
   getListCollectionsQueryKey,
+  getGetAlbumQueryKey,
+  getListAlbumsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FadeImage } from "@/components/ui/fade-image";
@@ -41,6 +44,8 @@ interface PhotoLightboxProps {
   hasPrev?: boolean;
   hasNext?: boolean;
   isLoadingNext?: boolean;
+  albumId?: number | null;
+  coverPhotoId?: number | null;
 }
 
 function LightboxStarRating({
@@ -165,7 +170,21 @@ function LightboxStarRating({
   );
 }
 
-function PhotoSidebarContent({ photoId, albumId, onAdvance }: { photoId: number; albumId?: number | null; onAdvance?: () => void }) {
+function PhotoSidebarContent({
+  photoId,
+  albumId,
+  coverAlbumId,
+  coverPhotoId,
+  onAdvance,
+  onCoverSet,
+}: {
+  photoId: number;
+  albumId?: number | null;
+  coverAlbumId?: number | null;
+  coverPhotoId?: number | null;
+  onAdvance?: () => void;
+  onCoverSet?: (photoId: number) => void;
+}) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data: fullPhoto, isLoading: photoLoading } = useGetPhoto(photoId, {
@@ -176,6 +195,7 @@ function PhotoSidebarContent({ photoId, albumId, onAdvance }: { photoId: number;
   const { mutate: removeFromCollection, isPending: removing } = useRemovePhotoFromCollection();
   const { mutate: updatePhoto, isPending: updatingVisibility } = useUpdatePhoto();
   const { mutate: createCollection, isPending: creating } = useCreateCollection();
+  const { mutate: setAlbumCover, isPending: settingCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
 
   const [showNewForm, setShowNewForm] = useState(false);
@@ -234,6 +254,22 @@ function PhotoSidebarContent({ photoId, albumId, onAdvance }: { photoId: number;
     );
   }
 
+  function handleSetCover() {
+    if (!coverAlbumId) return;
+    setAlbumCover(
+      { id: coverAlbumId, data: { photoId } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetAlbumQueryKey(coverAlbumId) });
+          qc.invalidateQueries({ queryKey: getListAlbumsQueryKey() });
+          onCoverSet?.(photoId);
+          toast({ title: "Cover photo updated" });
+        },
+        onError: () => toast({ title: "Failed to set cover photo", variant: "destructive" }),
+      }
+    );
+  }
+
   function openNewForm() {
     setShowNewForm(true);
     setNewTitle("");
@@ -287,8 +323,32 @@ function PhotoSidebarContent({ photoId, albumId, onAdvance }: { photoId: number;
     );
   }
 
+  const isCover = coverPhotoId != null && coverPhotoId === photoId;
+
   return (
     <div className="space-y-4" data-testid="lightbox-collection-manager">
+      {coverAlbumId != null && (
+        <button
+          type="button"
+          onClick={handleSetCover}
+          disabled={isCover || settingCover}
+          className={cn(
+            "flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed",
+            isCover
+              ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-300 opacity-80"
+              : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20 disabled:opacity-50"
+          )}
+          data-testid="lightbox-set-cover-btn"
+        >
+          {settingCover ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          ) : (
+            <ImageIcon className="h-4 w-4 shrink-0" />
+          )}
+          {isCover ? "Current cover" : "Set as cover"}
+        </button>
+      )}
+
       {me?.role === "admin" && (
         <button
           type="button"
@@ -428,11 +488,16 @@ function PhotoSidebarContent({ photoId, albumId, onAdvance }: { photoId: number;
 
 const SWIPE_THRESHOLD = 50;
 
-export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext, albumId, coverPhotoId }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
   const touchStartX = useRef<number | null>(null);
   const qc = useQueryClient();
   const { mutate: ratePhotoKb } = useRatePhoto();
+
+  const [localCoverPhotoId, setLocalCoverPhotoId] = useState<number | null | undefined>(coverPhotoId);
+  useEffect(() => {
+    setLocalCoverPhotoId(coverPhotoId);
+  }, [coverPhotoId]);
 
   const handleAdvance = useCallback(() => {
     if (hasNext && onNext) onNext();
@@ -603,7 +668,14 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                 </a>
 
                 <div className="border-t border-white/10 pt-3">
-                  <PhotoSidebarContent photoId={photo.id} albumId={photo.albumId} onAdvance={handleAdvance} />
+                  <PhotoSidebarContent
+                    photoId={photo.id}
+                    albumId={photo.albumId}
+                    coverAlbumId={albumId}
+                    coverPhotoId={localCoverPhotoId}
+                    onAdvance={handleAdvance}
+                    onCoverSet={(newCoverId) => setLocalCoverPhotoId(newCoverId)}
+                  />
                 </div>
               </div>
             </div>

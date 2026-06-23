@@ -1045,6 +1045,8 @@ export default function AlbumDetail() {
           hasMore
         )}
         isLoadingNext={pendingLightboxAdvance}
+        albumId={albumId}
+        coverPhotoId={album?.coverPhotoId}
         onPrev={() => {
           if (!selectedPhoto) return;
           const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
