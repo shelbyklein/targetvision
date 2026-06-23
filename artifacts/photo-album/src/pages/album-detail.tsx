@@ -576,24 +576,6 @@ export default function AlbumDetail() {
     prefetchedOffsetRef.current = -1;
   }, [albumId, showHiddenLocal]);
 
-  useEffect(() => {
-    if (!selectedPhoto || !hasMore) return;
-    const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
-    if (idx < 0) return;
-    const distanceFromEnd = sortedPhotos.length - 1 - idx;
-    if (distanceFromEnd > PREFETCH_THRESHOLD) return;
-    const nextOffset = offset + PAGE_SIZE;
-    if (prefetchedOffsetRef.current === nextOffset) return;
-    prefetchedOffsetRef.current = nextOffset;
-    const nextParams = showHiddenLocal
-      ? { includeHidden: true as const, limit: PAGE_SIZE, offset: nextOffset }
-      : { limit: PAGE_SIZE, offset: nextOffset };
-    qc.prefetchQuery({
-      queryKey: getListAlbumPhotosQueryKey(albumId, nextParams),
-      queryFn: () => listAlbumPhotos(albumId, nextParams),
-    });
-  }, [selectedPhoto, sortedPhotos, hasMore, offset, showHiddenLocal, albumId, qc]);
-
   const { mutate: setCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
@@ -683,6 +665,24 @@ export default function AlbumDetail() {
     showHiddenLocal ? allPhotos : allPhotos.filter((p) => !p.isHidden),
     sort,
   );
+
+  useEffect(() => {
+    if (!selectedPhoto || !hasMore) return;
+    const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
+    if (idx < 0) return;
+    const distanceFromEnd = sortedPhotos.length - 1 - idx;
+    if (distanceFromEnd > PREFETCH_THRESHOLD) return;
+    const nextOffset = offset + PAGE_SIZE;
+    if (prefetchedOffsetRef.current === nextOffset) return;
+    prefetchedOffsetRef.current = nextOffset;
+    const nextParams = showHiddenLocal
+      ? { includeHidden: true as const, limit: PAGE_SIZE, offset: nextOffset }
+      : { limit: PAGE_SIZE, offset: nextOffset };
+    qc.prefetchQuery({
+      queryKey: getListAlbumPhotosQueryKey(albumId, nextParams),
+      queryFn: () => listAlbumPhotos(albumId, nextParams),
+    });
+  }, [selectedPhoto, sortedPhotos, hasMore, offset, showHiddenLocal, albumId, qc]);
 
   if (albumLoading) {
     return (
