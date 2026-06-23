@@ -126,6 +126,35 @@ export default function PhotosPage() {
   const currentPage = Math.min(pageNum, totalPages);
   const paginatedPhotos = photos?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
+  const selectedPhotoIndex = selectedPhoto && photos
+    ? photos.findIndex((p) => p.id === selectedPhoto.id)
+    : -1;
+
+  const lightboxHasPrev = selectedPhotoIndex > 0;
+  const lightboxHasNext = selectedPhotoIndex >= 0 && selectedPhotoIndex < totalPhotos - 1;
+
+  function lightboxPhotoAt(idx: number): LightboxPhoto | null {
+    if (!photos || idx < 0 || idx >= photos.length) return null;
+    const p = photos[idx];
+    return { id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId: p.albumId };
+  }
+
+  function handleLightboxPrev() {
+    if (!lightboxHasPrev) return;
+    const newIdx = selectedPhotoIndex - 1;
+    setSelectedPhoto(lightboxPhotoAt(newIdx));
+    const newPage = Math.floor(newIdx / PAGE_SIZE) + 1;
+    if (newPage !== currentPage) navigate({ page: String(newPage) });
+  }
+
+  function handleLightboxNext() {
+    if (!lightboxHasNext) return;
+    const newIdx = selectedPhotoIndex + 1;
+    setSelectedPhoto(lightboxPhotoAt(newIdx));
+    const newPage = Math.floor(newIdx / PAGE_SIZE) + 1;
+    if (newPage !== currentPage) navigate({ page: String(newPage) });
+  }
+
   function navigate(next: Partial<ReturnType<typeof parseSearch>>) {
     const merged = { ...urlParams, ...next };
     setLocation(`/photos${buildQs(merged)}`, { replace: true });
@@ -566,6 +595,10 @@ export default function PhotosPage() {
       <PhotoLightbox
         photo={selectedPhoto}
         onClose={() => setSelectedPhoto(null)}
+        hasPrev={lightboxHasPrev}
+        hasNext={lightboxHasNext}
+        onPrev={handleLightboxPrev}
+        onNext={handleLightboxNext}
       />
     </AppLayout>
   );
