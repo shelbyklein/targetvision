@@ -11,8 +11,6 @@ import {
   useDismissPhotoSuggestion,
   useAcceptPhotoNewCollectionSuggestion,
   useDismissPhotoNewCollectionSuggestion,
-  useBulkUpdatePhotos,
-  useBulkDeletePhotos,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -47,12 +45,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -61,12 +53,10 @@ import {
 } from "@/components/ui/select";
 import {
   Plus,
-  MoreHorizontal,
   Star,
   CalendarDays,
   Camera,
   ArrowLeft,
-  Star as StarIcon,
   Trash2,
   Upload,
   ImagePlus,
@@ -80,6 +70,8 @@ import {
   EyeOff,
   Eye,
   RefreshCw,
+  Bot,
+  FolderOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -496,8 +488,6 @@ export default function AlbumDetail() {
     name: string;
   } | null>(null);
   const [showHiddenLocal, setShowHiddenLocal] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
@@ -506,9 +496,6 @@ export default function AlbumDetail() {
   const [pendingLightboxAdvance, setPendingLightboxAdvance] = useState(false);
   const prevAllPhotosLengthRef = useRef(0);
   const wasFetchingRef = useRef(false);
-  const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
-  const { mutateAsync: bulkDeletePhotos, isPending: bulkDeleting } = useBulkDeletePhotos();
-
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
@@ -638,52 +625,6 @@ export default function AlbumDetail() {
     qc.invalidateQueries({ queryKey: getGetAlbumQueryKey(albumId) });
     qc.invalidateQueries({ queryKey: [`/api/albums/${albumId}/photos`] });
     qc.invalidateQueries({ queryKey: getListAlbumsQueryKey() });
-  }
-
-  function toggleSelect(photoId: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(photoId)) next.delete(photoId);
-      else next.add(photoId);
-      return next;
-    });
-  }
-
-  function clearSelection() {
-    setSelectedIds(new Set());
-  }
-
-  async function handleBulkVisibility(isHidden: boolean) {
-    const ids = Array.from(selectedIds);
-    try {
-      const result = await bulkUpdatePhotos({ data: { ids, isHidden } });
-      const count = result?.updated ?? ids.length;
-      toast({
-        title: isHidden
-          ? `${count} photo${count !== 1 ? "s" : ""} hidden`
-          : `${count} photo${count !== 1 ? "s" : ""} unhidden`,
-      });
-      clearSelection();
-      invalidate();
-    } catch {
-      toast({ title: "Bulk action failed", variant: "destructive" });
-    }
-  }
-
-  async function handleBulkDelete() {
-    const ids = Array.from(selectedIds);
-    setConfirmBulkDelete(false);
-    try {
-      const result = await bulkDeletePhotos({ data: { ids } });
-      const count = result?.deleted ?? ids.length;
-      toast({
-        title: `${count} photo${count !== 1 ? "s" : ""} deleted`,
-      });
-      clearSelection();
-      invalidate();
-    } catch {
-      toast({ title: "Delete failed", variant: "destructive" });
-    }
   }
 
   function handleSetCover(photoId: number) {
@@ -882,28 +823,13 @@ export default function AlbumDetail() {
             data-testid="photo-grid"
           >
             {sortedPhotos.map((photo) => {
-              const isSelected = selectedIds.has(photo.id);
+              const collections = photo.photoCollections ?? [];
               return (
               <div
                 key={photo.id}
-                className={`relative group rounded-lg overflow-hidden bg-muted${isSelected ? " ring-2 ring-primary ring-offset-1" : ""}`}
+                className="relative group rounded-lg overflow-hidden bg-muted"
                 data-testid="photo-grid-item"
               >
-                {me?.role === "admin" && (
-                  <button
-                    type="button"
-                    onClick={() => toggleSelect(photo.id)}
-                    className={`absolute top-2 left-2 z-20 h-5 w-5 rounded border-2 transition-all ${
-                      isSelected
-                        ? "bg-primary border-primary text-primary-foreground opacity-100"
-                        : "bg-white/80 border-white/80 opacity-0 group-hover:opacity-100"
-                    } flex items-center justify-center`}
-                    aria-label={isSelected ? "Deselect photo" : "Select photo"}
-                    data-testid="photo-select-checkbox"
-                  >
-                    {isSelected && <Check className="h-3 w-3" />}
-                  </button>
-                )}
                 <button
                   type="button"
                   className={`aspect-[4/3] overflow-hidden w-full block${photo.isHidden ? " opacity-60" : ""}`}
@@ -928,169 +854,6 @@ export default function AlbumDetail() {
                   />
                 </button>
 
-                {(() => {
-                  const existingSuggestions = photo.suggestedCollections ?? [];
-                  const newSuggestions = photo.suggestedNewCollections ?? [];
-                  if (existingSuggestions.length === 0 && newSuggestions.length === 0) return null;
-
-                  const MAX_VISIBLE = 2;
-                  const isExpanded = expandedSuggestions.has(photo.id) || hoveredSuggestions.has(photo.id);
-
-                  type PillItem =
-                    | { kind: "existing"; s: (typeof existingSuggestions)[0] }
-                    | { kind: "new"; s: (typeof newSuggestions)[0] };
-
-                  const allItems: PillItem[] = [
-                    ...existingSuggestions.map((s) => ({ kind: "existing" as const, s })),
-                    ...newSuggestions.map((s) => ({ kind: "new" as const, s })),
-                  ];
-
-                  const visibleItems = isExpanded ? allItems : allItems.slice(0, MAX_VISIBLE);
-                  const hiddenCount = allItems.length - MAX_VISIBLE;
-
-                  return (
-                    <div
-                      className="absolute bottom-2 left-2 right-2 z-10 flex flex-wrap gap-1"
-                      data-testid="card-suggestions"
-                      onMouseLeave={() => {
-                        setHoveredSuggestions((prev) => {
-                          const next = new Set(prev);
-                          next.delete(photo.id);
-                          return next;
-                        });
-                      }}
-                    >
-                      {visibleItems.map((item) => {
-                        if (item.kind === "existing") {
-                          const s = item.s;
-                          return (
-                            <div
-                              key={`existing-${s.id}`}
-                              role="button"
-                              tabIndex={0}
-                              className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-rose-50 dark:bg-rose-950 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-rose-100 dark:hover:bg-rose-900 cursor-pointer"
-                              data-testid={`card-suggested-collection-${s.id}`}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleAcceptSuggestion(photo.id, s.id);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleAcceptSuggestion(photo.id, s.id);
-                                }
-                              }}
-                              aria-label={`Accept suggestion ${s.title}`}
-                            >
-                              <Sparkles className="h-2 w-2 text-primary" />
-                              <span>Add to {s.title}</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleAcceptSuggestion(photo.id, s.id);
-                                }}
-                                className="rounded-full p-0.5 hover:bg-rose-100 dark:hover:bg-rose-900 text-primary"
-                                aria-label={`Accept suggestion ${s.title}`}
-                                data-testid={`card-accept-suggestion-${s.id}`}
-                              >
-                                <Check className="h-2 w-2" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleDismissSuggestion(photo.id, s.id);
-                                }}
-                                className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
-                                aria-label={`Dismiss suggestion ${s.title}`}
-                                data-testid={`card-dismiss-suggestion-${s.id}`}
-                              >
-                                <X className="h-2 w-2" />
-                              </button>
-                            </div>
-                          );
-                        } else {
-                          const s = item.s;
-                          return (
-                            <div
-                              key={`new-${s.id}`}
-                              role="button"
-                              tabIndex={0}
-                              className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-emerald-100 dark:bg-emerald-900 pl-1.5 pr-0.5 py-px text-[9px] text-foreground hover:bg-emerald-200 dark:hover:bg-emerald-800 cursor-pointer"
-                              data-testid={`card-suggested-new-collection-${s.id}`}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
-                                }
-                              }}
-                              aria-label={`Accept new collection suggestion ${s.suggestedName}`}
-                            >
-                              <Sparkles className="h-2 w-2 text-emerald-600 dark:text-emerald-400" />
-                              <span>New: {s.suggestedName}</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setConfirmNewCollection({ photoId: photo.id, suggestionId: s.id, name: s.suggestedName });
-                                }}
-                                className="rounded-full p-0.5 hover:bg-emerald-200 dark:hover:bg-emerald-800 text-emerald-700 dark:text-emerald-400"
-                                aria-label={`Accept new collection suggestion ${s.suggestedName}`}
-                                data-testid={`card-accept-new-collection-suggestion-${s.id}`}
-                              >
-                                <Check className="h-2 w-2" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  handleDismissNewCollectionSuggestion(photo.id, s.id);
-                                }}
-                                className="rounded-full p-0.5 hover:bg-muted-foreground/20 text-muted-foreground"
-                                aria-label={`Dismiss new collection suggestion ${s.suggestedName}`}
-                                data-testid={`card-dismiss-new-collection-suggestion-${s.id}`}
-                              >
-                                <X className="h-2 w-2" />
-                              </button>
-                            </div>
-                          );
-                        }
-                      })}
-                      {!isExpanded && hiddenCount > 0 && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center rounded-full border border-muted-foreground/30 bg-background/70 px-1.5 py-px text-[9px] text-muted-foreground backdrop-blur-sm hover:bg-background/90 hover:text-foreground transition-colors"
-                          data-testid="card-suggestions-show-more"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setExpandedSuggestions((prev) => new Set([...prev, photo.id]));
-                          }}
-                          onMouseEnter={() => {
-                            setHoveredSuggestions((prev) => new Set([...prev, photo.id]));
-                          }}
-                          aria-label={`Show ${hiddenCount} more suggestion${hiddenCount > 1 ? "s" : ""}`}
-                        >
-                          +{hiddenCount} more
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-
                 {photo.isHidden && (
                   <div
                     className="absolute top-2 left-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10"
@@ -1102,46 +865,52 @@ export default function AlbumDetail() {
                   </div>
                 )}
 
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
-
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="h-7 w-7 bg-white/90 hover:bg-white"
-                        data-testid="photo-options-btn"
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleSetCover(photo.id)}
-                        className="gap-2"
-                      >
-                        <StarIcon className="h-4 w-4" />
-                        Set as cover
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {photo.averageRating != null && (
-                  <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-black/60 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                    <span className="text-xs text-white font-medium">
-                      {photo.averageRating.toFixed(1)}
-                    </span>
-                    <span className="text-[10px] text-white/80 ml-0.5">
-                      ({photo.ratingCount})
-                    </span>
+                {photo.aiDescription && (
+                  <div
+                    className="absolute top-2 right-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10"
+                    title="AI description available"
+                    data-testid="ai-badge"
+                  >
+                    <Bot className="h-2.5 w-2.5 text-sky-300" />
+                    <Check className="h-2 w-2 text-sky-300" />
                   </div>
                 )}
 
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
+
+                <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-1 z-10">
+                  <div className="flex flex-wrap gap-1 min-w-0">
+                    {collections.length > 0 && (
+                      <>
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] text-white leading-none max-w-[7rem] truncate"
+                          title={collections[0].title}
+                          data-testid="collection-pill"
+                        >
+                          <FolderOpen className="h-2 w-2 shrink-0" />
+                          <span className="truncate">{collections[0].title}</span>
+                        </span>
+                        {collections.length > 1 && (
+                          <span className="inline-flex items-center rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] text-white leading-none">
+                            +{collections.length - 1}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {photo.averageRating != null && (
+                    <div className="flex items-center gap-0.5 bg-black/60 rounded-full px-1.5 py-0.5 shrink-0">
+                      <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                      <span className="text-[10px] text-white font-medium leading-none">
+                        {photo.averageRating.toFixed(1)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 {album.coverPhotoId === photo.id && (
-                  <div className="absolute bottom-[3.5rem] left-2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded font-medium">
+                  <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded font-medium z-10">
                     Cover
                   </div>
                 )}
@@ -1183,84 +952,6 @@ export default function AlbumDetail() {
           </div>
         )}
       </div>
-
-      {me?.role === "admin" && selectedIds.size > 0 && (
-        <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full bg-foreground text-background shadow-xl px-5 py-3"
-          data-testid="bulk-action-toolbar"
-        >
-          <span className="text-sm font-medium">
-            {selectedIds.size} selected
-          </span>
-          <div className="w-px h-4 bg-background/30" />
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
-            onClick={() => handleBulkVisibility(true)}
-            disabled={bulkUpdating || bulkDeleting}
-            data-testid="bulk-hide-btn"
-          >
-            <EyeOff className="h-3.5 w-3.5" />
-            Hide selected
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-3 text-background hover:bg-background/20 hover:text-background gap-1.5"
-            onClick={() => handleBulkVisibility(false)}
-            disabled={bulkUpdating || bulkDeleting}
-            data-testid="bulk-unhide-btn"
-          >
-            <Eye className="h-3.5 w-3.5" />
-            Unhide selected
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-3 text-red-400 hover:bg-red-500/20 hover:text-red-300 gap-1.5"
-            onClick={() => setConfirmBulkDelete(true)}
-            disabled={bulkUpdating || bulkDeleting}
-            data-testid="bulk-delete-btn"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete selected
-          </Button>
-          <div className="w-px h-4 bg-background/30" />
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="text-background/70 hover:text-background transition-colors"
-            aria-label="Clear selection"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete {selectedIds.size} selected photo{selectedIds.size !== 1 ? "s" : ""}. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBulkDelete}
-              disabled={bulkDeleting || selectedIds.size === 0}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="bulk-delete-confirm-btn"
-            >
-              {bulkDeleting ? "Deleting…" : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Dialog
         open={confirmNewCollection !== null}
