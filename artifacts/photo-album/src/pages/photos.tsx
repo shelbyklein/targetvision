@@ -459,18 +459,18 @@ export default function PhotosPage() {
                           <p className="text-xs text-white/80 truncate">{photo.albumTitle}</p>
                         )
                       )}
-                      {photo.averageRating != null && (
-                        <div className="flex items-center gap-0.5 mt-1">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                          <span className="text-xs text-white font-medium">
-                            {photo.averageRating.toFixed(1)}
-                          </span>
-                          <span className="text-[10px] text-white/80 ml-0.5">
-                            ({photo.ratingCount})
-                          </span>
-                        </div>
-                      )}
                     </div>
+                    {photo.averageRating != null && (
+                      <div
+                        className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-black/60 px-1.5 py-0.5 pointer-events-none"
+                        data-testid="rating-badge"
+                      >
+                        <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                        <span className="text-[10px] text-white font-medium leading-none">
+                          {photo.averageRating.toFixed(1)}
+                        </span>
+                      </div>
+                    )}
                     {photo.isHidden && (
                       <div
                         className="absolute top-1.5 left-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow pointer-events-none"
