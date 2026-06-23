@@ -92,7 +92,7 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 interface FileItem {
   file: File;
   preview: string;
-  status: "pending" | "uploading" | "done" | "error";
+  status: "pending" | "uploading" | "done" | "error" | "cancelled";
   progress: number;
   errorMessage?: string;
 }
@@ -103,6 +103,7 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchIndices, setBatchIndices] = useState<ReadonlySet<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelControllerRef = useRef<AbortController | null>(null);
   const { mutateAsync: uploadPhoto } = useUploadPhoto();
   const { toast } = useToast();
 
@@ -148,20 +149,34 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
     });
   }
 
-  async function processIndices(indices: number[]): Promise<{ successCount: number; errorCount: number }> {
-    if (!indices.length || isSubmitting) return { successCount: 0, errorCount: 0 };
+  async function processIndices(indices: number[]): Promise<{ successCount: number; errorCount: number; cancelCount: number }> {
+    if (!indices.length || isSubmitting) return { successCount: 0, errorCount: 0, cancelCount: 0 };
     setIsSubmitting(true);
+
+    const controller = new AbortController();
+    cancelControllerRef.current = controller;
+    const { signal } = controller;
 
     const fileRefs = indices.map((index) => ({ index, file: files[index].file }));
 
     let successCount = 0;
     let errorCount = 0;
+    let cancelCount = 0;
     const CONCURRENCY = 4;
     let cursor = 0;
 
     async function runNext(): Promise<void> {
       if (cursor >= fileRefs.length) return;
       const { index, file } = fileRefs[cursor++];
+
+      if (signal.aborted) {
+        setFiles((prev) =>
+          prev.map((f, i) => (i === index ? { ...f, status: "cancelled", progress: 0 } : f))
+        );
+        cancelCount++;
+        await runNext();
+        return;
+      }
 
       setFiles((prev) =>
         prev.map((f, i) =>
@@ -170,7 +185,7 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
       );
 
       try {
-        const result = await uploadFile(file);
+        const result = await uploadFile(file, undefined, signal);
         if (!result) throw new Error("Upload failed");
 
         setFiles((prev) =>
@@ -190,11 +205,20 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
           prev.map((f, i) => (i === index ? { ...f, status: "done", progress: 100 } : f))
         );
         successCount++;
-      } catch {
+      } catch (err) {
+        const isAbort =
+          signal.aborted ||
+          (err instanceof Error && (err.name === "AbortError" || err.message === "Upload aborted"));
         setFiles((prev) =>
-          prev.map((f, i) => (i === index ? { ...f, status: "error", progress: 0 } : f))
+          prev.map((f, i) =>
+            i === index ? { ...f, status: isAbort ? "cancelled" : "error", progress: 0 } : f
+          )
         );
-        errorCount++;
+        if (isAbort) {
+          cancelCount++;
+        } else {
+          errorCount++;
+        }
       }
 
       await runNext();
@@ -204,8 +228,13 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
       Array.from({ length: Math.min(CONCURRENCY, fileRefs.length) }, runNext)
     );
 
+    cancelControllerRef.current = null;
     setIsSubmitting(false);
-    return { successCount, errorCount };
+    return { successCount, errorCount, cancelCount };
+  }
+
+  function handleCancelBatch() {
+    cancelControllerRef.current?.abort();
   }
 
   async function retryFile(index: number) {
@@ -215,6 +244,14 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
       toast({ title: successCount === 1 ? "Photo uploaded" : `${successCount} photos uploaded` });
     } else {
       toast({ title: "Photo failed to upload", variant: "destructive" });
+    }
+  }
+
+  function handleCancelOrClose() {
+    if (isSubmitting) {
+      handleCancelBatch();
+    } else {
+      handleClose(false);
     }
   }
 
@@ -237,13 +274,23 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
       .map(({ index }) => index);
 
     const preErrorCount = files.filter((item) => item.status === "error").length;
-    const { successCount, errorCount: uploadErrorCount } = await processIndices(pendingIndices);
+    const { successCount, errorCount: uploadErrorCount, cancelCount } = await processIndices(pendingIndices);
     const totalErrors = preErrorCount + uploadErrorCount;
 
     setBatchIndices(new Set(pendingIndices));
-    onAdded();
+    if (successCount > 0) onAdded();
 
-    if (totalErrors === 0) {
+    if (cancelCount > 0 && successCount === 0 && totalErrors === 0) {
+      toast({ title: "Upload cancelled" });
+    } else if (cancelCount > 0) {
+      if (successCount > 0) {
+        toast({
+          title: `${successCount} photo${successCount !== 1 ? "s" : ""} uploaded — ${cancelCount} cancelled`,
+        });
+      } else {
+        toast({ title: `${cancelCount} photo${cancelCount !== 1 ? "s" : ""} cancelled`, variant: "destructive" });
+      }
+    } else if (totalErrors === 0) {
       toast({
         title: successCount === 1 ? "Photo uploaded" : `${successCount} photos uploaded`,
       });
@@ -329,12 +376,20 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
                         <AlertCircle className="h-5 w-5 text-red-400" />
                       </div>
                     )}
+                    {item.status === "cancelled" && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <X className="h-5 w-5 text-yellow-400" />
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <p className="text-xs text-muted-foreground truncate">{item.file.name}</p>
                     {item.status === "uploading" && (
                       <Progress value={item.progress} className="h-1" />
+                    )}
+                    {item.status === "cancelled" && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">Cancelled</p>
                     )}
                     {item.status === "error" && item.errorMessage && (
                       <p className="text-xs text-red-500">{item.errorMessage}</p>
@@ -351,7 +406,7 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
                       <X className="h-4 w-4" />
                     </button>
                   )}
-                  {item.status === "error" && !isSubmitting && (
+                  {(item.status === "error" || item.status === "cancelled") && !isSubmitting && (
                     <button
                       type="button"
                       onClick={() => retryFile(index)}
@@ -381,10 +436,10 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
             <Button
               type="button"
               variant="outline"
-              onClick={() => handleClose(false)}
-              disabled={isSubmitting}
+              onClick={handleCancelOrClose}
+              data-testid="cancel-upload-btn"
             >
-              Cancel
+              {isSubmitting ? "Stop Upload" : "Cancel"}
             </Button>
             <Button
               type="submit"

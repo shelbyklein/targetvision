@@ -60,7 +60,7 @@ export function useUpload(options: UseUploadOptions = {}) {
   const [progress, setProgress] = useState(0);
 
   const requestUploadUrl = useCallback(
-    async (file: File): Promise<UploadResponse> => {
+    async (file: File, signal?: AbortSignal): Promise<UploadResponse> => {
       const response = await fetch(`${basePath}/uploads/request-url`, {
         method: "POST",
         headers: {
@@ -71,6 +71,7 @@ export function useUpload(options: UseUploadOptions = {}) {
           size: file.size,
           contentType: file.type || "application/octet-stream",
         }),
+        signal,
       });
 
       if (!response.ok) {
@@ -84,11 +85,19 @@ export function useUpload(options: UseUploadOptions = {}) {
   );
 
   const uploadToPresignedUrl = useCallback(
-    (file: File, uploadURL: string, onProgress?: (percent: number) => void): Promise<void> => {
+    (file: File, uploadURL: string, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<void> => {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", uploadURL);
         xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+
+        if (signal) {
+          if (signal.aborted) {
+            reject(new Error("Upload aborted"));
+            return;
+          }
+          signal.addEventListener("abort", () => xhr.abort(), { once: true });
+        }
 
         if (onProgress) {
           xhr.upload.addEventListener("progress", (e) => {
@@ -116,7 +125,7 @@ export function useUpload(options: UseUploadOptions = {}) {
   );
 
   const uploadFile = useCallback(
-    async (file: File, onProgress?: (percent: number) => void): Promise<UploadResponse | null> => {
+    async (file: File, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<UploadResponse | null> => {
       const contentType = file.type || "application/octet-stream";
       if (!contentType.startsWith("image/")) {
         const typeError = new Error("Only image file types are allowed");
@@ -131,13 +140,13 @@ export function useUpload(options: UseUploadOptions = {}) {
 
       try {
         setProgress(5);
-        const uploadResponse = await requestUploadUrl(file);
+        const uploadResponse = await requestUploadUrl(file, signal);
 
         setProgress(10);
         await uploadToPresignedUrl(file, uploadResponse.uploadURL, (xhrPct) => {
           setProgress(10 + Math.round(xhrPct * 0.85));
           onProgress?.(xhrPct);
-        });
+        }, signal);
 
         setProgress(100);
         onProgress?.(100);
