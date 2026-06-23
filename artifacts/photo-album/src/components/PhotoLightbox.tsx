@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
   useGetPhoto,
@@ -49,12 +49,14 @@ function LightboxStarRating({
   averageRating,
   currentUserId,
   onRated,
+  onAdvance,
 }: {
   photoId: number;
   myRating?: number | null;
   averageRating?: number | null;
   currentUserId?: number;
   onRated: () => void;
+  onAdvance?: () => void;
 }) {
   const [hovered, setHovered] = useState(0);
   const { mutate: ratePhoto, isPending } = useRatePhoto();
@@ -74,7 +76,7 @@ function LightboxStarRating({
       {
         onSuccess: () => {
           onRated();
-          toast({ title: `Rated ${score} star${score !== 1 ? "s" : ""}` });
+          onAdvance?.();
         },
         onError: () => toast({ title: "Failed to submit rating", variant: "destructive" }),
       }
@@ -163,7 +165,7 @@ function LightboxStarRating({
   );
 }
 
-function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: number | null }) {
+function PhotoSidebarContent({ photoId, albumId, onAdvance }: { photoId: number; albumId?: number | null; onAdvance?: () => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data: fullPhoto, isLoading: photoLoading } = useGetPhoto(photoId, {
@@ -312,6 +314,7 @@ function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: 
           averageRating={fullPhoto?.averageRating}
           currentUserId={me?.id}
           onRated={invalidate}
+          onAdvance={onAdvance}
         />
       </div>
 
@@ -428,6 +431,28 @@ const SWIPE_THRESHOLD = 50;
 export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
   const touchStartX = useRef<number | null>(null);
+  const qc = useQueryClient();
+  const { mutate: ratePhotoKb } = useRatePhoto();
+
+  const handleAdvance = useCallback(() => {
+    if (hasNext && onNext) onNext();
+  }, [hasNext, onNext]);
+
+  // Stable ref so the keydown listener always calls the latest version
+  const rateAndAdvanceRef = useRef<(score: number) => void>(() => {});
+  rateAndAdvanceRef.current = useCallback((score: number) => {
+    if (!photo) return;
+    ratePhotoKb(
+      { id: photo.id, data: { score } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photo.id) });
+          qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
+          handleAdvance();
+        },
+      }
+    );
+  }, [photo, ratePhotoKb, qc, handleAdvance]);
 
   useEffect(() => {
     if (!photo) return;
@@ -438,6 +463,12 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
       } else if (e.key === "ArrowRight" && hasNext && onNext) {
         e.preventDefault();
         onNext();
+      } else {
+        const digit = parseInt(e.key, 10);
+        if (digit >= 1 && digit <= 5) {
+          e.preventDefault();
+          rateAndAdvanceRef.current(digit);
+        }
       }
     }
     window.addEventListener("keydown", handleKey);
@@ -572,7 +603,7 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                 </a>
 
                 <div className="border-t border-white/10 pt-3">
-                  <PhotoSidebarContent photoId={photo.id} albumId={photo.albumId} />
+                  <PhotoSidebarContent photoId={photo.id} albumId={photo.albumId} onAdvance={handleAdvance} />
                 </div>
               </div>
             </div>

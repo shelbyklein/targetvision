@@ -1,22 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   FolderOpen,
@@ -59,21 +46,11 @@ interface FolderEntry {
   id: string;
   name: string;
   files: File[];
-  groupId: string | null;
-}
-
-interface Group {
-  id: string;
-  folderIds: string[];
-  destType: "new" | "existing";
-  existingAlbumId?: number;
-  newAlbumName: string;
 }
 
 interface DuplicateFile {
   name: string;
   size: number;
-  groupId: string;
   folderId: string;
   skip: boolean;
 }
@@ -90,8 +67,8 @@ function humanSpeed(bps: number): string {
   return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
 }
 
-function deriveGroupName(folders: FolderEntry[]): string {
-  if (folders.length === 0) return "New Album";
+function deriveName(folders: FolderEntry[]): string {
+  if (folders.length === 0) return "";
   if (folders.length === 1) return folders[0].name;
   const names = folders.map((f) => f.name);
   const prefix = names.reduce((acc, name) => {
@@ -102,9 +79,7 @@ function deriveGroupName(folders: FolderEntry[]): string {
   return prefix.trim() || names[0];
 }
 
-async function readFilesFromEntry(
-  entry: FileSystemDirectoryEntry
-): Promise<File[]> {
+async function readFilesFromEntry(entry: FileSystemDirectoryEntry): Promise<File[]> {
   const files: File[] = [];
   const reader = entry.createReader();
   const readBatch = (): Promise<FileSystemEntry[]> =>
@@ -141,7 +116,6 @@ export default function BulkUpload() {
 
   const [localPhase, setLocalPhase] = useState<LocalPhase>("staging");
   const [folders, setFolders] = useState<FolderEntry[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [duplicates, setDuplicates] = useState<DuplicateFile[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [isDragOver, setIsDragOver] = useState(false);
@@ -149,26 +123,25 @@ export default function BulkUpload() {
   const [albumSearch, setAlbumSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"upload" | "history">("upload");
 
+  // Single destination for all folders
+  const [destType, setDestType] = useState<"new" | "existing">("new");
+  const [newAlbumName, setNewAlbumName] = useState("");
+  const [existingAlbumId, setExistingAlbumId] = useState<number | undefined>();
+
   const { data: batchHistory, isLoading: batchHistoryLoading } = useListBulkUploadBatches();
 
   const folderInputRef = useRef<HTMLInputElement>(null);
   const reattachInputRef = useRef<HTMLInputElement>(null);
 
-  function autoGroupNewFolders(newFolders: FolderEntry[]) {
-    setGroups((prev) => {
-      const next = [...prev];
-      for (const folder of newFolders) {
-        const gId = genId();
-        next.push({
-          id: gId,
-          folderIds: [folder.id],
-          destType: "new",
-          newAlbumName: folder.name,
-        });
-        folder.groupId = gId;
-      }
-      return next;
-    });
+  // Auto-suggest album name from folder names (only if name is empty)
+  useEffect(() => {
+    if (destType === "new" && folders.length > 0) {
+      setNewAlbumName((prev) => (prev.trim() ? prev : deriveName(folders)));
+    }
+  }, [folders, destType]);
+
+  async function addFolders(newFolders: FolderEntry[]) {
+    setFolders((prev) => [...prev, ...newFolders]);
   }
 
   async function addFoldersFromEntries(entries: FileSystemDirectoryEntry[]) {
@@ -177,12 +150,11 @@ export default function BulkUpload() {
     for (const entry of entries) {
       const files = await readFilesFromEntry(entry);
       if (files.length > 0) {
-        newFolders.push({ id: genId(), name: entry.name, files, groupId: null });
+        newFolders.push({ id: genId(), name: entry.name, files });
       }
     }
     if (newFolders.length > 0) {
-      setFolders((prev) => [...prev, ...newFolders]);
-      autoGroupNewFolders(newFolders);
+      await addFolders(newFolders);
     }
     setIsProcessingDrop(false);
   }
@@ -218,136 +190,56 @@ export default function BulkUpload() {
 
     const newFolders: FolderEntry[] = [];
     for (const [name, fls] of byFolder.entries()) {
-      newFolders.push({ id: genId(), name, files: fls, groupId: null });
+      newFolders.push({ id: genId(), name, files: fls });
     }
-
-    if (newFolders.length > 0) {
-      setFolders((prev) => [...prev, ...newFolders]);
-      autoGroupNewFolders(newFolders);
-    }
+    if (newFolders.length > 0) await addFolders(newFolders);
     if (folderInputRef.current) folderInputRef.current.value = "";
   }
 
   function removeFolder(folderId: string) {
-    setFolders((prev) => {
-      const folder = prev.find((f) => f.id === folderId);
-      if (!folder) return prev;
-      if (folder.groupId) {
-        setGroups((prevG) =>
-          prevG
-            .map((g) =>
-              g.id === folder.groupId
-                ? { ...g, folderIds: g.folderIds.filter((id) => id !== folderId) }
-                : g
-            )
-            .filter((g) => g.folderIds.length > 0)
-        );
-      }
-      return prev.filter((f) => f.id !== folderId);
-    });
+    setFolders((prev) => prev.filter((f) => f.id !== folderId));
   }
 
-  function mergeFolderIntoGroup(folderId: string, targetGroupId: string) {
-    setFolders((prev) => {
-      const folder = prev.find((f) => f.id === folderId);
-      if (!folder) return prev;
-      const oldGroupId = folder.groupId;
-      setGroups((prevG) =>
-        prevG
-          .map((g) => {
-            if (g.id === oldGroupId)
-              return { ...g, folderIds: g.folderIds.filter((id) => id !== folderId) };
-            if (g.id === targetGroupId)
-              return { ...g, folderIds: [...g.folderIds, folderId] };
-            return g;
-          })
-          .filter((g) => g.folderIds.length > 0)
-      );
-      return prev.map((f) => (f.id === folderId ? { ...f, groupId: targetGroupId } : f));
-    });
-  }
-
-  function updateGroup(groupId: string, patch: Partial<Group>) {
-    setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, ...patch } : g)));
-  }
-
-  function removeGroup(groupId: string) {
-    const groupFolderIds = groups.find((g) => g.id === groupId)?.folderIds ?? [];
-    setGroups((prev) => prev.filter((g) => g.id !== groupId));
-    setFolders((prev) =>
-      prev.map((f) => (groupFolderIds.includes(f.id) ? { ...f, groupId: null } : f))
-    );
-    for (const folderId of groupFolderIds) {
-      const folder = folders.find((f) => f.id === folderId);
-      if (folder) {
-        const newGroupId = genId();
-        setGroups((prev) => [
-          ...prev,
-          { id: newGroupId, folderIds: [folderId], destType: "new", newAlbumName: folder.name },
-        ]);
-        setFolders((prev) =>
-          prev.map((f) => (f.id === folderId ? { ...f, groupId: newGroupId } : f))
-        );
-      }
-    }
-  }
-
-  function toggleGroupExpand(groupId: string) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      return next;
-    });
-  }
+  const totalPhotoCount = folders.reduce((sum, f) => sum + f.files.length, 0);
 
   const canStartUpload =
-    groups.length > 0 &&
-    groups.every((g) =>
-      g.destType === "new"
-        ? g.newAlbumName.trim().length > 0
-        : g.existingAlbumId !== undefined
-    );
+    folders.length > 0 &&
+    (destType === "new"
+      ? newAlbumName.trim().length > 0
+      : existingAlbumId !== undefined);
 
   async function runDuplicateCheck(): Promise<DuplicateFile[]> {
-    const dupList: DuplicateFile[] = [];
-    for (const group of groups) {
-      const albumId =
-        group.destType === "existing" && group.existingAlbumId ? group.existingAlbumId : null;
-      if (!albumId) continue;
+    if (destType !== "existing" || !existingAlbumId) return [];
 
-      const groupFolders = folders.filter((f) => group.folderIds.includes(f.id));
-      const allFiles = groupFolders.flatMap((f) => f.files.map((file) => ({ file, folderId: f.id })));
+    const allFiles = folders.flatMap((f) =>
+      f.files.map((file) => ({ file, folderId: f.id }))
+    );
 
-      try {
-        const resp = await fetch(`/api/albums/${albumId}/photos/check-duplicates`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            files: allFiles.map(({ file }) => ({ name: file.name, size: file.size })),
-          }),
-        });
-        if (!resp.ok) continue;
-        const data = (await resp.json()) as {
-          duplicates: Array<{ name: string; size: number; photoId: number }>;
-        };
-        for (const dup of data.duplicates) {
-          const match = allFiles.find(
-            ({ file }) => file.name === dup.name && file.size === dup.size
-          );
-          if (match) {
-            dupList.push({
-              name: dup.name,
-              size: dup.size,
-              groupId: group.id,
-              folderId: match.folderId,
-              skip: true,
-            });
-          }
+    try {
+      const resp = await fetch(`/api/albums/${existingAlbumId}/photos/check-duplicates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          files: allFiles.map(({ file }) => ({ name: file.name, size: file.size })),
+        }),
+      });
+      if (!resp.ok) return [];
+      const data = (await resp.json()) as {
+        duplicates: Array<{ name: string; size: number; photoId: number }>;
+      };
+      const dupList: DuplicateFile[] = [];
+      for (const dup of data.duplicates) {
+        const match = allFiles.find(
+          ({ file }) => file.name === dup.name && file.size === dup.size
+        );
+        if (match) {
+          dupList.push({ name: dup.name, size: dup.size, folderId: match.folderId, skip: true });
         }
-      } catch {}
+      }
+      return dupList;
+    } catch {
+      return [];
     }
-    return dupList;
   }
 
   async function handleStartUpload() {
@@ -374,13 +266,21 @@ export default function BulkUpload() {
       folderNames.set(folder.id, folder.name);
     }
 
-    const groupSpecs: GroupSpec[] = groups.map((g) => ({
-      id: g.id,
-      name: g.destType === "new" ? g.newAlbumName.trim() : deriveGroupName(folders.filter((f) => g.folderIds.includes(f.id))),
-      destType: g.destType,
-      existingAlbumId: g.existingAlbumId,
-      folderIds: g.folderIds,
-    }));
+    const groupId = genId();
+    const albumName =
+      destType === "new"
+        ? newAlbumName.trim()
+        : albums?.find((a) => a.id === existingAlbumId)?.title ?? "Upload";
+
+    const groupSpecs: GroupSpec[] = [
+      {
+        id: groupId,
+        name: albumName,
+        destType,
+        existingAlbumId,
+        folderIds: folders.map((f) => f.id),
+      },
+    ];
 
     const result = await ctx.startQueue(groupSpecs, folderFiles, folderNames, skipSet);
     if (!result.success) {
@@ -401,15 +301,27 @@ export default function BulkUpload() {
     ctx.resetQueue();
     setLocalPhase("staging");
     setFolders([]);
-    setGroups([]);
     setDuplicates([]);
-    setExpandedGroups(new Set());
+    setDestType("new");
+    setNewAlbumName("");
+    setExistingAlbumId(undefined);
+    setAlbumSearch("");
+  }
+
+  function toggleGroupExpand(groupId: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
   }
 
   const filteredAlbums = albums?.filter((a) =>
     albumSearch.trim() ? a.title.toLowerCase().includes(albumSearch.toLowerCase()) : true
   );
 
+  // ── Complete phase ──────────────────────────────────────────────────────────
   if (ctx.phase === "complete") {
     const { queueFiles, resolvedGroups, canRetry, orphanedCount } = ctx;
     const totalDone = queueFiles.filter((f) => f.status === "done").length;
@@ -428,9 +340,7 @@ export default function BulkUpload() {
           variant: "destructive",
         });
       } else {
-        toast({
-          title: `Retrying ${matched} file${matched !== 1 ? "s" : ""}…`,
-        });
+        toast({ title: `Retrying ${matched} file${matched !== 1 ? "s" : ""}…` });
       }
       if (reattachInputRef.current) reattachInputRef.current.value = "";
     }
@@ -457,12 +367,7 @@ export default function BulkUpload() {
               {totalCancelled > 0 && `, ${totalCancelled} cancelled`}
             </p>
             {canRetry && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => ctx.retryFailed()}
-              >
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => ctx.retryFailed()}>
                 <RefreshCw className="h-3.5 w-3.5" />
                 Retry {totalFailed} failed
               </Button>
@@ -505,10 +410,7 @@ export default function BulkUpload() {
               const hasGroupErrors = failed > 0 && canRetry;
 
               return (
-                <div
-                  key={group.id}
-                  className="rounded-lg border border-border bg-card p-4 flex items-center justify-between gap-4"
-                >
+                <div key={group.id} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <p className="font-medium text-foreground text-sm truncate">{group.name}</p>
                     <p className="text-xs text-muted-foreground">
@@ -519,12 +421,7 @@ export default function BulkUpload() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {hasGroupErrors && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1.5 text-xs h-7"
-                        onClick={() => ctx.retryFailed(group.id)}
-                      >
+                      <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7" onClick={() => ctx.retryFailed(group.id)}>
                         <RefreshCw className="h-3 w-3" />
                         Retry {failed}
                       </Button>
@@ -542,9 +439,7 @@ export default function BulkUpload() {
           </div>
 
           <div className="flex gap-3 justify-center pt-2">
-            <Button variant="outline" onClick={() => navigate("/albums")}>
-              Back to Albums
-            </Button>
+            <Button variant="outline" onClick={() => navigate("/albums")}>Back to Albums</Button>
             <Button onClick={handleStartNewBatch}>Start New Batch</Button>
           </div>
         </div>
@@ -552,17 +447,9 @@ export default function BulkUpload() {
     );
   }
 
+  // ── Uploading phase ─────────────────────────────────────────────────────────
   if (ctx.phase === "uploading") {
-    const {
-      queueFiles,
-      resolvedGroups,
-      isPaused,
-      speedBps,
-      etaSeconds,
-      totalFiles,
-      completedFiles,
-      overallProgress,
-    } = ctx;
+    const { queueFiles, resolvedGroups, isPaused, speedBps, etaSeconds, totalFiles, completedFiles, overallProgress } = ctx;
 
     type GroupStatus = "queued" | "uploading" | "done" | "failed" | "cancelled";
     function getGroupStatus(groupId: string): GroupStatus {
@@ -570,13 +457,7 @@ export default function BulkUpload() {
       if (files.length === 0) return "queued";
       if (files.every((f) => f.status === "pending" || f.status === "skipped")) return "queued";
       if (files.some((f) => f.status === "uploading")) return "uploading";
-      const terminal = files.every(
-        (f) =>
-          f.status === "done" ||
-          f.status === "error" ||
-          f.status === "skipped" ||
-          f.status === "cancelled"
-      );
+      const terminal = files.every((f) => ["done", "error", "skipped", "cancelled"].includes(f.status));
       if (terminal) {
         if (files.every((f) => f.status === "cancelled")) return "cancelled";
         if (files.some((f) => f.status === "error")) return "failed";
@@ -590,23 +471,8 @@ export default function BulkUpload() {
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-foreground">Uploading…</h1>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={ctx.togglePause}
-              className="gap-2"
-            >
-              {isPaused ? (
-                <>
-                  <Play className="h-3.5 w-3.5" />
-                  Resume
-                </>
-              ) : (
-                <>
-                  <Pause className="h-3.5 w-3.5" />
-                  Pause
-                </>
-              )}
+            <Button variant="outline" size="sm" onClick={ctx.togglePause} className="gap-2">
+              {isPaused ? <><Play className="h-3.5 w-3.5" />Resume</> : <><Pause className="h-3.5 w-3.5" />Pause</>}
             </Button>
           </div>
 
@@ -617,12 +483,7 @@ export default function BulkUpload() {
                 {speedBps > 0 && <span className="ml-2">{humanSpeed(speedBps)}</span>}
               </span>
               {etaSeconds !== null && (
-                <span>
-                  ~{etaSeconds < 60
-                    ? `${etaSeconds}s`
-                    : `${Math.floor(etaSeconds / 60)}m ${etaSeconds % 60}s`}{" "}
-                  remaining
-                </span>
+                <span>~{etaSeconds < 60 ? `${etaSeconds}s` : `${Math.floor(etaSeconds / 60)}m ${etaSeconds % 60}s`} remaining</span>
               )}
             </div>
             <Progress value={overallProgress} className="h-2" />
@@ -636,59 +497,34 @@ export default function BulkUpload() {
               const groupTotal = groupFiles.filter((f) => f.status !== "skipped").length;
               const status = getGroupStatus(group.id);
               const isExpanded = expandedGroups.has(group.id);
-
               const folderIds = [...new Set(groupFiles.map((f) => f.folderId))];
 
               return (
-                <div
-                  key={group.id}
-                  className="rounded-lg border border-border bg-card overflow-hidden"
-                >
+                <div key={group.id} className="rounded-lg border border-border bg-card overflow-hidden">
                   <div className="px-4 py-3 flex items-center gap-3">
-                    <button
-                      onClick={() => toggleGroupExpand(group.id)}
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
+                    <button onClick={() => toggleGroupExpand(group.id)} className="text-muted-foreground hover:text-foreground transition-colors">
+                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </button>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{group.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {status === "queued" && "Queued"}
-                        {status === "uploading" &&
-                          `Uploading ${groupDone + 1} / ${groupTotal}`}
-                        {status === "done" &&
-                          `${groupDone} uploaded${groupFailed > 0 ? `, ${groupFailed} failed` : ""}`}
+                        {status === "uploading" && `Uploading ${groupDone + 1} / ${groupTotal}`}
+                        {status === "done" && `${groupDone} uploaded${groupFailed > 0 ? `, ${groupFailed} failed` : ""}`}
                         {status === "failed" && `${groupDone} done, ${groupFailed} failed`}
                         {status === "cancelled" && "Cancelled"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {(status === "queued" || status === "uploading") && (
-                        <button
-                          onClick={() => ctx.cancelGroup(group.id)}
-                          className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-                          title="Cancel this group"
-                        >
+                        <button onClick={() => ctx.cancelGroup(group.id)} className="text-xs text-muted-foreground hover:text-destructive transition-colors" title="Cancel upload">
                           <X className="h-4 w-4" />
                         </button>
                       )}
-                      {status === "uploading" && (
-                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                      )}
-                      {status === "done" && (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      )}
-                      {status === "failed" && (
-                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                      )}
-                      {status === "cancelled" && (
-                        <X className="h-4 w-4 text-muted-foreground" />
-                      )}
+                      {status === "uploading" && <Loader2 className="h-4 w-4 text-primary animate-spin" />}
+                      {status === "done" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                      {status === "failed" && <AlertCircle className="h-4 w-4 text-amber-500" />}
+                      {status === "cancelled" && <X className="h-4 w-4 text-muted-foreground" />}
                     </div>
                   </div>
 
@@ -696,8 +532,7 @@ export default function BulkUpload() {
                     <div className="border-t border-border divide-y divide-border">
                       {folderIds.map((folderId) => {
                         const folderFiles = groupFiles.filter((f) => f.folderId === folderId);
-                        const folderName =
-                          folderFiles[0]?.folderName ?? folderId;
+                        const folderName = folderFiles[0]?.folderName ?? folderId;
                         const folderDone = folderFiles.filter((f) => f.status === "done").length;
                         const folderFailed = folderFiles.filter((f) => f.status === "error").length;
                         const folderTotal = folderFiles.filter((f) => f.status !== "skipped").length;
@@ -709,9 +544,7 @@ export default function BulkUpload() {
                             <div className="flex-1 min-w-0">
                               <p className="text-xs text-foreground truncate">{folderName}</p>
                               <p className="text-xs text-muted-foreground">
-                                {folderUploading > 0
-                                  ? `Uploading ${folderDone + 1} / ${folderTotal}`
-                                  : `${folderDone} / ${folderTotal}`}
+                                {folderUploading > 0 ? `Uploading ${folderDone + 1} / ${folderTotal}` : `${folderDone} / ${folderTotal}`}
                                 {folderFailed > 0 && ` · ${folderFailed} failed`}
                               </p>
                             </div>
@@ -729,25 +562,20 @@ export default function BulkUpload() {
     );
   }
 
+  // ── Duplicate check phase ───────────────────────────────────────────────────
   if (localPhase === "duplicate-check") {
     return (
       <AppLayout>
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocalPhase("staging")}
-              className="gap-2"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setLocalPhase("staging")} className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
             <div>
               <h1 className="text-xl font-bold text-foreground">Duplicate Files Detected</h1>
               <p className="text-sm text-muted-foreground">
-                {duplicates.length} file{duplicates.length !== 1 ? "s" : ""} already exist in the
-                target album.
+                {duplicates.length} file{duplicates.length !== 1 ? "s" : ""} already exist in the target album.
               </p>
             </div>
           </div>
@@ -756,20 +584,8 @@ export default function BulkUpload() {
             <div className="px-4 py-3 flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">File</span>
               <div className="flex items-center gap-4">
-                <button
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setDuplicates((prev) => prev.map((d) => ({ ...d, skip: true })))}
-                >
-                  Skip all
-                </button>
-                <button
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() =>
-                    setDuplicates((prev) => prev.map((d) => ({ ...d, skip: false })))
-                  }
-                >
-                  Overwrite all
-                </button>
+                <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setDuplicates((prev) => prev.map((d) => ({ ...d, skip: true })))}>Skip all</button>
+                <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setDuplicates((prev) => prev.map((d) => ({ ...d, skip: false })))}>Overwrite all</button>
               </div>
             </div>
             {duplicates.map((dup, i) => (
@@ -777,23 +593,14 @@ export default function BulkUpload() {
                 <Checkbox
                   checked={dup.skip}
                   onCheckedChange={(checked) =>
-                    setDuplicates((prev) =>
-                      prev.map((d, j) => (j === i ? { ...d, skip: !!checked } : d))
-                    )
+                    setDuplicates((prev) => prev.map((d, j) => (j === i ? { ...d, skip: !!checked } : d)))
                   }
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-foreground truncate">{dup.name}</p>
                   <p className="text-xs text-muted-foreground">{humanSize(dup.size)}</p>
                 </div>
-                <span
-                  className={cn(
-                    "text-xs px-2 py-0.5 rounded-full font-medium",
-                    dup.skip
-                      ? "bg-muted text-muted-foreground"
-                      : "bg-amber-100 text-amber-700"
-                  )}
-                >
+                <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", dup.skip ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-700")}>
                   {dup.skip ? "Skip" : "Overwrite"}
                 </span>
               </div>
@@ -801,9 +608,7 @@ export default function BulkUpload() {
           </div>
 
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setLocalPhase("staging")}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setLocalPhase("staging")}>Cancel</Button>
             <Button onClick={() => doStartQueue(duplicates)}>Continue Upload</Button>
           </div>
         </div>
@@ -811,9 +616,10 @@ export default function BulkUpload() {
     );
   }
 
+  // ── Staging phase ───────────────────────────────────────────────────────────
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/albums")} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
@@ -822,7 +628,7 @@ export default function BulkUpload() {
           <div>
             <h1 className="text-xl font-bold text-foreground">Bulk Upload</h1>
             <p className="text-sm text-muted-foreground">
-              Drop multiple event folders at once, group them, and upload to albums in one batch.
+              Drop folders and choose where to upload them.
             </p>
           </div>
         </div>
@@ -832,9 +638,7 @@ export default function BulkUpload() {
             onClick={() => setActiveTab("upload")}
             className={cn(
               "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-2",
-              activeTab === "upload"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+              activeTab === "upload" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             <Upload className="h-3.5 w-3.5" />
@@ -844,9 +648,7 @@ export default function BulkUpload() {
             onClick={() => setActiveTab("history")}
             className={cn(
               "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-2",
-              activeTab === "history"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+              activeTab === "history" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             <History className="h-3.5 w-3.5" />
@@ -864,243 +666,163 @@ export default function BulkUpload() {
         )}
 
         {activeTab === "upload" && (
-          <>
-          <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={handleDrop}
-          className={cn(
-            "relative border-2 border-dashed rounded-xl py-12 flex flex-col items-center justify-center gap-3 transition-colors cursor-default",
-            isDragOver
-              ? "border-primary bg-primary/5"
-              : "border-border hover:border-muted-foreground/40"
-          )}
-        >
-          {isProcessingDrop ? (
-            <>
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <p className="text-sm font-medium text-foreground">Reading folder contents…</p>
-            </>
-          ) : (
-            <>
-              <FolderInput className="h-9 w-9 text-muted-foreground" />
-              <div className="text-center">
-                <p className="text-sm font-medium text-foreground">Drop folders here</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Drag and drop entire event folders — multiple at once
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => folderInputRef.current?.click()}
-              >
-                <FolderOpen className="h-4 w-4" />
-                Pick Folder
-              </Button>
-              <input
-                ref={folderInputRef}
-                type="file"
-                // @ts-ignore
-                webkitdirectory=""
-                multiple
-                className="hidden"
-                onChange={handleFolderInput}
-              />
-            </>
-          )}
-        </div>
-
-        {folders.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Groups ({groups.length})</h2>
-              <p className="text-xs text-muted-foreground">
-                {folders.reduce((sum, f) => sum + f.files.length, 0)} photos total
-              </p>
+          <div className="space-y-5">
+            {/* Drop zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={handleDrop}
+              className={cn(
+                "relative border-2 border-dashed rounded-xl py-10 flex flex-col items-center justify-center gap-3 transition-colors cursor-default",
+                isDragOver ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"
+              )}
+            >
+              {isProcessingDrop ? (
+                <>
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <p className="text-sm font-medium text-foreground">Reading folder contents…</p>
+                </>
+              ) : (
+                <>
+                  <FolderInput className="h-9 w-9 text-muted-foreground" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-foreground">Drop folders here</p>
+                    <p className="text-xs text-muted-foreground mt-1">Drag and drop one or more folders at once</p>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => folderInputRef.current?.click()}>
+                    <FolderOpen className="h-4 w-4" />
+                    Pick Folder
+                  </Button>
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    // @ts-ignore
+                    webkitdirectory=""
+                    multiple
+                    className="hidden"
+                    onChange={handleFolderInput}
+                  />
+                </>
+              )}
             </div>
 
-            <div className="space-y-3">
-              {groups.map((group) => {
-                const groupFolders = folders.filter((f) => group.folderIds.includes(f.id));
-                const totalGroupFiles = groupFolders.reduce((s, f) => s + f.files.length, 0);
-                const isExpanded = expandedGroups.has(group.id);
-                const otherGroups = groups.filter((g) => g.id !== group.id);
-
-                return (
-                  <div
-                    key={group.id}
-                    className="rounded-xl border border-border bg-card overflow-hidden"
-                  >
-                    <div
-                      className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => toggleGroupExpand(group.id)}
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">
-                          {groupFolders.length} folder{groupFolders.length !== 1 ? "s" : ""} ·{" "}
-                          {totalGroupFiles} photos
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeGroup(group.id);
-                        }}
-                        className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
-                        title="Ungroup all folders"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+            {/* Folder list */}
+            {folders.length > 0 && (
+              <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+                <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {folders.length} folder{folders.length !== 1 ? "s" : ""} · {totalPhotoCount} photos
+                  </span>
+                </div>
+                {folders.map((folder) => (
+                  <div key={folder.id} className="px-4 py-3 flex items-center gap-3">
+                    <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground truncate">{folder.name}</p>
+                      <p className="text-xs text-muted-foreground">{folder.files.length} photo{folder.files.length !== 1 ? "s" : ""}</p>
                     </div>
+                    <button
+                      onClick={() => removeFolder(folder.id)}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1 shrink-0"
+                      title="Remove folder"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
-                    {isExpanded && (
-                      <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-2">
-                        {groupFolders.map((folder) => (
-                          <div key={folder.id} className="flex items-center gap-3">
-                            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            <span className="flex-1 text-xs text-foreground truncate">
-                              {folder.name}
-                              <span className="text-muted-foreground ml-1.5">
-                                ({folder.files.length} photos)
-                              </span>
-                            </span>
-                            {otherGroups.length > 0 && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-6 text-xs px-2">
-                                    Move to group
-                                    <ChevronDown className="h-3 w-3 ml-1" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  {otherGroups.map((g) => {
-                                    const gName =
-                                      g.newAlbumName ||
-                                      deriveGroupName(
-                                        folders.filter((f) => g.folderIds.includes(f.id))
-                                      );
-                                    return (
-                                      <DropdownMenuItem
-                                        key={g.id}
-                                        onSelect={() => mergeFolderIntoGroup(folder.id, g.id)}
-                                      >
-                                        {gName}
-                                      </DropdownMenuItem>
-                                    );
-                                  })}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                            {groupFolders.length > 1 && (
-                              <button
-                                onClick={() => removeFolder(folder.id)}
-                                className="text-muted-foreground hover:text-destructive transition-colors"
-                                title="Remove from group"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
+            {/* Single album destination — shown after folders are added */}
+            {folders.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                <p className="text-sm font-semibold text-foreground">Upload destination</p>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setDestType("new"); setExistingAlbumId(undefined); setAlbumSearch(""); }}
+                    className={cn(
+                      "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                      destType === "new"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground"
+                    )}
+                  >
+                    New album
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDestType("existing"); setNewAlbumName(""); }}
+                    className={cn(
+                      "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                      destType === "existing"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground"
+                    )}
+                  >
+                    Existing album
+                  </button>
+                </div>
+
+                {destType === "new" && (
+                  <Input
+                    value={newAlbumName}
+                    onChange={(e) => setNewAlbumName(e.target.value)}
+                    placeholder="Album name"
+                    className="h-9 text-sm"
+                  />
+                )}
+
+                {destType === "existing" && (
+                  <div className="space-y-1.5">
+                    <Input
+                      value={albumSearch}
+                      onChange={(e) => { setAlbumSearch(e.target.value); setExistingAlbumId(undefined); }}
+                      placeholder="Search albums…"
+                      className="h-9 text-sm"
+                      autoFocus
+                    />
+                    {filteredAlbums && filteredAlbums.length > 0 && !existingAlbumId && (
+                      <div className="rounded-lg border border-border bg-popover max-h-48 overflow-y-auto divide-y divide-border shadow-sm">
+                        {filteredAlbums.map((album) => (
+                          <button
+                            key={album.id}
+                            className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent transition-colors"
+                            onClick={() => { setExistingAlbumId(album.id); setAlbumSearch(album.title); }}
+                          >
+                            {album.title}
+                          </button>
                         ))}
                       </div>
                     )}
-
-                    <div className="border-t border-border px-4 py-3 space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground">
-                        Album destination
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={group.destType}
-                          onValueChange={(v) =>
-                            updateGroup(group.id, {
-                              destType: v as "new" | "existing",
-                              existingAlbumId: undefined,
-                            })
-                          }
+                    {existingAlbumId && (
+                      <p className="text-sm text-primary font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        {albums?.find((a) => a.id === existingAlbumId)?.title}
+                        <button
+                          className="text-muted-foreground hover:text-foreground ml-1"
+                          onClick={() => { setExistingAlbumId(undefined); setAlbumSearch(""); }}
                         >
-                          <SelectTrigger className="h-8 w-40 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="new">Create new album</SelectItem>
-                            <SelectItem value="existing">Use existing album</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        {group.destType === "new" ? (
-                          <Input
-                            value={group.newAlbumName}
-                            onChange={(e) =>
-                              updateGroup(group.id, { newAlbumName: e.target.value })
-                            }
-                            placeholder="Album name"
-                            className="h-8 text-xs flex-1"
-                          />
-                        ) : (
-                          <div className="flex-1 space-y-1">
-                            <Input
-                              value={albumSearch}
-                              onChange={(e) => setAlbumSearch(e.target.value)}
-                              placeholder="Search albums…"
-                              className="h-8 text-xs"
-                            />
-                            {filteredAlbums && filteredAlbums.length > 0 && (
-                              <div className="rounded-md border border-border bg-popover max-h-32 overflow-y-auto divide-y divide-border">
-                                {filteredAlbums.map((album) => (
-                                  <button
-                                    key={album.id}
-                                    className={cn(
-                                      "w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors",
-                                      group.existingAlbumId === album.id && "bg-primary/10 text-primary font-medium"
-                                    )}
-                                    onClick={() =>
-                                      updateGroup(group.id, { existingAlbumId: album.id })
-                                    }
-                                  >
-                                    {album.title}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                            {group.existingAlbumId && (
-                              <p className="text-xs text-primary font-medium">
-                                ✓{" "}
-                                {albums?.find((a) => a.id === group.existingAlbumId)?.title}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </p>
+                    )}
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </div>
+            )}
 
-            <div className="flex justify-end pt-2">
-              <Button
-                onClick={handleStartUpload}
-                disabled={!canStartUpload}
-                className="gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                Start Upload ({folders.reduce((sum, f) => sum + f.files.length, 0)} photos)
-              </Button>
-            </div>
+            {/* Start button */}
+            {folders.length > 0 && (
+              <div className="flex justify-end">
+                <Button onClick={handleStartUpload} disabled={!canStartUpload} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Start Upload ({totalPhotoCount} photo{totalPhotoCount !== 1 ? "s" : ""})
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-          </>
         )}
       </div>
     </AppLayout>
@@ -1123,13 +845,7 @@ function formatRelativeTime(date: Date | string): string {
 
 function formatAbsoluteDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 interface Album {
@@ -1146,15 +862,7 @@ interface BatchRecord {
   createdAt: Date | string;
 }
 
-function HistoryTab({
-  batches,
-  isLoading,
-  albums,
-}: {
-  batches: BatchRecord[];
-  isLoading: boolean;
-  albums: Album[];
-}) {
+function HistoryTab({ batches, isLoading, albums }: { batches: BatchRecord[]; isLoading: boolean; albums: Album[] }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
@@ -1183,52 +891,39 @@ function HistoryTab({
         const hasFailures = batch.failedCount > 0;
 
         return (
-          <div
-            key={batch.id}
-            className="rounded-xl border border-border bg-card p-4 space-y-3"
-          >
+          <div key={batch.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   {batch.groupNames.map((name, i) => (
-                    <span
-                      key={i}
-                      className="text-sm font-medium text-foreground bg-muted/60 px-2 py-0.5 rounded"
-                    >
+                    <span key={i} className="text-sm font-medium text-foreground bg-muted/60 px-2 py-0.5 rounded">
                       {name}
                     </span>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1.5">
                   {batch.totalUploaded} photo{batch.totalUploaded !== 1 ? "s" : ""} uploaded
-                  {hasFailures && (
-                    <span className="text-amber-600 ml-1">· {batch.failedCount} failed</span>
-                  )}
+                  {hasFailures && <span className="text-amber-600 ml-1">· {batch.failedCount} failed</span>}
                 </p>
               </div>
-              <div
-                className="text-xs text-muted-foreground shrink-0"
+              <time
+                className="text-xs text-muted-foreground shrink-0 mt-0.5"
                 title={formatAbsoluteDate(batch.createdAt)}
               >
                 {formatRelativeTime(batch.createdAt)}
-              </div>
+              </time>
             </div>
 
             {batch.albumIds.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {batch.albumIds.map((albumId) => {
-                  const title = albumMap.get(albumId) ?? `Album #${albumId}`;
-                  return (
-                    <Link
-                      key={albumId}
-                      href={`/albums/${albumId}`}
-                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline bg-primary/8 px-2.5 py-1 rounded-full"
-                    >
-                      <LinkIcon className="h-3 w-3" />
-                      {title}
+              <div className="flex flex-wrap gap-2">
+                {batch.albumIds.map((albumId) => (
+                  <Button key={albumId} variant="outline" size="sm" asChild className="h-7 text-xs">
+                    <Link href={`/albums/${albumId}`}>
+                      <LinkIcon className="h-3 w-3 mr-1.5" />
+                      {albumMap.get(albumId) ?? `Album ${albumId}`}
                     </Link>
-                  );
-                })}
+                  </Button>
+                ))}
               </div>
             )}
           </div>
