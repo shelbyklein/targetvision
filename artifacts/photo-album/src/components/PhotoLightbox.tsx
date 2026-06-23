@@ -1,6 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, Bot } from "lucide-react";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
   useGetPhoto,
@@ -509,6 +509,11 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
     setLocalCoverPhotoId(coverPhotoId);
   }, [coverPhotoId]);
 
+  const [imageLoading, setImageLoading] = useState(false);
+  useLayoutEffect(() => {
+    if (photo?.id != null) setImageLoading(true);
+  }, [photo?.id]);
+
   const handleAdvance = useCallback(() => {
     if (hasNext && onNext) onNext();
   }, [hasNext, onNext]);
@@ -625,12 +630,21 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
           {photo && (
             <div className="flex flex-col lg:flex-row items-center lg:items-start gap-6 max-w-6xl w-full max-h-[90vh]">
               <div className="flex-1 flex flex-col items-center gap-3 min-w-0 overflow-hidden">
-                <FadeImage
-                  src={imgSrc!}
-                  alt={photo.name ?? "Photo"}
-                  className="max-h-[65vh] lg:max-h-[80vh] max-w-full rounded-lg object-contain shadow-2xl"
-                  data-testid="lightbox-image"
-                />
+                <div className="relative flex items-center justify-center max-h-[65vh] lg:max-h-[80vh] w-full">
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                      <Loader2 className="h-10 w-10 text-white/60 animate-spin" />
+                    </div>
+                  )}
+                  <FadeImage
+                    key={photo.id}
+                    src={imgSrc!}
+                    alt={photo.name ?? "Photo"}
+                    className="max-h-[65vh] lg:max-h-[80vh] max-w-full rounded-lg object-contain shadow-2xl"
+                    onLoad={() => setImageLoading(false)}
+                    data-testid="lightbox-image"
+                  />
+                </div>
 
                 <div className="flex items-center gap-3">
                   {photo.name && (
