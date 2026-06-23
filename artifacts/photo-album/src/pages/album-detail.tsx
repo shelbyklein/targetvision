@@ -4,6 +4,7 @@ import { useParams, Link, useLocation } from "wouter";
 import {
   useGetAlbum,
   useListAlbumPhotos,
+  listAlbumPhotos,
   useUploadPhoto,
   useDeleteAlbum,
   useSetAlbumCover,
@@ -78,6 +79,7 @@ import { useToast } from "@/hooks/use-toast";
 type SortOption = "newest" | "oldest" | "top-rated";
 
 const PAGE_SIZE = 50;
+const PREFETCH_THRESHOLD = 3;
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
@@ -568,6 +570,29 @@ export default function AlbumDetail() {
       }
     }
   }, [photosFetching, pendingLightboxAdvance, allPhotos.length]);
+
+  const prefetchedOffsetRef = useRef<number>(-1);
+  useEffect(() => {
+    prefetchedOffsetRef.current = -1;
+  }, [albumId, showHiddenLocal]);
+
+  useEffect(() => {
+    if (!selectedPhoto || !hasMore) return;
+    const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
+    if (idx < 0) return;
+    const distanceFromEnd = sortedPhotos.length - 1 - idx;
+    if (distanceFromEnd > PREFETCH_THRESHOLD) return;
+    const nextOffset = offset + PAGE_SIZE;
+    if (prefetchedOffsetRef.current === nextOffset) return;
+    prefetchedOffsetRef.current = nextOffset;
+    const nextParams = showHiddenLocal
+      ? { includeHidden: true as const, limit: PAGE_SIZE, offset: nextOffset }
+      : { limit: PAGE_SIZE, offset: nextOffset };
+    qc.prefetchQuery({
+      queryKey: getListAlbumPhotosQueryKey(albumId, nextParams),
+      queryFn: () => listAlbumPhotos(albumId, nextParams),
+    });
+  }, [selectedPhoto, sortedPhotos, hasMore, offset, showHiddenLocal, albumId, qc]);
 
   const { mutate: setCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
