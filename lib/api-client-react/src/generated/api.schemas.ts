@@ -121,6 +121,8 @@ export interface Photo {
   photoCollections?: CollectionSummary[];
   /** @nullable */
   aiDescription?: string | null;
+  /** @nullable */
+  latestAiStatus?: "success" | "skipped" | "failed" | null;
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
 }

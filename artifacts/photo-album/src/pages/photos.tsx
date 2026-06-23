@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Bot, Check, FolderOpen } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Bot, Check, AlertCircle, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -481,7 +481,16 @@ export default function PhotosPage() {
                         <span className="text-[10px] font-semibold text-white leading-none">Hidden</span>
                       </div>
                     )}
-                    {photo.aiDescription && (
+                    {photo.latestAiStatus === "failed" && !photo.aiDescription ? (
+                      <div
+                        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow pointer-events-none"
+                        title="AI analysis failed"
+                        data-testid="ai-badge"
+                      >
+                        <Bot className="h-2.5 w-2.5 text-amber-400" />
+                        <AlertCircle className="h-2 w-2 text-amber-400" />
+                      </div>
+                    ) : photo.aiDescription ? (
                       <div
                         className="absolute top-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 shadow pointer-events-none"
                         title="AI description available"
@@ -490,7 +499,7 @@ export default function PhotosPage() {
                         <Bot className="h-2.5 w-2.5 text-sky-300" />
                         <Check className="h-2 w-2 text-sky-300" />
                       </div>
-                    )}
+                    ) : null}
                     {collections.length > 0 && (
                       <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center gap-1 pointer-events-none">
                         <span

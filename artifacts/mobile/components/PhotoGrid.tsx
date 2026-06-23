@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback } from "react";
 import {
   Dimensions,
@@ -29,6 +30,26 @@ interface PhotoItemProps {
   onPress: () => void;
 }
 
+function AiBadge({ photo }: { photo: Photo }) {
+  if (photo.latestAiStatus === "failed" && !photo.aiDescription) {
+    return (
+      <View style={styles.aiBadge} accessibilityLabel="AI analysis failed">
+        <Ionicons name="hardware-chip-outline" size={9} color="#fbbf24" />
+        <Ionicons name="alert-circle" size={8} color="#fbbf24" />
+      </View>
+    );
+  }
+  if (photo.aiDescription) {
+    return (
+      <View style={styles.aiBadge} accessibilityLabel="AI description available">
+        <Ionicons name="hardware-chip-outline" size={9} color="#7dd3fc" />
+        <Ionicons name="checkmark" size={8} color="#7dd3fc" />
+      </View>
+    );
+  }
+  return null;
+}
+
 function PhotoItem({ photo, onPress }: PhotoItemProps) {
   return (
     <Pressable
@@ -42,6 +63,7 @@ function PhotoItem({ photo, onPress }: PhotoItemProps) {
         contentFit="cover"
         transition={150}
       />
+      <AiBadge photo={photo} />
     </Pressable>
   );
 }
@@ -94,5 +116,17 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
+  },
+  aiBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 1,
+    backgroundColor: "rgba(0,0,0,0.70)",
+    borderRadius: 20,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
 });

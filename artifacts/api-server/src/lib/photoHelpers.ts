@@ -1,5 +1,5 @@
-import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable } from "@workspace/db";
-import { eq, and, avg, count } from "drizzle-orm";
+import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable, aiAnalysisEventsTable } from "@workspace/db";
+import { eq, and, avg, count, desc } from "drizzle-orm";
 
 export async function buildPhotoResponse(photoId: number, currentUserId?: number) {
   const [photo] = await db
@@ -13,7 +13,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
 
   if (!photo) return null;
 
-  const [photoCollections, ratingDataArr, ratingsList, suggestedCollections, suggestedNewCollections] = await Promise.all([
+  const [photoCollections, ratingDataArr, ratingsList, suggestedCollections, suggestedNewCollections, latestAiEvents] = await Promise.all([
     db
       .select({
         id: collectionsTable.id,
@@ -65,9 +65,16 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
           eq(photoNewCollectionSuggestionsTable.status, "pending"),
         ),
       ),
+    db
+      .select({ status: aiAnalysisEventsTable.status })
+      .from(aiAnalysisEventsTable)
+      .where(eq(aiAnalysisEventsTable.photoId, photoId))
+      .orderBy(desc(aiAnalysisEventsTable.createdAt))
+      .limit(1),
   ]);
 
   const ratingData = ratingDataArr[0];
+  const latestAiStatus = latestAiEvents[0]?.status ?? null;
 
   let myRating: number | null = null;
   if (currentUserId) {
@@ -104,6 +111,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     })),
     suggestedCollections,
     suggestedNewCollections,
+    latestAiStatus,
   };
 }
 

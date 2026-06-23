@@ -890,7 +890,16 @@ export default function AlbumDetail() {
                   </div>
                 )}
 
-                {photo.aiDescription && (
+                {photo.latestAiStatus === "failed" && !photo.aiDescription ? (
+                  <div
+                    className="absolute top-2 right-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10"
+                    title="AI analysis failed"
+                    data-testid="ai-badge"
+                  >
+                    <Bot className="h-2.5 w-2.5 text-amber-400" />
+                    <AlertCircle className="h-2 w-2 text-amber-400" />
+                  </div>
+                ) : photo.aiDescription ? (
                   <div
                     className="absolute top-2 right-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10"
                     title="AI description available"
@@ -899,7 +908,7 @@ export default function AlbumDetail() {
                     <Bot className="h-2.5 w-2.5 text-sky-300" />
                     <Check className="h-2 w-2 text-sky-300" />
                   </div>
-                )}
+                ) : null}
 
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
 
