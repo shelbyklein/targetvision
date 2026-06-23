@@ -40,6 +40,7 @@ interface PhotoLightboxProps {
   onNext?: () => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  isLoadingNext?: boolean;
 }
 
 function LightboxStarRating({
@@ -424,7 +425,7 @@ function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: 
 
 const SWIPE_THRESHOLD = 50;
 
-export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
   const touchStartX = useRef<number | null>(null);
 
@@ -501,13 +502,17 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
 
           {onNext && (
             <button
-              onClick={(e) => { e.stopPropagation(); onNext(); }}
-              disabled={!hasNext}
+              onClick={(e) => { e.stopPropagation(); if (!isLoadingNext) onNext(); }}
+              disabled={!hasNext || isLoadingNext}
               className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors focus:outline-none focus:ring-2 focus:ring-white z-10 disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Next photo"
               data-testid="lightbox-next"
             >
-              <ChevronRight className="h-6 w-6" />
+              {isLoadingNext ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <ChevronRight className="h-6 w-6" />
+              )}
             </button>
           )}
 

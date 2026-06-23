@@ -448,6 +448,9 @@ export default function AlbumDetail() {
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
   const [hoveredSuggestions, setHoveredSuggestions] = useState<Set<number>>(new Set());
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
+  const [pendingLightboxAdvance, setPendingLightboxAdvance] = useState(false);
+  const prevAllPhotosLengthRef = useRef(0);
+  const wasFetchingRef = useRef(false);
   const { mutateAsync: bulkUpdatePhotos, isPending: bulkUpdating } = useBulkUpdatePhotos();
   const { mutateAsync: bulkDeletePhotos, isPending: bulkDeleting } = useBulkDeletePhotos();
 
@@ -502,6 +505,28 @@ export default function AlbumDetail() {
       });
     }
   }, [photosPage, offset]);
+
+  useEffect(() => {
+    if (!pendingLightboxAdvance || !selectedPhoto) return;
+    if (allPhotos.length > prevAllPhotosLengthRef.current) {
+      const newPhoto = allPhotos[prevAllPhotosLengthRef.current];
+      setPendingLightboxAdvance(false);
+      if (newPhoto) {
+        setSelectedPhoto({ id: newPhoto.id, url: newPhoto.url, thumbnailKey: newPhoto.thumbnailKey, name: newPhoto.name, averageRating: newPhoto.averageRating, albumId });
+      }
+    }
+  }, [allPhotos, pendingLightboxAdvance, selectedPhoto, albumId]);
+
+  useEffect(() => {
+    const wasFetching = wasFetchingRef.current;
+    wasFetchingRef.current = photosFetching;
+    if (wasFetching && !photosFetching && pendingLightboxAdvance) {
+      if (allPhotos.length <= prevAllPhotosLengthRef.current) {
+        setPendingLightboxAdvance(false);
+      }
+    }
+  }, [photosFetching, pendingLightboxAdvance, allPhotos.length]);
+
   const { mutate: setCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
   const { mutate: deleteAlbum, isPending: deletingAlbum } = useDeleteAlbum();
@@ -1242,9 +1267,13 @@ export default function AlbumDetail() {
 
       <PhotoLightbox
         photo={selectedPhoto}
-        onClose={() => setSelectedPhoto(null)}
+        onClose={() => { setSelectedPhoto(null); setPendingLightboxAdvance(false); }}
         hasPrev={selectedPhoto !== null && sortedPhotos.findIndex((p) => p.id === selectedPhoto.id) > 0}
-        hasNext={selectedPhoto !== null && sortedPhotos.findIndex((p) => p.id === selectedPhoto.id) < sortedPhotos.length - 1}
+        hasNext={selectedPhoto !== null && (
+          sortedPhotos.findIndex((p) => p.id === selectedPhoto.id) < sortedPhotos.length - 1 ||
+          hasMore
+        )}
+        isLoadingNext={pendingLightboxAdvance}
         onPrev={() => {
           if (!selectedPhoto) return;
           const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
@@ -1254,11 +1283,15 @@ export default function AlbumDetail() {
           }
         }}
         onNext={() => {
-          if (!selectedPhoto) return;
+          if (!selectedPhoto || pendingLightboxAdvance) return;
           const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
           if (idx < sortedPhotos.length - 1) {
             const p = sortedPhotos[idx + 1];
             setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId });
+          } else if (hasMore) {
+            prevAllPhotosLengthRef.current = allPhotos.length;
+            setPendingLightboxAdvance(true);
+            setOffset((prev) => prev + PAGE_SIZE);
           }
         }}
       />
