@@ -4,6 +4,7 @@ import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoColl
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { readMagicBytes, detectImageMimeType } from "../lib/magicBytes";
 import { logger } from "../lib/logger";
 import {
   ListAlbumPhotosParams,
@@ -63,12 +64,37 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
 
   let mimeType: string | null = null;
   if (body.data.storageKey) {
+    let objectFile;
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(body.data.storageKey);
+      objectFile = await objectStorageService.getObjectEntityFile(body.data.storageKey);
       const [metadata] = await objectFile.getMetadata();
       mimeType = (metadata.contentType as string) || null;
     } catch {
       res.status(400).json({ error: "Unable to verify uploaded file type" });
+      return;
+    }
+
+    try {
+      const magicBuf = await readMagicBytes(objectFile);
+      const detectedType = detectImageMimeType(magicBuf);
+      if (!detectedType) {
+        await objectFile.delete().catch((err) => {
+          logger.error({ err, storageKey: body.data.storageKey }, "Failed to delete rejected upload");
+        });
+        res.status(400).json({ error: "File content does not match a supported image type (JPEG, PNG, GIF, WebP)" });
+        return;
+      }
+      if (mimeType && detectedType !== mimeType) {
+        await objectFile.delete().catch((err) => {
+          logger.error({ err, storageKey: body.data.storageKey }, "Failed to delete rejected upload");
+        });
+        res.status(400).json({ error: `File content (${detectedType}) does not match the claimed type (${mimeType})` });
+        return;
+      }
+      mimeType = detectedType;
+    } catch (err) {
+      logger.error({ err, storageKey: body.data.storageKey }, "Magic byte check failed");
+      res.status(400).json({ error: "Unable to verify file content" });
       return;
     }
   } else {
