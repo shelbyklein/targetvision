@@ -11,11 +11,13 @@ import {
   useRatePhoto,
   useClearPhotoRating,
   useGetMe,
+  useCreateCollection,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
   getGetRecentPhotosQueryKey,
   getGetTopRatedPhotosQueryKey,
+  getListCollectionsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FadeImage } from "@/components/ui/fade-image";
@@ -170,7 +172,13 @@ function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: 
   const { mutate: addToCollection, isPending: adding } = useAddPhotoToCollection();
   const { mutate: removeFromCollection, isPending: removing } = useRemovePhotoFromCollection();
   const { mutate: updatePhoto, isPending: updatingVisibility } = useUpdatePhoto();
+  const { mutate: createCollection, isPending: creating } = useCreateCollection();
   const { data: me } = useGetMe();
+
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const newTitleRef = useRef<HTMLInputElement>(null);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
@@ -180,6 +188,7 @@ function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: 
     qc.invalidateQueries({ queryKey: getListPhotosQueryKey().slice(0, 1) });
     qc.invalidateQueries({ queryKey: getGetRecentPhotosQueryKey() });
     qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
+    qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
   }
 
   function handleAdd(collectionId: string) {
@@ -218,6 +227,48 @@ function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: 
           toast({ title: next ? "Photo hidden" : "Photo visible again" });
         },
         onError: () => toast({ title: "Failed to update photo", variant: "destructive" }),
+      }
+    );
+  }
+
+  function openNewForm() {
+    setShowNewForm(true);
+    setNewTitle("");
+    setNewDesc("");
+    setTimeout(() => newTitleRef.current?.focus(), 0);
+  }
+
+  function cancelNewForm() {
+    setShowNewForm(false);
+    setNewTitle("");
+    setNewDesc("");
+  }
+
+  function handleCreateAndAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) return;
+    createCollection(
+      { data: { title: trimmedTitle, description: newDesc.trim() || undefined } },
+      {
+        onSuccess: (newCollection) => {
+          addToCollection(
+            { id: newCollection.id, data: { photoId } },
+            {
+              onSuccess: () => {
+                invalidate();
+                toast({ title: `Created "${trimmedTitle}" and added photo` });
+                cancelNewForm();
+              },
+              onError: () => {
+                invalidate();
+                toast({ title: `Collection "${trimmedTitle}" created, but couldn't add photo`, variant: "destructive" });
+                cancelNewForm();
+              },
+            }
+          );
+        },
+        onError: () => toast({ title: "Failed to create collection", variant: "destructive" }),
       }
     );
   }
@@ -264,10 +315,76 @@ function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: 
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-white/70">
-          <FolderOpen className="h-3.5 w-3.5" />
-          <span className="text-xs font-semibold uppercase tracking-wide">Collections</span>
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 text-white/70">
+            <FolderOpen className="h-3.5 w-3.5" />
+            <span className="text-xs font-semibold uppercase tracking-wide">Collections</span>
+          </div>
+          {!showNewForm && (
+            <button
+              type="button"
+              onClick={openNewForm}
+              className="flex items-center gap-0.5 text-xs text-white/50 hover:text-white/90 transition-colors rounded px-1 py-0.5 hover:bg-white/10"
+              data-testid="lightbox-new-collection-btn"
+              aria-label="Create new collection"
+            >
+              <Plus className="h-3 w-3" />
+              New
+            </button>
+          )}
         </div>
+
+        {showNewForm && (
+          <form
+            onSubmit={handleCreateAndAdd}
+            className="space-y-2 rounded-lg border border-white/20 bg-white/5 p-2.5"
+            data-testid="lightbox-new-collection-form"
+          >
+            <input
+              ref={newTitleRef}
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="Collection title"
+              required
+              className="w-full rounded-md bg-white/10 border border-white/20 text-white placeholder:text-white/35 text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/40"
+              data-testid="lightbox-new-collection-title"
+            />
+            <input
+              type="text"
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              placeholder="Description (optional)"
+              className="w-full rounded-md bg-white/10 border border-white/20 text-white placeholder:text-white/35 text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/40"
+              data-testid="lightbox-new-collection-desc"
+            />
+            <div className="flex items-center gap-1.5">
+              <button
+                type="submit"
+                disabled={creating || adding || !newTitle.trim()}
+                className="flex-1 rounded-md bg-white text-gray-900 text-xs font-medium px-2.5 py-1.5 hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                data-testid="lightbox-new-collection-submit"
+              >
+                {creating || adding ? (
+                  <span className="flex items-center justify-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Creating…
+                  </span>
+                ) : (
+                  "Create & add"
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={cancelNewForm}
+                className="rounded-md border border-white/20 text-white/60 text-xs px-2.5 py-1.5 hover:bg-white/10 hover:text-white transition-colors"
+                data-testid="lightbox-new-collection-cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
 
         {allCollections && allCollections.length > 0 ? (
           <div className="flex flex-wrap gap-1.5" data-testid="lightbox-collection-pills">
@@ -297,9 +414,9 @@ function PhotoSidebarContent({ photoId, albumId }: { photoId: number; albumId?: 
               );
             })}
           </div>
-        ) : (
+        ) : !showNewForm ? (
           <p className="text-xs text-white/40">No collections yet.</p>
-        )}
+        ) : null}
       </div>
     </div>
   );
