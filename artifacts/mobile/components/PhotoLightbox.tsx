@@ -17,6 +17,7 @@ import {
 } from "react-native";
 
 import type { Photo } from "@workspace/api-client-react";
+import colors from "@/constants/colors";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -307,9 +308,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   aiDesc: {
-    color: "rgba(255,255,255,0.6)",
+    color: colors.dark.accentForeground,
     fontSize: 13,
     fontStyle: "italic",
+    lineHeight: 18,
   },
   albumLabel: {
     color: "rgba(255,255,255,0.5)",
