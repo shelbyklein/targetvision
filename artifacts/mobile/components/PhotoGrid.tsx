@@ -1,15 +1,20 @@
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 
-import type { Photo } from "@workspace/api-client-react";
+import {
+  type Photo,
+  useRerunPhotoAnalysis,
+} from "@workspace/api-client-react";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const NUM_COLS = 3;
@@ -31,12 +36,43 @@ interface PhotoItemProps {
 }
 
 function AiBadge({ photo }: { photo: Photo }) {
+  const [isRerunning, setIsRerunning] = useState(false);
+  const qc = useQueryClient();
+  const { mutate: rerunAnalysis } = useRerunPhotoAnalysis();
+
   if (photo.latestAiStatus === "failed" && !photo.aiDescription) {
     return (
-      <View style={styles.aiBadge} accessibilityLabel="AI analysis failed">
-        <Ionicons name="hardware-chip-outline" size={9} color="#fbbf24" />
-        <Ionicons name="alert-circle" size={8} color="#fbbf24" />
-      </View>
+      <Pressable
+        style={styles.aiBadge}
+        accessibilityLabel={isRerunning ? "Re-running AI analysis" : "AI analysis failed — tap to retry"}
+        onPress={() => {
+          if (isRerunning) return;
+          setIsRerunning(true);
+          rerunAnalysis(
+            { id: photo.id },
+            {
+              onSuccess: () => {
+                void qc.invalidateQueries({
+                  predicate: (query) => {
+                    const key = query.queryKey[0];
+                    return key === "photos" || key === "album-photos";
+                  },
+                });
+              },
+              onSettled: () => setIsRerunning(false),
+            }
+          );
+        }}
+      >
+        {isRerunning ? (
+          <ActivityIndicator size={10} color="#fbbf24" />
+        ) : (
+          <>
+            <Ionicons name="hardware-chip-outline" size={9} color="#fbbf24" />
+            <Ionicons name="alert-circle" size={8} color="#fbbf24" />
+          </>
+        )}
+      </Pressable>
     );
   }
   if (photo.aiDescription) {

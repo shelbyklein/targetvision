@@ -12,6 +12,7 @@ import {
   useDismissPhotoSuggestion,
   useAcceptPhotoNewCollectionSuggestion,
   useDismissPhotoNewCollectionSuggestion,
+  useRerunPhotoAnalysis,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -490,6 +491,8 @@ export default function AlbumDetail() {
     name: string;
   } | null>(null);
   const [showHiddenLocal, setShowHiddenLocal] = useState(false);
+  const [reanalyzingIds, setReanalyzingIds] = useState<Set<number>>(new Set());
+  const { mutate: rerunAnalysis } = useRerunPhotoAnalysis();
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
@@ -891,14 +894,43 @@ export default function AlbumDetail() {
                 )}
 
                 {photo.latestAiStatus === "failed" && !photo.aiDescription ? (
-                  <div
-                    className="absolute top-2 right-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10"
-                    title="AI analysis failed"
+                  <button
+                    type="button"
+                    className="absolute top-2 right-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10 hover:bg-black/90 transition-colors"
+                    title={reanalyzingIds.has(photo.id) ? "Re-running AI analysis…" : "AI analysis failed — click to retry"}
                     data-testid="ai-badge"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const photoId = photo.id;
+                      setReanalyzingIds((prev) => new Set(prev).add(photoId));
+                      rerunAnalysis(
+                        { id: photoId },
+                        {
+                          onSuccess: () => {
+                            toast({ title: "AI analysis started" });
+                            qc.invalidateQueries({ queryKey: getListAlbumPhotosQueryKey(albumId) });
+                          },
+                          onError: () => toast({ title: "Failed to start AI analysis", variant: "destructive" }),
+                          onSettled: () =>
+                            setReanalyzingIds((prev) => {
+                              const next = new Set(prev);
+                              next.delete(photoId);
+                              return next;
+                            }),
+                        }
+                      );
+                    }}
+                    disabled={reanalyzingIds.has(photo.id)}
                   >
-                    <Bot className="h-2.5 w-2.5 text-amber-400" />
-                    <AlertCircle className="h-2 w-2 text-amber-400" />
-                  </div>
+                    {reanalyzingIds.has(photo.id) ? (
+                      <Loader2 className="h-2.5 w-2.5 text-amber-400 animate-spin" />
+                    ) : (
+                      <>
+                        <Bot className="h-2.5 w-2.5 text-amber-400" />
+                        <AlertCircle className="h-2 w-2 text-amber-400" />
+                      </>
+                    )}
+                  </button>
                 ) : photo.aiDescription ? (
                   <div
                     className="absolute top-2 right-2 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 z-10"
