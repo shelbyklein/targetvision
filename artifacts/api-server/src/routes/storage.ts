@@ -31,6 +31,11 @@ router.post("/storage/uploads/request-url", requireAuth, async (req: Request, re
   try {
     const { name, size, contentType } = parsed.data;
 
+    if (!contentType.startsWith("image/")) {
+      res.status(400).json({ error: "Only image file types are allowed" });
+      return;
+    }
+
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 

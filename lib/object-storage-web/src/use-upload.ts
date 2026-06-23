@@ -117,6 +117,14 @@ export function useUpload(options: UseUploadOptions = {}) {
 
   const uploadFile = useCallback(
     async (file: File, onProgress?: (percent: number) => void): Promise<UploadResponse | null> => {
+      const contentType = file.type || "application/octet-stream";
+      if (!contentType.startsWith("image/")) {
+        const typeError = new Error("Only image file types are allowed");
+        setError(typeError);
+        options.onError?.(typeError);
+        return null;
+      }
+
       setIsUploading(true);
       setError(null);
       setProgress(0);
@@ -155,6 +163,11 @@ export function useUpload(options: UseUploadOptions = {}) {
       url: string;
       headers?: Record<string, string>;
     }> => {
+      const contentType = file.type || "application/octet-stream";
+      if (!contentType.startsWith("image/")) {
+        throw new Error("Only image file types are allowed");
+      }
+
       const response = await fetch(`${basePath}/uploads/request-url`, {
         method: "POST",
         headers: {
