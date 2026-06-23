@@ -28,7 +28,14 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Team Photo Album to access your photos so you can upload them to albums.",
+          "cameraPermission": "Allow Team Photo Album to use the camera so you can take and upload photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
