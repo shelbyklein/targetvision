@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, Bot } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
@@ -377,6 +377,16 @@ function PhotoSidebarContent({
           onAdvance={onAdvance}
         />
       </div>
+
+      {fullPhoto?.aiDescription && (
+        <div className="border-t border-white/10 pt-3 space-y-1.5" data-testid="lightbox-ai-description">
+          <div className="flex items-center gap-1.5 text-white/70">
+            <Bot className="h-3.5 w-3.5 text-sky-300" />
+            <span className="text-xs font-semibold uppercase tracking-wide">AI Description</span>
+          </div>
+          <p className="text-xs text-white/70 leading-relaxed">{fullPhoto.aiDescription}</p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-1.5">
