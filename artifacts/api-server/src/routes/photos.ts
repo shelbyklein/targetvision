@@ -233,7 +233,7 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     .orderBy(photosTable.createdAt);
 
   const allIds = allPhotos.map((p) => p.id);
-  const { search, tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, albumId } = query.data;
+  const { search, tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, albumId, aiStatus } = query.data;
 
   const filteredIds = await applyFiltersAndFetchIds(allIds, {
     search,
@@ -245,6 +245,7 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     dateTo,
     uploaderId,
     albumId,
+    aiStatus,
   });
 
   const full = await Promise.all(filteredIds.map((id) => buildPhotoResponse(id, req.dbUser?.id)));

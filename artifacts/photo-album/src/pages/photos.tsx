@@ -39,6 +39,7 @@ function parseSearch(search: string) {
     albumId: p.get("albumId") ?? "",
     dateFrom: p.get("dateFrom") ?? "",
     dateTo: p.get("dateTo") ?? "",
+    aiStatus: p.get("aiStatus") ?? "",
     page: p.get("page") ?? "1",
   };
 }
@@ -89,7 +90,7 @@ export default function PhotosPage() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const urlParams = parseSearch(searchString);
-  const { search, ratingMin, uploaderId, albumId, dateFrom, dateTo, page } = urlParams;
+  const { search, ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus, page } = urlParams;
   const [inputValue, setInputValue] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
@@ -135,13 +136,14 @@ export default function PhotosPage() {
     ...(dateFrom && { dateFrom }),
     ...(dateTo && { dateTo }),
     ...(showHidden && { includeHidden: true }),
+    ...(aiStatus && { aiStatus: aiStatus as "has_description" | "failed" | "not_analysed" }),
   };
 
   const { data: photos, isLoading } = useListPhotos(
     Object.keys(apiParams).length > 0 ? apiParams : undefined
   );
 
-  const hasActiveFilters = !!(ratingMin || uploaderId || albumId || dateFrom || dateTo);
+  const hasActiveFilters = !!(ratingMin || uploaderId || albumId || dateFrom || dateTo || aiStatus);
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const totalPhotos = photos?.length ?? 0;
@@ -199,6 +201,7 @@ export default function PhotosPage() {
       albumId: "",
       dateFrom: "",
       dateTo: "",
+      aiStatus: "",
       page: "1",
     });
   }
@@ -248,7 +251,7 @@ export default function PhotosPage() {
             Filters
             {hasActiveFilters && (
               <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                {[ratingMin, uploaderId, albumId, dateFrom, dateTo].filter(Boolean).length}
+                {[ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus].filter(Boolean).length}
               </span>
             )}
           </Button>
@@ -375,6 +378,26 @@ export default function PhotosPage() {
                   </Select>
                 </div>
               )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">AI status</label>
+                <Select
+                  value={aiStatus || "__all__"}
+                  onValueChange={(v) =>
+                    handleFilterChange("aiStatus", v === "__all__" ? "" : v)
+                  }
+                >
+                  <SelectTrigger className="h-9 text-sm" data-testid="filter-ai-status">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All</SelectItem>
+                    <SelectItem value="has_description">Has description</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                    <SelectItem value="not_analysed">Not analysed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {hasActiveFilters && (
@@ -415,6 +438,20 @@ export default function PhotosPage() {
                   <Badge variant="secondary" className="gap-1 text-xs">
                     Uploader: {users?.find((u) => String(u.id) === uploaderId)?.name ?? uploaderId}
                     <button type="button" onClick={() => handleFilterChange("uploaderId", "")} className="ml-1 hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                {aiStatus && (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    <Bot className="h-3 w-3" />
+                    AI:{" "}
+                    {aiStatus === "has_description"
+                      ? "Has description"
+                      : aiStatus === "failed"
+                      ? "Failed"
+                      : "Not analysed"}
+                    <button type="button" onClick={() => handleFilterChange("aiStatus", "")} className="ml-1 hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>

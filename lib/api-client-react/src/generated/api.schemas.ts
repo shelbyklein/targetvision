@@ -424,4 +424,5 @@ export type ListPhotosParams = {
   uploaderId?: number;
   includeHidden?: boolean;
   albumId?: number;
+  aiStatus?: "has_description" | "failed" | "not_analysed";
 };

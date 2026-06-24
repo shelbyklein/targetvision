@@ -374,6 +374,7 @@ export const ListPhotosQueryParams = zod.object({
   uploaderId: zod.coerce.number().optional(),
   includeHidden: zod.coerce.boolean().optional(),
   albumId: zod.coerce.number().optional(),
+  aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
 });
 
 export const ListPhotosResponseItem = zod.object({

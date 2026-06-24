@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, avg, eq, gte, ilike, inArray, lte } from "drizzle-orm";
+import { and, avg, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, notInArray } from "drizzle-orm";
 import {
   db,
   albumsTable,
@@ -9,6 +9,7 @@ import {
   tagsTable,
   collectionTagsTable,
   photoCollectionsTable,
+  aiAnalysisEventsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -25,6 +26,7 @@ interface PhotoFilterOptions {
   dateTo?: string;
   uploaderId?: number;
   albumId?: number;
+  aiStatus?: "has_description" | "failed" | "not_analysed";
 }
 
 async function applyFiltersAndFetchIds(
@@ -120,6 +122,38 @@ async function applyFiltersAndFetchIds(
       if (filters.ratingMax != null && r > filters.ratingMax) return false;
       return true;
     });
+  }
+
+  if (filters.aiStatus) {
+    if (filters.aiStatus === "has_description") {
+      const rows = await db
+        .select({ id: photosTable.id })
+        .from(photosTable)
+        .where(isNotNull(photosTable.aiDescription));
+      const aiIds = new Set(rows.map((r) => r.id));
+      ids = ids.filter((id) => aiIds.has(id));
+    } else if (filters.aiStatus === "not_analysed") {
+      const withEvents = await db
+        .selectDistinct({ photoId: aiAnalysisEventsTable.photoId })
+        .from(aiAnalysisEventsTable);
+      const withEventIds = new Set(withEvents.map((r) => r.photoId).filter((id): id is number => id != null));
+      ids = ids.filter((id) => !withEventIds.has(id));
+    } else if (filters.aiStatus === "failed") {
+      const allEvents = await db
+        .select({
+          photoId: aiAnalysisEventsTable.photoId,
+          status: aiAnalysisEventsTable.status,
+        })
+        .from(aiAnalysisEventsTable)
+        .orderBy(desc(aiAnalysisEventsTable.createdAt));
+      const latestStatusMap = new Map<number, string>();
+      for (const event of allEvents) {
+        if (event.photoId != null && !latestStatusMap.has(event.photoId)) {
+          latestStatusMap.set(event.photoId, event.status);
+        }
+      }
+      ids = ids.filter((id) => latestStatusMap.get(id) === "failed");
+    }
   }
 
   return ids;
