@@ -233,6 +233,9 @@ export const ListAlbumPhotosParams = zod.object({
 
 export const ListAlbumPhotosQueryParams = zod.object({
   includeHidden: zod.coerce.boolean().optional(),
+  inCollection: zod.coerce.boolean().optional(),
+  hasRating: zod.coerce.boolean().optional(),
+  aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
 });
 
 export const ListAlbumPhotosResponseItem = zod.object({

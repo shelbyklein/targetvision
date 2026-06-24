@@ -196,22 +196,33 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
     : DEFAULT_LIMIT;
   const offset = !isNaN(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
+  const inCollectionStr = req.query.inCollection;
+  const inCollection = inCollectionStr === "true" ? true : inCollectionStr === "false" ? false : undefined;
+  const hasRatingStr = req.query.hasRating;
+  const hasRating = hasRatingStr === "true" ? true : hasRatingStr === "false" ? false : undefined;
+  const aiStatusRaw = typeof req.query.aiStatus === "string" ? req.query.aiStatus : undefined;
+  const aiStatus =
+    aiStatusRaw === "has_description" || aiStatusRaw === "failed" || aiStatusRaw === "not_analysed"
+      ? aiStatusRaw
+      : undefined;
+
   const conditions = canSeeHidden
     ? eq(photosTable.albumId, params.data.id)
     : and(eq(photosTable.albumId, params.data.id), eq(photosTable.isHidden, false));
 
-  const rows = await db
+  const allRows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
     .where(conditions)
-    .orderBy(desc(photosTable.createdAt))
-    .offset(offset)
-    .limit(limit + 1);
+    .orderBy(desc(photosTable.createdAt));
 
-  const hasMore = rows.length > limit;
-  const photoRows = hasMore ? rows.slice(0, limit) : rows;
+  const allIds = allRows.map((r) => r.id);
+  const filteredIds = await applyFiltersAndFetchIds(allIds, { inCollection, hasRating, aiStatus });
 
-  const full = await Promise.all(photoRows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
+  const hasMore = filteredIds.length > offset + limit;
+  const pageIds = filteredIds.slice(offset, offset + limit);
+
+  const full = await Promise.all(pageIds.map((id) => buildPhotoResponse(id, req.dbUser?.id)));
   const photoList = full.filter(Boolean);
   res.json(ListAlbumPhotosPagedResponse.parse({ photos: photoList, hasMore }));
 });

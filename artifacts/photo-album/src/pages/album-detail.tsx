@@ -491,6 +491,9 @@ export default function AlbumDetail() {
     name: string;
   } | null>(null);
   const [showHiddenLocal, setShowHiddenLocal] = useState(false);
+  const [filterInCollection, setFilterInCollection] = useState<boolean | undefined>(undefined);
+  const [filterHasRating, setFilterHasRating] = useState<boolean | undefined>(undefined);
+  const [filterAiStatus, setFilterAiStatus] = useState<"has_description" | "not_analysed" | "failed" | undefined>(undefined);
   const [reanalyzingIds, setReanalyzingIds] = useState<Set<number>>(new Set());
   const { mutate: rerunAnalysis } = useRerunPhotoAnalysis();
   const [offset, setOffset] = useState(0);
@@ -505,9 +508,22 @@ export default function AlbumDetail() {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
 
-  const photosParams = showHiddenLocal
-    ? { includeHidden: true as const, limit: PAGE_SIZE, offset }
-    : { limit: PAGE_SIZE, offset };
+  const hasActiveFilters = filterInCollection != null || filterHasRating != null || filterAiStatus != null;
+
+  function clearFilters() {
+    setFilterInCollection(undefined);
+    setFilterHasRating(undefined);
+    setFilterAiStatus(undefined);
+  }
+
+  const photosParams = {
+    ...(showHiddenLocal ? { includeHidden: true as const } : {}),
+    limit: PAGE_SIZE,
+    offset,
+    ...(filterInCollection != null ? { inCollection: filterInCollection } : {}),
+    ...(filterHasRating != null ? { hasRating: filterHasRating } : {}),
+    ...(filterAiStatus != null ? { aiStatus: filterAiStatus } : {}),
+  };
   const { data: photosPage, isLoading: photosPageLoading, isFetching: photosFetching } = useListAlbumPhotos(albumId, photosParams, {
     query: {
       enabled: !!albumId,
@@ -535,7 +551,7 @@ export default function AlbumDetail() {
   useEffect(() => {
     setOffset(0);
     setAllPhotos([]);
-  }, [albumId, showHiddenLocal]);
+  }, [albumId, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus]);
 
   useEffect(() => {
     if (photosPage === undefined) return;
@@ -577,7 +593,7 @@ export default function AlbumDetail() {
   const prefetchedOffsetRef = useRef<number>(-1);
   useEffect(() => {
     prefetchedOffsetRef.current = -1;
-  }, [albumId, showHiddenLocal]);
+  }, [albumId, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus]);
 
   const { mutate: setCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
@@ -678,14 +694,19 @@ export default function AlbumDetail() {
     const nextOffset = offset + PAGE_SIZE;
     if (prefetchedOffsetRef.current === nextOffset) return;
     prefetchedOffsetRef.current = nextOffset;
-    const nextParams = showHiddenLocal
-      ? { includeHidden: true as const, limit: PAGE_SIZE, offset: nextOffset }
-      : { limit: PAGE_SIZE, offset: nextOffset };
+    const nextParams = {
+      ...(showHiddenLocal ? { includeHidden: true as const } : {}),
+      limit: PAGE_SIZE,
+      offset: nextOffset,
+      ...(filterInCollection != null ? { inCollection: filterInCollection } : {}),
+      ...(filterHasRating != null ? { hasRating: filterHasRating } : {}),
+      ...(filterAiStatus != null ? { aiStatus: filterAiStatus } : {}),
+    };
     qc.prefetchQuery({
       queryKey: getListAlbumPhotosQueryKey(albumId, nextParams),
       queryFn: () => listAlbumPhotos(albumId, nextParams),
     });
-  }, [selectedPhoto, sortedPhotos, hasMore, offset, showHiddenLocal, albumId, qc]);
+  }, [selectedPhoto, sortedPhotos, hasMore, offset, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus, albumId, qc]);
 
   if (albumLoading) {
     return (
@@ -814,17 +835,11 @@ export default function AlbumDetail() {
           </div>
         </div>
 
-        {allPhotos.length > 0 && (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              {allPhotos.length} photo{allPhotos.length !== 1 ? "s" : ""}
-            </p>
-            <div className="flex items-center gap-2">
+        {!photosLoading && album && (album.photoCount > 0 || hasActiveFilters) && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-              <Select
-                value={sort}
-                onValueChange={(v) => setSort(v as SortOption)}
-              >
+              <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
                 <SelectTrigger className="h-8 w-36 text-sm" data-testid="sort-select">
                   <SelectValue />
                 </SelectTrigger>
@@ -835,6 +850,72 @@ export default function AlbumDetail() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="h-4 w-px bg-border" />
+
+            <Select
+              value={filterInCollection == null ? "all" : String(filterInCollection)}
+              onValueChange={(v) => setFilterInCollection(v === "all" ? undefined : v === "true")}
+            >
+              <SelectTrigger className="h-8 w-44 text-sm" data-testid="filter-collection-select">
+                <SelectValue placeholder="Collection" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any collection</SelectItem>
+                <SelectItem value="true">In a collection</SelectItem>
+                <SelectItem value="false">Not in collection</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filterHasRating == null ? "all" : String(filterHasRating)}
+              onValueChange={(v) => setFilterHasRating(v === "all" ? undefined : v === "true")}
+            >
+              <SelectTrigger className="h-8 w-36 text-sm" data-testid="filter-rating-select">
+                <SelectValue placeholder="Rating" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any rating</SelectItem>
+                <SelectItem value="true">Has rating</SelectItem>
+                <SelectItem value="false">Not rated</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filterAiStatus ?? "all"}
+              onValueChange={(v) =>
+                setFilterAiStatus(
+                  v === "all" ? undefined : (v as "has_description" | "not_analysed" | "failed"),
+                )
+              }
+            >
+              <SelectTrigger className="h-8 w-44 text-sm" data-testid="filter-ai-select">
+                <SelectValue placeholder="AI status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any AI status</SelectItem>
+                <SelectItem value="has_description">Has AI description</SelectItem>
+                <SelectItem value="not_analysed">Not yet analysed</SelectItem>
+                <SelectItem value="failed">Analysis failed</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="clear-filters-btn"
+              >
+                <X className="h-3 w-3" />
+                Clear filters
+              </button>
+            )}
+
+            <span className="text-xs text-muted-foreground ml-auto">
+              {allPhotos.length} photo{allPhotos.length !== 1 ? "s" : ""}
+              {hasActiveFilters ? " (filtered)" : ""}
+            </span>
           </div>
         )}
 
@@ -1004,6 +1085,25 @@ export default function AlbumDetail() {
             </div>
           )}
           </>
+        ) : hasActiveFilters ? (
+          <div
+            className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-xl"
+            data-testid="no-photos-filtered"
+          >
+            <AlertCircle className="h-10 w-10 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-foreground mb-1">No photos match the active filters</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              Try adjusting or clearing the filters to see more photos.
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-sm text-primary hover:underline"
+              data-testid="clear-filters-empty-btn"
+            >
+              Clear filters
+            </button>
+          </div>
         ) : (
           <div
             className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-xl"

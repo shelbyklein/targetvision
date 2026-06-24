@@ -27,6 +27,8 @@ interface PhotoFilterOptions {
   uploaderId?: number;
   albumId?: number;
   aiStatus?: "has_description" | "failed" | "not_analysed";
+  inCollection?: boolean;
+  hasRating?: boolean;
 }
 
 async function applyFiltersAndFetchIds(
@@ -153,6 +155,32 @@ async function applyFiltersAndFetchIds(
         }
       }
       ids = ids.filter((id) => latestStatusMap.get(id) === "failed");
+    }
+  }
+
+  if (filters.inCollection != null) {
+    const inCollectionRows = await db
+      .selectDistinct({ photoId: photoCollectionsTable.photoId })
+      .from(photoCollectionsTable);
+    const collectionPhotoIds = new Set(
+      inCollectionRows.map((r) => r.photoId).filter((id): id is number => id != null),
+    );
+    if (filters.inCollection) {
+      ids = ids.filter((id) => collectionPhotoIds.has(id));
+    } else {
+      ids = ids.filter((id) => !collectionPhotoIds.has(id));
+    }
+  }
+
+  if (filters.hasRating != null) {
+    const ratedRows = await db
+      .selectDistinct({ photoId: ratingsTable.photoId })
+      .from(ratingsTable);
+    const ratedIds = new Set(ratedRows.map((r) => r.photoId));
+    if (filters.hasRating) {
+      ids = ids.filter((id) => ratedIds.has(id));
+    } else {
+      ids = ids.filter((id) => !ratedIds.has(id));
     }
   }
 
