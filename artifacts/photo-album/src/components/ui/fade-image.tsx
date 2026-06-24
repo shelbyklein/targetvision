@@ -6,14 +6,17 @@ interface FadeImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   alt: string;
 }
 
-export function FadeImage({ src, alt, className, ...props }: FadeImageProps) {
+export function FadeImage({ src, alt, className, onLoad, ...props }: FadeImageProps) {
   const [loaded, setLoaded] = useState(false);
 
   return (
     <img
       src={src}
       alt={alt}
-      onLoad={() => setLoaded(true)}
+      onLoad={(e) => {
+        setLoaded(true);
+        onLoad?.(e);
+      }}
       className={cn(
         "transition-opacity duration-500",
         loaded ? "opacity-100" : "opacity-0",
