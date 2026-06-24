@@ -248,6 +248,7 @@ function PhotoSidebarContent({
         onSuccess: () => {
           invalidate();
           toast({ title: next ? "Photo hidden" : "Photo visible again" });
+          if (next) handleAdvance();
         },
         onError: () => toast({ title: "Failed to update photo", variant: "destructive" }),
       }
@@ -518,7 +519,10 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
     if (hasNext && onNext) onNext();
   }, [hasNext, onNext]);
 
-  // Stable ref so the keydown listener always calls the latest version
+  // Stable refs so keydown listeners always call the latest version
+  const hideAndAdvanceRef = useRef<() => void>(() => {});
+  hideAndAdvanceRef.current = handleToggleHidden;
+
   const rateAndAdvanceRef = useRef<(score: number) => void>(() => {});
   rateAndAdvanceRef.current = useCallback((score: number) => {
     if (!photo) return;
@@ -543,6 +547,9 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
       } else if (e.key === "ArrowRight" && hasNext && onNext) {
         e.preventDefault();
         onNext();
+      } else if ((e.key === "h" || e.key === "H") && me?.role === "admin") {
+        e.preventDefault();
+        hideAndAdvanceRef.current();
       } else {
         const digit = parseInt(e.key, 10);
         if (digit >= 1 && digit <= 5) {
