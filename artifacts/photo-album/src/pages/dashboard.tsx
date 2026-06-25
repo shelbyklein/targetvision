@@ -5,6 +5,7 @@ import {
   useGetRecentPhotos,
   useGetTopRatedPhotos,
   useListCollections,
+  useListAlbums,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,6 +41,46 @@ function StatCard({
   );
 }
 
+function CardGrid({
+  loading,
+  empty,
+  skeletonCount,
+  cols,
+  children,
+}: {
+  loading: boolean;
+  empty: boolean;
+  skeletonCount?: number;
+  cols?: string;
+  children: React.ReactNode;
+}) {
+  const gridCols = cols ?? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
+  if (loading) {
+    return (
+      <div className={`grid ${gridCols} gap-4`}>
+        {Array.from({ length: skeletonCount ?? 4 }).map((_, i) => (
+          <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+  if (empty) {
+    return <p className="text-sm text-muted-foreground py-4">Nothing here yet.</p>;
+  }
+  return <div className={`grid ${gridCols} gap-4`}>{children}</div>;
+}
+
+function SectionHeader({ title, href }: { title: string; href: string }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
+      <Link href={href} className="text-sm text-primary hover:underline">
+        View all
+      </Link>
+    </div>
+  );
+}
+
 function PhotoStrip({
   photos,
   loading,
@@ -53,7 +94,7 @@ function PhotoStrip({
     return (
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-square rounded-lg" />
+          <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
         ))}
       </div>
     );
@@ -67,7 +108,7 @@ function PhotoStrip({
         <button
           key={photo.id}
           onClick={() => onPhotoClick(photo)}
-          className="relative aspect-square rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           data-testid="photo-strip-item"
           aria-label={`Preview ${photo.name ?? "photo"}`}
         >
@@ -95,20 +136,21 @@ export default function Dashboard() {
   const { data: recentPhotos, isLoading: recentLoading } = useGetRecentPhotos();
   const { data: topRated, isLoading: topLoading } = useGetTopRatedPhotos();
   const { data: collections, isLoading: collectionsLoading } = useListCollections();
+  const { data: albums, isLoading: albumsLoading } = useListAlbums();
 
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
 
   const allPhotos = useMemo<LightboxPhoto[]>(() => {
     const seen = new Set<number>();
     const result: LightboxPhoto[] = [];
-    for (const p of [...(recentPhotos ?? []), ...(topRated ?? [])]) {
+    for (const p of [...(topRated ?? []), ...(recentPhotos ?? [])]) {
       if (!seen.has(p.id)) {
         seen.add(p.id);
         result.push(p);
       }
     }
     return result;
-  }, [recentPhotos, topRated]);
+  }, [topRated, recentPhotos]);
 
   const selectedIndex = selectedPhoto ? allPhotos.findIndex((p) => p.id === selectedPhoto.id) : -1;
   const hasPrev = selectedIndex > 0;
@@ -137,60 +179,75 @@ export default function Dashboard() {
         </div>
 
         <section>
-          <h2 className="text-base font-semibold text-foreground mb-3">Recent Photos</h2>
-          <PhotoStrip photos={recentPhotos ?? []} loading={recentLoading} onPhotoClick={setSelectedPhoto} />
+          <SectionHeader title="Collections" href="/collections" />
+          <CardGrid loading={collectionsLoading} empty={!collections || collections.length === 0}>
+            {(collections ?? []).map((col) => (
+              <Link key={col.id} href={`/collections/${col.id}`}>
+                <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-primary/40 transition-colors cursor-pointer">
+                  <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+                    {col.coverPhotoUrl ? (
+                      <FadeImage
+                        src={col.coverPhotoUrl}
+                        alt={col.title}
+                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <FolderOpen className="h-10 w-10 text-muted-foreground/30" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="font-medium text-sm text-foreground truncate">{col.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {col.photoCount} photo{col.photoCount !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </CardGrid>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-foreground mb-3">Top Rated</h2>
+          <SectionHeader title="Albums" href="/albums" />
+          <CardGrid loading={albumsLoading} empty={!albums || albums.length === 0}>
+            {(albums ?? []).map((album) => (
+              <Link key={album.id} href={`/albums/${album.id}`}>
+                <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-primary/40 transition-colors cursor-pointer">
+                  <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+                    {album.coverPhotoUrl ? (
+                      <FadeImage
+                        src={album.coverPhotoUrl}
+                        alt={album.title}
+                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <Images className="h-10 w-10 text-muted-foreground/30" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="font-medium text-sm text-foreground truncate">{album.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </CardGrid>
+        </section>
+
+        <section>
+          <SectionHeader title="Favorites" href="/photos?sort=top-rated" />
           <PhotoStrip photos={topRated ?? []} loading={topLoading} onPhotoClick={setSelectedPhoto} />
         </section>
 
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-foreground">Collections</h2>
-            <Link href="/collections" className="text-sm text-primary hover:underline">
-              View all
-            </Link>
-          </div>
-
-          {collectionsLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
-              ))}
-            </div>
-          ) : !collections || collections.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No collections yet.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {collections.map((col) => (
-                <Link key={col.id} href={`/collections/${col.id}`}>
-                  <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-primary/40 transition-colors cursor-pointer">
-                    <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                      {col.coverPhotoUrl ? (
-                        <FadeImage
-                          src={col.coverPhotoUrl}
-                          alt={col.title}
-                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center">
-                          <FolderOpen className="h-10 w-10 text-muted-foreground/30" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <p className="font-medium text-sm text-foreground truncate">{col.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {col.photoCount} photo{col.photoCount !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+          <SectionHeader title="Recent" href="/photos?sort=recent" />
+          <PhotoStrip photos={recentPhotos ?? []} loading={recentLoading} onPhotoClick={setSelectedPhoto} />
         </section>
       </div>
 
