@@ -248,7 +248,7 @@ function PhotoSidebarContent({
         onSuccess: () => {
           invalidate();
           toast({ title: next ? "Photo hidden" : "Photo visible again" });
-          if (next) handleAdvance();
+          if (next) onAdvance?.();
         },
         onError: () => toast({ title: "Failed to update photo", variant: "destructive" }),
       }
@@ -519,9 +519,24 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
     if (hasNext && onNext) onNext();
   }, [hasNext, onNext]);
 
+  const { mutate: updatePhotoKb } = useUpdatePhoto();
+  const { data: me } = useGetMe();
+  const { toast: toastKb } = useToast();
+
   // Stable refs so keydown listeners always call the latest version
   const hideAndAdvanceRef = useRef<() => void>(() => {});
-  hideAndAdvanceRef.current = handleToggleHidden;
+  hideAndAdvanceRef.current = useCallback(() => {
+    if (!photo || me?.role !== "admin") return;
+    updatePhotoKb(
+      { id: photo.id, data: { isHidden: true } },
+      {
+        onSuccess: () => {
+          toastKb({ title: "Photo hidden" });
+          handleAdvance();
+        },
+      },
+    );
+  }, [photo, me, updatePhotoKb, toastKb, handleAdvance]);
 
   const rateAndAdvanceRef = useRef<(score: number) => void>(() => {});
   rateAndAdvanceRef.current = useCallback((score: number) => {

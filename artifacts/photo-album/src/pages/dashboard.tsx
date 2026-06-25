@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import {
   useGetDashboardStats,
   useGetRecentPhotos,
   useGetTopRatedPhotos,
+  useListCollections,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Images, Camera, Users, FolderOpen, Star } from "lucide-react";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
+import { Link } from "wouter";
 
 function StatCard({
   label,
@@ -92,8 +94,32 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentPhotos, isLoading: recentLoading } = useGetRecentPhotos();
   const { data: topRated, isLoading: topLoading } = useGetTopRatedPhotos();
+  const { data: collections, isLoading: collectionsLoading } = useListCollections();
 
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
+
+  const allPhotos = useMemo<LightboxPhoto[]>(() => {
+    const seen = new Set<number>();
+    const result: LightboxPhoto[] = [];
+    for (const p of [...(recentPhotos ?? []), ...(topRated ?? [])]) {
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        result.push(p);
+      }
+    }
+    return result;
+  }, [recentPhotos, topRated]);
+
+  const selectedIndex = selectedPhoto ? allPhotos.findIndex((p) => p.id === selectedPhoto.id) : -1;
+  const hasPrev = selectedIndex > 0;
+  const hasNext = selectedIndex >= 0 && selectedIndex < allPhotos.length - 1;
+
+  function handlePrev() {
+    if (hasPrev) setSelectedPhoto(allPhotos[selectedIndex - 1]);
+  }
+  function handleNext() {
+    if (hasNext) setSelectedPhoto(allPhotos[selectedIndex + 1]);
+  }
 
   return (
     <AppLayout>
@@ -119,9 +145,63 @@ export default function Dashboard() {
           <h2 className="text-base font-semibold text-foreground mb-3">Top Rated</h2>
           <PhotoStrip photos={topRated ?? []} loading={topLoading} onPhotoClick={setSelectedPhoto} />
         </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-foreground">Collections</h2>
+            <Link href="/collections" className="text-sm text-primary hover:underline">
+              View all
+            </Link>
+          </div>
+
+          {collectionsLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
+              ))}
+            </div>
+          ) : !collections || collections.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No collections yet.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {collections.map((col) => (
+                <Link key={col.id} href={`/collections/${col.id}`}>
+                  <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-primary/40 transition-colors cursor-pointer">
+                    <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+                      {col.coverPhotoUrl ? (
+                        <FadeImage
+                          src={col.coverPhotoUrl}
+                          alt={col.title}
+                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <FolderOpen className="h-10 w-10 text-muted-foreground/30" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="font-medium text-sm text-foreground truncate">{col.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {col.photoCount} photo{col.photoCount !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
-      <PhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+      <PhotoLightbox
+        photo={selectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={handlePrev}
+        onNext={handleNext}
+      />
     </AppLayout>
   );
 }
