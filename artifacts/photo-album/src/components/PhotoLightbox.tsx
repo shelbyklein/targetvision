@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, Bot } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, Bot, Sparkles } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
@@ -168,6 +168,37 @@ function LightboxStarRating({
       )}
     </div>
   );
+}
+
+const STOPWORDS = new Set([
+  "a","an","the","and","or","of","in","on","at","to","for","with","by","is","are",
+  "was","were","has","have","this","that","these","those","it","its","as","be",
+  "from","not","but","can","also","very","her","his","she","he","they","their",
+  "one","two","two","man","men","woman","women","person","people",
+]);
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+}
+
+function suggestCollections(
+  aiDescription: string | null | undefined,
+  collections: Array<{ id: number; title: string; description?: string | null }>,
+): Set<number> {
+  if (!aiDescription || !collections.length) return new Set();
+  const descTokens = new Set(tokenize(aiDescription));
+  const suggested = new Set<number>();
+  for (const col of collections) {
+    const colTokens = tokenize(`${col.title} ${col.description ?? ""}`);
+    if (colTokens.some((t) => descTokens.has(t))) {
+      suggested.add(col.id);
+    }
+  }
+  return suggested;
 }
 
 function PhotoSidebarContent({
@@ -463,31 +494,55 @@ function PhotoSidebarContent({
 
         {allCollections && allCollections.length > 0 ? (
           <div className="flex flex-wrap gap-1.5" data-testid="lightbox-collection-pills">
-            {allCollections.map((col) => {
-              const isIn = currentCollections.some((c) => c.id === col.id);
-              return (
-                <button
-                  key={col.id}
-                  type="button"
-                  onClick={() =>
-                    isIn ? handleRemove(col.id, col.title) : handleAdd(String(col.id))
-                  }
-                  disabled={adding || removing}
-                  className={cn(
-                    "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50",
-                    isIn
-                      ? "bg-white text-gray-900 border border-white hover:bg-white/85"
-                      : "bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
-                  )}
-                  data-testid={`lightbox-collection-pill-${col.id}`}
-                  aria-label={isIn ? `Remove from ${col.title}` : `Add to ${col.title}`}
-                  aria-pressed={isIn}
-                >
-                  {isIn ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
-                  {col.title}
-                </button>
-              );
-            })}
+            {(() => {
+              const suggested = suggestCollections(fullPhoto?.aiDescription, allCollections);
+              const sorted = [...allCollections].sort((a, b) => {
+                const aS = suggested.has(a.id) ? 0 : 1;
+                const bS = suggested.has(b.id) ? 0 : 1;
+                return aS - bS;
+              });
+              return sorted.map((col) => {
+                const isIn = currentCollections.some((c) => c.id === col.id);
+                const isSuggested = suggested.has(col.id);
+                return (
+                  <button
+                    key={col.id}
+                    type="button"
+                    onClick={() =>
+                      isIn ? handleRemove(col.id, col.title) : handleAdd(String(col.id))
+                    }
+                    disabled={adding || removing}
+                    className={cn(
+                      "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50",
+                      isIn
+                        ? "bg-white text-gray-900 border border-white hover:bg-white/85"
+                        : isSuggested
+                        ? "bg-amber-500/20 text-amber-200 border border-amber-400/50 hover:bg-amber-500/35 hover:text-amber-100 hover:border-amber-400/80"
+                        : "bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
+                    )}
+                    data-testid={`lightbox-collection-pill-${col.id}`}
+                    aria-label={
+                      isIn
+                        ? `Remove from ${col.title}`
+                        : isSuggested
+                        ? `AI suggested: Add to ${col.title}`
+                        : `Add to ${col.title}`
+                    }
+                    aria-pressed={isIn}
+                    title={isSuggested && !isIn ? "AI suggested based on photo description" : undefined}
+                  >
+                    {isIn ? (
+                      <Check className="h-3 w-3 shrink-0" />
+                    ) : isSuggested ? (
+                      <Sparkles className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <Plus className="h-3 w-3 shrink-0" />
+                    )}
+                    {col.title}
+                  </button>
+                );
+              });
+            })()}
           </div>
         ) : !showNewForm ? (
           <p className="text-xs text-white/40">No collections yet.</p>
