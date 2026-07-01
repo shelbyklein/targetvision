@@ -61,7 +61,7 @@ function getPrivateObjectDir(): string {
   return dir;
 }
 
-function parseExifDateValue(value: Date | string | null | undefined): Date | null {
+export function parseExifDateValue(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
   if (value instanceof Date) {
     return isNaN(value.getTime()) ? null : value;
