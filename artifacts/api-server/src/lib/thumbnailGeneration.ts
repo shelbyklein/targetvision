@@ -74,7 +74,7 @@ function parseExifDateValue(value: Date | string | null | undefined): Date | nul
   return isNaN(date.getTime()) ? null : date;
 }
 
-async function extractExifDate(buffer: Buffer): Promise<Date | null> {
+export async function extractExifDate(buffer: Buffer): Promise<Date | null> {
   try {
     const metadata = await sharp(buffer).metadata();
     if (!metadata.exif) return null;

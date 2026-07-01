@@ -26,6 +26,8 @@ import {
   BulkRetryAiAnalysisEventsResponse,
   BackfillThumbnailsResponse,
   BackfillThumbnailsStatusResponse,
+  BackfillExifDatesStatusResponse,
+  BackfillExifDatesResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -38,6 +40,7 @@ import {
 import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
+import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDateBackfill";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -385,6 +388,16 @@ router.post("/admin/thumbnails/backfill", requireAdmin, async (_req, res): Promi
   }
 
   res.json(BackfillThumbnailsResponse.parse({ processed: photos.length, succeeded, skipped, failed }));
+});
+
+router.get("/admin/photos/exif-date-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutCaptureDate();
+  res.json(BackfillExifDatesStatusResponse.parse({ missingCount }));
+});
+
+router.post("/admin/photos/exif-date-backfill", requireAdmin, async (_req, res): Promise<void> => {
+  const result = await backfillExifDates();
+  res.json(BackfillExifDatesResponse.parse(result));
 });
 
 router.post("/migrate/add-collection-cover-photo", async (req, res): Promise<void> => {

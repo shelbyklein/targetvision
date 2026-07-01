@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { AiServicesSection } from "@/components/admin/AiServicesSection";
 import { RegistrationSection } from "@/components/admin/RegistrationSection";
 import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
+import { CapturedDatesSection } from "@/components/admin/CapturedDatesSection";
 
 export default function Admin() {
   const qc = useQueryClient();
@@ -86,6 +87,8 @@ export default function Admin() {
         <AiServicesSection />
 
         <ThumbnailsSection />
+
+        <CapturedDatesSection />
 
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">

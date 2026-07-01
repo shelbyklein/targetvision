@@ -35,3 +35,14 @@ export const BackfillThumbnailsResponse = z.object({
 export const BackfillThumbnailsStatusResponse = z.object({
   missingCount: z.number(),
 });
+
+export const BackfillExifDatesStatusResponse = z.object({
+  missingCount: z.number(),
+});
+
+export const BackfillExifDatesResponse = z.object({
+  processed: z.number(),
+  updated: z.number(),
+  skipped: z.number(),
+  failed: z.number(),
+});
