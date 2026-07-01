@@ -16,6 +16,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
+import { generateCollectionKeywords } from "../lib/aiKeywordGeneration";
 
 const router: IRouter = Router();
 
@@ -277,6 +278,29 @@ router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res):
   }
 
   res.sendStatus(204);
+});
+
+router.post("/collections/:id/generate-keywords", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid collection ID" });
+    return;
+  }
+
+  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const keywords = await generateCollectionKeywords(id, collection.title, collection.description);
+  res.json({ keywords });
 });
 
 export default router;

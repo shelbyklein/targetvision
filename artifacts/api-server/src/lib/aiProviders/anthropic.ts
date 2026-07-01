@@ -28,6 +28,22 @@ export class AnthropicProvider implements AnalysisProvider {
     this.model = model || DEFAULT_PROVIDER_MODELS.anthropic;
   }
 
+  async generateText(systemPrompt: string, userText: string): Promise<string | null> {
+    try {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userText }],
+      });
+      const block = response.content.find((b) => b.type === "text");
+      return block?.type === "text" ? block.text : null;
+    } catch (err) {
+      logger.error({ err }, "Anthropic text generation failed");
+      return null;
+    }
+  }
+
   async analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null> {
     try {
       const img = extractBase64FromDataUrl(req.imageDataUrl);

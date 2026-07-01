@@ -17,6 +17,7 @@ import {
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
   useGetMe,
+  useBulkDeletePhotos,
 } from "@workspace/api-client-react";
 import type { Photo } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -60,6 +61,8 @@ import {
   Camera,
   ArrowLeft,
   Trash2,
+  CheckSquare,
+  Square,
   Upload,
   ImagePlus,
   X,
@@ -496,6 +499,9 @@ export default function AlbumDetail() {
   const [filterAiStatus, setFilterAiStatus] = useState<"has_description" | "not_analysed" | "failed" | undefined>(undefined);
   const [reanalyzingIds, setReanalyzingIds] = useState<Set<number>>(new Set());
   const { mutate: rerunAnalysis } = useRerunPhotoAnalysis();
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { mutate: bulkDeleteAlbumPhotos, isPending: bulkDeletingPhotos } = useBulkDeletePhotos();
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
@@ -514,6 +520,34 @@ export default function AlbumDetail() {
     setFilterInCollection(undefined);
     setFilterHasRating(undefined);
     setFilterAiStatus(undefined);
+  }
+
+  function canSelectPhoto(photo: { uploaderId?: number | null }) {
+    return me?.role === "admin" || me?.id === photo.uploaderId;
+  }
+
+  function toggleSelectPhoto(photoId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+  }
+
+  function handleBulkDeletePhotos() {
+    bulkDeleteAlbumPhotos(
+      { data: { ids: Array.from(selectedIds) } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListAlbumPhotosQueryKey(albumId) });
+          toast({ title: `${selectedIds.size} photo${selectedIds.size !== 1 ? "s" : ""} deleted` });
+          setSelectedIds(new Set());
+          setSelectMode(false);
+        },
+        onError: () => toast({ title: "Failed to delete photos", variant: "destructive" }),
+      }
+    );
   }
 
   const photosParams = {
@@ -797,6 +831,18 @@ export default function AlbumDetail() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {me && (
+              <Button
+                variant={selectMode ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => { setSelectMode((v) => !v); setSelectedIds(new Set()); }}
+                data-testid="toggle-select-mode"
+              >
+                <CheckSquare className="h-4 w-4" />
+                {selectMode ? "Cancel" : "Select"}
+              </Button>
+            )}
             <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
 
             {me?.role === "admin" && (
@@ -936,13 +982,31 @@ export default function AlbumDetail() {
               return (
               <div
                 key={photo.id}
-                className="relative group rounded-lg overflow-hidden bg-muted"
+                className={cn(
+                  "relative group rounded-lg overflow-hidden bg-muted border",
+                  selectMode && canSelectPhoto(photo)
+                    ? selectedIds.has(photo.id)
+                      ? "border-primary ring-2 ring-primary cursor-pointer"
+                      : "border-border cursor-pointer"
+                    : "border-transparent"
+                )}
                 data-testid="photo-grid-item"
+                onClick={selectMode && canSelectPhoto(photo) ? () => toggleSelectPhoto(photo.id) : undefined}
               >
+                {selectMode && canSelectPhoto(photo) && (
+                  <div className="absolute top-2 left-2 z-20 pointer-events-none">
+                    {selectedIds.has(photo.id) ? (
+                      <CheckSquare className="h-5 w-5 text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                    ) : (
+                      <Square className="h-5 w-5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                    )}
+                  </div>
+                )}
                 <button
                   type="button"
                   className={`aspect-[4/3] overflow-hidden w-full block${photo.isHidden ? " opacity-60" : ""}`}
-                  onClick={() =>
+                  onClick={(e) => {
+                    if (selectMode) { e.stopPropagation(); return; }
                     setSelectedPhoto({
                       id: photo.id,
                       url: photo.url,
@@ -950,8 +1014,8 @@ export default function AlbumDetail() {
                       name: photo.name,
                       averageRating: photo.averageRating,
                       albumId,
-                    })
-                  }
+                    });
+                  }}
                   aria-label={`Open ${photo.name ?? "photo"} in lightbox`}
                   data-testid="photo-thumbnail-btn"
                 >
@@ -1177,6 +1241,43 @@ export default function AlbumDetail() {
         </DialogContent>
       </Dialog>
 
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border px-4 py-3 flex items-center justify-between gap-3">
+          <span className="text-sm font-medium">
+            {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={bulkDeletingPhotos}>
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  Delete {selectedIds.size}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove the selected photo{selectedIds.size !== 1 ? "s" : ""} from all albums and collections. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive hover:bg-destructive/90"
+                    onClick={handleBulkDeletePhotos}
+                  >
+                    {bulkDeletingPhotos ? "Deleting…" : `Delete ${selectedIds.size}`}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
       <PhotoLightbox
         photo={selectedPhoto}
         onClose={() => { setSelectedPhoto(null); setPendingLightboxAdvance(false); }}

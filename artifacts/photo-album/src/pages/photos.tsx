@@ -9,8 +9,20 @@ import {
   useListAlbums,
   useGetMe,
   useRerunPhotoAnalysis,
+  useBulkDeletePhotos,
   getListPhotosQueryKey,
 } from "@workspace/api-client-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
@@ -24,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Bot, Check, AlertCircle, FolderOpen, Loader2 } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Bot, Check, AlertCircle, FolderOpen, Loader2, Trash2, CheckSquare, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -103,6 +115,37 @@ export default function PhotosPage() {
   const [showHidden, setShowHidden] = useState(false);
   const [reanalyzingIds, setReanalyzingIds] = useState<Set<number>>(new Set());
   const { mutate: rerunAnalysis } = useRerunPhotoAnalysis();
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { mutate: bulkDeletePhotos, isPending: bulkDeleting } = useBulkDeletePhotos();
+
+  function canSelect(photo: { uploaderId?: number | null }) {
+    return me?.role === "admin" || me?.id === photo.uploaderId;
+  }
+
+  function toggleSelect(photoId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+  }
+
+  function handleBulkDelete() {
+    bulkDeletePhotos(
+      { data: { ids: Array.from(selectedIds) } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListPhotosQueryKey() });
+          toast({ title: `${selectedIds.size} photo${selectedIds.size !== 1 ? "s" : ""} deleted` });
+          setSelectedIds(new Set());
+          setSelectMode(false);
+        },
+        onError: () => toast({ title: "Failed to delete photos", variant: "destructive" }),
+      }
+    );
+  }
 
   function handleRerunAnalysis(photoId: number) {
     setReanalyzingIds((prev) => new Set(prev).add(photoId));
@@ -240,21 +283,35 @@ export default function PhotosPage() {
               )}
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn("gap-1.5", hasActiveFilters && "border-primary text-primary")}
-            onClick={() => setShowFilters((v) => !v)}
-            data-testid="toggle-filters"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                {[ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus].filter(Boolean).length}
-              </span>
+          <div className="flex items-center gap-2">
+            {me && (
+              <Button
+                variant={selectMode ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => { setSelectMode((v) => !v); setSelectedIds(new Set()); }}
+                data-testid="toggle-select-mode"
+              >
+                <CheckSquare className="h-4 w-4" />
+                {selectMode ? "Cancel" : "Select"}
+              </Button>
             )}
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn("gap-1.5", hasActiveFilters && "border-primary text-primary")}
+              onClick={() => setShowFilters((v) => !v)}
+              data-testid="toggle-filters"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                  {[ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
 
         <form onSubmit={handleSearch} className="flex gap-2" data-testid="search-form">
@@ -478,13 +535,31 @@ export default function PhotosPage() {
                 return (
                   <div
                     key={photo.id}
-                    className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted"
+                    className={cn(
+                      "group relative aspect-square rounded-lg overflow-hidden border bg-muted",
+                      selectMode && canSelect(photo)
+                        ? selectedIds.has(photo.id)
+                          ? "border-primary ring-2 ring-primary cursor-pointer"
+                          : "border-border cursor-pointer"
+                        : "border-border"
+                    )}
                     data-testid="photo-grid-item"
+                    onClick={selectMode && canSelect(photo) ? () => toggleSelect(photo.id) : undefined}
                   >
+                    {selectMode && canSelect(photo) && (
+                      <div className="absolute top-2 left-2 z-20 pointer-events-none">
+                        {selectedIds.has(photo.id) ? (
+                          <CheckSquare className="h-5 w-5 text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                        ) : (
+                          <Square className="h-5 w-5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                        )}
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="block h-full w-full cursor-pointer"
-                      onClick={() =>
+                      onClick={(e) => {
+                        if (selectMode) { e.stopPropagation(); return; }
                         setSelectedPhoto({
                           id: photo.id,
                           url: photo.url,
@@ -492,8 +567,8 @@ export default function PhotosPage() {
                           name: photo.name,
                           averageRating: photo.averageRating,
                           albumId: photo.albumId,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <FadeImage
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
@@ -673,6 +748,43 @@ export default function PhotosPage() {
         )}
       </div>
 
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border px-4 py-3 flex items-center justify-between gap-3">
+          <span className="text-sm font-medium">
+            {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={bulkDeleting}>
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  Delete {selectedIds.size}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove the selected photo{selectedIds.size !== 1 ? "s" : ""} from all albums and collections. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive hover:bg-destructive/90"
+                    onClick={handleBulkDelete}
+                  >
+                    {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
       <PhotoLightbox
         photo={selectedPhoto}
         onClose={() => setSelectedPhoto(null)}

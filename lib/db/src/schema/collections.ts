@@ -9,6 +9,7 @@ export const collectionsTable = pgTable("collections", {
   createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   coverPhotoId: integer("cover_photo_id").references(() => photosTable.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  aiKeywords: text("ai_keywords"),
 });
 
 export const photoCollectionsTable = pgTable("photo_collections", {

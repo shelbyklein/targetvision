@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, Bot, Sparkles } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, Bot, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
@@ -13,6 +13,7 @@ import {
   useGetMe,
   useCreateCollection,
   useSetAlbumCover,
+  useDeletePhoto,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -22,6 +23,17 @@ import {
   getGetAlbumQueryKey,
   getListAlbumsQueryKey,
 } from "@workspace/api-client-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { FadeImage } from "@/components/ui/fade-image";
 import { useToast } from "@/hooks/use-toast";
@@ -178,6 +190,7 @@ function PhotoSidebarContent({
   coverPhotoId,
   onAdvance,
   onCoverSet,
+  onDelete,
 }: {
   photoId: number;
   albumId?: number | null;
@@ -185,6 +198,7 @@ function PhotoSidebarContent({
   coverPhotoId?: number | null;
   onAdvance?: () => void;
   onCoverSet?: (photoId: number) => void;
+  onDelete?: () => void;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -197,6 +211,7 @@ function PhotoSidebarContent({
   const { mutate: updatePhoto, isPending: updatingVisibility } = useUpdatePhoto();
   const { mutate: createCollection, isPending: creating } = useCreateCollection();
   const { mutate: setAlbumCover, isPending: settingCover } = useSetAlbumCover();
+  const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { data: me } = useGetMe();
 
   const [showNewForm, setShowNewForm] = useState(false);
@@ -256,6 +271,20 @@ function PhotoSidebarContent({
     );
   }
 
+  function handleDeletePhoto() {
+    deletePhoto(
+      { id: photoId },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: "Photo deleted" });
+          onDelete?.();
+        },
+        onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),
+      }
+    );
+  }
+
   function handleSetCover() {
     if (!coverAlbumId) return;
     setAlbumCover(
@@ -293,6 +322,7 @@ function PhotoSidebarContent({
       { data: { title: trimmedTitle, description: newDesc.trim() || undefined } },
       {
         onSuccess: (newCollection) => {
+          fetch(`/api/collections/${newCollection.id}/generate-keywords`, { method: "POST" }).catch(() => {});
           addToCollection(
             { id: newCollection.id, data: { photoId } },
             {
@@ -367,6 +397,39 @@ function PhotoSidebarContent({
           {isHidden ? <Eye className="h-4 w-4 shrink-0" /> : <EyeOff className="h-4 w-4 shrink-0" />}
           {isHidden ? "Unhide photo" : "Hide photo"}
         </button>
+      )}
+
+      {(me?.role === "admin" || me?.id === fullPhoto?.uploaderId) && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button
+              type="button"
+              disabled={deleting}
+              className="flex items-center gap-2 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              data-testid="lightbox-delete-btn"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Trash2 className="h-4 w-4 shrink-0" />}
+              Delete photo
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently remove the photo from all albums and collections. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                onClick={handleDeletePhoto}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       <div className="border-t border-white/10 pt-3">
@@ -746,6 +809,7 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                     coverPhotoId={localCoverPhotoId}
                     onAdvance={handleAdvance}
                     onCoverSet={(newCoverId) => setLocalCoverPhotoId(newCoverId)}
+                    onDelete={onClose}
                   />
                 </div>
               </div>

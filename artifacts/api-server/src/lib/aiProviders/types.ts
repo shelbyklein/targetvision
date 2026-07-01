@@ -64,4 +64,5 @@ export interface RawAnalysisResult {
 export interface AnalysisProvider {
   id: ProviderId;
   analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null>;
+  generateText(systemPrompt: string, userText: string): Promise<string | null>;
 }

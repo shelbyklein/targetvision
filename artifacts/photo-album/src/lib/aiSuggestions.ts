@@ -32,6 +32,16 @@ export function suggestCollections(
 export function collectionKeywords(collection: {
   title: string;
   description?: string | null;
+  aiKeywords?: string | null;
 }): string {
-  return tokenize(`${collection.title} ${collection.description ?? ""}`).join(" ");
+  const aiTerms = (() => {
+    if (!collection.aiKeywords) return "";
+    try {
+      const parsed: unknown = JSON.parse(collection.aiKeywords);
+      return Array.isArray(parsed) ? (parsed as string[]).join(" ") : "";
+    } catch {
+      return collection.aiKeywords;
+    }
+  })();
+  return tokenize(`${collection.title} ${collection.description ?? ""} ${aiTerms}`).join(" ");
 }

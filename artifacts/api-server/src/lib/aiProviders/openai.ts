@@ -17,6 +17,24 @@ export class OpenAIProvider implements AnalysisProvider {
     this.model = model || DEFAULT_PROVIDER_MODELS.openai;
   }
 
+  async generateText(systemPrompt: string, userText: string): Promise<string | null> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        max_completion_tokens: 1024,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userText },
+        ],
+        response_format: { type: "json_object" },
+      });
+      return response.choices[0]?.message?.content ?? null;
+    } catch (err) {
+      logger.error({ err }, "OpenAI text generation failed");
+      return null;
+    }
+  }
+
   async analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null> {
     try {
       const response = await this.client.chat.completions.create({

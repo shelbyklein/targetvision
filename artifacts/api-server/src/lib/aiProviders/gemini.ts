@@ -29,6 +29,20 @@ export class GeminiProvider implements AnalysisProvider {
     this.model = model || DEFAULT_PROVIDER_MODELS.gemini;
   }
 
+  async generateText(systemPrompt: string, userText: string): Promise<string | null> {
+    try {
+      const response = await this.client.models.generateContent({
+        model: this.model,
+        contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\n${userText}` }] }],
+        config: { responseMimeType: "application/json" },
+      });
+      return response.text ?? null;
+    } catch (err) {
+      logger.error({ err }, "Gemini text generation failed");
+      return null;
+    }
+  }
+
   async analyze(req: AnalysisRequest): Promise<RawAnalysisResult | null> {
     try {
       const img = extractBase64FromDataUrl(req.imageDataUrl);
