@@ -29,6 +29,7 @@ async function buildAlbumResponse(albumId: number) {
       ownerName: usersTable.name,
       photoCount: count(photosTable.id),
       hiddenCount: sql<number>`cast(count(case when ${photosTable.isHidden} = true then 1 end) as integer)`,
+      ratedCount: sql<number>`(select cast(count(distinct r.photo_id) as integer) from ratings r inner join photos p2 on r.photo_id = p2.id where p2.album_id = ${albumsTable.id})`,
     })
     .from(albumsTable)
     .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
@@ -52,6 +53,7 @@ async function buildAlbumResponse(albumId: number) {
     ownerName: row.ownerName ?? null,
     photoCount: Number(row.photoCount),
     hiddenCount: Number(row.hiddenCount),
+    ratedCount: Number(row.ratedCount),
     coverPhotoUrl,
   };
 }
@@ -63,6 +65,7 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
       ownerName: usersTable.name,
       photoCount: count(photosTable.id),
       hiddenCount: sql<number>`cast(count(case when ${photosTable.isHidden} = true then 1 end) as integer)`,
+      ratedCount: sql<number>`(select cast(count(distinct r.photo_id) as integer) from ratings r inner join photos p2 on r.photo_id = p2.id where p2.album_id = ${albumsTable.id})`,
     })
     .from(albumsTable)
     .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
@@ -87,6 +90,7 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
         ownerName: row.ownerName ?? null,
         photoCount: Number(row.photoCount),
         hiddenCount: Number(row.hiddenCount),
+        ratedCount: Number(row.ratedCount),
         coverPhotoUrl,
         coverPhotoThumbnailKey,
       };

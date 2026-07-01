@@ -511,6 +511,7 @@ export default function AlbumDetail() {
   const [hoveredSuggestions, setHoveredSuggestions] = useState<Set<number>>(new Set());
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
   const [pendingLightboxAdvance, setPendingLightboxAdvance] = useState(false);
+  const [unratedReviewMode, setUnratedReviewMode] = useState(false);
   const prevAllPhotosLengthRef = useRef(0);
   const wasFetchingRef = useRef(false);
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
@@ -603,6 +604,25 @@ export default function AlbumDetail() {
   useEffect(() => {
     prefetchedOffsetRef.current = -1;
   }, [albumId, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus]);
+
+  const unratedPhotosRef = useRef<Photo[]>([]);
+  useEffect(() => {
+    unratedPhotosRef.current = unratedPhotos;
+  });
+  useEffect(() => {
+    if (!unratedReviewMode || !selectedPhoto) return;
+    const stillUnrated = unratedPhotosRef.current.some((p) => p.id === selectedPhoto.id);
+    if (!stillUnrated) {
+      const remaining = unratedPhotosRef.current;
+      if (remaining.length > 0) {
+        const next = remaining[0];
+        setSelectedPhoto({ id: next.id, url: next.url, thumbnailKey: next.thumbnailKey, name: next.name, averageRating: next.averageRating, albumId });
+      } else {
+        setSelectedPhoto(null);
+        setUnratedReviewMode(false);
+      }
+    }
+  }, [unratedReviewMode, selectedPhoto, albumId]);
 
   const { mutate: setCover } = useSetAlbumCover();
   const { data: me } = useGetMe();
@@ -728,6 +748,9 @@ export default function AlbumDetail() {
     sort,
   );
 
+  const unratedPhotos = sortedPhotos.filter((p) => p.ratingCount === 0);
+  const lightboxPhotos = unratedReviewMode ? unratedPhotos : sortedPhotos;
+
   useEffect(() => {
     if (!selectedPhoto || !hasMore) return;
     const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
@@ -850,6 +873,22 @@ export default function AlbumDetail() {
               >
                 <CheckSquare className="h-4 w-4" />
                 {isSelectMode ? "Cancel" : "Select"}
+              </Button>
+            )}
+            {!photosLoading && unratedPhotos.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => {
+                  const first = unratedPhotos[0];
+                  setUnratedReviewMode(true);
+                  setSelectedPhoto({ id: first.id, url: first.url, thumbnailKey: first.thumbnailKey, name: first.name, averageRating: first.averageRating, albumId });
+                }}
+                data-testid="review-unrated-btn"
+              >
+                <Star className="h-4 w-4" />
+                Review Unrated ({unratedPhotos.length})
               </Button>
             )}
             <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
@@ -1294,11 +1333,11 @@ export default function AlbumDetail() {
 
       <PhotoLightbox
         photo={selectedPhoto}
-        onClose={() => { setSelectedPhoto(null); setPendingLightboxAdvance(false); }}
-        hasPrev={selectedPhoto !== null && sortedPhotos.findIndex((p) => p.id === selectedPhoto.id) > 0}
+        onClose={() => { setSelectedPhoto(null); setPendingLightboxAdvance(false); setUnratedReviewMode(false); }}
+        hasPrev={selectedPhoto !== null && lightboxPhotos.findIndex((p) => p.id === selectedPhoto.id) > 0}
         hasNext={selectedPhoto !== null && (
-          sortedPhotos.findIndex((p) => p.id === selectedPhoto.id) < sortedPhotos.length - 1 ||
-          hasMore
+          lightboxPhotos.findIndex((p) => p.id === selectedPhoto.id) < lightboxPhotos.length - 1 ||
+          (!unratedReviewMode && hasMore)
         )}
         isLoadingNext={pendingLightboxAdvance}
         albumId={albumId}
@@ -1306,6 +1345,7 @@ export default function AlbumDetail() {
         onDeleted={(deletedId) => {
           setSelectedPhoto(null);
           setPendingLightboxAdvance(false);
+          setUnratedReviewMode(false);
           invalidate();
           qc.invalidateQueries({ queryKey: getListPhotosQueryKey().slice(0, 1) });
           qc.invalidateQueries({ queryKey: getGetRecentPhotosQueryKey() });
@@ -1313,19 +1353,19 @@ export default function AlbumDetail() {
         }}
         onPrev={() => {
           if (!selectedPhoto) return;
-          const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
+          const idx = lightboxPhotos.findIndex((p) => p.id === selectedPhoto.id);
           if (idx > 0) {
-            const p = sortedPhotos[idx - 1];
+            const p = lightboxPhotos[idx - 1];
             setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId });
           }
         }}
         onNext={() => {
           if (!selectedPhoto || pendingLightboxAdvance) return;
-          const idx = sortedPhotos.findIndex((p) => p.id === selectedPhoto.id);
-          if (idx < sortedPhotos.length - 1) {
-            const p = sortedPhotos[idx + 1];
+          const idx = lightboxPhotos.findIndex((p) => p.id === selectedPhoto.id);
+          if (idx < lightboxPhotos.length - 1) {
+            const p = lightboxPhotos[idx + 1];
             setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId });
-          } else if (hasMore) {
+          } else if (!unratedReviewMode && hasMore) {
             prevAllPhotosLengthRef.current = allPhotos.length;
             setPendingLightboxAdvance(true);
             setOffset((prev) => prev + PAGE_SIZE);

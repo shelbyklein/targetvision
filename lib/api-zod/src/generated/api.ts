@@ -73,6 +73,7 @@ export const ListAlbumsResponseItem = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   photoCount: zod.number(),
+  ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });
@@ -105,6 +106,7 @@ export const GetAlbumResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   photoCount: zod.number(),
+  ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });
@@ -132,6 +134,7 @@ export const UpdateAlbumResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   photoCount: zod.number(),
+  ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });
@@ -228,6 +231,7 @@ export const SetAlbumCoverResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   photoCount: zod.number(),
+  ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });

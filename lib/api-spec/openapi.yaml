@@ -1589,6 +1589,8 @@ components:
           type: ["string", "null"]
         photoCount:
           type: integer
+        ratedCount:
+          type: integer
         hiddenCount:
           type: integer
         createdAt:

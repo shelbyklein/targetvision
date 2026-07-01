@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Images, CalendarDays, Camera, EyeOff, FolderInput } from "lucide-react";
+import { Plus, Images, CalendarDays, Camera, EyeOff, FolderInput, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 
@@ -170,6 +170,12 @@ export default function Albums() {
                         <Camera className="h-3 w-3" />
                         {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
                       </span>
+                      {album.photoCount > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3" />
+                          {album.ratedCount}/{album.photoCount} rated
+                        </span>
+                      )}
                       {me?.role === "admin" && !!album.hiddenCount && (
                         <span className="flex items-center gap-0.5 text-muted-foreground/70">
                           <EyeOff className="h-3 w-3" />
