@@ -22,6 +22,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "drizzle-orm": "catalog:",
+    "exif-reader": "^2.0.3",
     "express": "^5",
     "google-auth-library": "^10.6.2",
     "http-proxy-middleware": "^4.0.0",

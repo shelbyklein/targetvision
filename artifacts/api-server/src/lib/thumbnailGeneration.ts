@@ -1,8 +1,9 @@
 import sharp from "sharp";
+import exifReader from "exif-reader";
 import { randomUUID } from "crypto";
 import { objectStorageClient } from "./objectStorage";
 import { db, photosTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { logger } from "./logger";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
@@ -58,6 +59,31 @@ function getPrivateObjectDir(): string {
     throw new Error("PRIVATE_OBJECT_DIR not set");
   }
   return dir;
+}
+
+function parseExifDateValue(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  // EXIF date strings use "YYYY:MM:DD HH:MM:SS" format
+  const match = String(value).match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, year, month, day, hour, min, sec] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(min), Number(sec)));
+  return isNaN(date.getTime()) ? null : date;
+}
+
+async function extractExifDate(buffer: Buffer): Promise<Date | null> {
+  try {
+    const metadata = await sharp(buffer).metadata();
+    if (!metadata.exif) return null;
+    const exif = exifReader(metadata.exif);
+    const rawDate = (exif.Photo?.DateTimeOriginal ?? exif.Image?.DateTime) as Date | string | null | undefined;
+    return parseExifDateValue(rawDate);
+  } catch {
+    return null;
+  }
 }
 
 export type ThumbnailResult = "success" | "skipped" | "failed";
@@ -141,6 +167,18 @@ export async function generateAndStoreThumbnail(photoId: number, storageKey: str
       .update(photosTable)
       .set({ thumbnailKey })
       .where(eq(photosTable.id, photoId));
+
+    const exifDate = await extractExifDate(sourceBuffer);
+    if (exifDate) {
+      const updated = await db
+        .update(photosTable)
+        .set({ takenAt: exifDate })
+        .where(and(eq(photosTable.id, photoId), isNull(photosTable.takenAt)))
+        .returning({ id: photosTable.id });
+      if (updated.length > 0) {
+        logger.info({ photoId, takenAt: exifDate }, "takenAt populated from EXIF data");
+      }
+    }
 
     logger.info({ photoId, thumbnailKey }, "Thumbnail generated and stored");
     return "success";
