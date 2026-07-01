@@ -356,6 +356,12 @@ router.get("/admin/thumbnails/backfill-status", requireAdmin, async (_req, res):
 });
 
 router.post("/admin/thumbnails/backfill", requireAdmin, async (_req, res): Promise<void> => {
+  // Reset any photos stuck with thumbnailGenerating=true from a previous interrupted process.
+  await db
+    .update(photosTable)
+    .set({ thumbnailGenerating: false })
+    .where(and(isNull(photosTable.thumbnailKey), eq(photosTable.thumbnailGenerating, true)));
+
   const photos = await db
     .select({ id: photosTable.id, storageKey: photosTable.storageKey })
     .from(photosTable)

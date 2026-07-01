@@ -20,6 +20,12 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function backfillMissingThumbnails(): Promise<void> {
   try {
+    // Clear any stuck thumbnailGenerating=true flags left over from a previous interrupted process.
+    await db
+      .update(photosTable)
+      .set({ thumbnailGenerating: false })
+      .where(and(isNull(photosTable.thumbnailKey), eq(photosTable.thumbnailGenerating, true)));
+
     const photos = await db
       .select({ id: photosTable.id, storageKey: photosTable.storageKey })
       .from(photosTable)
