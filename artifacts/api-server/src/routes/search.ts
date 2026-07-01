@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, avg, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, notInArray } from "drizzle-orm";
+import { and, avg, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, notInArray, or } from "drizzle-orm";
 import {
   db,
   albumsTable,
@@ -50,7 +50,9 @@ async function applyFiltersAndFetchIds(
         .from(photosTable)
         .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
         .where(ilike(usersTable.name, pattern)),
-      db.select({ id: photosTable.id }).from(photosTable).where(ilike(photosTable.aiDescription, pattern)),
+      db.select({ id: photosTable.id }).from(photosTable).where(
+        or(...filters.search.trim().split(/\s+/).filter(Boolean).map((word) => ilike(photosTable.aiDescription, `%${word}%`)))
+      ),
     ]);
     const searchIds = new Set([
       ...byAlbumTitle.map((r) => r.id),
