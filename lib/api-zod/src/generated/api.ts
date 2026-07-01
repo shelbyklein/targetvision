@@ -178,7 +178,15 @@ export const GetAlbumTopRatedResponseItem = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -233,9 +241,6 @@ export const ListAlbumPhotosParams = zod.object({
 
 export const ListAlbumPhotosQueryParams = zod.object({
   includeHidden: zod.coerce.boolean().optional(),
-  inCollection: zod.coerce.boolean().optional(),
-  hasRating: zod.coerce.boolean().optional(),
-  aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
 });
 
 export const ListAlbumPhotosResponseItem = zod.object({
@@ -266,7 +271,15 @@ export const ListAlbumPhotosResponseItem = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -342,7 +355,15 @@ export const SearchPhotosResponseItem = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -377,7 +398,6 @@ export const ListPhotosQueryParams = zod.object({
   uploaderId: zod.coerce.number().optional(),
   includeHidden: zod.coerce.boolean().optional(),
   albumId: zod.coerce.number().optional(),
-  aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
 });
 
 export const ListPhotosResponseItem = zod.object({
@@ -408,7 +428,15 @@ export const ListPhotosResponseItem = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -489,7 +517,15 @@ export const GetPhotoResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -518,7 +554,6 @@ export const UpdatePhotoParams = zod.object({
 
 export const UpdatePhotoBody = zod.object({
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
   takenAt: zod.string().nullish(),
   isHidden: zod.boolean().optional(),
 });
@@ -551,7 +586,15 @@ export const UpdatePhotoResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -617,7 +660,15 @@ export const AddPhotoTagResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -673,7 +724,15 @@ export const RemovePhotoTagResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -732,7 +791,15 @@ export const AddPhotoCategoryResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -788,7 +855,15 @@ export const RemovePhotoCategoryResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -849,7 +924,15 @@ export const RatePhotoResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -904,7 +987,15 @@ export const ClearPhotoRatingResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1315,7 +1406,15 @@ export const GetDashboardStatsResponse = zod.object({
         )
         .optional(),
       aiDescription: zod.string().nullish(),
-      latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+      latestAiStatus: zod
+        .union([
+          zod.literal("success"),
+          zod.literal("skipped"),
+          zod.literal("failed"),
+          zod.literal(null),
+        ])
+        .nullish()
+        .describe("Status of the most recent AI analysis event for this photo"),
       suggestedCollections: zod
         .array(
           zod.object({
@@ -1368,7 +1467,15 @@ export const GetRecentPhotosResponseItem = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1420,7 +1527,15 @@ export const GetTopRatedPhotosResponseItem = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1517,6 +1632,7 @@ export const GetCollectionResponse = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  aiKeywords: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   photos: zod
     .array(
@@ -1548,7 +1664,17 @@ export const GetCollectionResponse = zod.object({
           )
           .optional(),
         aiDescription: zod.string().nullish(),
-        latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+        latestAiStatus: zod
+          .union([
+            zod.literal("success"),
+            zod.literal("skipped"),
+            zod.literal("failed"),
+            zod.literal(null),
+          ])
+          .nullish()
+          .describe(
+            "Status of the most recent AI analysis event for this photo",
+          ),
         suggestedCollections: zod
           .array(
             zod.object({
@@ -1582,6 +1708,7 @@ export const UpdateCollectionBody = zod.object({
   title: zod.string().min(1).optional(),
   description: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
+  aiKeywords: zod.string().nullish(),
 });
 
 export const UpdateCollectionResponse = zod.object({
@@ -1592,6 +1719,7 @@ export const UpdateCollectionResponse = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  aiKeywords: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   photos: zod
     .array(
@@ -1623,7 +1751,17 @@ export const UpdateCollectionResponse = zod.object({
           )
           .optional(),
         aiDescription: zod.string().nullish(),
-        latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+        latestAiStatus: zod
+          .union([
+            zod.literal("success"),
+            zod.literal("skipped"),
+            zod.literal("failed"),
+            zod.literal(null),
+          ])
+          .nullish()
+          .describe(
+            "Status of the most recent AI analysis event for this photo",
+          ),
         suggestedCollections: zod
           .array(
             zod.object({
@@ -1673,6 +1811,13 @@ export const RemovePhotoFromCollectionParams = zod.object({
 });
 
 /**
+ * @summary Trigger AI keyword generation for a smart collection
+ */
+export const GenerateCollectionKeywordsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Accept a suggested collection for a photo (adds photo to the collection)
  */
 export const AcceptPhotoSuggestionParams = zod.object({
@@ -1708,7 +1853,15 @@ export const AcceptPhotoSuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1764,7 +1917,15 @@ export const DismissPhotoSuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1820,7 +1981,15 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1876,7 +2045,15 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1932,7 +2109,15 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -1988,7 +2173,15 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -2048,7 +2241,15 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({
@@ -2104,7 +2305,15 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
     )
     .optional(),
   aiDescription: zod.string().nullish(),
-  latestAiStatus: zod.enum(["success", "skipped", "failed"]).nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
   suggestedCollections: zod
     .array(
       zod.object({

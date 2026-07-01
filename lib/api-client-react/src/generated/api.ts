@@ -4339,6 +4339,90 @@ export const useRemovePhotoFromCollection = <
 };
 
 /**
+ * @summary Trigger AI keyword generation for a smart collection
+ */
+export const getGenerateCollectionKeywordsUrl = (id: number) => {
+  return `/api/collections/${id}/generate-keywords`;
+};
+
+export const generateCollectionKeywords = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getGenerateCollectionKeywordsUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getGenerateCollectionKeywordsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateCollectionKeywords>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateCollectionKeywords>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["generateCollectionKeywords"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateCollectionKeywords>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return generateCollectionKeywords(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateCollectionKeywordsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateCollectionKeywords>>
+>;
+
+export type GenerateCollectionKeywordsMutationError = ErrorType<void>;
+
+/**
+ * @summary Trigger AI keyword generation for a smart collection
+ */
+export const useGenerateCollectionKeywords = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateCollectionKeywords>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateCollectionKeywords>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getGenerateCollectionKeywordsMutationOptions(options));
+};
+
+/**
  * @summary Accept a suggested collection for a photo (adds photo to the collection)
  */
 export const getAcceptPhotoSuggestionUrl = (

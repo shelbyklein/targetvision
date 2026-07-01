@@ -75,6 +75,20 @@ export interface AlbumCoverUpdate {
   photoId: number;
 }
 
+/**
+ * Status of the most recent AI analysis event for this photo
+ * @nullable
+ */
+export type PhotoLatestAiStatus =
+  | (typeof PhotoLatestAiStatus)[keyof typeof PhotoLatestAiStatus]
+  | null;
+
+export const PhotoLatestAiStatus = {
+  success: "success",
+  skipped: "skipped",
+  failed: "failed",
+} as const;
+
 export interface CollectionSummary {
   id: number;
   title: string;
@@ -121,8 +135,11 @@ export interface Photo {
   photoCollections?: CollectionSummary[];
   /** @nullable */
   aiDescription?: string | null;
-  /** @nullable */
-  latestAiStatus?: "success" | "skipped" | "failed" | null;
+  /**
+   * Status of the most recent AI analysis event for this photo
+   * @nullable
+   */
+  latestAiStatus?: PhotoLatestAiStatus;
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
 }
@@ -138,6 +155,8 @@ export interface Collection {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
+  /** @nullable */
+  aiKeywords?: string | null;
   createdAt: string;
   photos?: Photo[];
 }
@@ -155,6 +174,8 @@ export interface CollectionUpdate {
   description?: string | null;
   /** @nullable */
   coverPhotoId?: number | null;
+  /** @nullable */
+  aiKeywords?: string | null;
 }
 
 export interface CollectionPhotoInput {
@@ -401,9 +422,6 @@ export interface AiAnalysisEvent {
 
 export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
-  inCollection?: boolean;
-  hasRating?: boolean;
-  aiStatus?: "has_description" | "failed" | "not_analysed";
 };
 
 export type SearchPhotosParams = {
@@ -427,5 +445,4 @@ export type ListPhotosParams = {
   uploaderId?: number;
   includeHidden?: boolean;
   albumId?: number;
-  aiStatus?: "has_description" | "failed" | "not_analysed";
 };

@@ -18,6 +18,8 @@ export interface Collection {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
+  /** @nullable */
+  aiKeywords?: string | null;
   createdAt: Date;
   photos?: Photo[];
 }

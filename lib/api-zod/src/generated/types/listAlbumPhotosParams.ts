@@ -8,7 +8,4 @@
 
 export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
-  inCollection?: boolean;
-  hasRating?: boolean;
-  aiStatus?: "has_description" | "failed" | "not_analysed";
 };

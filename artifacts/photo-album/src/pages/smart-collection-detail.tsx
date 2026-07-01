@@ -1,17 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCollection,
   useListPhotos,
   useAddPhotoToCollection,
+  useUpdateCollection,
+  useGenerateCollectionKeywords,
   getGetCollectionQueryKey,
+  getListPhotosQueryKey,
 } from "@workspace/api-client-react";
 import type { Photo } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FadeImage } from "@/components/ui/fade-image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,8 +24,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
-import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, X, RefreshCw, Wand2 } from "lucide-react";
 import { collectionKeywords } from "@/lib/aiSuggestions";
+import { useToast } from "@/hooks/use-toast";
 
 type SortOption = "newest" | "oldest" | "top-rated" | "name-az";
 
@@ -56,19 +61,50 @@ function sortPhotos(photos: RichPhoto[], sort: SortOption): RichPhoto[] {
   }
 }
 
+function parseAiKeywords(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]).filter((k) => typeof k === "string" && k.trim()) : [];
+  } catch {
+    return raw
+      .split(/[\s,]+/)
+      .map((k) => k.trim())
+      .filter(Boolean);
+  }
+}
+
 export default function SmartCollectionDetail() {
   const { id } = useParams<{ id: string }>();
   const collectionId = parseInt(id, 10);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: collection, isLoading: collectionLoading } = useGetCollection(collectionId, {
     query: { enabled: !!collectionId, queryKey: getGetCollectionQueryKey(collectionId) },
   });
 
-  const keywords = collection ? collectionKeywords(collection) : "";
+  const [localKeywords, setLocalKeywords] = useState<string[]>([]);
+  const [newKeywordInput, setNewKeywordInput] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (collection) {
+      setLocalKeywords(parseAiKeywords(collection.aiKeywords));
+    }
+  }, [collection?.aiKeywords]);
+
+  const { mutate: updateCollection } = useUpdateCollection();
+  const { mutate: generateKeywords, isPending: isRegenerating } = useGenerateCollectionKeywords();
+
+  const keywords = collection
+    ? collectionKeywords({ ...collection, aiKeywords: JSON.stringify(localKeywords) })
+    : "";
+
+  const photosQueryParams = keywords ? { search: keywords, aiStatus: "has_description" as const } : undefined;
 
   const { data: rawPhotos, isLoading: photosLoading } = useListPhotos(
-    keywords ? { search: keywords, aiStatus: "has_description" } : undefined,
+    photosQueryParams,
     { query: { enabled: !!keywords } },
   );
 
@@ -88,6 +124,59 @@ export default function SmartCollectionDetail() {
       },
     },
   });
+
+  function saveKeywords(kws: string[]) {
+    setIsSaving(true);
+    updateCollection(
+      { id: collectionId, data: { aiKeywords: JSON.stringify(kws) } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+        },
+        onError: () => toast({ title: "Failed to save keywords", variant: "destructive" }),
+        onSettled: () => setIsSaving(false),
+      },
+    );
+  }
+
+  function removeKeyword(kw: string) {
+    const next = localKeywords.filter((k) => k !== kw);
+    setLocalKeywords(next);
+    saveKeywords(next);
+  }
+
+  function handleAddKeyword(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = newKeywordInput.trim().toLowerCase();
+    if (!trimmed || localKeywords.includes(trimmed)) {
+      setNewKeywordInput("");
+      return;
+    }
+    const next = [...localKeywords, trimmed];
+    setLocalKeywords(next);
+    setNewKeywordInput("");
+    saveKeywords(next);
+  }
+
+  function handleRefresh() {
+    if (photosQueryParams) {
+      queryClient.invalidateQueries({ queryKey: getListPhotosQueryKey(photosQueryParams) });
+    }
+    toast({ title: "Refreshing matched photos…" });
+  }
+
+  function handleRegenerate() {
+    generateKeywords(
+      { id: collectionId },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+          toast({ title: "Keywords regenerated with AI" });
+        },
+        onError: () => toast({ title: "AI keyword generation failed", variant: "destructive" }),
+      },
+    );
+  }
 
   function handleAddPhoto(photoId: number, e: React.MouseEvent) {
     e.stopPropagation();
@@ -158,6 +247,98 @@ export default function SmartCollectionDetail() {
           </div>
         </div>
 
+        {/* Keywords management panel */}
+        <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3" data-testid="keywords-panel">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="text-sm font-semibold">Smart keywords</span>
+              <span className="text-xs text-muted-foreground">— photos must match these terms</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={handleRegenerate}
+                disabled={isRegenerating || collectionLoading}
+                data-testid="regenerate-keywords-btn"
+              >
+                {isRegenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Wand2 className="h-3.5 w-3.5" />
+                )}
+                {isRegenerating ? "Generating…" : "AI regenerate"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={handleRefresh}
+                data-testid="refresh-photos-btn"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh photos
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 min-h-[2rem] items-center" data-testid="keyword-chips">
+            {collectionLoading ? (
+              <>
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-6 w-14 rounded-full" />
+              </>
+            ) : localKeywords.length === 0 ? (
+              <span className="text-xs text-muted-foreground italic">
+                No keywords yet — add some below or click "AI regenerate"
+              </span>
+            ) : (
+              localKeywords.map((kw) => (
+                <span
+                  key={kw}
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+                  data-testid="keyword-chip"
+                >
+                  {kw}
+                  <button
+                    type="button"
+                    onClick={() => removeKeyword(kw)}
+                    disabled={isSaving}
+                    aria-label={`Remove keyword ${kw}`}
+                    className="ml-0.5 rounded-full hover:text-destructive transition-colors disabled:opacity-40"
+                    data-testid="remove-keyword-btn"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+
+          <form onSubmit={handleAddKeyword} className="flex gap-2" data-testid="add-keyword-form">
+            <Input
+              placeholder="Add a keyword…"
+              value={newKeywordInput}
+              onChange={(e) => setNewKeywordInput(e.target.value)}
+              className="h-8 text-sm"
+              data-testid="keyword-input"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              className="h-8 gap-1.5 shrink-0"
+              disabled={!newKeywordInput.trim() || isSaving}
+              data-testid="add-keyword-btn"
+            >
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Add
+            </Button>
+          </form>
+        </div>
+
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             {isLoading ? (
@@ -194,7 +375,7 @@ export default function SmartCollectionDetail() {
             <Sparkles className="h-10 w-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm font-medium text-foreground mb-1">No keywords to match</p>
             <p className="text-xs text-muted-foreground max-w-sm">
-              Add a more descriptive title or description to this collection so the AI can find matching photos.
+              Add keywords above or click "AI regenerate" to generate them from the collection title and description.
             </p>
           </div>
         ) : photos.length === 0 ? (

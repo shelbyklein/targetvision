@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CollectionSummary } from "./collectionSummary";
+import type { PhotoLatestAiStatus } from "./photoLatestAiStatus";
 import type { PhotoRating } from "./photoRating";
 import type { SuggestedCollection } from "./suggestedCollection";
 
@@ -30,8 +31,11 @@ export interface Photo {
   photoCollections?: CollectionSummary[];
   /** @nullable */
   aiDescription?: string | null;
-  /** @nullable */
-  latestAiStatus?: "success" | "skipped" | "failed" | null;
+  /**
+   * Status of the most recent AI analysis event for this photo
+   * @nullable
+   */
+  latestAiStatus?: PhotoLatestAiStatus;
   suggestedCollections?: SuggestedCollection[];
   ratings?: PhotoRating[];
 }

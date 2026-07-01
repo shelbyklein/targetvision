@@ -13,4 +13,6 @@ export interface CollectionUpdate {
   description?: string | null;
   /** @nullable */
   coverPhotoId?: number | null;
+  /** @nullable */
+  aiKeywords?: string | null;
 }

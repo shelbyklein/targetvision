@@ -41,6 +41,7 @@ export * from "./listAlbumPhotosParams";
 export * from "./listPhotosParams";
 export * from "./photo";
 export * from "./photoCategoryInput";
+export * from "./photoLatestAiStatus";
 export * from "./photoRating";
 export * from "./photoTagInput";
 export * from "./photoUpdate";
