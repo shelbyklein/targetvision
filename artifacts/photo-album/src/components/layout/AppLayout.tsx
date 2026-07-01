@@ -146,23 +146,58 @@ function GlobalSearchBar() {
   );
 }
 
+function MobileBottomNav({ location, isAdmin }: { location: string; isAdmin: boolean }) {
+  const mobileItems = [
+    ...navItems,
+    ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
+  ];
+
+  return (
+    <nav
+      className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border flex"
+      data-testid="mobile-bottom-nav"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      {mobileItems.map((item) => {
+        const Icon = item.icon;
+        const active = location === item.href || location.startsWith(item.href + "/");
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+              active ? "text-primary" : "text-muted-foreground"
+            )}
+            data-testid={`mobile-nav-${item.label.toLowerCase()}`}
+          >
+            <Icon className={cn("h-5 w-5", active && "stroke-[2.2]")} />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
   const { data: me } = useGetMe();
   const bannerVisible = useBannerVisible();
+  const isAdmin = me?.role === "admin";
 
   return (
     <div className="min-h-screen bg-background flex flex-col" data-testid="app-layout">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
               <img src="/target-vision.svg" alt="Target Vision" className="h-7 w-7" />
-              <span className="font-semibold text-foreground tracking-tight">Target Vision</span>
+              <span className="hidden sm:inline font-semibold text-foreground tracking-tight">Target Vision</span>
             </Link>
-            <nav className="flex items-center gap-1" data-testid="main-nav">
+            <nav className="hidden sm:flex items-center gap-1" data-testid="main-nav">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = location === item.href || location.startsWith(item.href + "/");
@@ -183,7 +218,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
-              {me?.role === "admin" && (
+              {isAdmin && (
                 <Link
                   href="/admin"
                   className={cn(
@@ -201,19 +236,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
             <GlobalSearchBar />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2" data-testid="user-menu-trigger">
-                  <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
+                <Button variant="ghost" size="sm" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="user-menu-trigger">
+                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary shrink-0">
                     {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? "?"}
                   </div>
-                  <span className="text-sm text-foreground max-w-[120px] truncate">
+                  <span className="hidden sm:inline text-sm text-foreground max-w-[120px] truncate">
                     {user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress ?? "Me"}
                   </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <ChevronDown className="hidden sm:inline h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
@@ -251,14 +286,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className={cn("flex-1 max-w-7xl mx-auto w-full px-6 py-8", bannerVisible && "pb-20")}>
+      <main className={cn(
+        "flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8",
+        "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-8",
+        bannerVisible && "sm:pb-20"
+      )}>
         {children}
       </main>
 
+      <MobileBottomNav location={location} isAdmin={isAdmin} />
       <BulkUploadBanner />
 
       {!bannerVisible && (
-        <footer className="border-t border-border py-6 text-sm text-muted-foreground">
+        <footer className="hidden sm:block border-t border-border py-6 text-sm text-muted-foreground">
           <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span>Copyright</span>
