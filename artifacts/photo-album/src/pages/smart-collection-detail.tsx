@@ -7,6 +7,7 @@ import {
   useAddPhotoToCollection,
   useUpdateCollection,
   useGenerateCollectionKeywords,
+  useSetCollectionCover,
   getGetCollectionQueryKey,
   getListPhotosQueryKey,
 } from "@workspace/api-client-react";
@@ -24,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
-import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, X, RefreshCw, Wand2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, X, RefreshCw, Wand2, ImageIcon } from "lucide-react";
 import { collectionKeywords } from "@/lib/aiSuggestions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -124,6 +125,25 @@ export default function SmartCollectionDetail() {
       },
     },
   });
+
+  const [settingCoverId, setSettingCoverId] = useState<number | null>(null);
+  const { mutate: setCollectionCover } = useSetCollectionCover({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+        toast({ title: "Cover photo updated" });
+      },
+      onError: () => toast({ title: "Failed to set cover photo", variant: "destructive" }),
+      onSettled: () => setSettingCoverId(null),
+    },
+  });
+
+  function handleSetCover(photoId: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (settingCoverId !== null) return;
+    setSettingCoverId(photoId);
+    setCollectionCover({ id: collectionId, data: { photoId } });
+  }
 
   function saveKeywords(kws: string[]) {
     setIsSaving(true);
@@ -407,6 +427,32 @@ export default function SmartCollectionDetail() {
                     alt={photo.name ?? "Photo"}
                     className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                   />
+
+                  {/* Cover photo button — top right, always visible when active */}
+                  {(() => {
+                    const isCover = collection?.coverPhotoId === photo.id;
+                    const isSetting = settingCoverId === photo.id;
+                    return (
+                      <button
+                        onClick={(e) => handleSetCover(photo.id, e)}
+                        disabled={isSetting || settingCoverId !== null}
+                        aria-label={isCover ? "Current cover photo" : "Set as cover photo"}
+                        data-testid="set-cover-btn"
+                        className={`absolute top-1.5 right-1.5 z-10 flex items-center justify-center rounded-full w-7 h-7 transition-all focus:outline-none focus:ring-2 focus:ring-white/60 ${
+                          isCover
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : "bg-black/40 text-white opacity-0 group-hover:opacity-100 hover:bg-black/70 backdrop-blur-sm"
+                        } ${isSetting ? "opacity-100" : ""}`}
+                      >
+                        {isSetting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ImageIcon className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    );
+                  })()}
+
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
                     <button
                       onClick={(e) => handleAddPhoto(photo.id, e)}

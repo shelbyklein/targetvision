@@ -1206,6 +1206,37 @@ paths:
         "404":
           description: Not found
 
+  /collections/{id}/cover:
+    patch:
+      operationId: setCollectionCover
+      tags: [collections]
+      summary: Set the cover photo for a collection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectionCoverUpdate"
+      responses:
+        "200":
+          description: Updated collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
   /collections/{id}/generate-keywords:
     post:
       operationId: generateCollectionKeywords
@@ -1588,6 +1619,13 @@ components:
           type: ["string", "null"]
 
     AlbumCoverUpdate:
+      type: object
+      required: [photoId]
+      properties:
+        photoId:
+          type: integer
+
+    CollectionCoverUpdate:
       type: object
       required: [photoId]
       properties:

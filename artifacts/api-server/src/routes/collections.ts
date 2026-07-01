@@ -280,6 +280,43 @@ router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res):
   res.sendStatus(204);
 });
 
+router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(rawId, 10);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid collection ID" });
+    return;
+  }
+
+  const photoId = typeof req.body?.photoId === "number" ? req.body.photoId : parseInt(req.body?.photoId, 10);
+  if (!Number.isInteger(photoId) || photoId <= 0) {
+    res.status(400).json({ error: "Invalid photoId" });
+    return;
+  }
+
+  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, photoId));
+  if (!photo) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+
+  await db.update(collectionsTable).set({ coverPhotoId: photoId }).where(eq(collectionsTable.id, id));
+
+  const full = await buildCollectionResponse(id);
+  res.json(full);
+});
+
 router.post("/collections/:id/generate-keywords", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);

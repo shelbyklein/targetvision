@@ -1811,6 +1811,90 @@ export const RemovePhotoFromCollectionParams = zod.object({
 });
 
 /**
+ * @summary Set the cover photo for a collection
+ */
+export const SetCollectionCoverParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetCollectionCoverBody = zod.object({
+  photoId: zod.number(),
+});
+
+export const SetCollectionCoverResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  createdById: zod.number(),
+  photoCount: zod.number(),
+  coverPhotoId: zod.number().nullish(),
+  coverPhotoUrl: zod.string().nullish(),
+  aiKeywords: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  photos: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        albumId: zod.number(),
+        albumTitle: zod.string().nullish(),
+        uploaderId: zod.number(),
+        storageKey: zod.string().nullish(),
+        url: zod.string(),
+        takenAt: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        isHidden: zod.boolean(),
+        averageRating: zod.number().nullish(),
+        ratingCount: zod.number(),
+        myRating: zod.number().nullish(),
+        photoCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+              description: zod.string().nullish(),
+              createdById: zod.number(),
+              photoCount: zod.number(),
+              coverPhotoId: zod.number().nullish(),
+              coverPhotoUrl: zod.string().nullish(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+        aiDescription: zod.string().nullish(),
+        latestAiStatus: zod
+          .union([
+            zod.literal("success"),
+            zod.literal("skipped"),
+            zod.literal("failed"),
+            zod.literal(null),
+          ])
+          .nullish()
+          .describe(
+            "Status of the most recent AI analysis event for this photo",
+          ),
+        suggestedCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+            }),
+          )
+          .optional(),
+        ratings: zod
+          .array(
+            zod.object({
+              userId: zod.number(),
+              score: zod.number(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * @summary Trigger AI keyword generation for a smart collection
  */
 export const GenerateCollectionKeywordsParams = zod.object({

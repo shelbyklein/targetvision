@@ -31,6 +31,7 @@ export * from "./bulkRetryAiAnalysisEventsResult";
 export * from "./category";
 export * from "./categoryInput";
 export * from "./collection";
+export * from "./collectionCoverUpdate";
 export * from "./collectionInput";
 export * from "./collectionPhotoInput";
 export * from "./collectionSummary";

@@ -34,6 +34,7 @@ import type {
   Category,
   CategoryInput,
   Collection,
+  CollectionCoverUpdate,
   CollectionInput,
   CollectionPhotoInput,
   CollectionSummary,
@@ -4336,6 +4337,93 @@ export const useRemovePhotoFromCollection = <
   TContext
 > => {
   return useMutation(getRemovePhotoFromCollectionMutationOptions(options));
+};
+
+/**
+ * @summary Set the cover photo for a collection
+ */
+export const getSetCollectionCoverUrl = (id: number) => {
+  return `/api/collections/${id}/cover`;
+};
+
+export const setCollectionCover = async (
+  id: number,
+  collectionCoverUpdate: CollectionCoverUpdate,
+  options?: RequestInit,
+): Promise<Collection> => {
+  return customFetch<Collection>(getSetCollectionCoverUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(collectionCoverUpdate),
+  });
+};
+
+export const getSetCollectionCoverMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setCollectionCover>>,
+    TError,
+    { id: number; data: BodyType<CollectionCoverUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setCollectionCover>>,
+  TError,
+  { id: number; data: BodyType<CollectionCoverUpdate> },
+  TContext
+> => {
+  const mutationKey = ["setCollectionCover"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setCollectionCover>>,
+    { id: number; data: BodyType<CollectionCoverUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setCollectionCover(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetCollectionCoverMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setCollectionCover>>
+>;
+export type SetCollectionCoverMutationBody = BodyType<CollectionCoverUpdate>;
+export type SetCollectionCoverMutationError = ErrorType<void>;
+
+/**
+ * @summary Set the cover photo for a collection
+ */
+export const useSetCollectionCover = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setCollectionCover>>,
+    TError,
+    { id: number; data: BodyType<CollectionCoverUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setCollectionCover>>,
+  TError,
+  { id: number; data: BodyType<CollectionCoverUpdate> },
+  TContext
+> => {
+  return useMutation(getSetCollectionCoverMutationOptions(options));
 };
 
 /**

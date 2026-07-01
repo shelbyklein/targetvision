@@ -75,6 +75,10 @@ export interface AlbumCoverUpdate {
   photoId: number;
 }
 
+export interface CollectionCoverUpdate {
+  photoId: number;
+}
+
 /**
  * Status of the most recent AI analysis event for this photo
  * @nullable
