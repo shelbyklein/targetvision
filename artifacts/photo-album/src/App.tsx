@@ -327,6 +327,18 @@ function ClerkProviderWithRoutes() {
               </>
             )}
           </Route>
+          <Route path="/smart-collections">
+            {() => (
+              <>
+                <Show when="signed-in">
+                  <LazyPage load={() => import("@/pages/smart-collections")} />
+                </Show>
+                <Show when="signed-out">
+                  <Redirect to="/sign-in" />
+                </Show>
+              </>
+            )}
+          </Route>
           <Route path="/smart-collections/:id">
             {() => (
               <>

@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
 import { useParams, Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCollection,
   useListPhotos,
+  useAddPhotoToCollection,
   getGetCollectionQueryKey,
 } from "@workspace/api-client-react";
 import type { Photo } from "@workspace/api-client-react";
@@ -18,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
-import { ArrowLeft, Sparkles, Star, ArrowUpDown } from "lucide-react";
+import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2 } from "lucide-react";
 import { collectionKeywords } from "@/lib/aiSuggestions";
 
 type SortOption = "newest" | "oldest" | "top-rated" | "name-az";
@@ -57,6 +59,7 @@ function sortPhotos(photos: RichPhoto[], sort: SortOption): RichPhoto[] {
 export default function SmartCollectionDetail() {
   const { id } = useParams<{ id: string }>();
   const collectionId = parseInt(id, 10);
+  const queryClient = useQueryClient();
 
   const { data: collection, isLoading: collectionLoading } = useGetCollection(collectionId, {
     query: { enabled: !!collectionId, queryKey: getGetCollectionQueryKey(collectionId) },
@@ -71,6 +74,38 @@ export default function SmartCollectionDetail() {
 
   const [sort, setSort] = useState<SortOption>("top-rated");
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
+  const [addingIds, setAddingIds] = useState<Set<number>>(new Set());
+
+  const collectionPhotoIds = useMemo(
+    () => new Set((collection?.photos ?? []).map((p) => p.id)),
+    [collection?.photos],
+  );
+
+  const addPhotoMutation = useAddPhotoToCollection({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+      },
+    },
+  });
+
+  function handleAddPhoto(photoId: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (collectionPhotoIds.has(photoId) || addingIds.has(photoId)) return;
+    setAddingIds((prev) => new Set(prev).add(photoId));
+    addPhotoMutation.mutate(
+      { id: collectionId, data: { photoId } },
+      {
+        onSettled: () => {
+          setAddingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(photoId);
+            return next;
+          });
+        },
+      },
+    );
+  }
 
   const photos = useMemo(() => {
     if (!rawPhotos) return [];
@@ -175,31 +210,59 @@ export default function SmartCollectionDetail() {
             className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
             data-testid="smart-collection-photo-grid"
           >
-            {photos.map((photo) => (
-              <button
-                key={photo.id}
-                onClick={() => setSelectedPhoto(toLight(photo))}
-                className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                data-testid="smart-photo-item"
-                aria-label={`Preview ${photo.name ?? "photo"}`}
-              >
-                <FadeImage
-                  src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
-                  alt={photo.name ?? "Photo"}
-                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
-                  {photo.averageRating != null && (
-                    <div className="flex items-center gap-0.5 ml-auto bg-black/60 rounded px-1.5 py-0.5">
-                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                      <span className="text-xs text-white font-medium">
-                        {photo.averageRating.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
+            {photos.map((photo) => {
+              const inCollection = collectionPhotoIds.has(photo.id);
+              const isAdding = addingIds.has(photo.id);
+              return (
+                <button
+                  key={photo.id}
+                  onClick={() => setSelectedPhoto(toLight(photo))}
+                  className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  data-testid="smart-photo-item"
+                  aria-label={`Preview ${photo.name ?? "photo"}`}
+                >
+                  <FadeImage
+                    src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
+                    alt={photo.name ?? "Photo"}
+                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
+                    <button
+                      onClick={(e) => handleAddPhoto(photo.id, e)}
+                      disabled={inCollection || isAdding}
+                      aria-label={
+                        inCollection
+                          ? `Already in ${collection?.title}`
+                          : `Add to ${collection?.title}`
+                      }
+                      data-testid="add-to-collection-btn"
+                      className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-white/60 ${
+                        inCollection
+                          ? "bg-emerald-500/90 text-white cursor-default"
+                          : "bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm"
+                      }`}
+                    >
+                      {isAdding ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : inCollection ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <Plus className="h-3 w-3" />
+                      )}
+                      {inCollection ? "In collection" : "Add"}
+                    </button>
+                    {photo.averageRating != null && (
+                      <div className="flex items-center gap-0.5 ml-auto bg-black/60 rounded px-1.5 py-0.5">
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span className="text-xs text-white font-medium">
+                          {photo.averageRating.toFixed(1)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
