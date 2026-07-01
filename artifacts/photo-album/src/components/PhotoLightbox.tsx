@@ -59,6 +59,7 @@ interface PhotoLightboxProps {
   isLoadingNext?: boolean;
   albumId?: number | null;
   coverPhotoId?: number | null;
+  onDeleted?: (photoId: number) => void;
 }
 
 function LightboxStarRating({
@@ -190,7 +191,7 @@ function PhotoSidebarContent({
   coverPhotoId,
   onAdvance,
   onCoverSet,
-  onDelete,
+  onDeleted,
 }: {
   photoId: number;
   albumId?: number | null;
@@ -198,7 +199,7 @@ function PhotoSidebarContent({
   coverPhotoId?: number | null;
   onAdvance?: () => void;
   onCoverSet?: (photoId: number) => void;
-  onDelete?: () => void;
+  onDeleted?: (photoId: number) => void;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -271,20 +272,6 @@ function PhotoSidebarContent({
     );
   }
 
-  function handleDeletePhoto() {
-    deletePhoto(
-      { id: photoId },
-      {
-        onSuccess: () => {
-          invalidate();
-          toast({ title: "Photo deleted" });
-          onDelete?.();
-        },
-        onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),
-      }
-    );
-  }
-
   function handleSetCover() {
     if (!coverAlbumId) return;
     setAlbumCover(
@@ -344,8 +331,28 @@ function PhotoSidebarContent({
     );
   }
 
+  function handleDelete() {
+    deletePhoto(
+      { id: photoId },
+      {
+        onSuccess: () => {
+          toast({ title: "Photo deleted" });
+          if (albumId) {
+            qc.invalidateQueries({ queryKey: getListAlbumPhotosQueryKey(albumId) });
+          }
+          qc.invalidateQueries({ queryKey: getListPhotosQueryKey().slice(0, 1) });
+          qc.invalidateQueries({ queryKey: getGetRecentPhotosQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
+          onDeleted?.(photoId);
+        },
+        onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),
+      }
+    );
+  }
+
   const currentCollections = fullPhoto?.photoCollections ?? [];
   const isHidden = fullPhoto?.isHidden ?? false;
+  const canDelete = me && fullPhoto && (me.id === fullPhoto.uploaderId || me.role === "admin");
 
   if (photoLoading || collectionsLoading) {
     return (
@@ -399,13 +406,13 @@ function PhotoSidebarContent({
         </button>
       )}
 
-      {(me?.role === "admin" || me?.id === fullPhoto?.uploaderId) && (
+      {canDelete && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button
               type="button"
               disabled={deleting}
-              className="flex items-center gap-2 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 w-full rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="lightbox-delete-btn"
             >
               {deleting ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Trash2 className="h-4 w-4 shrink-0" />}
@@ -422,10 +429,11 @@ function PhotoSidebarContent({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                onClick={handleDeletePhoto}
+                onClick={handleDelete}
+                className="bg-destructive hover:bg-destructive/90"
+                data-testid="lightbox-confirm-delete"
               >
-                Delete
+                Delete photo
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -587,7 +595,7 @@ function PhotoSidebarContent({
 
 const SWIPE_THRESHOLD = 50;
 
-export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext, albumId, coverPhotoId }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext, albumId, coverPhotoId, onDeleted }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
   const touchStartX = useRef<number | null>(null);
   const qc = useQueryClient();
@@ -809,7 +817,7 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                     coverPhotoId={localCoverPhotoId}
                     onAdvance={handleAdvance}
                     onCoverSet={(newCoverId) => setLocalCoverPhotoId(newCoverId)}
-                    onDelete={onClose}
+                    onDeleted={(deletedId) => { onDeleted?.(deletedId); onClose(); }}
                   />
                 </div>
               </div>
