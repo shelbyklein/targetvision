@@ -105,6 +105,10 @@ router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Resp
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
 
+    // Storage keys are content-addressed — once written they never change.
+    // Cache aggressively so browsers never re-download the same thumbnail/photo.
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
       nodeStream.pipe(res);
