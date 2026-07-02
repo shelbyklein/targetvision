@@ -26,23 +26,31 @@ export function FadeImage({ src, alt, className, onLoad, ...props }: FadeImagePr
   }, [src]);
 
   return (
-    <img
-      src={activeSrc}
-      alt={alt}
-      onLoad={(e) => {
-        setLoaded(true);
-        slotRef.current?.complete();
-        onLoad?.(e);
-      }}
-      onError={() => {
-        slotRef.current?.complete();
-      }}
-      className={cn(
-        "transition-opacity duration-500",
-        loaded ? "opacity-100" : "opacity-0",
-        className,
-      )}
-      {...props}
-    />
+    <div className={cn("relative overflow-hidden", className)}>
+      <div
+        className={cn(
+          "absolute inset-0 animate-shimmer transition-opacity duration-300",
+          loaded ? "opacity-0 pointer-events-none" : "opacity-100",
+        )}
+      />
+      <img
+        src={activeSrc}
+        alt={alt}
+        onLoad={(e) => {
+          setLoaded(true);
+          slotRef.current?.complete();
+          onLoad?.(e);
+        }}
+        onError={() => {
+          setLoaded(true);
+          slotRef.current?.complete();
+        }}
+        className={cn(
+          "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
+          loaded ? "opacity-100" : "opacity-0",
+        )}
+        {...props}
+      />
+    </div>
   );
 }
