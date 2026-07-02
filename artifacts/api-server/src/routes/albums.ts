@@ -23,19 +23,25 @@ import { buildPhotoResponse } from "../lib/photoHelpers";
 const router: IRouter = Router();
 
 async function buildAlbumResponse(albumId: number) {
-  const [row] = await db
-    .select({
-      album: albumsTable,
-      ownerName: usersTable.name,
-      photoCount: count(photosTable.id),
-      hiddenCount: sql<number>`cast(count(case when ${photosTable.isHidden} = true then 1 end) as integer)`,
-      ratedCount: sql<number>`(select cast(count(distinct r.photo_id) as integer) from ratings r inner join photos p2 on r.photo_id = p2.id where p2.album_id = ${albumsTable.id})`,
-    })
-    .from(albumsTable)
-    .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
-    .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
-    .where(eq(albumsTable.id, albumId))
-    .groupBy(albumsTable.id, usersTable.name);
+  const [[row], [ratedRow]] = await Promise.all([
+    db
+      .select({
+        album: albumsTable,
+        ownerName: usersTable.name,
+        photoCount: count(photosTable.id),
+        hiddenCount: sql<number>`cast(count(case when ${photosTable.isHidden} = true then 1 end) as integer)`,
+      })
+      .from(albumsTable)
+      .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
+      .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
+      .where(eq(albumsTable.id, albumId))
+      .groupBy(albumsTable.id, usersTable.name),
+    db
+      .select({ ratedCount: sql<number>`cast(count(distinct ${ratingsTable.photoId}) as integer)` })
+      .from(ratingsTable)
+      .innerJoin(photosTable, eq(ratingsTable.photoId, photosTable.id))
+      .where(eq(photosTable.albumId, albumId)),
+  ]);
 
   if (!row) return null;
 
@@ -53,25 +59,40 @@ async function buildAlbumResponse(albumId: number) {
     ownerName: row.ownerName ?? null,
     photoCount: Number(row.photoCount),
     hiddenCount: Number(row.hiddenCount),
-    ratedCount: Number(row.ratedCount),
+    ratedCount: Number(ratedRow?.ratedCount ?? 0),
     coverPhotoUrl,
   };
 }
 
 router.get("/albums", requireAuth, async (req, res): Promise<void> => {
-  const rows = await db
-    .select({
-      album: albumsTable,
-      ownerName: usersTable.name,
-      photoCount: count(photosTable.id),
-      hiddenCount: sql<number>`cast(count(case when ${photosTable.isHidden} = true then 1 end) as integer)`,
-      ratedCount: sql<number>`(select cast(count(distinct r.photo_id) as integer) from ratings r inner join photos p2 on r.photo_id = p2.id where p2.album_id = ${albumsTable.id})`,
-    })
-    .from(albumsTable)
-    .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
-    .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
-    .groupBy(albumsTable.id, usersTable.name)
-    .orderBy(sql`${albumsTable.createdAt} desc`);
+  // Fetch album rows and ratedCounts in parallel.
+  // ratedCounts uses a single aggregate scan — NOT a correlated subquery per album.
+  const [rows, ratedCountRows] = await Promise.all([
+    db
+      .select({
+        album: albumsTable,
+        ownerName: usersTable.name,
+        photoCount: count(photosTable.id),
+        hiddenCount: sql<number>`cast(count(case when ${photosTable.isHidden} = true then 1 end) as integer)`,
+      })
+      .from(albumsTable)
+      .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
+      .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
+      .groupBy(albumsTable.id, usersTable.name)
+      .orderBy(sql`${albumsTable.createdAt} desc`),
+    db
+      .select({
+        albumId: photosTable.albumId,
+        ratedCount: sql<number>`cast(count(distinct ${ratingsTable.photoId}) as integer)`,
+      })
+      .from(ratingsTable)
+      .innerJoin(photosTable, eq(ratingsTable.photoId, photosTable.id))
+      .groupBy(photosTable.albumId),
+  ]);
+
+  const ratedCountByAlbum = new Map(
+    ratedCountRows.map((r) => [r.albumId, Number(r.ratedCount)])
+  );
 
   const albums = await Promise.all(
     rows.map(async (row) => {
@@ -90,7 +111,7 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
         ownerName: row.ownerName ?? null,
         photoCount: Number(row.photoCount),
         hiddenCount: Number(row.hiddenCount),
-        ratedCount: Number(row.ratedCount),
+        ratedCount: ratedCountByAlbum.get(row.album.id) ?? 0,
         coverPhotoUrl,
         coverPhotoThumbnailKey,
       };
