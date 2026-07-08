@@ -5,6 +5,7 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListPhotosAiStatus } from "./listPhotosAiStatus";
 
 export type ListPhotosParams = {
   search?: string;
@@ -17,4 +18,5 @@ export type ListPhotosParams = {
   uploaderId?: number;
   includeHidden?: boolean;
   albumId?: number;
+  aiStatus?: ListPhotosAiStatus;
 };

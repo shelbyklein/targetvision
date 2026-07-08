@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { AiServicesSection } from "@/components/admin/AiServicesSection";
+import { AiAnalysisBackfillSection } from "@/components/admin/AiAnalysisBackfillSection";
 import { RegistrationSection } from "@/components/admin/RegistrationSection";
 import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
 import { CapturedDatesSection } from "@/components/admin/CapturedDatesSection";
@@ -30,7 +31,7 @@ export default function Admin() {
   const { data: me, isLoading: meLoading } = useGetMe();
   const isAdmin = me?.role === "admin";
   const { data: users, isLoading: usersLoading } = useListUsers({
-    query: { enabled: isAdmin },
+    query: { enabled: isAdmin, queryKey: getListUsersQueryKey() },
   });
   const { mutate: updateRole } = useUpdateUserRole();
 
@@ -85,6 +86,8 @@ export default function Admin() {
         <RegistrationSection />
 
         <AiServicesSection />
+
+        <AiAnalysisBackfillSection />
 
         <ThumbnailsSection />
 

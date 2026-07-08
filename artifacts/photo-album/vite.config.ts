@@ -18,11 +18,14 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
+// Default to "/" rather than requiring BASE_PATH=/ on the command line:
+// Git Bash on Windows rewrites a bare "/" value into the Git install path
+// (MSYS path conversion), silently corrupting the base.
+const basePath = process.env.BASE_PATH ?? "/";
 
-if (!basePath) {
+if (!basePath.startsWith("/")) {
   throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
+    `BASE_PATH must start with "/" but was "${basePath}".`,
   );
 }
 
@@ -65,6 +68,19 @@ export default defineConfig({
     allowedHosts: true,
     fs: {
       strict: true,
+    },
+    proxy: {
+      "/api": {
+        target: `http://localhost:${process.env.API_PORT ?? 8080}`,
+        changeOrigin: true,
+      },
+      // Browser uploads go to fake-gcs-server through this same-origin proxy,
+      // avoiding cross-origin preflight against the emulator.
+      "/gcs": {
+        target: process.env.GCS_ENDPOINT ?? "http://localhost:4443",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gcs/, ""),
+      },
     },
   },
   preview: {

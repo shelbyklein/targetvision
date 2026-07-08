@@ -18,7 +18,7 @@ import {
   GetAlbumTopRatedResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse } from "../lib/photoHelpers";
+import { buildPhotoResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
@@ -46,12 +46,14 @@ async function buildAlbumResponse(albumId: number) {
   if (!row) return null;
 
   let coverPhotoUrl: string | null = null;
+  let coverPhotoThumbnailKey: string | null = null;
   if (row.album.coverPhotoId) {
     const [cover] = await db
-      .select({ url: photosTable.url })
+      .select({ url: photosTable.url, thumbnailKey: photosTable.thumbnailKey })
       .from(photosTable)
       .where(eq(photosTable.id, row.album.coverPhotoId));
     coverPhotoUrl = cover?.url ?? null;
+    coverPhotoThumbnailKey = cover?.thumbnailKey ?? null;
   }
 
   return {
@@ -61,6 +63,7 @@ async function buildAlbumResponse(albumId: number) {
     hiddenCount: Number(row.hiddenCount),
     ratedCount: Number(ratedRow?.ratedCount ?? 0),
     coverPhotoUrl,
+    coverPhotoThumbnailKey,
   };
 }
 
@@ -203,7 +206,13 @@ router.delete("/albums/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  const photosToClean = await db
+    .select({ id: photosTable.id, storageKey: photosTable.storageKey, thumbnailKey: photosTable.thumbnailKey })
+    .from(photosTable)
+    .where(eq(photosTable.albumId, params.data.id));
+
   await db.delete(albumsTable).where(eq(albumsTable.id, params.data.id));
+  await Promise.all(photosToClean.map((photo) => deletePhotoStorageObjects(photo)));
   res.sendStatus(204);
 });
 

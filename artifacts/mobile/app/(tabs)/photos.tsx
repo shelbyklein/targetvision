@@ -20,7 +20,7 @@ export default function PhotosScreen() {
     isError,
     refetch,
     isRefetching,
-  } = useListPhotos({
+  } = useListPhotos(undefined, {
     query: { queryKey: ["photos"] },
   });
 

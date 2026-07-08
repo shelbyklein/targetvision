@@ -18,7 +18,7 @@ export const UserRole = {
 
 export interface User {
   id: number;
-  clerkId: string;
+  authUserId: string;
   name: string;
   email: string;
   role: UserRole;
@@ -51,6 +51,8 @@ export interface Album {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
+  /** @nullable */
+  coverPhotoThumbnailKey?: string | null;
   photoCount: number;
   ratedCount?: number;
   hiddenCount?: number;
@@ -105,6 +107,9 @@ export interface CollectionSummary {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
+  /** @nullable */
+  coverPhotoThumbnailKey?: string | null;
+  tags?: string[];
   createdAt: string;
 }
 
@@ -113,8 +118,15 @@ export interface SuggestedCollection {
   title: string;
 }
 
+export interface SuggestedNewCollection {
+  id: number;
+  suggestedName: string;
+}
+
 export interface PhotoRating {
   userId: number;
+  /** @nullable */
+  userName?: string | null;
   score: number;
   createdAt: string;
 }
@@ -127,7 +139,13 @@ export interface Photo {
   uploaderId: number;
   /** @nullable */
   storageKey?: string | null;
+  /** @nullable */
+  thumbnailKey?: string | null;
   url: string;
+  /** @nullable */
+  filename?: string | null;
+  /** @nullable */
+  filesize?: number | null;
   /** @nullable */
   takenAt?: string | null;
   createdAt: string;
@@ -146,7 +164,13 @@ export interface Photo {
    */
   latestAiStatus?: PhotoLatestAiStatus;
   suggestedCollections?: SuggestedCollection[];
+  suggestedNewCollections?: SuggestedNewCollection[];
   ratings?: PhotoRating[];
+}
+
+export interface ListAlbumPhotosPagedResponse {
+  photos: Photo[];
+  hasMore: boolean;
 }
 
 export interface Collection {
@@ -162,6 +186,7 @@ export interface Collection {
   coverPhotoUrl?: string | null;
   /** @nullable */
   aiKeywords?: string | null;
+  tags?: string[];
   createdAt: string;
   photos?: Photo[];
 }
@@ -210,6 +235,8 @@ export interface PhotoUploadInput {
   storageKey?: string;
   takenAt?: string;
   contentType?: string;
+  filename?: string;
+  filesize?: number;
 }
 
 export interface PhotoTagInput {
@@ -260,6 +287,7 @@ export interface DashboardStats {
   totalPhotos: number;
   totalUsers: number;
   totalTags: number;
+  totalCollections: number;
   recentActivity: Photo[];
 }
 
@@ -282,7 +310,7 @@ export interface UploadUrlRequest {
 }
 
 export interface UploadUrlResponse {
-  /** Presigned GCS URL for PUT upload. */
+  /** Presigned URL for PUT upload. Absolute in production; may be a relative proxy path (e.g. `/gcs/...`) in local dev. */
   uploadURL: string;
   /** Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database. */
   objectPath: string;
@@ -427,7 +455,21 @@ export interface AiAnalysisEvent {
 
 export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
+  limit?: number;
+  offset?: number;
+  inCollection?: boolean;
+  hasRating?: boolean;
+  aiStatus?: ListAlbumPhotosAiStatus;
 };
+
+export type ListAlbumPhotosAiStatus =
+  (typeof ListAlbumPhotosAiStatus)[keyof typeof ListAlbumPhotosAiStatus];
+
+export const ListAlbumPhotosAiStatus = {
+  has_description: "has_description",
+  failed: "failed",
+  not_analysed: "not_analysed",
+} as const;
 
 export type SearchPhotosParams = {
   q: string;
@@ -450,4 +492,14 @@ export type ListPhotosParams = {
   uploaderId?: number;
   includeHidden?: boolean;
   albumId?: number;
+  aiStatus?: ListPhotosAiStatus;
 };
+
+export type ListPhotosAiStatus =
+  (typeof ListPhotosAiStatus)[keyof typeof ListPhotosAiStatus];
+
+export const ListPhotosAiStatus = {
+  has_description: "has_description",
+  failed: "failed",
+  not_analysed: "not_analysed",
+} as const;

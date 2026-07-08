@@ -1,4 +1,4 @@
-@layer theme, base, clerk, components, utilities;
+@layer theme, base, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -140,6 +140,10 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  /* Heading accent colors — brand red / navy, tuned per theme for contrast */
+  --heading-primary: 354 69% 39%;
+  --heading-secondary: 218 52% 21%;
 }
 
 .dark {
@@ -196,6 +200,10 @@
   --chart-3: 354 40% 45%;
   --chart-4: 216 40% 40%;
   --chart-5: 216 25% 65%;
+
+  /* Heading accent colors — brightened for contrast on dark backgrounds */
+  --heading-primary: 354 65% 58%;
+  --heading-secondary: 216 20% 85%;
 }
 
 @keyframes shimmer {
@@ -230,10 +238,10 @@
   }
 
   h1 {
-    color: hsl(354 69% 39%) !important;
+    color: hsl(var(--heading-primary)) !important;
   }
 
   h2, h3, h4, h5, h6 {
-    color: hsl(218 52% 21%) !important;
+    color: hsl(var(--heading-secondary)) !important;
   }
 }

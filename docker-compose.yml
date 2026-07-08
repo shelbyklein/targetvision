@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: targetvision
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  fake-gcs:
+    image: fsouza/fake-gcs-server:1.52.3
+    restart: unless-stopped
+    command:
+      [
+        "-scheme", "http",
+        "-port", "4443",
+        "-public-host", "localhost:4443",
+        "-external-url", "http://localhost:4443",
+        "-backend", "filesystem",
+        "-filesystem-root", "/storage",
+        "-data", "/data",
+      ]
+    ports:
+      - "4443:4443"
+    volumes:
+      # Live object store on the big E: drive (photos are the growing dataset;
+      # keep them off C:, where Docker's own virtual disk lives).
+      - E:/TargetVision/storage:/storage
+      # Seed dir: each subdirectory becomes a bucket on boot.
+      - ./scripts/fake-gcs/seed:/data
+
+volumes:
+  postgres-data:

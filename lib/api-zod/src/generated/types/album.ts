@@ -20,6 +20,8 @@ export interface Album {
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
+  /** @nullable */
+  coverPhotoThumbnailKey?: string | null;
   photoCount: number;
   ratedCount?: number;
   hiddenCount?: number;

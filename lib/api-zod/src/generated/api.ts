@@ -20,7 +20,7 @@ export const HealthCheckResponse = zod.object({
  */
 export const GetMeResponse = zod.object({
   id: zod.number(),
-  clerkId: zod.string(),
+  authUserId: zod.string(),
   name: zod.string(),
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
@@ -32,7 +32,7 @@ export const GetMeResponse = zod.object({
  */
 export const ListUsersResponseItem = zod.object({
   id: zod.number(),
-  clerkId: zod.string(),
+  authUserId: zod.string(),
   name: zod.string(),
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
@@ -53,7 +53,7 @@ export const UpdateUserRoleBody = zod.object({
 
 export const UpdateUserRoleResponse = zod.object({
   id: zod.number(),
-  clerkId: zod.string(),
+  authUserId: zod.string(),
   name: zod.string(),
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
@@ -72,6 +72,7 @@ export const ListAlbumsResponseItem = zod.object({
   eventDate: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
@@ -105,6 +106,7 @@ export const GetAlbumResponse = zod.object({
   eventDate: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
@@ -133,6 +135,7 @@ export const UpdateAlbumResponse = zod.object({
   eventDate: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
@@ -159,7 +162,10 @@ export const GetAlbumTopRatedResponseItem = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -176,6 +182,8 @@ export const GetAlbumTopRatedResponseItem = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -198,10 +206,19 @@ export const GetAlbumTopRatedResponseItem = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -230,6 +247,7 @@ export const SetAlbumCoverResponse = zod.object({
   eventDate: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
@@ -245,64 +263,87 @@ export const ListAlbumPhotosParams = zod.object({
 
 export const ListAlbumPhotosQueryParams = zod.object({
   includeHidden: zod.coerce.boolean().optional(),
+  limit: zod.coerce.number().optional(),
+  offset: zod.coerce.number().optional(),
+  inCollection: zod.coerce.boolean().optional(),
+  hasRating: zod.coerce.boolean().optional(),
+  aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
 });
 
-export const ListAlbumPhotosResponseItem = zod.object({
-  id: zod.number(),
-  albumId: zod.number(),
-  albumTitle: zod.string().nullish(),
-  uploaderId: zod.number(),
-  storageKey: zod.string().nullish(),
-  url: zod.string(),
-  takenAt: zod.string().nullish(),
-  createdAt: zod.coerce.date(),
-  isHidden: zod.boolean(),
-  averageRating: zod.number().nullish(),
-  ratingCount: zod.number(),
-  myRating: zod.number().nullish(),
-  photoCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-        description: zod.string().nullish(),
-        createdById: zod.number(),
-        photoCount: zod.number(),
-        coverPhotoId: zod.number().nullish(),
-        coverPhotoUrl: zod.string().nullish(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
-  aiDescription: zod.string().nullish(),
-  latestAiStatus: zod
-    .union([
-      zod.literal("success"),
-      zod.literal("skipped"),
-      zod.literal("failed"),
-      zod.literal(null),
-    ])
-    .nullish()
-    .describe("Status of the most recent AI analysis event for this photo"),
-  suggestedCollections: zod
-    .array(
-      zod.object({
-        id: zod.number(),
-        title: zod.string(),
-      }),
-    )
-    .optional(),
-  ratings: zod
-    .array(
-      zod.object({
-        userId: zod.number(),
-        score: zod.number(),
-        createdAt: zod.coerce.date(),
-      }),
-    )
-    .optional(),
+export const ListAlbumPhotosResponse = zod.object({
+  photos: zod.array(
+    zod.object({
+      id: zod.number(),
+      albumId: zod.number(),
+      albumTitle: zod.string().nullish(),
+      uploaderId: zod.number(),
+      storageKey: zod.string().nullish(),
+      thumbnailKey: zod.string().nullish(),
+      url: zod.string(),
+      filename: zod.string().nullish(),
+      filesize: zod.number().nullish(),
+      takenAt: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      isHidden: zod.boolean(),
+      averageRating: zod.number().nullish(),
+      ratingCount: zod.number(),
+      myRating: zod.number().nullish(),
+      photoCollections: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            title: zod.string(),
+            description: zod.string().nullish(),
+            createdById: zod.number(),
+            photoCount: zod.number(),
+            coverPhotoId: zod.number().nullish(),
+            coverPhotoUrl: zod.string().nullish(),
+            coverPhotoThumbnailKey: zod.string().nullish(),
+            tags: zod.array(zod.string()).optional(),
+            createdAt: zod.coerce.date(),
+          }),
+        )
+        .optional(),
+      aiDescription: zod.string().nullish(),
+      latestAiStatus: zod
+        .union([
+          zod.literal("success"),
+          zod.literal("skipped"),
+          zod.literal("failed"),
+          zod.literal(null),
+        ])
+        .nullish()
+        .describe("Status of the most recent AI analysis event for this photo"),
+      suggestedCollections: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            title: zod.string(),
+          }),
+        )
+        .optional(),
+      suggestedNewCollections: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            suggestedName: zod.string(),
+          }),
+        )
+        .optional(),
+      ratings: zod
+        .array(
+          zod.object({
+            userId: zod.number(),
+            userName: zod.string().nullish(),
+            score: zod.number(),
+            createdAt: zod.coerce.date(),
+          }),
+        )
+        .optional(),
+    }),
+  ),
+  hasMore: zod.boolean(),
 });
-export const ListAlbumPhotosResponse = zod.array(ListAlbumPhotosResponseItem);
 
 /**
  * @summary Add a photo to an album (URL-based)
@@ -316,6 +357,8 @@ export const UploadPhotoBody = zod.object({
   storageKey: zod.string().optional(),
   takenAt: zod.string().optional(),
   contentType: zod.string().optional(),
+  filename: zod.string().optional(),
+  filesize: zod.number().optional(),
 });
 
 /**
@@ -337,7 +380,10 @@ export const SearchPhotosResponseItem = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -354,6 +400,8 @@ export const SearchPhotosResponseItem = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -376,10 +424,19 @@ export const SearchPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -402,6 +459,7 @@ export const ListPhotosQueryParams = zod.object({
   uploaderId: zod.coerce.number().optional(),
   includeHidden: zod.coerce.boolean().optional(),
   albumId: zod.coerce.number().optional(),
+  aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
 });
 
 export const ListPhotosResponseItem = zod.object({
@@ -410,7 +468,10 @@ export const ListPhotosResponseItem = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -427,6 +488,8 @@ export const ListPhotosResponseItem = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -449,10 +512,19 @@ export const ListPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -499,7 +571,10 @@ export const GetPhotoResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -516,6 +591,8 @@ export const GetPhotoResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -538,10 +615,19 @@ export const GetPhotoResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -568,7 +654,10 @@ export const UpdatePhotoResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -585,6 +674,8 @@ export const UpdatePhotoResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -607,10 +698,19 @@ export const UpdatePhotoResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -642,7 +742,10 @@ export const AddPhotoTagResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -659,6 +762,8 @@ export const AddPhotoTagResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -681,10 +786,19 @@ export const AddPhotoTagResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -706,7 +820,10 @@ export const RemovePhotoTagResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -723,6 +840,8 @@ export const RemovePhotoTagResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -745,10 +864,19 @@ export const RemovePhotoTagResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -773,7 +901,10 @@ export const AddPhotoCategoryResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -790,6 +921,8 @@ export const AddPhotoCategoryResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -812,10 +945,19 @@ export const AddPhotoCategoryResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -837,7 +979,10 @@ export const RemovePhotoCategoryResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -854,6 +999,8 @@ export const RemovePhotoCategoryResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -876,10 +1023,19 @@ export const RemovePhotoCategoryResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -906,7 +1062,10 @@ export const RatePhotoResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -923,6 +1082,8 @@ export const RatePhotoResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -945,10 +1106,19 @@ export const RatePhotoResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -969,7 +1139,10 @@ export const ClearPhotoRatingResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -986,6 +1159,8 @@ export const ClearPhotoRatingResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1008,10 +1183,19 @@ export const ClearPhotoRatingResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1381,6 +1565,7 @@ export const GetDashboardStatsResponse = zod.object({
   totalPhotos: zod.number(),
   totalUsers: zod.number(),
   totalTags: zod.number(),
+  totalCollections: zod.number(),
   recentActivity: zod.array(
     zod.object({
       id: zod.number(),
@@ -1388,7 +1573,10 @@ export const GetDashboardStatsResponse = zod.object({
       albumTitle: zod.string().nullish(),
       uploaderId: zod.number(),
       storageKey: zod.string().nullish(),
+      thumbnailKey: zod.string().nullish(),
       url: zod.string(),
+      filename: zod.string().nullish(),
+      filesize: zod.number().nullish(),
       takenAt: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       isHidden: zod.boolean(),
@@ -1405,6 +1593,8 @@ export const GetDashboardStatsResponse = zod.object({
             photoCount: zod.number(),
             coverPhotoId: zod.number().nullish(),
             coverPhotoUrl: zod.string().nullish(),
+            coverPhotoThumbnailKey: zod.string().nullish(),
+            tags: zod.array(zod.string()).optional(),
             createdAt: zod.coerce.date(),
           }),
         )
@@ -1427,10 +1617,19 @@ export const GetDashboardStatsResponse = zod.object({
           }),
         )
         .optional(),
+      suggestedNewCollections: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            suggestedName: zod.string(),
+          }),
+        )
+        .optional(),
       ratings: zod
         .array(
           zod.object({
             userId: zod.number(),
+            userName: zod.string().nullish(),
             score: zod.number(),
             createdAt: zod.coerce.date(),
           }),
@@ -1449,7 +1648,10 @@ export const GetRecentPhotosResponseItem = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1466,6 +1668,8 @@ export const GetRecentPhotosResponseItem = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1488,10 +1692,19 @@ export const GetRecentPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1509,7 +1722,10 @@ export const GetTopRatedPhotosResponseItem = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1526,6 +1742,8 @@ export const GetTopRatedPhotosResponseItem = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1548,10 +1766,19 @@ export const GetTopRatedPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1579,7 +1806,11 @@ export const RequestUploadUrlBody = zod.object({
 });
 
 export const RequestUploadUrlResponse = zod.object({
-  uploadURL: zod.string().url().describe("Presigned GCS URL for PUT upload."),
+  uploadURL: zod
+    .string()
+    .describe(
+      "Presigned URL for PUT upload. Absolute in production; may be a relative proxy path (e.g. `\/gcs\/...`) in local dev.",
+    ),
   objectPath: zod
     .string()
     .describe(
@@ -1608,6 +1839,8 @@ export const ListCollectionsResponseItem = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
+  tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
 });
 export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem);
@@ -1637,6 +1870,7 @@ export const GetCollectionResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   aiKeywords: zod.string().nullish(),
+  tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
     .array(
@@ -1646,7 +1880,10 @@ export const GetCollectionResponse = zod.object({
         albumTitle: zod.string().nullish(),
         uploaderId: zod.number(),
         storageKey: zod.string().nullish(),
+        thumbnailKey: zod.string().nullish(),
         url: zod.string(),
+        filename: zod.string().nullish(),
+        filesize: zod.number().nullish(),
         takenAt: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         isHidden: zod.boolean(),
@@ -1663,6 +1900,8 @@ export const GetCollectionResponse = zod.object({
               photoCount: zod.number(),
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
+              coverPhotoThumbnailKey: zod.string().nullish(),
+              tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -1687,10 +1926,19 @@ export const GetCollectionResponse = zod.object({
             }),
           )
           .optional(),
+        suggestedNewCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              suggestedName: zod.string(),
+            }),
+          )
+          .optional(),
         ratings: zod
           .array(
             zod.object({
               userId: zod.number(),
+              userName: zod.string().nullish(),
               score: zod.number(),
               createdAt: zod.coerce.date(),
             }),
@@ -1724,6 +1972,7 @@ export const UpdateCollectionResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   aiKeywords: zod.string().nullish(),
+  tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
     .array(
@@ -1733,7 +1982,10 @@ export const UpdateCollectionResponse = zod.object({
         albumTitle: zod.string().nullish(),
         uploaderId: zod.number(),
         storageKey: zod.string().nullish(),
+        thumbnailKey: zod.string().nullish(),
         url: zod.string(),
+        filename: zod.string().nullish(),
+        filesize: zod.number().nullish(),
         takenAt: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         isHidden: zod.boolean(),
@@ -1750,6 +2002,8 @@ export const UpdateCollectionResponse = zod.object({
               photoCount: zod.number(),
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
+              coverPhotoThumbnailKey: zod.string().nullish(),
+              tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -1774,10 +2028,19 @@ export const UpdateCollectionResponse = zod.object({
             }),
           )
           .optional(),
+        suggestedNewCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              suggestedName: zod.string(),
+            }),
+          )
+          .optional(),
         ratings: zod
           .array(
             zod.object({
               userId: zod.number(),
+              userName: zod.string().nullish(),
               score: zod.number(),
               createdAt: zod.coerce.date(),
             }),
@@ -1834,6 +2097,7 @@ export const SetCollectionCoverResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   aiKeywords: zod.string().nullish(),
+  tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
     .array(
@@ -1843,7 +2107,10 @@ export const SetCollectionCoverResponse = zod.object({
         albumTitle: zod.string().nullish(),
         uploaderId: zod.number(),
         storageKey: zod.string().nullish(),
+        thumbnailKey: zod.string().nullish(),
         url: zod.string(),
+        filename: zod.string().nullish(),
+        filesize: zod.number().nullish(),
         takenAt: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         isHidden: zod.boolean(),
@@ -1860,6 +2127,8 @@ export const SetCollectionCoverResponse = zod.object({
               photoCount: zod.number(),
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
+              coverPhotoThumbnailKey: zod.string().nullish(),
+              tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -1884,10 +2153,19 @@ export const SetCollectionCoverResponse = zod.object({
             }),
           )
           .optional(),
+        suggestedNewCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              suggestedName: zod.string(),
+            }),
+          )
+          .optional(),
         ratings: zod
           .array(
             zod.object({
               userId: zod.number(),
+              userName: zod.string().nullish(),
               score: zod.number(),
               createdAt: zod.coerce.date(),
             }),
@@ -1919,7 +2197,10 @@ export const AcceptPhotoSuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1936,6 +2217,8 @@ export const AcceptPhotoSuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1958,10 +2241,19 @@ export const AcceptPhotoSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -1983,7 +2275,10 @@ export const DismissPhotoSuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2000,6 +2295,8 @@ export const DismissPhotoSuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2022,10 +2319,19 @@ export const DismissPhotoSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2047,7 +2353,10 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2064,6 +2373,8 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2086,10 +2397,19 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2111,7 +2431,10 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2128,6 +2451,8 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2150,10 +2475,19 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2175,7 +2509,10 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2192,6 +2529,8 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2214,10 +2553,19 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2239,7 +2587,10 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2256,6 +2607,8 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2278,10 +2631,19 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2307,7 +2669,10 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2324,6 +2689,8 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2346,10 +2713,19 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),
@@ -2371,7 +2747,10 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
   albumTitle: zod.string().nullish(),
   uploaderId: zod.number(),
   storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
   url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2388,6 +2767,8 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
         photoCount: zod.number(),
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2410,10 +2791,19 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
   ratings: zod
     .array(
       zod.object({
         userId: zod.number(),
+        userName: zod.string().nullish(),
         score: zod.number(),
         createdAt: zod.coerce.date(),
       }),

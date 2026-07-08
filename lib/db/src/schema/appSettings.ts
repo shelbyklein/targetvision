@@ -8,6 +8,9 @@ export const appSettingsTable = pgTable("app_settings", {
   aiEnabled: boolean("ai_enabled").notNull().default(true),
   activeProvider: text("active_provider").notNull().default("openai"),
 
+  aiAutoBackfillEnabled: boolean("ai_auto_backfill_enabled").notNull().default(false),
+  aiAutoBackfillBatchSize: integer("ai_auto_backfill_batch_size").notNull().default(10),
+
   openaiKeyCiphertext: text("openai_key_ciphertext"),
   openaiKeyIv: text("openai_key_iv"),
   openaiKeyTag: text("openai_key_tag"),

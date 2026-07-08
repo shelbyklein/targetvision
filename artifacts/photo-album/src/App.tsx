@@ -1,131 +1,35 @@
 import React, { useEffect, useRef } from "react";
 import { BulkUploadProvider } from "@/contexts/BulkUploadContext";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
-import { publishableKeyFromHost } from "@clerk/react/internal";
-import { shadcn } from "@clerk/themes";
-import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
+import { useSession } from "@/lib/auth-client";
+import { AuthGate } from "@/components/auth/AuthGate";
+import SignInPage from "@/pages/sign-in";
+import SignUpPage from "@/pages/sign-up";
 import { useGetRegistrationSettings } from "@workspace/api-client-react";
 
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
-
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-function stripBase(path: string): string {
-  return basePath && path.startsWith(basePath)
-    ? path.slice(basePath.length) || "/"
-    : path;
-}
-
-const clerkAppearance = {
-  theme: shadcn,
-  cssLayerName: "clerk",
-  options: {
-    logoPlacement: "inside" as const,
-    logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/target-vision.svg`,
-    socialButtonsVariant: "blockButton" as const,
-  },
-  variables: {
-    colorPrimary: "hsl(216, 54%, 24%)",
-    colorForeground: "hsl(216, 14%, 15%)",
-    colorMutedForeground: "hsl(216, 10%, 45%)",
-    colorDanger: "hsl(354, 69%, 39%)",
-    colorBackground: "hsl(216, 20%, 97%)",
-    colorInput: "hsl(216, 12%, 88%)",
-    colorInputForeground: "hsl(216, 14%, 15%)",
-    colorNeutral: "hsl(216, 12%, 88%)",
-    fontFamily: "Inter, sans-serif",
-    borderRadius: "0.5rem",
-  },
-  elements: {
-    rootBox: "w-full flex justify-center",
-    cardBox: "bg-card rounded-2xl w-[440px] max-w-full overflow-hidden shadow-md border border-border",
-    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-foreground font-semibold",
-    headerSubtitle: "text-muted-foreground",
-    socialButtonsBlockButtonText: "text-foreground font-medium",
-    formFieldLabel: "text-foreground text-sm font-medium",
-    footerActionLink: "text-primary hover:text-primary/80 font-medium",
-    footerActionText: "text-muted-foreground",
-    dividerText: "text-muted-foreground",
-    identityPreviewEditButton: "text-primary",
-    formFieldSuccessText: "text-green-600",
-    alertText: "text-foreground",
-    logoBox: "flex justify-center mb-2",
-    logoImage: "h-10 w-auto",
-    socialButtonsBlockButton: "border border-border bg-background hover:bg-accent transition-colors",
-    formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90 font-medium",
-    formFieldInput: "border border-input bg-background text-foreground focus:ring-ring",
-    header: "!pb-0 !mb-4",
-    footerAction: "bg-transparent !pt-4",
-    dividerLine: "bg-border",
-    alert: "border border-border bg-accent/20 rounded-md",
-    otpCodeFieldInput: "border border-input bg-background text-foreground text-center",
-    formFieldRow: "gap-3",
-    main: "!gap-5",
-  },
-};
-
-function ClerkQueryClientCacheInvalidator() {
-  const { addListener } = useClerk();
+// Clears the React Query cache whenever the signed-in user changes,
+// so no data leaks between accounts.
+function SessionQueryClientCacheInvalidator() {
+  const { data: session, isPending } = useSession();
   const qc = useQueryClient();
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    const unsubscribe = addListener(({ user }) => {
-      const userId = user?.id ?? null;
-      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
-        qc.clear();
-      }
-      prevUserIdRef.current = userId;
-    });
-    return unsubscribe;
-  }, [addListener, qc]);
+    if (isPending) return;
+    const userId = session?.user.id ?? null;
+    if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+      qc.clear();
+    }
+    prevUserIdRef.current = userId;
+  }, [session, isPending, qc]);
 
   return null;
-}
-
-function PoweredByUSAA() {
-  return (
-    <div className="flex items-center justify-center gap-2 mt-5">
-      <span className="text-xs text-muted-foreground/70">a</span>
-      <a
-        href="https://www.usarchery.org"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center"
-      >
-        <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-      </a>
-      <span className="text-xs text-muted-foreground/70">product</span>
-    </div>
-  );
-}
-
-function SignInPage() {
-  return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
-      <PoweredByUSAA />
-    </div>
-  );
-}
-
-function SignUpPage() {
-  return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
-      <PoweredByUSAA />
-    </div>
-  );
 }
 
 function SignUpGuard() {
@@ -152,223 +56,199 @@ function LazyPage({ load }: { load: () => Promise<{ default: React.ComponentType
   return <Component />;
 }
 
-function ClerkProviderWithRoutes() {
-  const [, setLocation] = useLocation();
-
+function AppRoutes() {
   return (
-    <ClerkProvider
-      publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
-      appearance={clerkAppearance}
-      signInUrl={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
-      localization={{
-        signIn: {
-          start: {
-            title: "Welcome back to Target Vision",
-            subtitle: "Sign in to start picking photos for marketing",
-          },
-        },
-        signUp: {
-          start: {
-            title: "Join Target Vision",
-            subtitle: "Create an account to help choose USA Archery's marketing photos",
-          },
-        },
-      }}
-      routerPush={(to) => setLocation(stripBase(to))}
-      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
-    >
-      <QueryClientProvider client={queryClient}>
-        <BulkUploadProvider>
-        <ClerkQueryClientCacheInvalidator />
-        <Switch>
-          <Route path="/">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <Redirect to="/dashboard" />
-                </Show>
-                <Show when="signed-out">
-                  <LazyPage load={() => import("@/pages/home")} />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/dashboard">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/dashboard")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/albums">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/albums")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/albums/:id">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/album-detail")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/bulk-upload">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/bulk-upload")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/photos/:id">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/photo-detail")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/photos">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/photos")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/admin">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/admin")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/settings">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/settings")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/search">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/search")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/collections">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/collections")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/collections/:id">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/collection-detail")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/smart-collections">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/smart-collections")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/smart-collections/:id">
-            {() => (
-              <>
-                <Show when="signed-in">
-                  <LazyPage load={() => import("@/pages/smart-collection-detail")} />
-                </Show>
-                <Show when="signed-out">
-                  <Redirect to="/sign-in" />
-                </Show>
-              </>
-            )}
-          </Route>
-          <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpGuard} />
-          <Route>
-            <LazyPage load={() => import("@/pages/not-found")} />
-          </Route>
-        </Switch>
-        <Toaster />
-        </BulkUploadProvider>
-      </QueryClientProvider>
-    </ClerkProvider>
+    <QueryClientProvider client={queryClient}>
+      <BulkUploadProvider>
+      <SessionQueryClientCacheInvalidator />
+      <Switch>
+        <Route path="/">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <Redirect to="/dashboard" />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <LazyPage load={() => import("@/pages/home")} />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/dashboard">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/dashboard")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/albums">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/albums")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/albums/:id">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/album-detail")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/bulk-upload">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/bulk-upload")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/photos/:id">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/photo-detail")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/photos">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/photos")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/admin">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/admin")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/settings">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/settings")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/search">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/search")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/collections">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/collections")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/collections/:id">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/collection-detail")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/smart-collections">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/smart-collections")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/smart-collections/:id">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/smart-collection-detail")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/sign-in" component={SignInPage} />
+        <Route path="/sign-up" component={SignUpGuard} />
+        <Route>
+          <LazyPage load={() => import("@/pages/not-found")} />
+        </Route>
+      </Switch>
+      <Toaster />
+      </BulkUploadProvider>
+    </QueryClientProvider>
   );
 }
 
 function App() {
   return (
-    <WouterRouter base={basePath}>
-      <ClerkProviderWithRoutes />
-    </WouterRouter>
+    <ThemeProvider>
+      <WouterRouter base={basePath}>
+        <AppRoutes />
+      </WouterRouter>
+    </ThemeProvider>
   );
 }
 

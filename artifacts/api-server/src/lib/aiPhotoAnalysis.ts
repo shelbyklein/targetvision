@@ -8,12 +8,22 @@ import {
   aiAnalysisEventsTable,
   type AiAnalysisEvent,
 } from "@workspace/db";
+import sharp from "sharp";
 import { logger } from "./logger";
 import { ObjectStorageService } from "./objectStorage";
 import { getActiveProvider } from "./aiProviders";
 import type { ProviderId } from "./aiProviders";
+import { createLimiter } from "./concurrencyLimit";
 
 const storageService = new ObjectStorageService();
+
+// Bound concurrent analyses: each one holds an image in memory while a slow
+// provider call is in flight, and uploads fire these off without awaiting.
+const analysisLimiter = createLimiter(2);
+
+// Providers downscale large images anyway; resizing before base64-encoding
+// cuts per-job heap usage from tens of MB (full-res photo) to ~1MB.
+const AI_IMAGE_MAX_DIM = 1568;
 
 interface ResolvedImage {
   dataUrl: string;
@@ -30,10 +40,30 @@ async function resolveImageForAI(
       const [metadata] = await file.getMetadata();
       const [buffer] = await file.download();
       const contentType = (metadata.contentType as string) || "image/jpeg";
-      return {
-        dataUrl: `data:${contentType};base64,${buffer.toString("base64")}`,
-        contentType,
-      };
+      try {
+        const resized = await sharp(buffer)
+          .resize({
+            width: AI_IMAGE_MAX_DIM,
+            height: AI_IMAGE_MAX_DIM,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        return {
+          dataUrl: `data:image/jpeg;base64,${resized.toString("base64")}`,
+          contentType: "image/jpeg",
+        };
+      } catch (resizeErr) {
+        logger.warn(
+          { err: resizeErr, storageKey },
+          "Could not downscale image for AI analysis, sending original",
+        );
+        return {
+          dataUrl: `data:${contentType};base64,${buffer.toString("base64")}`,
+          contentType,
+        };
+      }
     } catch (err) {
       logger.warn(
         { err, storageKey },
@@ -151,7 +181,13 @@ export async function analyzePhoto(
  * Used by the upload flow and by the admin "Retry" action on failed events.
  * Returns the inserted event row, or null if the photo is missing.
  */
-export async function runAndRecordPhotoAnalysis(
+export function runAndRecordPhotoAnalysis(
+  photoId: number,
+): Promise<AiAnalysisEvent | null> {
+  return analysisLimiter(() => runAndRecordPhotoAnalysisUnbounded(photoId));
+}
+
+async function runAndRecordPhotoAnalysisUnbounded(
   photoId: number,
 ): Promise<AiAnalysisEvent | null> {
   const [photo] = await db

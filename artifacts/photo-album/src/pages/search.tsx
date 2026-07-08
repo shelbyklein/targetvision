@@ -5,6 +5,8 @@ import {
   useSearchPhotos,
   useListUsers,
   useGetMe,
+  getListUsersQueryKey,
+  getSearchPhotosQueryKey,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
@@ -93,7 +95,7 @@ export default function SearchPage() {
   const [showHidden, setShowHidden] = useState(false);
 
   const { data: me } = useGetMe();
-  const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
+  const { data: users } = useListUsers({ query: { enabled: me?.role === "admin", queryKey: getListUsersQueryKey() } });
 
   const hasActiveFilters =
     !!ratingMin || !!ratingMax || !!dateFrom || !!dateTo || !!uploaderId;
@@ -109,7 +111,7 @@ export default function SearchPage() {
   };
 
   const { data: results, isLoading, isFetching } = useSearchPhotos(searchParams, {
-    query: { enabled: !!q },
+    query: { enabled: !!q, queryKey: getSearchPhotosQueryKey(searchParams) },
   });
 
   function navigate(next: Partial<ReturnType<typeof parseSearch>>) {
@@ -370,11 +372,11 @@ export default function SearchPage() {
 
         {q && (isLoading || isFetching) && (
           <div
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
+            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
             data-testid="search-loading"
           >
             {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-lg" />
+              <Skeleton key={i} className="aspect-square rounded-lg mb-3 break-inside-avoid" />
             ))}
           </div>
         )}
@@ -406,7 +408,7 @@ export default function SearchPage() {
               </div>
             ) : (
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
+                className="columns-2 sm:columns-3 lg:columns-4 gap-3"
                 data-testid="search-results"
               >
                 {results.map((photo) => (
@@ -416,13 +418,14 @@ export default function SearchPage() {
                     data-testid="search-result-item"
                   >
                     <div className={cn(
-                      "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
+                      "group relative mb-3 break-inside-avoid rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
                       photo.isHidden && "opacity-60"
                     )}>
                       <FadeImage
+                        fit="contain"
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
                         {photo.albumTitle && (

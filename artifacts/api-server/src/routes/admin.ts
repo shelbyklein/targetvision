@@ -2,7 +2,6 @@ import { Router, type IRouter } from "express";
 import { eq, desc, isNull, isNotNull, and } from "drizzle-orm";
 import {
   db,
-  pool,
   appSettingsTable,
   APP_SETTINGS_SINGLETON_ID,
   aiAnalysisEventsTable,
@@ -28,6 +27,13 @@ import {
   BackfillThumbnailsStatusResponse,
   BackfillExifDatesStatusResponse,
   BackfillExifDatesResponse,
+  BackfillAiAnalysisStatusResponse,
+  BackfillAiAnalysisBody,
+  BackfillAiAnalysisResponse,
+  ListAiBackfillRunsResponse,
+  GetAiAutoBackfillSettingsResponse,
+  UpdateAiAutoBackfillSettingsBody,
+  UpdateAiAutoBackfillSettingsResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -41,9 +47,15 @@ import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDateBackfill";
+import { countPhotosNeedingAiAnalysis, backfillAiAnalysis, listAiBackfillRuns } from "../lib/aiAnalysisBackfill";
+import { getAiAutoBackfillSettings, updateAiAutoBackfillSettings } from "../lib/aiAutoBackfillScheduler";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+function resolvePhotoThumbnailUrl(row: { url: string | null; thumbnailKey: string | null }): string | null {
+  return row.thumbnailKey ? `/api/storage${row.thumbnailKey}` : row.url;
+}
 
 router.get("/registration-settings", async (_req, res): Promise<void> => {
   const settings = await loadAppSettings();
@@ -220,7 +232,8 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
       status: aiAnalysisEventsTable.status,
       errorMessage: aiAnalysisEventsTable.errorMessage,
       createdAt: aiAnalysisEventsTable.createdAt,
-      photoThumbnailUrl: photosTable.url,
+      url: photosTable.url,
+      thumbnailKey: photosTable.thumbnailKey,
     })
     .from(aiAnalysisEventsTable)
     .leftJoin(photosTable, eq(photosTable.id, aiAnalysisEventsTable.photoId))
@@ -233,7 +246,7 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
         id: r.id,
         photoId: r.photoId,
         photoCaption: null,
-        photoThumbnailUrl: r.photoThumbnailUrl,
+        photoThumbnailUrl: resolvePhotoThumbnailUrl(r),
         provider: r.provider,
         status: r.status,
         errorMessage: r.errorMessage,
@@ -328,7 +341,8 @@ router.post(
         status: aiAnalysisEventsTable.status,
         errorMessage: aiAnalysisEventsTable.errorMessage,
         createdAt: aiAnalysisEventsTable.createdAt,
-        photoThumbnailUrl: photosTable.url,
+        url: photosTable.url,
+        thumbnailKey: photosTable.thumbnailKey,
       })
       .from(aiAnalysisEventsTable)
       .leftJoin(photosTable, eq(photosTable.id, aiAnalysisEventsTable.photoId))
@@ -339,7 +353,7 @@ router.post(
         id: row.id,
         photoId: row.photoId,
         photoCaption: null,
-        photoThumbnailUrl: row.photoThumbnailUrl,
+        photoThumbnailUrl: resolvePhotoThumbnailUrl(row),
         provider: row.provider,
         status: row.status,
         errorMessage: row.errorMessage,
@@ -400,28 +414,43 @@ router.post("/admin/photos/exif-date-backfill", requireAdmin, async (_req, res):
   res.json(BackfillExifDatesResponse.parse(result));
 });
 
-router.post("/migrate/add-collection-cover-photo", async (req, res): Promise<void> => {
-  const secret = process.env.BOOTSTRAP_ADMIN_SECRET;
-  if (!secret || req.headers["x-bootstrap-secret"] !== secret) {
-    res.status(403).json({ error: "forbidden" });
+router.get("/admin/ai-analysis/backfill-status", requireAdmin, async (_req, res): Promise<void> => {
+  const missingCount = await countPhotosNeedingAiAnalysis();
+  res.json(BackfillAiAnalysisStatusResponse.parse({ missingCount }));
+});
+
+router.post("/admin/ai-analysis/backfill", requireAdmin, async (req, res): Promise<void> => {
+  const body = BackfillAiAnalysisBody.safeParse(req.body ?? {});
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
     return;
   }
-  try {
-    await pool.query(`
-      ALTER TABLE collections
-      ADD COLUMN IF NOT EXISTS cover_photo_id integer REFERENCES photos(id) ON DELETE SET NULL
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS collection_tags (
-        collection_id integer NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
-        tag_id integer NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-        PRIMARY KEY (collection_id, tag_id)
-      )
-    `);
-    res.json({ ok: true, message: "cover_photo_id and collection_tags applied" });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  const result = await backfillAiAnalysis(body.data.limit, "manual");
+  res.json(BackfillAiAnalysisResponse.parse(result));
+});
+
+router.get("/admin/ai-analysis/backfill-runs", requireAdmin, async (_req, res): Promise<void> => {
+  const runs = await listAiBackfillRuns();
+  res.json(
+    ListAiBackfillRunsResponse.parse(
+      runs.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })),
+    ),
+  );
+});
+
+router.get("/admin/ai-analysis/auto-backfill-settings", requireAdmin, async (_req, res): Promise<void> => {
+  const settings = await getAiAutoBackfillSettings();
+  res.json(GetAiAutoBackfillSettingsResponse.parse(settings));
+});
+
+router.patch("/admin/ai-analysis/auto-backfill-settings", requireAdmin, async (req, res): Promise<void> => {
+  const body = UpdateAiAutoBackfillSettingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
   }
+  const settings = await updateAiAutoBackfillSettings(body.data);
+  res.json(UpdateAiAutoBackfillSettingsResponse.parse(settings));
 });
 
 export default router;

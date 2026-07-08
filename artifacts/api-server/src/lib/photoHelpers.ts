@@ -1,5 +1,29 @@
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable, aiAnalysisEventsTable } from "@workspace/db";
 import { eq, and, avg, count, desc } from "drizzle-orm";
+import { ObjectStorageService } from "./objectStorage";
+import { logger } from "./logger";
+
+const objectStorageService = new ObjectStorageService();
+
+/**
+ * Best-effort delete of a photo's original and thumbnail objects from storage.
+ * Failures are logged, not thrown — the DB row is the source of truth and is
+ * already gone by the time this runs.
+ */
+export async function deletePhotoStorageObjects(photo: {
+  id: number;
+  storageKey: string | null;
+  thumbnailKey: string | null;
+}): Promise<void> {
+  for (const key of [photo.storageKey, photo.thumbnailKey]) {
+    if (!key) continue;
+    try {
+      await objectStorageService.deleteObjectEntity(key);
+    } catch (err) {
+      logger.error({ err, photoId: photo.id, key }, "Failed to delete photo storage object");
+    }
+  }
+}
 
 export async function buildPhotoResponse(photoId: number, currentUserId?: number) {
   const [photo] = await db

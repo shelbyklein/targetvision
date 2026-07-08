@@ -8,6 +8,8 @@
 
 export interface PhotoRating {
   userId: number;
+  /** @nullable */
+  userName?: string | null;
   score: number;
   createdAt: Date;
 }

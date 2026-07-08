@@ -47,3 +47,12 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local env
+.env
+.env.local
+.kanbots/
+
+# Local machine/tooling state
+.claude/settings.local.json
+scripts/logs/

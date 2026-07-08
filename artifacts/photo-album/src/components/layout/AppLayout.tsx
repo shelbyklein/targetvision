@@ -1,9 +1,10 @@
 import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
-import { useUser, useClerk } from "@clerk/react";
+import { useSession, signOut } from "@/lib/auth-client";
 import { useGetMe } from "@workspace/api-client-react";
 import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -183,8 +184,9 @@ function MobileBottomNav({ location, isAdmin }: { location: string; isAdmin: boo
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const { data: session } = useSession();
+  const user = session?.user;
+  const firstName = user?.name?.split(" ")[0];
   const { data: me } = useGetMe();
   const bannerVisible = useBannerVisible();
   const isAdmin = me?.role === "admin";
@@ -240,22 +242,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1 sm:gap-3 shrink-0">
             <GlobalSearchBar />
 
+            <ThemeToggle />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="user-menu-trigger">
                   <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary shrink-0">
-                    {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? "?"}
+                    {firstName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "?"}
                   </div>
                   <span className="hidden sm:inline text-sm text-foreground max-w-[120px] truncate">
-                    {user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress ?? "Me"}
+                    {firstName ?? user?.email ?? "Me"}
                   </span>
                   <ChevronDown className="hidden sm:inline h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
                 <div className="px-3 py-2">
-                  <p className="text-sm font-medium text-foreground truncate">{user?.fullName ?? "Team Member"}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.emailAddresses?.[0]?.emailAddress}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{user?.name ?? "Team Member"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                   {me?.role && (
                     <span className={cn(
                       "mt-1 inline-block text-xs px-1.5 py-0.5 rounded font-medium",
@@ -275,7 +279,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive gap-2 cursor-pointer"
-                  onSelect={() => signOut({ redirectUrl: "/" })}
+                  onSelect={async () => {
+                    await signOut();
+                    // Full-page navigation so all client auth/query state resets.
+                    window.location.assign("/");
+                  }}
                   data-testid="sign-out-btn"
                 >
                   <LogOut className="h-4 w-4" />

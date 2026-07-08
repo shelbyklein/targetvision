@@ -92,9 +92,9 @@ function PhotoStrip({
 }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
+          <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
         ))}
       </div>
     );
@@ -103,19 +103,20 @@ function PhotoStrip({
     return <p className="text-sm text-muted-foreground py-4">No photos yet.</p>;
   }
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+    <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
       {photos.map((photo) => (
         <button
           key={photo.id}
           onClick={() => onPhotoClick(photo)}
-          className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          className="relative mb-3 break-inside-avoid w-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           data-testid="photo-strip-item"
           aria-label={`Preview ${photo.name ?? "photo"}`}
         >
           <FadeImage
+            fit="contain"
             src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
             alt={photo.name ?? "Photo"}
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+            className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
             {photo.averageRating != null && (

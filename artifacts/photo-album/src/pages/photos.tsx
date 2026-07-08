@@ -6,6 +6,7 @@ import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
   useListUsers,
+  getListUsersQueryKey,
   useListAlbums,
   useGetMe,
   useRerunPhotoAnalysis,
@@ -142,7 +143,7 @@ export default function PhotosPage() {
   }
 
   const { data: me } = useGetMe();
-  const { data: users } = useListUsers({ query: { enabled: me?.role === "admin" } });
+  const { data: users } = useListUsers({ query: { enabled: me?.role === "admin", queryKey: getListUsersQueryKey() } });
   const { data: albums } = useListAlbums();
 
   const apiParams = {
@@ -178,7 +179,7 @@ export default function PhotosPage() {
   function lightboxPhotoAt(idx: number): LightboxPhoto | null {
     if (!photos || idx < 0 || idx >= photos.length) return null;
     const p = photos[idx];
-    return { id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId: p.albumId };
+    return { id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.filename, averageRating: p.averageRating, albumId: p.albumId };
   }
 
   function handleLightboxPrev() {
@@ -526,15 +527,15 @@ export default function PhotosPage() {
         )}
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" data-testid="photos-loading">
+          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3" data-testid="photos-loading">
             {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-lg" />
+              <Skeleton key={i} className="aspect-square rounded-lg mb-3 break-inside-avoid" />
             ))}
           </div>
         ) : paginatedPhotos && paginatedPhotos.length > 0 ? (
           <>
             <div
-              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+              className="columns-2 sm:columns-3 lg:columns-4 gap-3"
               data-testid="photos-grid"
             >
               {paginatedPhotos.map((photo) => {
@@ -544,7 +545,7 @@ export default function PhotosPage() {
                   <div
                     key={photo.id}
                     className={cn(
-                      "group relative aspect-square rounded-lg overflow-hidden border bg-muted",
+                      "group relative mb-3 break-inside-avoid rounded-lg overflow-hidden border bg-muted",
                       isSelected ? "border-primary ring-2 ring-primary" : "border-border"
                     )}
                     data-testid="photo-grid-item"
@@ -561,7 +562,7 @@ export default function PhotosPage() {
                     )}
                     <button
                       type="button"
-                      className="block h-full w-full cursor-pointer"
+                      className="block w-full cursor-pointer"
                       onClick={() => {
                         if (isSelectMode) {
                           toggleSelection(photo.id);
@@ -570,7 +571,7 @@ export default function PhotosPage() {
                             id: photo.id,
                             url: photo.url,
                             thumbnailKey: photo.thumbnailKey,
-                            name: photo.name,
+                            name: photo.filename,
                             averageRating: photo.averageRating,
                             albumId: photo.albumId,
                           });
@@ -578,10 +579,11 @@ export default function PhotosPage() {
                       }}
                     >
                       <FadeImage
+                        fit="contain"
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
                         className={cn(
-                          "h-full w-full object-cover transition-transform duration-200 group-hover:scale-105",
+                          "w-full h-auto transition-transform duration-200 group-hover:scale-105",
                           photo.isHidden && "opacity-60"
                         )}
                         loading="lazy"

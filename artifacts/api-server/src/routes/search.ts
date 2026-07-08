@@ -11,6 +11,7 @@ import {
   photoCollectionsTable,
   aiAnalysisEventsTable,
 } from "@workspace/db";
+import { SearchPhotosResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
 
@@ -37,8 +38,10 @@ async function applyFiltersAndFetchIds(
 ): Promise<number[]> {
   let ids = baseIds;
 
-  if (filters.search) {
-    const pattern = `%${filters.search}%`;
+  const trimmedSearch = filters.search?.trim();
+  if (trimmedSearch) {
+    const pattern = `%${trimmedSearch}%`;
+    const words = trimmedSearch.split(/\s+/).filter(Boolean);
     const [byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
       db
         .select({ id: photosTable.id })
@@ -51,7 +54,7 @@ async function applyFiltersAndFetchIds(
         .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
         .where(ilike(usersTable.name, pattern)),
       db.select({ id: photosTable.id }).from(photosTable).where(
-        or(...filters.search.trim().split(/\s+/).filter(Boolean).map((word) => ilike(photosTable.aiDescription, `%${word}%`)))
+        or(...words.map((word) => ilike(photosTable.aiDescription, `%${word}%`)))
       ),
     ]);
     const searchIds = new Set([
@@ -192,7 +195,7 @@ async function applyFiltersAndFetchIds(
 router.get("/search", requireAuth, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!q) {
-    res.json([]);
+    res.json(SearchPhotosResponse.parse([]));
     return;
   }
 
@@ -202,7 +205,7 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
   const dateTo = typeof req.query.dateTo === "string" ? req.query.dateTo : undefined;
   const uploaderId = req.query.uploaderId ? parseInt(String(req.query.uploaderId), 10) : undefined;
   const includeHidden = req.query.includeHidden === "true";
-  const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
+  const canSeeHidden = req.dbUser!.role === "admin" && includeHidden;
 
   const pattern = `%${q}%`;
 
@@ -242,7 +245,7 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
   });
 
   const photos = await Promise.all(filtered.map((id) => buildPhotoResponse(id, req.dbUser?.id)));
-  res.json(photos.filter(Boolean));
+  res.json(SearchPhotosResponse.parse(photos.filter(Boolean)));
 });
 
 export { applyFiltersAndFetchIds };

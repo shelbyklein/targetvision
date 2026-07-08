@@ -209,9 +209,11 @@ export default function PhotoDetail() {
     name: string;
   } | null>(null);
 
-  const { data: albumPhotos } = useListAlbumPhotos(photo?.albumId ?? 0, {
-    query: { enabled: !!photo?.albumId },
-  });
+  const { data: albumPhotos } = useListAlbumPhotos(
+    photo?.albumId ?? 0,
+    undefined,
+    { query: { enabled: !!photo?.albumId, queryKey: getListAlbumPhotosQueryKey(photo?.albumId ?? 0, undefined) } },
+  );
 
   const albumPhotosList = albumPhotos?.photos ?? [];
   const currentIndex = albumPhotosList.length > 0 ? albumPhotosList.findIndex((p) => p.id === photoId) : -1;
@@ -542,7 +544,7 @@ export default function PhotoDetail() {
               </Button>
               {albumPhotos && currentIndex >= 0 && (
                 <span className="text-xs text-muted-foreground px-1 tabular-nums" data-testid="photo-position">
-                  {currentIndex + 1} / {albumPhotos.length}
+                  {currentIndex + 1} / {albumPhotosList.length}
                 </span>
               )}
               <Button

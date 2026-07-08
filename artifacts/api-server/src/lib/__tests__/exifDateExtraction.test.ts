@@ -77,6 +77,13 @@ vi.mock("../objectStorage", () => ({
       }),
     }),
   },
+  parseObjectPath: (path: string) => {
+    if (!path.startsWith("/")) path = `/${path}`;
+    const parts = path.split("/");
+    return { bucketName: parts[1], objectName: parts.slice(2).join("/") };
+  },
+  signObjectURL: () => Promise.resolve("https://storage.example.com/upload"),
+  getPrivateObjectDir: () => process.env.PRIVATE_OBJECT_DIR!,
 }));
 
 vi.mock("../logger", () => ({
@@ -96,13 +103,9 @@ import {
 } from "../thumbnailGeneration";
 
 function setupFetchForUpload() {
-  hoisted.mockFetch
-    .mockResolvedValueOnce({
-      ok: true,
-      json: () =>
-        Promise.resolve({ signed_url: "https://storage.example.com/upload" }),
-    })
-    .mockResolvedValueOnce({ ok: true });
+  // URL signing no longer goes through fetch (signObjectURL is mocked above);
+  // the only fetch left is the thumbnail PUT to the signed URL.
+  hoisted.mockFetch.mockResolvedValueOnce({ ok: true });
 }
 
 function setupDbClaim(takenAtAlreadySet: boolean) {

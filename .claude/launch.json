@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "export PATH=\"$HOME/.nvm/versions/node/v24.18.0/bin:$PATH\" && cd /Users/shelbyklein/Vibes/Targetvision/artifacts/photo-album && PORT=8081 BASE_PATH=/ ./node_modules/.bin/vite"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "export PATH=\"$HOME/.nvm/versions/node/v24.18.0/bin:$PATH\" && cd /Users/shelbyklein/Vibes/Targetvision && pnpm --filter @workspace/api-server run dev"
+      ],
+      "port": 8080
+    }
+  ]
+}

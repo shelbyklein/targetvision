@@ -5,9 +5,16 @@ import { requestSlot, type SlotHandle } from "@/lib/imageQueue";
 interface FadeImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
   alt: string;
+  /**
+   * "cover" (default): image absolutely fills a wrapper that gets its size
+   * from the caller (e.g. an aspect-ratio grid cell).
+   * "contain": image is laid out normally so it sizes itself intrinsically
+   * (e.g. a lightbox where the wrapper has no fixed dimensions of its own).
+   */
+  fit?: "cover" | "contain";
 }
 
-export function FadeImage({ src, alt, className, onLoad, ...props }: FadeImageProps) {
+export function FadeImage({ src, alt, className, onLoad, fit = "cover", ...props }: FadeImageProps) {
   const [activeSrc, setActiveSrc] = useState<string | undefined>();
   const [loaded, setLoaded] = useState(false);
   const slotRef = useRef<SlotHandle | null>(null);
@@ -25,6 +32,30 @@ export function FadeImage({ src, alt, className, onLoad, ...props }: FadeImagePr
     };
   }, [src]);
 
+  function handleLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    setLoaded(true);
+    slotRef.current?.complete();
+    onLoad?.(e);
+  }
+
+  function handleError() {
+    setLoaded(true);
+    slotRef.current?.complete();
+  }
+
+  if (fit === "contain") {
+    return (
+      <img
+        src={activeSrc}
+        alt={alt}
+        onLoad={handleLoad}
+        onError={handleError}
+        className={cn("transition-opacity duration-500", loaded ? "opacity-100" : "opacity-0", className)}
+        {...props}
+      />
+    );
+  }
+
   return (
     <div className={cn("relative overflow-hidden", className)}>
       <div
@@ -36,15 +67,8 @@ export function FadeImage({ src, alt, className, onLoad, ...props }: FadeImagePr
       <img
         src={activeSrc}
         alt={alt}
-        onLoad={(e) => {
-          setLoaded(true);
-          slotRef.current?.complete();
-          onLoad?.(e);
-        }}
-        onError={() => {
-          setLoaded(true);
-          slotRef.current?.complete();
-        }}
+        onLoad={handleLoad}
+        onError={handleError}
         className={cn(
           "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
           loaded ? "opacity-100" : "opacity-0",

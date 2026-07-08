@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { generateAndStoreThumbnail } from "./lib/thumbnailGeneration";
+import { startAiAutoBackfillScheduler } from "./lib/aiAutoBackfillScheduler";
 import { db, photosTable } from "@workspace/db";
 import { isNull, isNotNull, and, eq } from "drizzle-orm";
 
@@ -70,4 +71,5 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
 
   void backfillMissingThumbnails();
+  startAiAutoBackfillScheduler();
 });

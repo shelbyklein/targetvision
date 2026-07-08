@@ -13,6 +13,9 @@ import {
   AddPhotoToCollectionParams,
   AddPhotoToCollectionBody,
   RemovePhotoFromCollectionParams,
+  SetCollectionCoverParams,
+  SetCollectionCoverBody,
+  SetCollectionCoverResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotoResponse } from "../lib/photoHelpers";
@@ -229,6 +232,11 @@ router.post("/collections/:id/photos", requireAuth, async (req, res): Promise<vo
     return;
   }
 
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, body.data.photoId));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
@@ -261,6 +269,11 @@ router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res):
     return;
   }
 
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   await db
     .delete(photoCollectionsTable)
     .where(
@@ -282,19 +295,19 @@ router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res):
 
 router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(rawId, 10);
-  if (!Number.isInteger(id)) {
-    res.status(400).json({ error: "Invalid collection ID" });
+  const params = SetCollectionCoverParams.safeParse({ id: parseInt(rawId, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
     return;
   }
 
-  const photoId = typeof req.body?.photoId === "number" ? req.body.photoId : parseInt(req.body?.photoId, 10);
-  if (!Number.isInteger(photoId) || photoId <= 0) {
-    res.status(400).json({ error: "Invalid photoId" });
+  const body = SetCollectionCoverBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
     return;
   }
 
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, id));
+  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -305,16 +318,16 @@ router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, photoId));
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, body.data.photoId));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
   }
 
-  await db.update(collectionsTable).set({ coverPhotoId: photoId }).where(eq(collectionsTable.id, id));
+  await db.update(collectionsTable).set({ coverPhotoId: body.data.photoId }).where(eq(collectionsTable.id, params.data.id));
 
-  const full = await buildCollectionResponse(id);
-  res.json(full);
+  const full = await buildCollectionResponse(params.data.id);
+  res.json(SetCollectionCoverResponse.parse(full));
 });
 
 router.post("/collections/:id/generate-keywords", requireAuth, async (req, res): Promise<void> => {
@@ -336,8 +349,8 @@ router.post("/collections/:id/generate-keywords", requireAuth, async (req, res):
     return;
   }
 
-  const keywords = await generateCollectionKeywords(id, collection.title, collection.description);
-  res.json({ keywords });
+  await generateCollectionKeywords(id, collection.title, collection.description);
+  res.sendStatus(204);
 });
 
 export default router;

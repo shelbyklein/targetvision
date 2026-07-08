@@ -279,15 +279,39 @@ paths:
           required: false
           schema:
             type: boolean
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: inCollection
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: hasRating
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: aiStatus
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [has_description, failed, not_analysed]
       responses:
         "200":
-          description: List of photos in album
+          description: Page of photos in album
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Photo"
+                $ref: "#/components/schemas/ListAlbumPhotosPagedResponse"
     post:
       operationId: uploadPhoto
       tags: [photos]
@@ -425,6 +449,12 @@ paths:
           required: false
           schema:
             type: integer
+        - name: aiStatus
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["has_description", "failed", "not_analysed"]
       responses:
         "200":
           description: List of photos
@@ -1542,11 +1572,11 @@ components:
 
     User:
       type: object
-      required: [id, clerkId, name, email, role, createdAt]
+      required: [id, authUserId, name, email, role, createdAt]
       properties:
         id:
           type: integer
-        clerkId:
+        authUserId:
           type: string
         name:
           type: string
@@ -1586,6 +1616,8 @@ components:
         coverPhotoId:
           type: ["integer", "null"]
         coverPhotoUrl:
+          type: ["string", "null"]
+        coverPhotoThumbnailKey:
           type: ["string", "null"]
         photoCount:
           type: integer
@@ -1648,8 +1680,14 @@ components:
           type: integer
         storageKey:
           type: ["string", "null"]
+        thumbnailKey:
+          type: ["string", "null"]
         url:
           type: string
+        filename:
+          type: ["string", "null"]
+        filesize:
+          type: ["integer", "null"]
         takenAt:
           type: ["string", "null"]
         createdAt:
@@ -1677,10 +1715,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SuggestedCollection"
+        suggestedNewCollections:
+          type: array
+          items:
+            $ref: "#/components/schemas/SuggestedNewCollection"
         ratings:
           type: array
           items:
             $ref: "#/components/schemas/PhotoRating"
+
+    ListAlbumPhotosPagedResponse:
+      type: object
+      required: [photos, hasMore]
+      properties:
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Photo"
+        hasMore:
+          type: boolean
 
     PhotoRating:
       type: object
@@ -1688,6 +1741,8 @@ components:
       properties:
         userId:
           type: integer
+        userName:
+          type: ["string", "null"]
         score:
           type: integer
         createdAt:
@@ -1712,6 +1767,12 @@ components:
           type: ["integer", "null"]
         coverPhotoUrl:
           type: ["string", "null"]
+        coverPhotoThumbnailKey:
+          type: ["string", "null"]
+        tags:
+          type: array
+          items:
+            type: string
         createdAt:
           type: string
           format: date-time
@@ -1736,6 +1797,10 @@ components:
           type: ["string", "null"]
         aiKeywords:
           type: ["string", "null"]
+        tags:
+          type: array
+          items:
+            type: string
         createdAt:
           type: string
           format: date-time
@@ -1793,6 +1858,15 @@ components:
         title:
           type: string
 
+    SuggestedNewCollection:
+      type: object
+      required: [id, suggestedName]
+      properties:
+        id:
+          type: integer
+        suggestedName:
+          type: string
+
     SuggestedTag:
       type: object
       required: [name]
@@ -1822,6 +1896,10 @@ components:
           type: string
         contentType:
           type: string
+        filename:
+          type: string
+        filesize:
+          type: integer
 
     PhotoTagInput:
       type: object
@@ -1894,7 +1972,7 @@ components:
 
     DashboardStats:
       type: object
-      required: [totalAlbums, totalPhotos, totalUsers, totalTags, recentActivity]
+      required: [totalAlbums, totalPhotos, totalUsers, totalTags, totalCollections, recentActivity]
       properties:
         totalAlbums:
           type: integer
@@ -1903,6 +1981,8 @@ components:
         totalUsers:
           type: integer
         totalTags:
+          type: integer
+        totalCollections:
           type: integer
         recentActivity:
           type: array
@@ -1932,8 +2012,7 @@ components:
       properties:
         uploadURL:
           type: string
-          format: uri
-          description: Presigned GCS URL for PUT upload.
+          description: Presigned URL for PUT upload. Absolute in production; may be a relative proxy path (e.g. `/gcs/...`) in local dev.
         objectPath:
           type: string
           description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.

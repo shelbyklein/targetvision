@@ -1,6 +1,6 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Readable } from "stream";
-import { randomUUID } from "crypto";
+import { randomUUID, generateKeyPairSync } from "crypto";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -9,25 +9,41 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+// When GCS_ENDPOINT is set (local dev against fake-gcs-server), getSignedUrl
+// still needs signing credentials, but fake-gcs-server never validates
+// signatures — so an ephemeral throwaway key generated at boot is enough.
+const gcsEndpoint = process.env.GCS_ENDPOINT;
 
-export const objectStorageClient = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
+function makeEphemeralSigningCredentials() {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  });
+  return {
+    client_email: "fake@local-dev.iam.gserviceaccount.com",
+    private_key: privateKey,
+  };
+}
+
+export const objectStorageClient = gcsEndpoint
+  ? new Storage({
+      apiEndpoint: gcsEndpoint,
+      projectId: "local-dev",
+      credentials: makeEphemeralSigningCredentials(),
+    })
+  : new Storage(); // uses GOOGLE_APPLICATION_CREDENTIALS or gcloud ADC
+
+export function getPrivateObjectDir(): string {
+  const dir = process.env.PRIVATE_OBJECT_DIR || "";
+  if (!dir) {
+    throw new Error(
+      "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
+        "tool and set PRIVATE_OBJECT_DIR env var."
+    );
+  }
+  return dir;
+}
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -60,14 +76,7 @@ export class ObjectStorageService {
   }
 
   getPrivateObjectDir(): string {
-    const dir = process.env.PRIVATE_OBJECT_DIR || "";
-    if (!dir) {
-      throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
-      );
-    }
-    return dir;
+    return getPrivateObjectDir();
   }
 
   async searchPublicObject(filePath: string): Promise<File | null> {
@@ -155,11 +164,20 @@ export class ObjectStorageService {
   }
 
   normalizeObjectEntityPath(rawPath: string): string {
-    if (!rawPath.startsWith("https://storage.googleapis.com/")) {
+    // Strip the storage host (real GCS, or the local GCS_ENDPOINT emulator)
+    // so downstream code only ever sees /bucket/object paths.
+    let url: URL;
+    try {
+      url = new URL(rawPath);
+    } catch {
+      return rawPath;
+    }
+    const isGoogleHost = url.origin === "https://storage.googleapis.com";
+    const isLocalEndpoint = gcsEndpoint !== undefined && url.origin === new URL(gcsEndpoint).origin;
+    if (!isGoogleHost && !isLocalEndpoint) {
       return rawPath;
     }
 
-    const url = new URL(rawPath);
     const rawObjectPath = url.pathname;
 
     let objectEntityDir = this.getPrivateObjectDir();
@@ -189,6 +207,21 @@ export class ObjectStorageService {
     return normalizedPath;
   }
 
+  /**
+   * Best-effort delete of an object entity (e.g. a photo original or thumbnail).
+   * Swallows ObjectNotFoundError since the caller is cleaning up, not asserting
+   * the object exists.
+   */
+  async deleteObjectEntity(objectPath: string): Promise<void> {
+    try {
+      const file = await this.getObjectEntityFile(objectPath);
+      await file.delete();
+    } catch (err) {
+      if (err instanceof ObjectNotFoundError) return;
+      throw err;
+    }
+  }
+
   async canAccessObjectEntity({
     userId,
     objectFile,
@@ -206,7 +239,7 @@ export class ObjectStorageService {
   }
 }
 
-function parseObjectPath(path: string): {
+export function parseObjectPath(path: string): {
   bucketName: string;
   objectName: string;
 } {
@@ -227,7 +260,7 @@ function parseObjectPath(path: string): {
   };
 }
 
-async function signObjectURL({
+export async function signObjectURL({
   bucketName,
   objectName,
   method,
@@ -238,30 +271,13 @@ async function signObjectURL({
   method: "GET" | "PUT" | "DELETE" | "HEAD";
   ttlSec: number;
 }): Promise<string> {
-  const request = {
-    bucket_name: bucketName,
-    object_name: objectName,
-    method,
-    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-  };
-  const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-      signal: AbortSignal.timeout(30_000),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Failed to sign object URL, errorcode: ${response.status}, ` +
-        `make sure you're running on Replit`
-    );
-  }
-
-  const { signed_url: signedURL } = (await response.json()) as { signed_url: string };
-  return signedURL;
+  const [url] = await objectStorageClient
+    .bucket(bucketName)
+    .file(objectName)
+    .getSignedUrl({
+      version: "v4",
+      action: method === "GET" || method === "HEAD" ? "read" : method === "PUT" ? "write" : "delete",
+      expires: Date.now() + ttlSec * 1000,
+    });
+  return url;
 }

@@ -1,4 +1,5 @@
 export * from "./users";
+export * from "./auth";
 export * from "./albums";
 export * from "./photos";
 export * from "./tags";
@@ -6,4 +7,5 @@ export * from "./ratings";
 export * from "./collections";
 export * from "./appSettings";
 export * from "./aiAnalysisEvents";
+export * from "./aiBackfillRuns";
 export * from "./bulkUploadBatches";

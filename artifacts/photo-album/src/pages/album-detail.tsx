@@ -462,10 +462,7 @@ function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded: () => 
   );
 }
 
-function sortPhotos(
-  photos: Array<{ id: number; createdAt: string; averageRating?: number | null; ratingCount: number }>,
-  sort: SortOption
-) {
+function sortPhotos(photos: Photo[], sort: SortOption): Photo[] {
   const sorted = [...photos];
   if (sort === "newest") {
     sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -585,7 +582,7 @@ export default function AlbumDetail() {
       const newPhoto = allPhotos[prevAllPhotosLengthRef.current];
       setPendingLightboxAdvance(false);
       if (newPhoto) {
-        setSelectedPhoto({ id: newPhoto.id, url: newPhoto.url, thumbnailKey: newPhoto.thumbnailKey, name: newPhoto.name, averageRating: newPhoto.averageRating, albumId });
+        setSelectedPhoto({ id: newPhoto.id, url: newPhoto.url, thumbnailKey: newPhoto.thumbnailKey, name: newPhoto.filename, averageRating: newPhoto.averageRating, albumId });
       }
     }
   }, [allPhotos, pendingLightboxAdvance, selectedPhoto, albumId]);
@@ -616,7 +613,7 @@ export default function AlbumDetail() {
       const remaining = unratedPhotosRef.current;
       if (remaining.length > 0) {
         const next = remaining[0];
-        setSelectedPhoto({ id: next.id, url: next.url, thumbnailKey: next.thumbnailKey, name: next.name, averageRating: next.averageRating, albumId });
+        setSelectedPhoto({ id: next.id, url: next.url, thumbnailKey: next.thumbnailKey, name: next.filename, averageRating: next.averageRating, albumId });
       } else {
         setSelectedPhoto(null);
         setUnratedReviewMode(false);
@@ -883,7 +880,7 @@ export default function AlbumDetail() {
                 onClick={() => {
                   const first = unratedPhotos[0];
                   setUnratedReviewMode(true);
-                  setSelectedPhoto({ id: first.id, url: first.url, thumbnailKey: first.thumbnailKey, name: first.name, averageRating: first.averageRating, albumId });
+                  setSelectedPhoto({ id: first.id, url: first.url, thumbnailKey: first.thumbnailKey, name: first.filename, averageRating: first.averageRating, albumId });
                 }}
                 data-testid="review-unrated-btn"
               >
@@ -1014,15 +1011,15 @@ export default function AlbumDetail() {
         )}
 
         {photosLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
             {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
             ))}
           </div>
         ) : sortedPhotos.length > 0 ? (
           <>
           <div
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
+            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
             data-testid="photo-grid"
           >
             {sortedPhotos.map((photo) => {
@@ -1031,7 +1028,7 @@ export default function AlbumDetail() {
               return (
               <div
                 key={photo.id}
-                className={`relative group rounded-lg overflow-hidden bg-muted${isSelected ? " ring-2 ring-primary" : ""}`}
+                className={`relative group mb-3 break-inside-avoid rounded-lg overflow-hidden bg-muted${isSelected ? " ring-2 ring-primary" : ""}`}
                 data-testid="photo-grid-item"
               >
                 {isSelectMode && (
@@ -1043,7 +1040,7 @@ export default function AlbumDetail() {
                 )}
                 <button
                   type="button"
-                  className={`aspect-[4/3] overflow-hidden w-full block${photo.isHidden ? " opacity-60" : ""}`}
+                  className={`w-full block${photo.isHidden ? " opacity-60" : ""}`}
                   onClick={() => {
                     if (isSelectMode) {
                       toggleSelection(photo.id);
@@ -1052,20 +1049,21 @@ export default function AlbumDetail() {
                         id: photo.id,
                         url: photo.url,
                         thumbnailKey: photo.thumbnailKey,
-                        name: photo.name,
+                        name: photo.filename,
                         averageRating: photo.averageRating,
                         albumId,
                       });
                     }
                   }}
-                  aria-label={`Open ${photo.name ?? "photo"} in lightbox`}
+                  aria-label={`Open ${photo.filename ?? "photo"} in lightbox`}
                   data-testid="photo-thumbnail-btn"
                 >
                   <FadeImage
+                    fit="contain"
                     src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
-                    alt={photo.name ?? "Photo"}
+                    alt={photo.filename ?? "Photo"}
                     loading="lazy"
-                    className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                    className="w-full h-auto cursor-pointer transition-transform duration-200 group-hover:scale-105"
                   />
                 </button>
 
@@ -1356,7 +1354,7 @@ export default function AlbumDetail() {
           const idx = lightboxPhotos.findIndex((p) => p.id === selectedPhoto.id);
           if (idx > 0) {
             const p = lightboxPhotos[idx - 1];
-            setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId });
+            setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.filename, averageRating: p.averageRating, albumId });
           }
         }}
         onNext={() => {
@@ -1364,7 +1362,7 @@ export default function AlbumDetail() {
           const idx = lightboxPhotos.findIndex((p) => p.id === selectedPhoto.id);
           if (idx < lightboxPhotos.length - 1) {
             const p = lightboxPhotos[idx + 1];
-            setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.name, averageRating: p.averageRating, albumId });
+            setSelectedPhoto({ id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.filename, averageRating: p.averageRating, albumId });
           } else if (!unratedReviewMode && hasMore) {
             prevAllPhotosLengthRef.current = allPhotos.length;
             setPendingLightboxAdvance(true);

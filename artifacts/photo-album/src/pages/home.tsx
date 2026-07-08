@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Image, Star, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useGetRegistrationSettings } from "@workspace/api-client-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -17,6 +18,7 @@ export default function Home() {
           <span className="text-xl font-semibold tracking-tight text-foreground">Target Vision</span>
         </div>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <Link href="/sign-in">
             <Button data-testid="sign-in-btn" className="bg-[#1a2f53] hover:bg-[#152541] text-white border-[#1a2f53] hover:border-[#152541] focus-visible:ring-[#1a2f53]">Sign In</Button>
           </Link>

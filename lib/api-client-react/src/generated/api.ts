@@ -41,6 +41,7 @@ import type {
   CollectionUpdate,
   DashboardStats,
   HealthStatus,
+  ListAlbumPhotosPagedResponse,
   ListAlbumPhotosParams,
   ListPhotosParams,
   Photo,
@@ -976,11 +977,14 @@ export const listAlbumPhotos = async (
   id: number,
   params?: ListAlbumPhotosParams,
   options?: RequestInit,
-): Promise<Photo[]> => {
-  return customFetch<Photo[]>(getListAlbumPhotosUrl(id, params), {
-    ...options,
-    method: "GET",
-  });
+): Promise<ListAlbumPhotosPagedResponse> => {
+  return customFetch<ListAlbumPhotosPagedResponse>(
+    getListAlbumPhotosUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
 export const getListAlbumPhotosQueryKey = (

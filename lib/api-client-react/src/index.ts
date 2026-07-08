@@ -5,4 +5,5 @@ export type { AuthTokenGetter } from "./custom-fetch";
 export * from "./collectionTags";
 export * from "./thumbnails";
 export * from "./exifDateBackfill";
+export * from "./aiAnalysisBackfill";
 export * from "./bulkUploadBatches";

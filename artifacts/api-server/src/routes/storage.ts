@@ -36,8 +36,18 @@ router.post("/storage/uploads/request-url", requireAuth, async (req: Request, re
       return;
     }
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    let uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+    // In local dev the browser can't PUT cross-origin to fake-gcs-server, so
+    // rewrite the signed URL onto the web app's same-origin proxy prefix
+    // (see the /gcs proxy in photo-album/vite.config.ts). Server-side callers
+    // like thumbnail generation keep using absolute signed URLs.
+    const browserPrefix = process.env.GCS_BROWSER_UPLOAD_PREFIX;
+    if (browserPrefix) {
+      const parsedUrl = new URL(uploadURL);
+      uploadURL = `${browserPrefix}${parsedUrl.pathname}${parsedUrl.search}`;
+    }
 
     res.json(
       RequestUploadUrlResponse.parse({

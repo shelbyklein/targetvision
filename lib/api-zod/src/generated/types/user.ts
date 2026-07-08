@@ -9,7 +9,7 @@ import type { UserRole } from "./userRole";
 
 export interface User {
   id: number;
-  clerkId: string;
+  authUserId: string;
   name: string;
   email: string;
   role: UserRole;

@@ -328,9 +328,9 @@ export default function CollectionDetail() {
       <AppLayout>
         <div className="space-y-6">
           <Skeleton className="h-8 w-64" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
             ))}
           </div>
         </div>
@@ -441,7 +441,7 @@ export default function CollectionDetail() {
           </div>
         ) : (
           <div
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
+            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
             data-testid="collection-photo-grid"
           >
             {collection.photos.map((photo) => {
@@ -449,17 +449,16 @@ export default function CollectionDetail() {
               return (
                 <div
                   key={photo.id}
-                  className="relative group rounded-lg overflow-hidden bg-muted"
+                  className="relative group mb-3 break-inside-avoid rounded-lg overflow-hidden bg-muted"
                   data-testid="collection-photo-item"
                 >
                   <Link href={`/photos/${photo.id}`}>
-                    <div className="aspect-[4/3] overflow-hidden">
-                      <FadeImage
-                        src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
-                        alt={photo.caption ?? "Photo"}
-                        className="h-full w-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
-                      />
-                    </div>
+                    <FadeImage
+                      fit="contain"
+                      src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
+                      alt={photo.aiDescription ?? "Photo"}
+                      className="w-full h-auto cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                    />
                   </Link>
 
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />

@@ -31,14 +31,14 @@ import { useToast } from "@/hooks/use-toast";
 
 type SortOption = "newest" | "oldest" | "top-rated" | "name-az";
 
-type RichPhoto = Photo & { thumbnailKey?: string | null; name?: string | null };
+type RichPhoto = Photo;
 
 function toLight(photo: RichPhoto): LightboxPhoto {
   return {
     id: photo.id,
     url: photo.url,
     thumbnailKey: photo.thumbnailKey,
-    name: photo.name,
+    name: photo.filename,
     averageRating: photo.averageRating,
     albumId: photo.albumId,
   };
@@ -58,7 +58,7 @@ function sortPhotos(photos: RichPhoto[], sort: SortOption): RichPhoto[] {
         return b.ratingCount - a.ratingCount;
       });
     case "name-az":
-      return copy.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+      return copy.sort((a, b) => (a.filename ?? "").localeCompare(b.filename ?? ""));
   }
 }
 
@@ -106,7 +106,7 @@ export default function SmartCollectionDetail() {
 
   const { data: rawPhotos, isLoading: photosLoading } = useListPhotos(
     photosQueryParams,
-    { query: { enabled: !!keywords } },
+    { query: { enabled: !!keywords, queryKey: getListPhotosQueryKey(photosQueryParams) } },
   );
 
   const [sort, setSort] = useState<SortOption>("top-rated");
@@ -385,9 +385,9 @@ export default function SmartCollectionDetail() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
             ))}
           </div>
         ) : !keywords ? (
@@ -408,7 +408,7 @@ export default function SmartCollectionDetail() {
           </div>
         ) : (
           <div
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
+            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
             data-testid="smart-collection-photo-grid"
           >
             {photos.map((photo) => {
@@ -418,14 +418,15 @@ export default function SmartCollectionDetail() {
                 <button
                   key={photo.id}
                   onClick={() => setSelectedPhoto(toLight(photo))}
-                  className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  className="relative mb-3 break-inside-avoid w-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                   data-testid="smart-photo-item"
-                  aria-label={`Preview ${photo.name ?? "photo"}`}
+                  aria-label={`Preview ${photo.filename ?? "photo"}`}
                 >
                   <FadeImage
+                    fit="contain"
                     src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
-                    alt={photo.name ?? "Photo"}
-                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    alt={photo.filename ?? "Photo"}
+                    className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
                   />
 
                   {/* Cover photo button — top right, always visible when active */}

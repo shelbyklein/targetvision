@@ -91,23 +91,41 @@ export function useUpload(options: UseUploadOptions = {}) {
         xhr.open("PUT", uploadURL);
         xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
+        // Stall watchdog: a connection that stops making progress would
+        // otherwise hang forever and permanently occupy a bulk-upload slot.
+        // A whole-request timeout would kill legitimately slow large uploads,
+        // so abort only after no progress events for STALL_MS.
+        const STALL_MS = 60_000;
+        let stalled = false;
+        const onStall = () => {
+          stalled = true;
+          xhr.abort();
+        };
+        let stallTimer = setTimeout(onStall, STALL_MS);
+        const resetStallTimer = () => {
+          clearTimeout(stallTimer);
+          stallTimer = setTimeout(onStall, STALL_MS);
+        };
+        const clearStallTimer = () => clearTimeout(stallTimer);
+
         if (signal) {
           if (signal.aborted) {
+            clearStallTimer();
             reject(new Error("Upload aborted"));
             return;
           }
           signal.addEventListener("abort", () => xhr.abort(), { once: true });
         }
 
-        if (onProgress) {
-          xhr.upload.addEventListener("progress", (e) => {
-            if (e.lengthComputable) {
-              onProgress(Math.round((e.loaded / e.total) * 100));
-            }
-          });
-        }
+        xhr.upload.addEventListener("progress", (e) => {
+          resetStallTimer();
+          if (onProgress && e.lengthComputable) {
+            onProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        });
 
         xhr.addEventListener("load", () => {
+          clearStallTimer();
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
@@ -115,8 +133,20 @@ export function useUpload(options: UseUploadOptions = {}) {
           }
         });
 
-        xhr.addEventListener("error", () => reject(new Error("Failed to upload file to storage")));
-        xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+        xhr.addEventListener("error", () => {
+          clearStallTimer();
+          reject(new Error("Failed to upload file to storage"));
+        });
+        xhr.addEventListener("abort", () => {
+          clearStallTimer();
+          reject(
+            new Error(
+              stalled
+                ? "Upload stalled (no progress for 60s) and was aborted"
+                : "Upload aborted"
+            )
+          );
+        });
 
         xhr.send(file);
       });

@@ -5,7 +5,13 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListAlbumPhotosAiStatus } from "./listAlbumPhotosAiStatus";
 
 export type ListAlbumPhotosParams = {
   includeHidden?: boolean;
+  limit?: number;
+  offset?: number;
+  inCollection?: boolean;
+  hasRating?: boolean;
+  aiStatus?: ListAlbumPhotosAiStatus;
 };

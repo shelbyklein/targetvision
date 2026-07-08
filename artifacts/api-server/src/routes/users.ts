@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import {
   ListUsersResponse,
@@ -33,6 +33,23 @@ router.patch("/users/:id/role", requireAdmin, async (req, res): Promise<void> =>
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
+  }
+
+  const [existing] = await db.select().from(usersTable).where(eq(usersTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (existing.role === "admin" && body.data.role !== "admin") {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(usersTable)
+      .where(and(eq(usersTable.role, "admin"), ne(usersTable.id, params.data.id)));
+    if (count === 0) {
+      res.status(400).json({ error: "Cannot remove the last admin" });
+      return;
+    }
   }
 
   const [user] = await db

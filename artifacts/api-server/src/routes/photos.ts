@@ -31,6 +31,7 @@ import {
   DismissPhotoSuggestionParams,
   DismissPhotoSuggestionResponse,
   AcceptPhotoNewCollectionSuggestionParams,
+  AcceptPhotoNewCollectionSuggestionBody,
   AcceptPhotoNewCollectionSuggestionResponse,
   DismissPhotoNewCollectionSuggestionParams,
   DismissPhotoNewCollectionSuggestionResponse,
@@ -42,7 +43,7 @@ import {
   BulkDeletePhotosResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse } from "../lib/photoHelpers";
+import { buildPhotoResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
 import { applyFiltersAndFetchIds } from "./search";
 
 const router: IRouter = Router();
@@ -185,7 +186,7 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
   }
 
   const includeHidden = req.query.includeHidden === "true";
-  const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
+  const canSeeHidden = req.dbUser!.role === "admin" && includeHidden;
 
   const DEFAULT_LIMIT = 50;
   const MAX_LIMIT = 200;
@@ -235,13 +236,13 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
   }
 
   const includeHidden = req.query.includeHidden === "true";
-  const canSeeHidden = req.dbUser!.role === "admin" || includeHidden;
+  const canSeeHidden = req.dbUser!.role === "admin" && includeHidden;
 
   const allPhotos = await db
     .select({ id: photosTable.id })
     .from(photosTable)
     .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
-    .orderBy(photosTable.createdAt);
+    .orderBy(desc(photosTable.createdAt));
 
   const allIds = allPhotos.map((p) => p.id);
   const { search, tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, albumId, aiStatus } = query.data;
@@ -300,10 +301,17 @@ router.delete("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
 
   const { ids } = body.data;
 
+  const toDelete = await db
+    .select({ id: photosTable.id, storageKey: photosTable.storageKey, thumbnailKey: photosTable.thumbnailKey })
+    .from(photosTable)
+    .where(inArray(photosTable.id, ids));
+
   const deleted = await db
     .delete(photosTable)
     .where(inArray(photosTable.id, ids))
     .returning({ id: photosTable.id });
+
+  await Promise.all(toDelete.map((photo) => deletePhotoStorageObjects(photo)));
 
   res.json(BulkDeletePhotosResponse.parse({ deleted: deleted.length }));
 });
@@ -383,6 +391,7 @@ router.delete("/photos/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   await db.delete(photosTable).where(eq(photosTable.id, params.data.id));
+  await deletePhotoStorageObjects(existing);
   res.sendStatus(204);
 });
 
@@ -601,8 +610,12 @@ router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requi
     return;
   }
 
-  const bodyName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
-  const collectionTitle = bodyName || suggestion.suggestedName;
+  const body = AcceptPhotoNewCollectionSuggestionBody.safeParse(req.body ?? {});
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const collectionTitle = body.data.name?.trim() || suggestion.suggestedName;
 
   const [newCollection] = await db
     .insert(collectionsTable)

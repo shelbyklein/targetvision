@@ -758,6 +758,7 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                     key={photo.id}
                     src={imgSrc!}
                     alt={photo.name ?? "Photo"}
+                    fit="contain"
                     className="max-h-[65vh] lg:max-h-[80vh] max-w-full rounded-lg object-contain shadow-2xl"
                     onLoad={() => setImageLoading(false)}
                     data-testid="lightbox-image"

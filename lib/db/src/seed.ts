@@ -23,7 +23,9 @@ async function seed() {
   const [seedUser] = await db
     .insert(usersTable)
     .values({
-      clerkId: "seed_demo_user",
+      // Seed users have no Better Auth account rows, so they can't sign in —
+      // they exist only to attach demo albums/photos to.
+      authUserId: "seed_demo_user",
       name: "Alex Rivera",
       email: "alex@targetvision.demo",
       role: "admin",
@@ -40,7 +42,7 @@ async function seed() {
   const [secondUser] = await db
     .insert(usersTable)
     .values({
-      clerkId: "seed_demo_user_2",
+      authUserId: "seed_demo_user_2",
       name: "Jordan Kim",
       email: "jordan@targetvision.demo",
       role: "member",

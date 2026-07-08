@@ -9,6 +9,7 @@ import type { CollectionSummary } from "./collectionSummary";
 import type { PhotoLatestAiStatus } from "./photoLatestAiStatus";
 import type { PhotoRating } from "./photoRating";
 import type { SuggestedCollection } from "./suggestedCollection";
+import type { SuggestedNewCollection } from "./suggestedNewCollection";
 
 export interface Photo {
   id: number;
@@ -18,7 +19,13 @@ export interface Photo {
   uploaderId: number;
   /** @nullable */
   storageKey?: string | null;
+  /** @nullable */
+  thumbnailKey?: string | null;
   url: string;
+  /** @nullable */
+  filename?: string | null;
+  /** @nullable */
+  filesize?: number | null;
   /** @nullable */
   takenAt?: string | null;
   createdAt: Date;
@@ -37,5 +44,6 @@ export interface Photo {
    */
   latestAiStatus?: PhotoLatestAiStatus;
   suggestedCollections?: SuggestedCollection[];
+  suggestedNewCollections?: SuggestedNewCollection[];
   ratings?: PhotoRating[];
 }

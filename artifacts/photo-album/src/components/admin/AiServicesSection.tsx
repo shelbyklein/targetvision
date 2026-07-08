@@ -201,6 +201,7 @@ function RecentActivityPanel() {
   const { toast } = useToast();
   const { data: events, isLoading } = useListAiAnalysisEvents({
     query: {
+      queryKey: getListAiAnalysisEventsQueryKey(),
       refetchInterval: 10000,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: true,

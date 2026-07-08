@@ -80,7 +80,7 @@ export default function AlbumDetailScreen() {
     }
   }, [album?.title, navigation, showPicker, isUploading, colors.primary]);
 
-  const allPhotos = photos ?? [];
+  const allPhotos = photos?.photos ?? [];
 
   const handlePhotoPress = useCallback((_: Photo, index: number) => {
     setLightboxIndex(index);

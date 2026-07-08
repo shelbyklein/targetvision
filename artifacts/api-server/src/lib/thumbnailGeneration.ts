@@ -1,65 +1,17 @@
 import sharp from "sharp";
 import exifReader from "exif-reader";
 import { randomUUID } from "crypto";
-import { objectStorageClient } from "./objectStorage";
+import { objectStorageClient, parseObjectPath, signObjectURL, getPrivateObjectDir } from "./objectStorage";
 import { db, photosTable } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { logger } from "./logger";
+import { createLimiter } from "./concurrencyLimit";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 const THUMBNAIL_WIDTH = 600;
 
-function parseObjectPath(path: string): { bucketName: string; objectName: string } {
-  if (!path.startsWith("/")) {
-    path = `/${path}`;
-  }
-  const parts = path.split("/");
-  if (parts.length < 3) {
-    throw new Error("Invalid path: must contain at least a bucket name");
-  }
-  return {
-    bucketName: parts[1],
-    objectName: parts.slice(2).join("/"),
-  };
-}
-
-async function signObjectURL({
-  bucketName,
-  objectName,
-  method,
-  ttlSec,
-}: {
-  bucketName: string;
-  objectName: string;
-  method: "GET" | "PUT" | "DELETE" | "HEAD";
-  ttlSec: number;
-}): Promise<string> {
-  const request = {
-    bucket_name: bucketName,
-    object_name: objectName,
-    method,
-    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-  };
-  const response = await fetch(`${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to sign object URL, status: ${response.status}`);
-  }
-  const { signed_url: signedURL } = (await response.json()) as { signed_url: string };
-  return signedURL;
-}
-
-function getPrivateObjectDir(): string {
-  const dir = process.env.PRIVATE_OBJECT_DIR || "";
-  if (!dir) {
-    throw new Error("PRIVATE_OBJECT_DIR not set");
-  }
-  return dir;
-}
+// Bound concurrent generations: each downloads the full-size source image,
+// and uploads fire these off without awaiting.
+const thumbnailLimiter = createLimiter(2);
 
 export function parseExifDateValue(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
@@ -90,7 +42,11 @@ export type ThumbnailResult = "success" | "skipped" | "failed";
 
 const inProgressPhotoIds = new Set<number>();
 
-export async function generateAndStoreThumbnail(photoId: number, storageKey: string): Promise<ThumbnailResult> {
+export function generateAndStoreThumbnail(photoId: number, storageKey: string): Promise<ThumbnailResult> {
+  return thumbnailLimiter(() => generateAndStoreThumbnailUnbounded(photoId, storageKey));
+}
+
+async function generateAndStoreThumbnailUnbounded(photoId: number, storageKey: string): Promise<ThumbnailResult> {
   if (inProgressPhotoIds.has(photoId)) {
     logger.info({ photoId }, "Thumbnail generation already in progress for photo, skipping duplicate");
     return "skipped";
@@ -150,15 +106,26 @@ export async function generateAndStoreThumbnail(photoId: number, storageKey: str
       ttlSec: 900,
     });
 
-    const uploadResponse = await fetch(uploadURL, {
-      method: "PUT",
-      headers: { "Content-Type": "image/jpeg" },
-      body: thumbnailBuffer,
-      signal: AbortSignal.timeout(60_000),
-    });
+    // The storage emulator occasionally stalls under bulk-upload load; one
+    // retry recovers instead of leaving the photo without a thumbnail.
+    let uploadResponse: Response | undefined;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        uploadResponse = await fetch(uploadURL, {
+          method: "PUT",
+          headers: { "Content-Type": "image/jpeg" },
+          body: thumbnailBuffer,
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (uploadResponse.ok) break;
+      } catch (err) {
+        if (attempt === 2) throw err;
+        logger.warn({ photoId, err }, "Thumbnail upload attempt failed, retrying");
+      }
+    }
 
-    if (!uploadResponse.ok) {
-      throw new Error(`Thumbnail upload failed with status ${uploadResponse.status}`);
+    if (!uploadResponse?.ok) {
+      throw new Error(`Thumbnail upload failed with status ${uploadResponse?.status}`);
     }
 
     const thumbnailKey = `/objects/thumbnails/${thumbnailId}`;
