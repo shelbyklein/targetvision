@@ -19,6 +19,10 @@ export const photosTable = pgTable(
     aiDescription: text("ai_description"),
     isHidden: boolean("is_hidden").notNull().default(false),
     thumbnailGenerating: boolean("thumbnail_generating").notNull().default(false),
+    // SHA-256 hex digest of the original image bytes. Used to detect exact
+    // (byte-identical) duplicate photos. Nullable: populated on upload and via
+    // a background backfill for rows that predate this column.
+    contentHash: text("content_hash"),
     takenAt: timestamp("taken_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -30,6 +34,8 @@ export const photosTable = pgTable(
     // uploaderId and takenAt filters (search / date-range).
     index("photos_uploader_idx").on(table.uploaderId),
     index("photos_taken_at_idx").on(table.takenAt),
+    // Duplicate detection groups photos by their content hash.
+    index("photos_content_hash_idx").on(table.contentHash),
   ],
 );
 

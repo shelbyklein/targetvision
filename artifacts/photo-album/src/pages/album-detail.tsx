@@ -26,6 +26,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { AddPhotoDialog } from "@/components/AddPhotoDialog";
+import { MasonryGrid } from "@/components/MasonryGrid";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -509,7 +510,7 @@ export default function AlbumDetail() {
                 data-testid="review-unrated-btn"
               >
                 <Star className="h-4 w-4" />
-                Review Unrated ({unratedPhotos.length})
+                Review Unrated ({album.unratedCount ?? unratedPhotos.length})
               </Button>
             )}
             <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
@@ -643,11 +644,11 @@ export default function AlbumDetail() {
           </div>
         ) : sortedPhotos.length > 0 ? (
           <>
-          <div
-            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
+          <MasonryGrid
+            items={sortedPhotos}
+            getKey={(photo) => photo.id}
             data-testid="photo-grid"
-          >
-            {sortedPhotos.map((photo) => {
+            renderItem={(photo) => {
               const collections = photo.photoCollections ?? [];
               const isSelected = selectedIds.has(photo.id);
               return (
@@ -792,8 +793,8 @@ export default function AlbumDetail() {
                 )}
               </div>
               );
-            })}
-          </div>
+            }}
+          />
           {hasMore && (
             <div className="flex justify-center pt-4">
               <Button

@@ -30,6 +30,9 @@ import {
   BackfillAiAnalysisStatusResponse,
   BackfillAiAnalysisBody,
   BackfillAiAnalysisResponse,
+  BackfillContentHashesStatusResponse,
+  BackfillContentHashesResponse,
+  ListDuplicatePhotoGroupsResponse,
   ListAiBackfillRunsResponse,
   GetAiAutoBackfillSettingsResponse,
   UpdateAiAutoBackfillSettingsBody,
@@ -47,6 +50,7 @@ import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDateBackfill";
+import { countPhotosWithoutContentHash, backfillContentHashes, listDuplicatePhotoGroups } from "../lib/contentHash";
 import { countPhotosNeedingAiAnalysis, backfillAiAnalysis, listAiBackfillRuns } from "../lib/aiAnalysisBackfill";
 import { getAiAutoBackfillSettings, updateAiAutoBackfillSettings } from "../lib/aiAutoBackfillScheduler";
 import { logger } from "../lib/logger";
@@ -412,6 +416,37 @@ router.get("/admin/photos/exif-date-backfill-status", requireAdmin, async (_req,
 router.post("/admin/photos/exif-date-backfill", requireAdmin, async (_req, res): Promise<void> => {
   const result = await backfillExifDates();
   res.json(BackfillExifDatesResponse.parse(result));
+});
+
+router.get("/admin/photos/content-hash-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutContentHash();
+  res.json(BackfillContentHashesStatusResponse.parse({ missingCount }));
+});
+
+router.post("/admin/photos/content-hash-backfill", requireAdmin, async (_req, res): Promise<void> => {
+  const result = await backfillContentHashes();
+  res.json(BackfillContentHashesResponse.parse(result));
+});
+
+router.get("/admin/photos/duplicates", requireAdmin, async (_req, res): Promise<void> => {
+  const groups = await listDuplicatePhotoGroups();
+  res.json(
+    ListDuplicatePhotoGroupsResponse.parse({
+      groups: groups.map((g) => ({
+        contentHash: g.contentHash,
+        photos: g.photos.map((p) => ({
+          id: p.id,
+          albumId: p.albumId,
+          albumTitle: p.albumTitle,
+          filename: p.filename,
+          thumbnailUrl: resolvePhotoThumbnailUrl({ url: p.url, thumbnailKey: p.thumbnailKey }),
+          createdAt: p.createdAt.toISOString(),
+          isAlbumCover: p.isAlbumCover,
+          collectionCount: p.collectionCount,
+        })),
+      })),
+    }),
+  );
 });
 
 router.get("/admin/ai-analysis/backfill-status", requireAdmin, async (_req, res): Promise<void> => {

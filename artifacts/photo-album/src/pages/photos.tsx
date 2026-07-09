@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
+import { MasonryGrid } from "@/components/MasonryGrid";
 import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
@@ -534,11 +535,11 @@ export default function PhotosPage() {
           </div>
         ) : paginatedPhotos && paginatedPhotos.length > 0 ? (
           <>
-            <div
-              className="columns-2 sm:columns-3 lg:columns-4 gap-3"
+            <MasonryGrid
+              items={paginatedPhotos}
+              getKey={(photo) => photo.id}
               data-testid="photos-grid"
-            >
-              {paginatedPhotos.map((photo) => {
+              renderItem={(photo) => {
                 const collections = photo.photoCollections ?? [];
                 const isSelected = selectedIds.has(photo.id);
                 return (
@@ -675,8 +676,8 @@ export default function PhotosPage() {
                     )}
                   </div>
                 );
-              })}
-            </div>
+              }}
+            />
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 pt-2" data-testid="pagination">

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, count, sql, desc, avg } from "drizzle-orm";
+import { eq, and, count, sql, desc, avg } from "drizzle-orm";
 import { db, albumsTable, photosTable, usersTable, ratingsTable } from "@workspace/db";
 import {
   ListAlbumsResponse,
@@ -23,7 +23,7 @@ import { buildPhotosResponse, deletePhotoStorageObjects } from "../lib/photoHelp
 const router: IRouter = Router();
 
 async function buildAlbumResponse(albumId: number) {
-  const [[row], [ratedRow]] = await Promise.all([
+  const [[row], [ratedRow], [unratedRow]] = await Promise.all([
     db
       .select({
         album: albumsTable,
@@ -41,6 +41,18 @@ async function buildAlbumResponse(albumId: number) {
       .from(ratingsTable)
       .innerJoin(photosTable, eq(ratingsTable.photoId, photosTable.id))
       .where(eq(photosTable.albumId, albumId)),
+    // Visible (non-hidden) photos in the album with zero ratings. This mirrors the
+    // album detail page's default "Review Unrated" scope, which excludes hidden photos.
+    db
+      .select({ unratedCount: sql<number>`cast(count(*) as integer)` })
+      .from(photosTable)
+      .where(
+        and(
+          eq(photosTable.albumId, albumId),
+          eq(photosTable.isHidden, false),
+          sql`not exists (select 1 from ${ratingsTable} where ${ratingsTable.photoId} = ${photosTable.id})`,
+        ),
+      ),
   ]);
 
   if (!row) return null;
@@ -62,6 +74,7 @@ async function buildAlbumResponse(albumId: number) {
     photoCount: Number(row.photoCount),
     hiddenCount: Number(row.hiddenCount),
     ratedCount: Number(ratedRow?.ratedCount ?? 0),
+    unratedCount: Number(unratedRow?.unratedCount ?? 0),
     coverPhotoUrl,
     coverPhotoThumbnailKey,
   };

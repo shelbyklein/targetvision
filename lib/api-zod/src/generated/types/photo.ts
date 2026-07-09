@@ -26,6 +26,11 @@ export interface Photo {
   filename?: string | null;
   /** @nullable */
   filesize?: number | null;
+  /**
+   * SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.
+   * @nullable
+   */
+  contentHash?: string | null;
   /** @nullable */
   takenAt?: string | null;
   createdAt: Date;

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Images, Camera, Users, FolderOpen, Star, Sparkles } from "lucide-react";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
+import { MasonryGrid } from "@/components/MasonryGrid";
 import { Link } from "wouter";
 
 function StatCard({
@@ -104,8 +105,10 @@ function PhotoStrip({
     return <p className="text-sm text-muted-foreground py-4">No photos yet.</p>;
   }
   return (
-    <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
-      {photos.map((photo) => (
+    <MasonryGrid
+      items={photos}
+      getKey={(photo) => photo.id}
+      renderItem={(photo) => (
         <button
           key={photo.id}
           onClick={() => onPhotoClick(photo)}
@@ -128,8 +131,8 @@ function PhotoStrip({
             )}
           </div>
         </button>
-      ))}
-    </div>
+      )}
+    />
   );
 }
 

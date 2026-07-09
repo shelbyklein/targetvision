@@ -3,6 +3,7 @@ import { eq, and, inArray, desc } from "drizzle-orm";
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
+import { computeAndStoreContentHash } from "../lib/contentHash";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { readMagicBytes, detectImageMimeType } from "../lib/magicBytes";
 import { logger } from "../lib/logger";
@@ -133,6 +134,9 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
   if (photo.storageKey) {
     void generateAndStoreThumbnail(photo.id, photo.storageKey).catch((err) => {
       logger.error({ err, photoId: photo.id }, "Background thumbnail generation failed");
+    });
+    void computeAndStoreContentHash(photo.id, photo.storageKey).catch((err) => {
+      logger.error({ err, photoId: photo.id }, "Background content hash computation failed");
     });
   }
 

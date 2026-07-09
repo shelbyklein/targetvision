@@ -56,6 +56,7 @@ export interface Album {
   photoCount: number;
   ratedCount?: number;
   hiddenCount?: number;
+  unratedCount?: number;
   createdAt: string;
 }
 
@@ -80,6 +81,31 @@ export interface AlbumCoverUpdate {
 
 export interface CollectionCoverUpdate {
   photoId: number;
+}
+
+export interface DuplicatePhoto {
+  id: number;
+  albumId: number;
+  /** @nullable */
+  albumTitle?: string | null;
+  /** @nullable */
+  filename?: string | null;
+  /** @nullable */
+  thumbnailUrl?: string | null;
+  createdAt: string;
+  /** True if this photo is the cover of its album; deleting it would clear the album cover. */
+  isAlbumCover: boolean;
+  /** Number of collections this photo belongs to. */
+  collectionCount: number;
+}
+
+export interface DuplicatePhotoGroup {
+  contentHash: string;
+  photos: DuplicatePhoto[];
+}
+
+export interface ListDuplicatePhotoGroupsResponse {
+  groups: DuplicatePhotoGroup[];
 }
 
 /**
@@ -146,6 +172,11 @@ export interface Photo {
   filename?: string | null;
   /** @nullable */
   filesize?: number | null;
+  /**
+   * SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.
+   * @nullable
+   */
+  contentHash?: string | null;
   /** @nullable */
   takenAt?: string | null;
   createdAt: string;
