@@ -15,9 +15,6 @@ allowBuilds:
 autoInstallPeers: false
 
 catalog:
-  '@replit/vite-plugin-cartographer': ^0.5.1
-  '@replit/vite-plugin-dev-banner': ^0.1.1
-  '@replit/vite-plugin-runtime-error-modal': ^0.0.6
   '@tailwindcss/vite': ^4.1.14
   '@tanstack/react-query': ^5.90.21
   '@types/node': 25.3.5
@@ -43,10 +40,6 @@ scriptShell: C:\Program Files\Git\bin\bash.exe
 
 minimumReleaseAge: 1440
 
-minimumReleaseAgeExclude:
-  - '@replit/*'
-  - stripe-replit-sync
-
 onlyBuiltDependencies:
   - '@swc/core'
   - esbuild
@@ -59,3 +52,10 @@ overrides:
   esbuild: 0.27.3
   react: 19.1.0
   react-dom: 19.1.0
+  # Force a single @types/react across the workspace. Without this, mobile pins
+  # ~19.1.x while photo-album/catalog resolve ^19.2.x, producing two copies of
+  # @types/react whose structurally-identical-but-distinct types break the
+  # photo-album typecheck (calendar.tsx/spinner.tsx). Pinned to 19.1.x to match
+  # the react 19.1.0 runtime and Expo/React-Native's @types/react requirement.
+  '@types/react': 19.1.10
+  '@types/react-dom': 19.1.7

@@ -2044,7 +2044,7 @@ components:
 
     AiProviderInfo:
       type: object
-      required: [id, label, model, availableModels, hasKey, replitFallbackAvailable, usable]
+      required: [id, label, model, availableModels, hasKey, envKeyFallbackAvailable, usable]
       properties:
         id:
           type: string
@@ -2061,7 +2061,7 @@ components:
           type: boolean
         keyPreview:
           type: ["string", "null"]
-        replitFallbackAvailable:
+        envKeyFallbackAvailable:
           type: boolean
         usable:
           type: boolean

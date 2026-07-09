@@ -18,7 +18,7 @@ import {
   GetAlbumTopRatedResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
+import { buildPhotosResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
@@ -282,8 +282,8 @@ router.get("/albums/:id/top-rated", requireAuth, async (req, res): Promise<void>
     .orderBy(desc(avg(ratingsTable.score)))
     .limit(12);
 
-  const photos = await Promise.all(rows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
-  res.json(GetAlbumTopRatedResponse.parse(photos.filter(Boolean)));
+  const photos = await buildPhotosResponse(rows.map((p) => p.id), req.dbUser?.id);
+  res.json(GetAlbumTopRatedResponse.parse(photos));
 });
 
 export default router;

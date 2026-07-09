@@ -501,8 +501,8 @@ function ProviderCard({
                   {provider.keyPreview ?? "•••"}
                 </span>
               </span>
-            ) : provider.replitFallbackAvailable ? (
-              <span>No admin key — using Replit's built-in integration</span>
+            ) : provider.envKeyFallbackAvailable ? (
+              <span>No admin key — using server env fallback key</span>
             ) : (
               <span className="text-amber-600">No key configured</span>
             )}

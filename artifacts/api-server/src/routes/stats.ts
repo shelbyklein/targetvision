@@ -7,7 +7,7 @@ import {
   GetTopRatedPhotosResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse } from "../lib/photoHelpers";
+import { buildPhotosResponse } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
@@ -25,9 +25,7 @@ router.get("/stats/dashboard", requireAuth, async (req, res): Promise<void> => {
     .orderBy(desc(photosTable.createdAt))
     .limit(8);
 
-  const recentActivity = await Promise.all(
-    recentPhotoRows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id))
-  );
+  const recentActivity = await buildPhotosResponse(recentPhotoRows.map((p) => p.id), req.dbUser?.id);
 
   res.json(
     GetDashboardStatsResponse.parse({
@@ -36,7 +34,7 @@ router.get("/stats/dashboard", requireAuth, async (req, res): Promise<void> => {
       totalUsers: Number(userCount[0].count),
       totalTags: 0,
       totalCollections: Number(collectionCount[0].count),
-      recentActivity: recentActivity.filter(Boolean),
+      recentActivity,
     })
   );
 });
@@ -48,8 +46,8 @@ router.get("/stats/recent-photos", requireAuth, async (req, res): Promise<void> 
     .orderBy(desc(photosTable.createdAt))
     .limit(12);
 
-  const photos = await Promise.all(rows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
-  res.json(GetRecentPhotosResponse.parse(photos.filter(Boolean)));
+  const photos = await buildPhotosResponse(rows.map((p) => p.id), req.dbUser?.id);
+  res.json(GetRecentPhotosResponse.parse(photos));
 });
 
 router.get("/stats/top-rated", requireAuth, async (req, res): Promise<void> => {
@@ -64,8 +62,8 @@ router.get("/stats/top-rated", requireAuth, async (req, res): Promise<void> => {
     .orderBy(desc(avg(ratingsTable.score)))
     .limit(12);
 
-  const photos = await Promise.all(rows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
-  res.json(GetTopRatedPhotosResponse.parse(photos.filter(Boolean)));
+  const photos = await buildPhotosResponse(rows.map((p) => p.id), req.dbUser?.id);
+  res.json(GetTopRatedPhotosResponse.parse(photos));
 });
 
 export default router;

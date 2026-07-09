@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: targetvision_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Route the db push + tests at the CI Postgres service.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/targetvision_test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/targetvision_test
+      BETTER_AUTH_SECRET: ci-better-auth-secret-0000000000000000
+      AI_KEY_ENCRYPTION_SECRET: ci-ai-key-encryption-secret-000000000000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Apply migrations to the fresh test database before running integration tests.
+      # (Uses tsx directly so it reads DATABASE_URL from the environment, not a .env file.)
+      - run: pnpm --filter @workspace/db exec tsx src/migrate.ts
+      - run: pnpm run test

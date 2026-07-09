@@ -43,7 +43,7 @@ import {
   BulkDeletePhotosResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
+import { buildPhotoResponse, buildPhotosResponse, fetchAlbumPhotoPage, deletePhotoStorageObjects } from "../lib/photoHelpers";
 import { applyFiltersAndFetchIds } from "./search";
 
 const router: IRouter = Router();
@@ -207,24 +207,18 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
       ? aiStatusRaw
       : undefined;
 
-  const conditions = canSeeHidden
-    ? eq(photosTable.albumId, params.data.id)
-    : and(eq(photosTable.albumId, params.data.id), eq(photosTable.isHidden, false));
+  // Filter and paginate entirely in SQL: only the requested page of photo IDs
+  // leaves the database, and only that page is expanded into full responses.
+  const { ids: pageIds, hasMore } = await fetchAlbumPhotoPage(params.data.id, {
+    canSeeHidden,
+    inCollection,
+    hasRating,
+    aiStatus,
+    limit,
+    offset,
+  });
 
-  const allRows = await db
-    .select({ id: photosTable.id })
-    .from(photosTable)
-    .where(conditions)
-    .orderBy(desc(photosTable.createdAt));
-
-  const allIds = allRows.map((r) => r.id);
-  const filteredIds = await applyFiltersAndFetchIds(allIds, { inCollection, hasRating, aiStatus });
-
-  const hasMore = filteredIds.length > offset + limit;
-  const pageIds = filteredIds.slice(offset, offset + limit);
-
-  const full = await Promise.all(pageIds.map((id) => buildPhotoResponse(id, req.dbUser?.id)));
-  const photoList = full.filter(Boolean);
+  const photoList = await buildPhotosResponse(pageIds, req.dbUser?.id);
   res.json(ListAlbumPhotosPagedResponse.parse({ photos: photoList, hasMore }));
 });
 
@@ -260,8 +254,8 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     aiStatus,
   });
 
-  const full = await Promise.all(filteredIds.map((id) => buildPhotoResponse(id, req.dbUser?.id)));
-  res.json(ListPhotosResponse.parse(full.filter(Boolean)));
+  const full = await buildPhotosResponse(filteredIds, req.dbUser?.id);
+  res.json(ListPhotosResponse.parse(full));
 });
 
 router.patch("/photos/bulk", requireAuth, async (req, res): Promise<void> => {

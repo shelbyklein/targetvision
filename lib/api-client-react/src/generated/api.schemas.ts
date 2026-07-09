@@ -347,7 +347,7 @@ export interface AiProviderInfo {
   hasKey: boolean;
   /** @nullable */
   keyPreview?: string | null;
-  replitFallbackAvailable: boolean;
+  envKeyFallbackAvailable: boolean;
   usable: boolean;
 }
 

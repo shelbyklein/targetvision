@@ -13,7 +13,7 @@ import {
 } from "@workspace/db";
 import { SearchPhotosResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse } from "../lib/photoHelpers";
+import { buildPhotosResponse } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
@@ -244,8 +244,8 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     uploaderId,
   });
 
-  const photos = await Promise.all(filtered.map((id) => buildPhotoResponse(id, req.dbUser?.id)));
-  res.json(SearchPhotosResponse.parse(photos.filter(Boolean)));
+  const photos = await buildPhotosResponse(filtered, req.dbUser?.id);
+  res.json(SearchPhotosResponse.parse(photos));
 });
 
 export { applyFiltersAndFetchIds };

@@ -14,15 +14,25 @@ interface FadeImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fit?: "cover" | "contain";
 }
 
-export function FadeImage({ src, alt, className, onLoad, fit = "cover", ...props }: FadeImageProps) {
+export function FadeImage({ src, alt, className, onLoad, onError, fit = "cover", ...props }: FadeImageProps) {
   const [activeSrc, setActiveSrc] = useState<string | undefined>();
   const [loaded, setLoaded] = useState(false);
   const slotRef = useRef<SlotHandle | null>(null);
+  // Lazy images must not hold a queue slot: the browser defers their fetch
+  // until near-viewport, so onLoad/onError may never fire and the slot would
+  // be pinned forever, starving eager images (e.g. the lightbox). Native
+  // loading="lazy" already throttles them, so they skip the queue.
+  const isLazy = props.loading === "lazy";
 
   useEffect(() => {
     setLoaded(false);
-    setActiveSrc(undefined);
 
+    if (isLazy) {
+      setActiveSrc(src);
+      return;
+    }
+
+    setActiveSrc(undefined);
     const slot = requestSlot(() => setActiveSrc(src));
     slotRef.current = slot;
 
@@ -30,7 +40,7 @@ export function FadeImage({ src, alt, className, onLoad, fit = "cover", ...props
       slot.cancel();
       slotRef.current = null;
     };
-  }, [src]);
+  }, [src, isLazy]);
 
   function handleLoad(e: React.SyntheticEvent<HTMLImageElement>) {
     setLoaded(true);
@@ -38,9 +48,10 @@ export function FadeImage({ src, alt, className, onLoad, fit = "cover", ...props
     onLoad?.(e);
   }
 
-  function handleError() {
+  function handleError(e: React.SyntheticEvent<HTMLImageElement>) {
     setLoaded(true);
     slotRef.current?.complete();
+    onError?.(e);
   }
 
   if (fit === "contain") {

@@ -1,13 +1,7 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Readable } from "stream";
 import { randomUUID, generateKeyPairSync } from "crypto";
-import {
-  ObjectAclPolicy,
-  ObjectPermission,
-  canAccessObject,
-  getObjectAclPolicy,
-  setObjectAclPolicy,
-} from "./objectAcl";
+import { getObjectAclPolicy } from "./objectAcl";
 
 // When GCS_ENDPOINT is set (local dev against fake-gcs-server), getSignedUrl
 // still needs signing credentials, but fake-gcs-server never validates
@@ -193,20 +187,6 @@ export class ObjectStorageService {
     return `/objects/${entityId}`;
   }
 
-  async trySetObjectEntityAclPolicy(
-    rawPath: string,
-    aclPolicy: ObjectAclPolicy
-  ): Promise<string> {
-    const normalizedPath = this.normalizeObjectEntityPath(rawPath);
-    if (!normalizedPath.startsWith("/")) {
-      return normalizedPath;
-    }
-
-    const objectFile = await this.getObjectEntityFile(normalizedPath);
-    await setObjectAclPolicy(objectFile, aclPolicy);
-    return normalizedPath;
-  }
-
   /**
    * Best-effort delete of an object entity (e.g. a photo original or thumbnail).
    * Swallows ObjectNotFoundError since the caller is cleaning up, not asserting
@@ -222,21 +202,6 @@ export class ObjectStorageService {
     }
   }
 
-  async canAccessObjectEntity({
-    userId,
-    objectFile,
-    requestedPermission,
-  }: {
-    userId?: string;
-    objectFile: File;
-    requestedPermission?: ObjectPermission;
-  }): Promise<boolean> {
-    return canAccessObject({
-      userId,
-      objectFile,
-      requestedPermission: requestedPermission ?? ObjectPermission.READ,
-    });
-  }
 }
 
 export function parseObjectPath(path: string): {

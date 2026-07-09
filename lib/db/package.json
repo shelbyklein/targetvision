@@ -8,6 +8,8 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
+    "generate": "dotenv -e ../../.env -- drizzle-kit generate --config ./drizzle.config.ts",
+    "migrate": "dotenv -e ../../.env -- tsx src/migrate.ts",
     "push": "dotenv -e ../../.env -- drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "dotenv -e ../../.env -- drizzle-kit push --force --config ./drizzle.config.ts",
     "seed": "dotenv -e ../../.env -- pnpm dlx tsx src/seed.ts"
