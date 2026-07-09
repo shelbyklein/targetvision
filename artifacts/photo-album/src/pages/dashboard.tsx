@@ -8,6 +8,7 @@ import {
   useListAlbums,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Images, Camera, Users, FolderOpen, Star, Sparkles } from "lucide-react";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
@@ -186,35 +187,30 @@ export default function Dashboard() {
               <h2 className="text-base font-semibold text-foreground">Smart Collections</h2>
             </div>
           </div>
-          <CardGrid loading={collectionsLoading} empty={!collections || collections.length === 0}>
-            {(collections ?? []).map((col) => (
-              <Link key={col.id} href={`/smart-collections/${col.id}`}>
-                <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-amber-400/60 transition-colors cursor-pointer">
-                  <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                    {col.coverPhotoUrl ? (
-                      <FadeImage
-                        src={col.coverPhotoUrl}
-                        alt={col.title}
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center">
-                        <Sparkles className="h-10 w-10 text-amber-400/40" />
-                      </div>
-                    )}
-                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
-                      <Sparkles className="h-2.5 w-2.5" />
-                      AI
-                    </span>
-                  </div>
-                  <div className="p-3">
-                    <p className="font-medium text-sm text-foreground truncate">{col.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">AI-matched photos</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </CardGrid>
+          {collectionsLoading ? (
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-7 w-24 rounded-full" />
+              ))}
+            </div>
+          ) : !collections || collections.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">Nothing here yet.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2" data-testid="dashboard-smart-collections">
+              {collections.map((col) => (
+                <Link key={col.id} href={`/smart-collections/${col.id}`}>
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full gap-1.5 px-3 py-1 cursor-pointer hover:border-amber-400/60"
+                    data-testid={`smart-collection-pill-${col.id}`}
+                  >
+                    <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                    {col.title}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
 
         <section>

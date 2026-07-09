@@ -30,6 +30,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/lib/format-date";
 import {
   Dialog,
   DialogContent,
@@ -420,6 +421,10 @@ export default function AlbumDetail() {
     );
   }
 
+  const visiblePhotoCount = showHiddenLocal
+    ? album.photoCount
+    : album.photoCount - (album.hiddenCount ?? 0);
+
   return (
     <AppLayout>
       <div className="space-y-6" data-testid="album-detail-page">
@@ -446,7 +451,7 @@ export default function AlbumDetail() {
                 {album.eventDate && (
                   <span className="flex items-center gap-1">
                     <CalendarDays className="h-3.5 w-3.5" />
-                    {album.eventDate}
+                    {formatDate(album.eventDate)}
                   </span>
                 )}
                 <span className="flex items-center gap-1">
@@ -623,8 +628,9 @@ export default function AlbumDetail() {
             )}
 
             <span className="text-xs text-muted-foreground ml-auto">
-              {allPhotos.length} photo{allPhotos.length !== 1 ? "s" : ""}
-              {hasActiveFilters ? " (filtered)" : ""}
+              {hasActiveFilters
+                ? `${allPhotos.length}${hasMore ? "+" : ""} photo${allPhotos.length !== 1 ? "s" : ""} (filtered)`
+                : `${visiblePhotoCount} photo${visiblePhotoCount !== 1 ? "s" : ""}`}
             </span>
           </div>
         )}

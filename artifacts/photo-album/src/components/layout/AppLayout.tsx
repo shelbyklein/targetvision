@@ -2,9 +2,9 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles } from "lucide-react";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,9 +15,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { useBulkUploadOptional } from "@/contexts/BulkUploadContext";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const SIDEBAR_COOKIE_NAME = "sidebar_state";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,6 +43,17 @@ const navItems = [
   { href: "/collections", label: "Collections", icon: FolderOpen },
   { href: "/smart-collections", label: "Smart", icon: Sparkles },
 ];
+
+// Reads the persisted sidebar open/collapsed state (written as a cookie by
+// SidebarProvider) so the choice survives reloads without a flash of the
+// wrong state on first paint.
+function getInitialSidebarOpen(): boolean {
+  if (typeof document === "undefined") return true;
+  const match = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${SIDEBAR_COOKIE_NAME}=(true|false)`)
+  );
+  return match ? match[1] === "true" : true;
+}
 
 function humanSpeed(bps: number): string {
   if (bps < 1024) return `${Math.round(bps)} B/s`;
@@ -134,129 +162,108 @@ function GlobalSearchBar() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="relative hidden sm:block" data-testid="global-search-form">
+    <form onSubmit={handleSubmit} className="relative flex-1 max-w-md" data-testid="global-search-form">
       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
       <Input
         ref={inputRef}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Search photos..."
-        className="h-8 pl-8 pr-3 text-sm w-48 focus:w-64 transition-all duration-200 bg-muted/50 border-transparent focus:bg-background focus:border-input"
+        className="h-8 pl-8 pr-3 text-sm w-full bg-muted/50 border-transparent focus:bg-background focus:border-input"
         data-testid="global-search-input"
       />
     </form>
   );
 }
 
-function MobileBottomNav({ location, isAdmin }: { location: string; isAdmin: boolean }) {
-  const mobileItems = [
+function ThemeMenuButton() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
+  return (
+    <SidebarMenuButton
+      onClick={toggleTheme}
+      tooltip={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      data-testid="theme-toggle"
+    >
+      {isDark ? <Sun /> : <Moon />}
+      <span>{isDark ? "Light mode" : "Dark mode"}</span>
+    </SidebarMenuButton>
+  );
+}
+
+function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean }) {
+  const { data: session } = useSession();
+  const user = session?.user;
+  const firstName = user?.name?.split(" ")[0];
+  const { data: me } = useGetMe();
+
+  const items = [
     ...navItems,
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
   ];
 
   return (
-    <nav
-      className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border flex"
-      data-testid="mobile-bottom-nav"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
-      {mobileItems.map((item) => {
-        const Icon = item.icon;
-        const active = location === item.href || location.startsWith(item.href + "/");
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-              active ? "text-primary" : "text-muted-foreground"
-            )}
-            data-testid={`mobile-nav-${item.label.toLowerCase()}`}
-          >
-            <Icon className={cn("h-5 w-5", active && "stroke-[2.2]")} />
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
+    <Sidebar collapsible="icon" data-testid="app-sidebar">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild tooltip="Target Vision">
+              <Link href="/dashboard" data-testid="sidebar-brand">
+                <img src="/target-vision.svg" alt="Target Vision" className="size-6 shrink-0" />
+                <span className="font-semibold tracking-tight">Target Vision</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
-  const { data: session } = useSession();
-  const user = session?.user;
-  const firstName = user?.name?.split(" ")[0];
-  const { data: me } = useGetMe();
-  const bannerVisible = useBannerVisible();
-  const isAdmin = me?.role === "admin";
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarMenu data-testid="main-nav">
+            {items.map((item) => {
+              const Icon = item.icon;
+              const active = location === item.href || location.startsWith(item.href + "/");
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                    <Link href={item.href} data-testid={`nav-${item.label.toLowerCase()}`}>
+                      <Icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col" data-testid="app-layout">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
-              <img src="/target-vision.svg" alt="Target Vision" className="h-7 w-7" />
-              <span className="hidden sm:inline font-semibold text-foreground tracking-tight">Target Vision</span>
-            </Link>
-            <nav className="hidden sm:flex items-center gap-1" data-testid="main-nav">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = location === item.href || location.startsWith(item.href + "/");
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                      active
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                    data-testid={`nav-${item.label.toLowerCase()}`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                    location === "/admin"
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                  data-testid="nav-admin"
-                >
-                  <Shield className="h-3.5 w-3.5" />
-                  Admin
-                </Link>
-              )}
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
-            <GlobalSearchBar />
-
-            <ThemeToggle />
-
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <ThemeMenuButton />
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5 sm:gap-2 px-2 sm:px-3" data-testid="user-menu-trigger">
-                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={firstName ?? user?.email ?? "Account"}
+                  data-testid="user-menu-trigger"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary shrink-0">
                     {firstName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "?"}
                   </div>
-                  <span className="hidden sm:inline text-sm text-foreground max-w-[120px] truncate">
-                    {firstName ?? user?.email ?? "Me"}
-                  </span>
-                  <ChevronDown className="hidden sm:inline h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
+                  <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
+                    <span className="truncate font-medium text-foreground">{firstName ?? user?.email ?? "Me"}</span>
+                    {user?.email && <span className="truncate text-xs text-muted-foreground">{user.email}</span>}
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+                </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent side="right" align="end" className="w-52">
                 <div className="px-3 py-2">
                   <p className="text-sm font-medium text-foreground truncate">{user?.name ?? "Team Member"}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
@@ -291,33 +298,56 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        </div>
-      </header>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
 
-      <main className={cn(
-        "flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8",
-        "pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-8",
-        bannerVisible && "sm:pb-20"
-      )}>
-        {children}
-      </main>
+      <SidebarRail />
+    </Sidebar>
+  );
+}
 
-      <MobileBottomNav location={location} isAdmin={isAdmin} />
-      <BulkUploadBanner />
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const { data: me } = useGetMe();
+  const bannerVisible = useBannerVisible();
+  const isAdmin = me?.role === "admin";
 
-      {!bannerVisible && (
-        <footer className="hidden sm:block border-t border-border py-6 text-sm text-muted-foreground">
-          <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span>Copyright</span>
+  return (
+    <SidebarProvider defaultOpen={getInitialSidebarOpen()} data-testid="app-layout">
+      <AppSidebar location={location} isAdmin={isAdmin} />
+
+      <SidebarInset className="min-h-svh">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 sm:gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm">
+          <SidebarTrigger className="-ml-1" data-testid="sidebar-toggle" />
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Target Vision">
+            <img src="/target-vision.svg" alt="Target Vision" className="h-7 w-7" />
+          </Link>
+          <GlobalSearchBar />
+        </header>
+
+        <main className={cn(
+          "flex-1 w-full mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8",
+          bannerVisible && "pb-20"
+        )}>
+          {children}
+        </main>
+
+        {!bannerVisible && (
+          <footer className="hidden sm:block border-t border-border py-6 text-sm text-muted-foreground">
+            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>Copyright</span>
+                <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+                <span>{new Date().getFullYear()}</span>
+              </div>
               <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-              <span>{new Date().getFullYear()}</span>
             </div>
-            <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-          </div>
-        </footer>
-      )}
-    </div>
+          </footer>
+        )}
+      </SidebarInset>
+
+      <BulkUploadBanner />
+    </SidebarProvider>
   );
 }

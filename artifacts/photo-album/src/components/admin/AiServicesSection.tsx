@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, KeyRound, AlertTriangle, Check, Activity, CircleX, MinusCircle, CheckCircle2, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatDate } from "@/lib/format-date";
 
 type ProviderId = "openai" | "anthropic" | "gemini";
 
@@ -185,7 +186,7 @@ function formatRelative(iso: string): string {
   if (hr < 24) return `${hr}h ago`;
   const day = Math.floor(hr / 24);
   if (day < 30) return `${day}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }
 
 function StatusIcon({ status }: { status: AiAnalysisEvent["status"] }) {

@@ -26,6 +26,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { formatDate } from "@/lib/format-date";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -752,7 +753,7 @@ export default function PhotoDetail() {
                 {photo.takenAt && (
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-3.5 w-3.5" />
-                    <span>{new Date(photo.takenAt).toLocaleDateString()}</span>
+                    <span>{formatDate(photo.takenAt)}</span>
                   </div>
                 )}
               </div>
