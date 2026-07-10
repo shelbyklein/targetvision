@@ -456,6 +456,7 @@ export default function CollectionDetail() {
                   <Link href={`/photos/${photo.id}`}>
                     <FadeImage
                       fit="contain"
+                      loading="lazy"
                       src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                       alt={photo.aiDescription ?? "Photo"}
                       className="w-full h-auto cursor-pointer transition-transform duration-200 group-hover:scale-105"

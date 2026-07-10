@@ -424,6 +424,7 @@ export default function SearchPage() {
                     )}>
                       <FadeImage
                         fit="contain"
+                        loading="lazy"
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
                         className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
