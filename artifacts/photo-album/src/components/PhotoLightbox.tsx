@@ -734,6 +734,19 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
   useEffect(() => {
     if (!photo) return;
     function handleKey(e: KeyboardEvent) {
+      // Don't hijack keystrokes while the user is typing in a field (e.g. naming
+      // a new collection) — otherwise arrow keys change photo, digits rate it,
+      // and "h" hides it, all while they mean to be entering text.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       if (e.key === "ArrowLeft" && hasPrev && onPrev) {
         e.preventDefault();
         onPrev();
