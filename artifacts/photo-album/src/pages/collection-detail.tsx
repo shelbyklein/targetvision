@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
+import type { Photo } from "@workspace/api-client-react";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetCollection,
@@ -287,12 +289,24 @@ function TagsSection({
   );
 }
 
+function toLight(photo: Photo): LightboxPhoto {
+  return {
+    id: photo.id,
+    url: photo.url,
+    thumbnailKey: photo.thumbnailKey,
+    name: photo.filename,
+    averageRating: photo.averageRating,
+    albumId: photo.albumId,
+  };
+}
+
 export default function CollectionDetail() {
   const { id } = useParams<{ id: string }>();
   const collectionId = parseInt(id, 10);
   const qc = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
 
   const { data: collection, isLoading } = useGetCollection(collectionId, {
     query: { enabled: !!collectionId, queryKey: getGetCollectionQueryKey(collectionId) },
@@ -323,6 +337,11 @@ export default function CollectionDetail() {
 
   const canManage =
     me && collection && (me.id === collection.createdById || me.role === "admin");
+
+  const photos = collection?.photos ?? [];
+  const selectedIndex = selectedPhoto ? photos.findIndex((p) => p.id === selectedPhoto.id) : -1;
+  const hasPrev = selectedIndex > 0;
+  const hasNext = selectedIndex >= 0 && selectedIndex < photos.length - 1;
 
   if (isLoading) {
     return (
@@ -453,7 +472,12 @@ export default function CollectionDetail() {
                   className="relative group mb-3 break-inside-avoid rounded-lg overflow-hidden bg-muted"
                   data-testid="collection-photo-item"
                 >
-                  <Link href={`/photos/${photo.id}`}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPhoto(toLight(photo))}
+                    className="block w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                    aria-label={`Preview ${photo.filename ?? "photo"}`}
+                  >
                     <FadeImage
                       fit="contain"
                       loading="lazy"
@@ -461,7 +485,7 @@ export default function CollectionDetail() {
                       alt={photo.aiDescription ?? "Photo"}
                       className="w-full h-auto cursor-pointer transition-transform duration-200 group-hover:scale-105"
                     />
-                  </Link>
+                  </button>
 
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 pointer-events-none" />
 
@@ -558,6 +582,15 @@ export default function CollectionDetail() {
           />
         )}
       </div>
+
+      <PhotoLightbox
+        photo={selectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={() => hasPrev && setSelectedPhoto(toLight(photos[selectedIndex - 1]))}
+        onNext={() => hasNext && setSelectedPhoto(toLight(photos[selectedIndex + 1]))}
+      />
     </AppLayout>
   );
 }
