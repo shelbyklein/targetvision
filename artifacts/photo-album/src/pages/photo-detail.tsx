@@ -16,12 +16,16 @@ import {
   useRerunPhotoAnalysis,
   useUpdatePhoto,
   useCreateCollection,
+  useListProjects,
+  useAddPhotoToProject,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
   getGetRecentPhotosQueryKey,
   getGetTopRatedPhotosQueryKey,
   getListCollectionsQueryKey,
+  getListProjectsQueryKey,
+  getGetProjectQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe } from "@workspace/api-client-react";
@@ -56,7 +60,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil, Plus, EyeOff, Eye } from "lucide-react";
+import { Star, X, ArrowLeft, Trash2, CalendarDays, Download, FolderOpen, FolderKanban, Sparkles, Check, Loader2, RefreshCw, ChevronLeft, ChevronRight, Pencil, Plus, EyeOff, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -191,7 +195,9 @@ export default function PhotoDetail() {
   });
   const { data: me } = useGetMe();
   const { data: allCollections } = useListCollections();
+  const { data: allProjects } = useListProjects();
   const { mutate: addToCollection } = useAddPhotoToCollection();
+  const { mutate: addToProject } = useAddPhotoToProject();
   const { mutate: removeFromCollection } = useRemovePhotoFromCollection();
   const { mutate: acceptSuggestion } = useAcceptPhotoSuggestion();
   const { mutate: dismissSuggestion } = useDismissPhotoSuggestion();
@@ -297,6 +303,22 @@ export default function PhotoDetail() {
     addToCollection(
       { id: parseInt(collectionId, 10), data: { photoId } },
       { onSuccess: invalidate, onError: () => toast({ title: "Failed to add to collection", variant: "destructive" }) }
+    );
+  }
+
+  function handleAddProject(projectId: string) {
+    const id = parseInt(projectId, 10);
+    const project = allProjects?.find((p) => p.id === id);
+    addToProject(
+      { id, data: { photoId } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
+          toast({ title: project ? `Added to "${project.name}"` : "Added to project" });
+        },
+        onError: () => toast({ title: "Failed to add to project", variant: "destructive" }),
+      }
     );
   }
 
@@ -874,6 +896,35 @@ export default function PhotoDetail() {
                   Create
                 </Button>
               </form>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                <FolderKanban className="h-3.5 w-3.5" />
+                Projects
+              </Label>
+              {allProjects && allProjects.length > 0 ? (
+                <Select onValueChange={handleAddProject} data-testid="add-project-select">
+                  <SelectTrigger className="h-8 text-sm w-full">
+                    <SelectValue placeholder="Add to project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allProjects.map((proj) => (
+                      <SelectItem key={proj.id} value={String(proj.id)} data-testid={`project-option-${proj.id}`}>
+                        {proj.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No projects yet.{" "}
+                  <Link href="/projects" className="text-primary hover:underline">
+                    Create one
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
 
             <Separator />

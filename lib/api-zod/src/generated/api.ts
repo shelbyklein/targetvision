@@ -2325,6 +2325,260 @@ export const GenerateCollectionKeywordsParams = zod.object({
 });
 
 /**
+ * @summary List all projects
+ */
+export const ListProjectsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  createdById: zod.number(),
+  photoCount: zod.number(),
+  coverPhotoUrl: zod.string().nullish(),
+  coverPhotoThumbnailKey: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListProjectsResponse = zod.array(ListProjectsResponseItem);
+
+/**
+ * @summary Create a new project
+ */
+
+export const CreateProjectBody = zod.object({
+  name: zod.string().min(1),
+  description: zod.string().optional(),
+});
+
+/**
+ * @summary Get a single project with its photos
+ */
+export const GetProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProjectResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  createdById: zod.number(),
+  photoCount: zod.number(),
+  coverPhotoUrl: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  photos: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        albumId: zod.number(),
+        albumTitle: zod.string().nullish(),
+        uploaderId: zod.number(),
+        storageKey: zod.string().nullish(),
+        thumbnailKey: zod.string().nullish(),
+        url: zod.string(),
+        filename: zod.string().nullish(),
+        filesize: zod.number().nullish(),
+        contentHash: zod
+          .string()
+          .nullish()
+          .describe(
+            "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+          ),
+        takenAt: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        isHidden: zod.boolean(),
+        averageRating: zod.number().nullish(),
+        ratingCount: zod.number(),
+        myRating: zod.number().nullish(),
+        photoCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+              description: zod.string().nullish(),
+              createdById: zod.number(),
+              photoCount: zod.number(),
+              coverPhotoId: zod.number().nullish(),
+              coverPhotoUrl: zod.string().nullish(),
+              coverPhotoThumbnailKey: zod.string().nullish(),
+              tags: zod.array(zod.string()).optional(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+        aiDescription: zod.string().nullish(),
+        latestAiStatus: zod
+          .union([
+            zod.literal("success"),
+            zod.literal("skipped"),
+            zod.literal("failed"),
+            zod.literal(null),
+          ])
+          .nullish()
+          .describe(
+            "Status of the most recent AI analysis event for this photo",
+          ),
+        suggestedCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+            }),
+          )
+          .optional(),
+        suggestedNewCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              suggestedName: zod.string(),
+            }),
+          )
+          .optional(),
+        ratings: zod
+          .array(
+            zod.object({
+              userId: zod.number(),
+              userName: zod.string().nullish(),
+              score: zod.number(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Update a project (owner or admin)
+ */
+export const UpdateProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateProjectBody = zod.object({
+  name: zod.string().min(1).optional(),
+  description: zod.string().nullish(),
+});
+
+export const UpdateProjectResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  createdById: zod.number(),
+  photoCount: zod.number(),
+  coverPhotoUrl: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  photos: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        albumId: zod.number(),
+        albumTitle: zod.string().nullish(),
+        uploaderId: zod.number(),
+        storageKey: zod.string().nullish(),
+        thumbnailKey: zod.string().nullish(),
+        url: zod.string(),
+        filename: zod.string().nullish(),
+        filesize: zod.number().nullish(),
+        contentHash: zod
+          .string()
+          .nullish()
+          .describe(
+            "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+          ),
+        takenAt: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        isHidden: zod.boolean(),
+        averageRating: zod.number().nullish(),
+        ratingCount: zod.number(),
+        myRating: zod.number().nullish(),
+        photoCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+              description: zod.string().nullish(),
+              createdById: zod.number(),
+              photoCount: zod.number(),
+              coverPhotoId: zod.number().nullish(),
+              coverPhotoUrl: zod.string().nullish(),
+              coverPhotoThumbnailKey: zod.string().nullish(),
+              tags: zod.array(zod.string()).optional(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+        aiDescription: zod.string().nullish(),
+        latestAiStatus: zod
+          .union([
+            zod.literal("success"),
+            zod.literal("skipped"),
+            zod.literal("failed"),
+            zod.literal(null),
+          ])
+          .nullish()
+          .describe(
+            "Status of the most recent AI analysis event for this photo",
+          ),
+        suggestedCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              title: zod.string(),
+            }),
+          )
+          .optional(),
+        suggestedNewCollections: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              suggestedName: zod.string(),
+            }),
+          )
+          .optional(),
+        ratings: zod
+          .array(
+            zod.object({
+              userId: zod.number(),
+              userName: zod.string().nullish(),
+              score: zod.number(),
+              createdAt: zod.coerce.date(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Delete a project (owner or admin)
+ */
+export const DeleteProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Add a photo to a project
+ */
+export const AddPhotoToProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddPhotoToProjectBody = zod.object({
+  photoId: zod.number(),
+});
+
+/**
+ * @summary Remove a photo from a project
+ */
+export const RemovePhotoFromProjectParams = zod.object({
+  id: zod.coerce.number(),
+  photoId: zod.coerce.number(),
+});
+
+/**
  * @summary Accept a suggested collection for a photo (adds photo to the collection)
  */
 export const AcceptPhotoSuggestionParams = zod.object({

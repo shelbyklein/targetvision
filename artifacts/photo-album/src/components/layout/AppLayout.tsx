@@ -2,7 +2,7 @@ import { useState, useRef, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, FolderKanban, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
@@ -41,6 +41,7 @@ const navItems = [
   { href: "/albums", label: "Albums", icon: Images },
   { href: "/photos", label: "Photos", icon: Grid2x2 },
   { href: "/collections", label: "Collections", icon: FolderOpen },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/smart-collections", label: "Smart", icon: Sparkles },
 ];
 

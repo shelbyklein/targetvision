@@ -16,8 +16,12 @@ export default defineConfig({
       AI_KEY_ENCRYPTION_SECRET:
         process.env.AI_KEY_ENCRYPTION_SECRET ?? "test-ai-key-encryption-secret-0000000000000000",
     },
-    // Integration tests share one Postgres and truncate between tests, so they
-    // must not run concurrently within a file.
+    // Integration tests share one Postgres and TRUNCATE between tests, so they
+    // must run fully serially: `concurrent: false` stops concurrency within a
+    // file, and `fileParallelism: false` stops separate files from running in
+    // parallel workers (otherwise one file's reset wipes another's rows
+    // mid-test — FK violations, duplicate-key errors, empty result sets).
     sequence: { concurrent: false },
+    fileParallelism: false,
   },
 });
