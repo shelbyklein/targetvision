@@ -1,4 +1,4 @@
-import { useState, useRef, type DragEvent, type FormEvent } from "react";
+import { useState, useRef, useEffect, type DragEvent, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useSession, signOut } from "@/lib/auth-client";
 import {
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { isPhotoDrag, getDraggedPhotoId } from "@/lib/photoDrag";
+import { isPhotoDrag, getDraggedPhotoId, PHOTO_DND_MIME } from "@/lib/photoDrag";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -222,6 +222,29 @@ function ProjectsNav({ location }: { location: string }) {
     typeof localStorage !== "undefined" && localStorage.getItem(PROJECTS_NAV_OPEN_KEY) === "true"
   );
   const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [justAddedId, setJustAddedId] = useState<number | null>(null);
+
+  // While any photo is being dragged, auto-reveal the projects (so they're
+  // droppable) and light up the drop zone. Cleared when the drag ends.
+  useEffect(() => {
+    function onDragStartWin(ev: globalThis.DragEvent) {
+      if (ev.dataTransfer?.types.includes(PHOTO_DND_MIME)) {
+        setDragActive(true);
+        setOpen(true);
+      }
+    }
+    function onDragEndWin() {
+      setDragActive(false);
+      setDragOverId(null);
+    }
+    window.addEventListener("dragstart", onDragStartWin);
+    window.addEventListener("dragend", onDragEndWin);
+    return () => {
+      window.removeEventListener("dragstart", onDragStartWin);
+      window.removeEventListener("dragend", onDragEndWin);
+    };
+  }, []);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -244,6 +267,11 @@ function ProjectsNav({ location }: { location: string }) {
           qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
           qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
           qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
+          setJustAddedId(projectId);
+          window.setTimeout(
+            () => setJustAddedId((cur) => (cur === projectId ? null : cur)),
+            1100,
+          );
           toast({ title: `Added to "${projectName}"` });
         },
         onError: () => toast({ title: "Failed to add to project", variant: "destructive" }),
@@ -278,7 +306,14 @@ function ProjectsNav({ location }: { location: string }) {
                     <SidebarMenuSubButton
                       asChild
                       isActive={location === `/projects/${project.id}`}
-                      className={cn(dragOverId === project.id && "bg-sidebar-accent ring-1 ring-primary")}
+                      className={cn(
+                        "origin-left transition-all duration-150",
+                        dragActive && "border border-dashed border-primary/50",
+                        dragOverId === project.id &&
+                          "scale-[1.05] border-solid border-primary bg-primary/15 shadow-lg ring-2 ring-primary",
+                        justAddedId === project.id &&
+                          "border-solid border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500",
+                      )}
                       onDragOver={(e: DragEvent) => {
                         if (isPhotoDrag(e)) {
                           e.preventDefault();
@@ -290,7 +325,14 @@ function ProjectsNav({ location }: { location: string }) {
                     >
                       <Link href={`/projects/${project.id}`} data-testid={`projects-nav-item-${project.id}`}>
                         <span className="truncate">{project.name}</span>
-                        <SidebarMenuBadge>{project.photoCount}</SidebarMenuBadge>
+                        <SidebarMenuBadge
+                          className={cn(
+                            "transition-transform duration-200",
+                            justAddedId === project.id && "scale-150 text-emerald-400",
+                          )}
+                        >
+                          {project.photoCount}
+                        </SidebarMenuBadge>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
