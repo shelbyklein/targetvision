@@ -8,6 +8,7 @@ import tagsCategoriesRouter from "./tagsCategories";
 import statsRouter from "./stats";
 import storageRouter from "./storage";
 import collectionsRouter from "./collections";
+import projectsRouter from "./projects";
 import adminRouter from "./admin";
 import bulkUploadBatchesRouter from "./bulkUploadBatches";
 
@@ -22,6 +23,7 @@ router.use(tagsCategoriesRouter);
 router.use(statsRouter);
 router.use(storageRouter);
 router.use(collectionsRouter);
+router.use(projectsRouter);
 router.use(adminRouter);
 router.use(bulkUploadBatchesRouter);
 

@@ -206,6 +206,30 @@ function AppRoutes() {
             </>
           )}
         </Route>
+        <Route path="/projects">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/projects")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/projects/:id">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/project-detail")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
         <Route path="/smart-collections">
           {() => (
             <>

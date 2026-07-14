@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, ImageOff, Bot, Sparkles, Trash2 } from "lucide-react";
+import { X, Star, FolderOpen, FolderKanban, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, ImageOff, Bot, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
@@ -14,12 +14,16 @@ import {
   useCreateCollection,
   useSetAlbumCover,
   useDeletePhoto,
+  useListProjects,
+  useAddPhotoToProject,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
   getGetRecentPhotosQueryKey,
   getGetTopRatedPhotosQueryKey,
   getListCollectionsQueryKey,
+  getListProjectsQueryKey,
+  getGetProjectQueryKey,
   getGetAlbumQueryKey,
   getListAlbumsQueryKey,
 } from "@workspace/api-client-react";
@@ -213,6 +217,8 @@ function PhotoSidebarContent({
   const { mutate: createCollection, isPending: creating } = useCreateCollection();
   const { mutate: setAlbumCover, isPending: settingCover } = useSetAlbumCover();
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
+  const { data: allProjects } = useListProjects();
+  const { mutate: addToProject, isPending: addingToProject } = useAddPhotoToProject();
   const { data: me } = useGetMe();
 
   const [showNewForm, setShowNewForm] = useState(false);
@@ -240,6 +246,20 @@ function PhotoSidebarContent({
           toast({ title: "Added to collection" });
         },
         onError: () => toast({ title: "Failed to add to collection", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleAddProject(projectId: number, projectName: string) {
+    addToProject(
+      { id: projectId, data: { photoId } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
+          toast({ title: `Added to "${projectName}"` });
+        },
+        onError: () => toast({ title: "Failed to add to project", variant: "destructive" }),
       }
     );
   }
@@ -588,6 +608,34 @@ function PhotoSidebarContent({
         ) : !showNewForm ? (
           <p className="text-xs text-white/40">No collections yet.</p>
         ) : null}
+      </div>
+
+      <div className="space-y-2 border-t border-white/10 pt-3">
+        <div className="flex items-center gap-1.5 text-white/70">
+          <FolderKanban className="h-3.5 w-3.5" />
+          <span className="text-xs font-semibold uppercase tracking-wide">Projects</span>
+        </div>
+
+        {allProjects && allProjects.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5" data-testid="lightbox-project-pills">
+            {allProjects.map((proj) => (
+              <button
+                key={proj.id}
+                type="button"
+                onClick={() => handleAddProject(proj.id, proj.name)}
+                disabled={addingToProject}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
+                data-testid={`lightbox-project-pill-${proj.id}`}
+                aria-label={`Add to ${proj.name}`}
+              >
+                <Plus className="h-3 w-3 shrink-0" />
+                {proj.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-white/40">No projects yet.</p>
+        )}
       </div>
     </div>
   );
