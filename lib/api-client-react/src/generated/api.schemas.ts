@@ -139,6 +139,11 @@ export interface CollectionSummary {
   createdAt: string;
 }
 
+export interface PhotoProjectMembership {
+  id: number;
+  name: string;
+}
+
 export interface SuggestedCollection {
   id: number;
   title: string;
@@ -187,6 +192,8 @@ export interface Photo {
   /** @nullable */
   myRating?: number | null;
   photoCollections?: CollectionSummary[];
+  /** Projects this photo currently belongs to (membership only). */
+  photoProjects?: PhotoProjectMembership[];
   /** @nullable */
   aiDescription?: string | null;
   /**

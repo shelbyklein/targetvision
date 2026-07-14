@@ -16,6 +16,7 @@ import {
   useDeletePhoto,
   useListProjects,
   useAddPhotoToProject,
+  useRemovePhotoFromProject,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -219,6 +220,7 @@ function PhotoSidebarContent({
   const { mutate: deletePhoto, isPending: deleting } = useDeletePhoto();
   const { data: allProjects } = useListProjects();
   const { mutate: addToProject, isPending: addingToProject } = useAddPhotoToProject();
+  const { mutate: removeFromProject, isPending: removingFromProject } = useRemovePhotoFromProject();
   const { data: me } = useGetMe();
 
   const [showNewForm, setShowNewForm] = useState(false);
@@ -255,11 +257,27 @@ function PhotoSidebarContent({
       { id: projectId, data: { photoId } },
       {
         onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
           qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
           qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
           toast({ title: `Added to "${projectName}"` });
         },
         onError: () => toast({ title: "Failed to add to project", variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleRemoveProject(projectId: number, projectName: string) {
+    removeFromProject(
+      { id: projectId, photoId },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
+          qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
+          toast({ title: `Removed from "${projectName}"` });
+        },
+        onError: () => toast({ title: "Failed to remove from project", variant: "destructive" }),
       }
     );
   }
@@ -371,6 +389,7 @@ function PhotoSidebarContent({
   }
 
   const currentCollections = fullPhoto?.photoCollections ?? [];
+  const currentProjects = fullPhoto?.photoProjects ?? [];
   const isHidden = fullPhoto?.isHidden ?? false;
   const canDelete = me && fullPhoto && (me.id === fullPhoto.uploaderId || me.role === "admin");
 
@@ -618,20 +637,31 @@ function PhotoSidebarContent({
 
         {allProjects && allProjects.length > 0 ? (
           <div className="flex flex-wrap gap-1.5" data-testid="lightbox-project-pills">
-            {allProjects.map((proj) => (
-              <button
-                key={proj.id}
-                type="button"
-                onClick={() => handleAddProject(proj.id, proj.name)}
-                disabled={addingToProject}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
-                data-testid={`lightbox-project-pill-${proj.id}`}
-                aria-label={`Add to ${proj.name}`}
-              >
-                <Plus className="h-3 w-3 shrink-0" />
-                {proj.name}
-              </button>
-            ))}
+            {allProjects.map((proj) => {
+              const isIn = currentProjects.some((p) => p.id === proj.id);
+              return (
+                <button
+                  key={proj.id}
+                  type="button"
+                  onClick={() =>
+                    isIn ? handleRemoveProject(proj.id, proj.name) : handleAddProject(proj.id, proj.name)
+                  }
+                  disabled={addingToProject || removingFromProject}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50",
+                    isIn
+                      ? "bg-white text-gray-900 border border-white hover:bg-white/85"
+                      : "bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
+                  )}
+                  data-testid={`lightbox-project-pill-${proj.id}`}
+                  aria-label={isIn ? `Remove from ${proj.name}` : `Add to ${proj.name}`}
+                  aria-pressed={isIn}
+                >
+                  {isIn ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
+                  {proj.name}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <p className="text-xs text-white/40">No projects yet.</p>
