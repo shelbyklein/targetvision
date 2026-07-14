@@ -243,6 +243,52 @@ export interface CollectionPhotoInput {
   photoId: number;
 }
 
+export interface ProjectSummary {
+  id: number;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  createdById: number;
+  photoCount: number;
+  /** @nullable */
+  coverPhotoUrl?: string | null;
+  /** @nullable */
+  coverPhotoThumbnailKey?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  createdById: number;
+  photoCount: number;
+  /** @nullable */
+  coverPhotoUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  photos?: Photo[];
+}
+
+export interface ProjectInput {
+  /** @minLength 1 */
+  name: string;
+  description?: string;
+}
+
+export interface ProjectUpdate {
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface ProjectPhotoInput {
+  photoId: number;
+}
+
 export interface PhotoUpdate {
   /** @nullable */
   aiDescription?: string | null;

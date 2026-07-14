@@ -15,6 +15,13 @@
       "when": 1783619608163,
       "tag": "0001_hard_shadowcat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784005386192,
+      "tag": "0002_graceful_tusk",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,8 @@ tags:
     description: Category operations
   - name: collections
     description: Collection operations
+  - name: projects
+    description: Project operations (user-curated photo buckets)
   - name: ratings
     description: Rating operations
   - name: stats
@@ -1305,6 +1307,160 @@ paths:
         "404":
           description: Not found
 
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectSummary"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a single project with its photos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project with photos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project (owner or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project (owner or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /projects/{id}/photos:
+    post:
+      operationId: addPhotoToProject
+      tags: [projects]
+      summary: Add a photo to a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectPhotoInput"
+      responses:
+        "204":
+          description: Added
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /projects/{id}/photos/{photoId}:
+    delete:
+      operationId: removePhotoFromProject
+      tags: [projects]
+      summary: Remove a photo from a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
   /photos/{id}/suggestions/{collectionId}/accept:
     post:
       operationId: acceptPhotoSuggestion
@@ -1899,6 +2055,84 @@ components:
           type: ["string", "null"]
 
     CollectionPhotoInput:
+      type: object
+      required: [photoId]
+      properties:
+        photoId:
+          type: integer
+
+    ProjectSummary:
+      type: object
+      required: [id, name, createdById, createdAt, updatedAt, photoCount]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        createdById:
+          type: integer
+        photoCount:
+          type: integer
+        coverPhotoUrl:
+          type: ["string", "null"]
+        coverPhotoThumbnailKey:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Project:
+      type: object
+      required: [id, name, createdById, createdAt, updatedAt, photoCount]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        createdById:
+          type: integer
+        photoCount:
+          type: integer
+        coverPhotoUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Photo"
+
+    ProjectInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: ["string", "null"]
+
+    ProjectPhotoInput:
       type: object
       required: [photoId]
       properties:

@@ -5,6 +5,7 @@ export * from "./photos";
 export * from "./tags";
 export * from "./ratings";
 export * from "./collections";
+export * from "./projects";
 export * from "./appSettings";
 export * from "./aiAnalysisEvents";
 export * from "./aiBackfillRuns";
