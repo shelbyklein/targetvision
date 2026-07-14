@@ -27,12 +27,7 @@ one command, all local, no pushing. That way any change can be rolled back.
 
 ## Open
 
-- [ ] (feat) Add a top-level "Projects" section — a new primary destination (peer of Albums and Collections) where a user gathers/curates specific images for use in an actual document, as opposed to browsing/searching the library for options. [priority: high]
-  - Concept: a Project is a user-curated *bucket* of chosen photos (think "shortlist for a deliverable") — curation is the whole scope. No export/output/"use these" step. Distinct from Albums (storage/ownership) and Smart Collections (keyword-driven auto-groupings). Photos can live in a Project regardless of which album they belong to, and in more than one project.
-  - Nav: add "Projects" to the left sidebar at the same level as Albums/Collections, with its own list page and detail page.
-  - Data/API: new `projects` table (name, description, timestamps) + a project↔photo join (many-to-many); CRUD endpoints; add/remove photo to/from a project. Update OpenAPI spec + regenerate codegen.
-  - UI: a Projects list page (cards), a Project detail page showing the curated photos (reuse the MasonryGrid), and an "Add to Project" action from photo cards / the lightbox (like adding to a collection).
-  - v1 scope: create/rename/delete projects + add/remove photos. Ordering within a project = by date added (manual reorder deferred). No export.
+- [ ] (feat) Show project membership on the lightbox "Add to Project" pills — the pills always render a `+` and never reflect whether the photo is already in a project (unlike Collections pills, which show a filled/member state). The photo API payload carries collection membership but not project membership; add a `photoProjects` field to the Photo response (mirroring `photoCollections`) and render membership state. [priority: low]
 
 - [ ] (feat) Near-duplicate detection (follow-up) — extend duplicate detection with a perceptual/dHash column + threshold grouping to catch re-encoded/resized copies, not just byte-identical ones. [priority: low]
 
@@ -55,3 +50,4 @@ one command, all local, no pushing. That way any change can be rolled back.
 - [x] 2026-07-09 (bug) "Review Unrated" count only reflects loaded photos — album response now returns a server-computed `unratedCount` (non-hidden photos with zero ratings); the button shows the true album-wide total instead of the ~50-cap client-side count.
 - [x] 2026-07-09 (bug) Masonry grid fills column-by-column — new shared `MasonryGrid` distributes items round-robin into column buckets (item i → column i % N) for true left-to-right reading order, responsive across breakpoints; applied to all six photo grids.
 - [x] 2026-07-09 (feat) Duplicate detection & cleanup (exact) — added a `contentHash` (SHA-256) column + migration, hashing on upload, a background backfill, an admin-only duplicate-groups endpoint, and an admin "Duplicates" section that reuses the existing photo-delete path; album-cover photos are delete-disabled and collection membership is warned. Near-duplicate/perceptual hashing left as a follow-up.
+- [x] 2026-07-14 (feat) Projects — a top-level "Projects" section (peer of Albums/Collections): user-curated buckets of photos. New `projects` + `project_photos` tables (migration `0002`), full CRUD + add/remove-photo API (`routes/projects.ts`), sidebar nav, list + detail pages (detail reuses `MasonryGrid`), and "Add to Project" controls on the photo detail page and lightbox. v1 = create/rename/delete + add/remove photos, ordered by date added. Verified end-to-end in the browser. Lightbox pill membership-state left as a follow-up.
