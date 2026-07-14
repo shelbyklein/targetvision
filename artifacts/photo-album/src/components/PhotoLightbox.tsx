@@ -490,16 +490,6 @@ function PhotoSidebarContent({
         />
       </div>
 
-      {fullPhoto?.aiDescription && (
-        <div className="border-t border-white/10 pt-3 space-y-1.5" data-testid="lightbox-ai-description">
-          <div className="flex items-center gap-1.5 text-white/70">
-            <Bot className="h-3.5 w-3.5 text-sky-300" />
-            <span className="text-xs font-semibold uppercase tracking-wide">AI Description</span>
-          </div>
-          <p className="text-xs text-white/70 leading-relaxed">{fullPhoto.aiDescription}</p>
-        </div>
-      )}
-
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5 text-white/70">
@@ -700,6 +690,11 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
   const { mutate: updatePhotoKb } = useUpdatePhoto();
   const { data: me } = useGetMe();
   const { toast: toastKb } = useToast();
+  // Shares the cache with the sidebar's useGetPhoto (same query key) — no extra
+  // request. Used to show the AI description directly under the photo.
+  const { data: fullPhoto } = useGetPhoto(photo?.id ?? 0, {
+    query: { enabled: !!photo?.id, queryKey: getGetPhotoQueryKey(photo?.id ?? 0) },
+  });
 
   // Stable refs so keydown listeners always call the latest version
   const hideAndAdvanceRef = useRef<() => void>(() => {});
@@ -885,6 +880,16 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                     </div>
                   )}
                 </div>
+
+                {fullPhoto?.aiDescription && (
+                  <div className="mx-auto max-w-2xl text-left" data-testid="lightbox-ai-description">
+                    <div className="mb-1 flex items-center gap-1.5 text-white/60">
+                      <Bot className="h-3.5 w-3.5 text-sky-300" />
+                      <span className="text-xs font-semibold uppercase tracking-wide">AI Description</span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-white/75">{fullPhoto.aiDescription}</p>
+                  </div>
+                )}
               </div>
 
               <div
