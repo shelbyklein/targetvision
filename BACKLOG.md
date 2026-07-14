@@ -27,6 +27,13 @@ one command, all local, no pushing. That way any change can be rolled back.
 
 ## Open
 
+- [ ] (feat) Add a top-level "Projects" section — a new primary destination (peer of Albums and Collections) where a user gathers/curates specific images for use in an actual document, as opposed to browsing/searching the library for options. [priority: high]
+  - Concept: a Project is a user-curated *bucket* of chosen photos (think "shortlist for a deliverable") — curation is the whole scope. No export/output/"use these" step. Distinct from Albums (storage/ownership) and Smart Collections (keyword-driven auto-groupings). Photos can live in a Project regardless of which album they belong to, and in more than one project.
+  - Nav: add "Projects" to the left sidebar at the same level as Albums/Collections, with its own list page and detail page.
+  - Data/API: new `projects` table (name, description, timestamps) + a project↔photo join (many-to-many); CRUD endpoints; add/remove photo to/from a project. Update OpenAPI spec + regenerate codegen.
+  - UI: a Projects list page (cards), a Project detail page showing the curated photos (reuse the MasonryGrid), and an "Add to Project" action from photo cards / the lightbox (like adding to a collection).
+  - v1 scope: create/rename/delete projects + add/remove photos. Ordering within a project = by date added (manual reorder deferred). No export.
+
 - [ ] (feat) Near-duplicate detection (follow-up) — extend duplicate detection with a perceptual/dHash column + threshold grouping to catch re-encoded/resized copies, not just byte-identical ones. [priority: low]
 
 - [ ] (feat) Server-side pagination for the main Photos page and Search — right now `/photos` and `/search` return every matching photo; add limit/offset (contract + frontend change). [priority: low]
@@ -34,6 +41,7 @@ one command, all local, no pushing. That way any change can be rolled back.
 - [ ] (bug) Album card metadata text too large — the photo count, date, and other metadata below album titles on the Albums page should use a smaller text size. [priority: low]
 - [ ] (chore) Decompose the remaining large pages — `photo-detail.tsx` (~1000 lines), `bulk-upload.tsx`, and `PhotoLightbox.tsx` into smaller components. [priority: low]
 - [ ] (chore) Finish removing Replit leftovers in the mobile app — `artifacts/mobile/scripts/build.js`, `dev-start.mjs`, and `app.json` still reference Replit. [priority: low]
+- [ ] (chore) Backfill missing photo indexes on baselined DBs — the four indexes added in migration `0000` (`photos_album_created_idx`, `photos_created_idx`, `photos_uploader_idx`, `photos_taken_at_idx`) only get created on fresh DBs; DBs baselined against `0000` never ran them. Add a `0002` migration with `CREATE INDEX IF NOT EXISTS` so existing dev/prod DBs get them. Perf-only, not correctness. [priority: low]
 
 ## Done
 
