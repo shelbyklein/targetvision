@@ -1,10 +1,21 @@
-import { useState, useRef, type FormEvent } from "react";
+import { useState, useRef, type DragEvent, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useSession, signOut } from "@/lib/auth-client";
-import { useGetMe } from "@workspace/api-client-react";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, FolderKanban, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon } from "lucide-react";
+import {
+  useGetMe,
+  useListProjects,
+  useAddPhotoToProject,
+  getListProjectsQueryKey,
+  getGetProjectQueryKey,
+  getGetPhotoQueryKey,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, FolderKanban, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { isPhotoDrag, getDraggedPhotoId } from "@/lib/photoDrag";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,8 +35,13 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
@@ -192,6 +208,102 @@ function ThemeMenuButton() {
   );
 }
 
+const PROJECTS_NAV_OPEN_KEY = "projects_nav_open";
+
+// The "Projects" nav entry as a collapsible tree: the label links to /projects,
+// a chevron expands to list each project (with its photo count), and each
+// project row is a drop target — drag a photo from any grid onto it to add it.
+function ProjectsNav({ location }: { location: string }) {
+  const { data: projects } = useListProjects();
+  const { mutate: addToProject } = useAddPhotoToProject();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [open, setOpen] = useState<boolean>(() =>
+    typeof localStorage !== "undefined" && localStorage.getItem(PROJECTS_NAV_OPEN_KEY) === "true"
+  );
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    try {
+      localStorage.setItem(PROJECTS_NAV_OPEN_KEY, String(next));
+    } catch {
+      // localStorage unavailable (private mode) — expansion just won't persist.
+    }
+  }
+
+  function handleDrop(e: DragEvent, projectId: number, projectName: string) {
+    e.preventDefault();
+    setDragOverId(null);
+    const photoId = getDraggedPhotoId(e);
+    if (photoId == null) return;
+    addToProject(
+      { id: projectId, data: { photoId } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
+          qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
+          toast({ title: `Added to "${projectName}"` });
+        },
+        onError: () => toast({ title: "Failed to add to project", variant: "destructive" }),
+      }
+    );
+  }
+
+  return (
+    <Collapsible asChild open={open} onOpenChange={handleOpenChange} className="group/projects">
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={location === "/projects"} tooltip="Projects">
+          <Link href="/projects" data-testid="nav-projects">
+            <FolderKanban />
+            <span>Projects</span>
+          </Link>
+        </SidebarMenuButton>
+        {projects && projects.length > 0 && (
+          <>
+            <CollapsibleTrigger asChild>
+              <SidebarMenuAction
+                className="transition-transform data-[state=open]:rotate-90"
+                data-testid="projects-nav-toggle"
+                aria-label={open ? "Collapse projects" : "Expand projects"}
+              >
+                <ChevronRight />
+              </SidebarMenuAction>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarMenuSub data-testid="projects-nav-sub">
+                {projects.map((project) => (
+                  <SidebarMenuSubItem key={project.id}>
+                    <SidebarMenuSubButton
+                      asChild
+                      isActive={location === `/projects/${project.id}`}
+                      className={cn(dragOverId === project.id && "bg-sidebar-accent ring-1 ring-primary")}
+                      onDragOver={(e: DragEvent) => {
+                        if (isPhotoDrag(e)) {
+                          e.preventDefault();
+                          setDragOverId(project.id);
+                        }
+                      }}
+                      onDragLeave={() => setDragOverId((cur) => (cur === project.id ? null : cur))}
+                      onDrop={(e: DragEvent) => handleDrop(e, project.id, project.name)}
+                    >
+                      <Link href={`/projects/${project.id}`} data-testid={`projects-nav-item-${project.id}`}>
+                        <span className="truncate">{project.name}</span>
+                        <SidebarMenuBadge>{project.photoCount}</SidebarMenuBadge>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                ))}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </>
+        )}
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
 function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean }) {
   const { data: session } = useSession();
   const user = session?.user;
@@ -223,6 +335,9 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarMenu data-testid="main-nav">
             {items.map((item) => {
+              if (item.href === "/projects") {
+                return <ProjectsNav key={item.href} location={location} />;
+              }
               const Icon = item.icon;
               const active = location === item.href || location.startsWith(item.href + "/");
               return (

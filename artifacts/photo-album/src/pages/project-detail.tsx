@@ -15,6 +15,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { formatDate } from "@/lib/format-date";
 import { FadeImage } from "@/components/ui/fade-image";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { startPhotoDrag } from "@/lib/photoDrag";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -319,6 +320,8 @@ export default function ProjectDetail() {
             renderItem={(photo) => (
               <div
                 key={photo.id}
+                draggable
+                onDragStart={(e) => startPhotoDrag(e, photo.id)}
                 className="relative group mb-3 break-inside-avoid rounded-lg overflow-hidden bg-muted"
                 data-testid="project-photo-item"
               >

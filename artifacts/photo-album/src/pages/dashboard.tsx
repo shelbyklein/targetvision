@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Images, Camera, Users, FolderOpen, Star, Sparkles } from "lucide-react";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { startPhotoDrag } from "@/lib/photoDrag";
 import { Link } from "wouter";
 
 function StatCard({
@@ -111,6 +112,8 @@ function PhotoStrip({
       renderItem={(photo) => (
         <button
           key={photo.id}
+          draggable
+          onDragStart={(e) => startPhotoDrag(e, photo.id)}
           onClick={() => onPhotoClick(photo)}
           className="relative mb-3 break-inside-avoid w-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           data-testid="photo-strip-item"

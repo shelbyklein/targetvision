@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { startPhotoDrag } from "@/lib/photoDrag";
 import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, X, RefreshCw, Wand2, ImageIcon } from "lucide-react";
 import { collectionKeywords } from "@/lib/aiSuggestions";
 import { useToast } from "@/hooks/use-toast";
@@ -418,6 +419,8 @@ export default function SmartCollectionDetail() {
               return (
                 <button
                   key={photo.id}
+                  draggable
+                  onDragStart={(e) => startPhotoDrag(e, photo.id)}
                   onClick={() => setSelectedPhoto(toLight(photo))}
                   className="relative mb-3 break-inside-avoid w-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                   data-testid="smart-photo-item"
