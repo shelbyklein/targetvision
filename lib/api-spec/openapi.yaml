@@ -1007,6 +1007,23 @@ paths:
         "404":
           description: Event or its photo not found
 
+  /admin/photos/duplicates:
+    get:
+      operationId: listDuplicatePhotoGroups
+      tags: [admin]
+      summary: List groups of exact-duplicate photos sharing a content hash (admin only)
+      responses:
+        "200":
+          description: Duplicate photo groups (only groups with 2+ members)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDuplicatePhotoGroupsResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
   /stats/dashboard:
     get:
       operationId: getDashboardStats
@@ -1625,6 +1642,8 @@ components:
           type: integer
         hiddenCount:
           type: integer
+        unratedCount:
+          type: integer
         createdAt:
           type: string
           format: date-time
@@ -1666,6 +1685,50 @@ components:
         photoId:
           type: integer
 
+    DuplicatePhoto:
+      type: object
+      required: [id, albumId, createdAt, isAlbumCover, collectionCount]
+      properties:
+        id:
+          type: integer
+        albumId:
+          type: integer
+        albumTitle:
+          type: ["string", "null"]
+        filename:
+          type: ["string", "null"]
+        thumbnailUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        isAlbumCover:
+          type: boolean
+          description: True if this photo is the cover of its album; deleting it would clear the album cover.
+        collectionCount:
+          type: integer
+          description: Number of collections this photo belongs to.
+
+    DuplicatePhotoGroup:
+      type: object
+      required: [contentHash, photos]
+      properties:
+        contentHash:
+          type: string
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuplicatePhoto"
+
+    ListDuplicatePhotoGroupsResponse:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuplicatePhotoGroup"
+
     Photo:
       type: object
       required: [id, albumId, uploaderId, url, createdAt, ratingCount, isHidden]
@@ -1688,6 +1751,9 @@ components:
           type: ["string", "null"]
         filesize:
           type: ["integer", "null"]
+        contentHash:
+          type: ["string", "null"]
+          description: SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.
         takenAt:
           type: ["string", "null"]
         createdAt:
@@ -2044,7 +2110,7 @@ components:
 
     AiProviderInfo:
       type: object
-      required: [id, label, model, availableModels, hasKey, replitFallbackAvailable, usable]
+      required: [id, label, model, availableModels, hasKey, envKeyFallbackAvailable, usable]
       properties:
         id:
           type: string
@@ -2061,7 +2127,7 @@ components:
           type: boolean
         keyPreview:
           type: ["string", "null"]
-        replitFallbackAvailable:
+        envKeyFallbackAvailable:
           type: boolean
         usable:
           type: boolean

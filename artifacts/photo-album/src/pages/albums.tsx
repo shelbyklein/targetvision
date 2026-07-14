@@ -19,6 +19,7 @@ import {
 import { Plus, Images, CalendarDays, Camera, EyeOff, FolderInput, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
+import { formatDate } from "@/lib/format-date";
 
 function CreateAlbumDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
@@ -185,7 +186,7 @@ export default function Albums() {
                       {album.eventDate && (
                         <span className="flex items-center gap-1">
                           <CalendarDays className="h-3 w-3" />
-                          {album.eventDate}
+                          {formatDate(album.eventDate)}
                         </span>
                       )}
                     </div>

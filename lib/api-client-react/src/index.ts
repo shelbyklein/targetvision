@@ -6,4 +6,5 @@ export * from "./collectionTags";
 export * from "./thumbnails";
 export * from "./exifDateBackfill";
 export * from "./aiAnalysisBackfill";
+export * from "./contentHashBackfill";
 export * from "./bulkUploadBatches";

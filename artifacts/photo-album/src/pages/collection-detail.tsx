@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
+import { MasonryGrid } from "@/components/MasonryGrid";
 import { useParams, Link, useLocation } from "wouter";
 import {
   useGetCollection,
@@ -440,11 +441,11 @@ export default function CollectionDetail() {
             </p>
           </div>
         ) : (
-          <div
-            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
+          <MasonryGrid
+            items={collection.photos}
+            getKey={(photo) => photo.id}
             data-testid="collection-photo-grid"
-          >
-            {collection.photos.map((photo) => {
+            renderItem={(photo) => {
               const isCover = collection.coverPhotoId === photo.id;
               return (
                 <div
@@ -455,6 +456,7 @@ export default function CollectionDetail() {
                   <Link href={`/photos/${photo.id}`}>
                     <FadeImage
                       fit="contain"
+                      loading="lazy"
                       src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                       alt={photo.aiDescription ?? "Photo"}
                       className="w-full h-auto cursor-pointer transition-transform duration-200 group-hover:scale-105"
@@ -552,8 +554,8 @@ export default function CollectionDetail() {
                   )}
                 </div>
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
     </AppLayout>

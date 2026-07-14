@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Bot, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatDateTime } from "@/lib/format-date";
 
 type BackfillResult = {
   processed: number;
@@ -244,7 +245,7 @@ export function AiAnalysisBackfillSection() {
                   {runs.map((run) => (
                     <TableRow key={run.id} data-testid={`ai-backfill-run-${run.id}`}>
                       <TableCell className="text-xs">
-                        {new Date(run.createdAt).toLocaleString()}
+                        {formatDateTime(run.createdAt)}
                       </TableCell>
                       <TableCell className="text-xs capitalize">{run.trigger}</TableCell>
                       <TableCell className="text-xs text-right">{run.processed}</TableCell>

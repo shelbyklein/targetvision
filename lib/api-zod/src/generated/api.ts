@@ -76,6 +76,7 @@ export const ListAlbumsResponseItem = zod.object({
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
+  unratedCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });
 export const ListAlbumsResponse = zod.array(ListAlbumsResponseItem);
@@ -110,6 +111,7 @@ export const GetAlbumResponse = zod.object({
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
+  unratedCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });
 
@@ -139,6 +141,7 @@ export const UpdateAlbumResponse = zod.object({
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
+  unratedCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });
 
@@ -166,6 +169,12 @@ export const GetAlbumTopRatedResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -251,6 +260,7 @@ export const SetAlbumCoverResponse = zod.object({
   photoCount: zod.number(),
   ratedCount: zod.number().optional(),
   hiddenCount: zod.number().optional(),
+  unratedCount: zod.number().optional(),
   createdAt: zod.coerce.date(),
 });
 
@@ -282,6 +292,12 @@ export const ListAlbumPhotosResponse = zod.object({
       url: zod.string(),
       filename: zod.string().nullish(),
       filesize: zod.number().nullish(),
+      contentHash: zod
+        .string()
+        .nullish()
+        .describe(
+          "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+        ),
       takenAt: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       isHidden: zod.boolean(),
@@ -384,6 +400,12 @@ export const SearchPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -472,6 +494,12 @@ export const ListPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -575,6 +603,12 @@ export const GetPhotoResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -658,6 +692,12 @@ export const UpdatePhotoResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -746,6 +786,12 @@ export const AddPhotoTagResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -824,6 +870,12 @@ export const RemovePhotoTagResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -905,6 +957,12 @@ export const AddPhotoCategoryResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -983,6 +1041,12 @@ export const RemovePhotoCategoryResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1066,6 +1130,12 @@ export const RatePhotoResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1143,6 +1213,12 @@ export const ClearPhotoRatingResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1283,7 +1359,7 @@ export const GetAiSettingsResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     anthropic: zod.object({
@@ -1298,7 +1374,7 @@ export const GetAiSettingsResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     gemini: zod.object({
@@ -1313,7 +1389,7 @@ export const GetAiSettingsResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
   }),
@@ -1351,7 +1427,7 @@ export const UpdateAiSettingsResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     anthropic: zod.object({
@@ -1366,7 +1442,7 @@ export const UpdateAiSettingsResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     gemini: zod.object({
@@ -1381,7 +1457,7 @@ export const UpdateAiSettingsResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
   }),
@@ -1417,7 +1493,7 @@ export const SetAiProviderKeyResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     anthropic: zod.object({
@@ -1432,7 +1508,7 @@ export const SetAiProviderKeyResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     gemini: zod.object({
@@ -1447,7 +1523,7 @@ export const SetAiProviderKeyResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
   }),
@@ -1477,7 +1553,7 @@ export const ClearAiProviderKeyResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     anthropic: zod.object({
@@ -1492,7 +1568,7 @@ export const ClearAiProviderKeyResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
     gemini: zod.object({
@@ -1507,7 +1583,7 @@ export const ClearAiProviderKeyResponse = zod.object({
       ),
       hasKey: zod.boolean(),
       keyPreview: zod.string().nullish(),
-      replitFallbackAvailable: zod.boolean(),
+      envKeyFallbackAvailable: zod.boolean(),
       usable: zod.boolean(),
     }),
   }),
@@ -1558,6 +1634,35 @@ export const RetryAiAnalysisEventResponse = zod.object({
 });
 
 /**
+ * @summary List groups of exact-duplicate photos sharing a content hash (admin only)
+ */
+export const ListDuplicatePhotoGroupsResponse = zod.object({
+  groups: zod.array(
+    zod.object({
+      contentHash: zod.string(),
+      photos: zod.array(
+        zod.object({
+          id: zod.number(),
+          albumId: zod.number(),
+          albumTitle: zod.string().nullish(),
+          filename: zod.string().nullish(),
+          thumbnailUrl: zod.string().nullish(),
+          createdAt: zod.coerce.date(),
+          isAlbumCover: zod
+            .boolean()
+            .describe(
+              "True if this photo is the cover of its album; deleting it would clear the album cover.",
+            ),
+          collectionCount: zod
+            .number()
+            .describe("Number of collections this photo belongs to."),
+        }),
+      ),
+    }),
+  ),
+});
+
+/**
  * @summary Get dashboard summary statistics
  */
 export const GetDashboardStatsResponse = zod.object({
@@ -1577,6 +1682,12 @@ export const GetDashboardStatsResponse = zod.object({
       url: zod.string(),
       filename: zod.string().nullish(),
       filesize: zod.number().nullish(),
+      contentHash: zod
+        .string()
+        .nullish()
+        .describe(
+          "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+        ),
       takenAt: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       isHidden: zod.boolean(),
@@ -1652,6 +1763,12 @@ export const GetRecentPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1726,6 +1843,12 @@ export const GetTopRatedPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -1884,6 +2007,12 @@ export const GetCollectionResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        contentHash: zod
+          .string()
+          .nullish()
+          .describe(
+            "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+          ),
         takenAt: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         isHidden: zod.boolean(),
@@ -1986,6 +2115,12 @@ export const UpdateCollectionResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        contentHash: zod
+          .string()
+          .nullish()
+          .describe(
+            "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+          ),
         takenAt: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         isHidden: zod.boolean(),
@@ -2111,6 +2246,12 @@ export const SetCollectionCoverResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        contentHash: zod
+          .string()
+          .nullish()
+          .describe(
+            "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+          ),
         takenAt: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         isHidden: zod.boolean(),
@@ -2201,6 +2342,12 @@ export const AcceptPhotoSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2279,6 +2426,12 @@ export const DismissPhotoSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2357,6 +2510,12 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2435,6 +2594,12 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2513,6 +2678,12 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2591,6 +2762,12 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2673,6 +2850,12 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),
@@ -2751,6 +2934,12 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
   takenAt: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   isHidden: zod.boolean(),

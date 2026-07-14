@@ -25,5 +25,6 @@ export interface Album {
   photoCount: number;
   ratedCount?: number;
   hiddenCount?: number;
+  unratedCount?: number;
   createdAt: Date;
 }

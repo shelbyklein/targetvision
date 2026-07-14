@@ -2,29 +2,15 @@ import { File } from "@google-cloud/storage";
 
 const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
 
-export enum ObjectPermission {
-  READ = "read",
-  WRITE = "write",
-}
-
+// TargetVision serves photos as internal-team content: any signed-in member may
+// read any object (see the GET /storage/objects route, which gates on auth only).
+// The only ACL fact still consulted is an object's public/private visibility,
+// used by downloadObject to choose the Cache-Control header. Per-owner/per-object
+// read enforcement is intentionally not implemented; if it is ever needed,
+// reintroduce a canAccessObject check in the storage route.
 export interface ObjectAclPolicy {
   owner: string;
   visibility: "public" | "private";
-}
-
-export async function setObjectAclPolicy(
-  objectFile: File,
-  aclPolicy: ObjectAclPolicy,
-): Promise<void> {
-  const [exists] = await objectFile.exists();
-  if (!exists) {
-    throw new Error(`Object not found: ${objectFile.name}`);
-  }
-  await objectFile.setMetadata({
-    metadata: {
-      [ACL_POLICY_METADATA_KEY]: JSON.stringify(aclPolicy),
-    },
-  });
 }
 
 export async function getObjectAclPolicy(
@@ -34,22 +20,4 @@ export async function getObjectAclPolicy(
   const raw = metadata?.metadata?.[ACL_POLICY_METADATA_KEY];
   if (!raw) return null;
   return JSON.parse(raw as string);
-}
-
-export async function canAccessObject({
-  userId,
-  objectFile,
-  requestedPermission,
-}: {
-  userId?: string;
-  objectFile: File;
-  requestedPermission: ObjectPermission;
-}): Promise<boolean> {
-  const aclPolicy = await getObjectAclPolicy(objectFile);
-  if (!aclPolicy) return false;
-  if (aclPolicy.visibility === "public" && requestedPermission === ObjectPermission.READ) {
-    return true;
-  }
-  if (!userId) return false;
-  return aclPolicy.owner === userId;
 }

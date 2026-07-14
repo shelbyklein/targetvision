@@ -56,7 +56,7 @@ export function AlbumCard({ album, onPress }: AlbumCardProps) {
             <Text style={styles.date}>
               {new Date(album.eventDate).toLocaleDateString("en-US", {
                 month: "short",
-                day: "numeric",
+                day: "2-digit",
                 year: "numeric",
               })}
             </Text>

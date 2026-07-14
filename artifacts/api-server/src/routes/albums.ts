@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, count, sql, desc, avg } from "drizzle-orm";
+import { eq, and, count, sql, desc, avg } from "drizzle-orm";
 import { db, albumsTable, photosTable, usersTable, ratingsTable } from "@workspace/db";
 import {
   ListAlbumsResponse,
@@ -18,12 +18,12 @@ import {
   GetAlbumTopRatedResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
+import { buildPhotosResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
 async function buildAlbumResponse(albumId: number) {
-  const [[row], [ratedRow]] = await Promise.all([
+  const [[row], [ratedRow], [unratedRow]] = await Promise.all([
     db
       .select({
         album: albumsTable,
@@ -41,6 +41,18 @@ async function buildAlbumResponse(albumId: number) {
       .from(ratingsTable)
       .innerJoin(photosTable, eq(ratingsTable.photoId, photosTable.id))
       .where(eq(photosTable.albumId, albumId)),
+    // Visible (non-hidden) photos in the album with zero ratings. This mirrors the
+    // album detail page's default "Review Unrated" scope, which excludes hidden photos.
+    db
+      .select({ unratedCount: sql<number>`cast(count(*) as integer)` })
+      .from(photosTable)
+      .where(
+        and(
+          eq(photosTable.albumId, albumId),
+          eq(photosTable.isHidden, false),
+          sql`not exists (select 1 from ${ratingsTable} where ${ratingsTable.photoId} = ${photosTable.id})`,
+        ),
+      ),
   ]);
 
   if (!row) return null;
@@ -62,6 +74,7 @@ async function buildAlbumResponse(albumId: number) {
     photoCount: Number(row.photoCount),
     hiddenCount: Number(row.hiddenCount),
     ratedCount: Number(ratedRow?.ratedCount ?? 0),
+    unratedCount: Number(unratedRow?.unratedCount ?? 0),
     coverPhotoUrl,
     coverPhotoThumbnailKey,
   };
@@ -282,8 +295,8 @@ router.get("/albums/:id/top-rated", requireAuth, async (req, res): Promise<void>
     .orderBy(desc(avg(ratingsTable.score)))
     .limit(12);
 
-  const photos = await Promise.all(rows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id)));
-  res.json(GetAlbumTopRatedResponse.parse(photos.filter(Boolean)));
+  const photos = await buildPhotosResponse(rows.map((p) => p.id), req.dbUser?.id);
+  res.json(GetAlbumTopRatedResponse.parse(photos));
 });
 
 export default router;

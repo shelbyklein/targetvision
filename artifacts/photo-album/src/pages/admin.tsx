@@ -24,6 +24,7 @@ import { AiAnalysisBackfillSection } from "@/components/admin/AiAnalysisBackfill
 import { RegistrationSection } from "@/components/admin/RegistrationSection";
 import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
 import { CapturedDatesSection } from "@/components/admin/CapturedDatesSection";
+import { DuplicatesSection } from "@/components/admin/DuplicatesSection";
 
 export default function Admin() {
   const qc = useQueryClient();
@@ -92,6 +93,8 @@ export default function Admin() {
         <ThumbnailsSection />
 
         <CapturedDatesSection />
+
+        <DuplicatesSection />
 
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">

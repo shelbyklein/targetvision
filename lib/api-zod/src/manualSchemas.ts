@@ -47,6 +47,17 @@ export const BackfillExifDatesResponse = z.object({
   failed: z.number(),
 });
 
+export const BackfillContentHashesStatusResponse = z.object({
+  missingCount: z.number(),
+});
+
+export const BackfillContentHashesResponse = z.object({
+  processed: z.number(),
+  updated: z.number(),
+  skipped: z.number(),
+  failed: z.number(),
+});
+
 export const BackfillAiAnalysisStatusResponse = z.object({
   missingCount: z.number(),
 });

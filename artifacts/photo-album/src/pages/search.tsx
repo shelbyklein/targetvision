@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
+import { MasonryGrid } from "@/components/MasonryGrid";
 import { useLocation, useSearch } from "wouter";
 import {
   useSearchPhotos,
@@ -407,11 +408,11 @@ export default function SearchPage() {
                 )}
               </div>
             ) : (
-              <div
-                className="columns-2 sm:columns-3 lg:columns-4 gap-3"
+              <MasonryGrid
+                items={results}
+                getKey={(photo) => photo.id}
                 data-testid="search-results"
-              >
-                {results.map((photo) => (
+                renderItem={(photo) => (
                   <Link
                     key={photo.id}
                     href={`/photos/${photo.id}`}
@@ -423,6 +424,7 @@ export default function SearchPage() {
                     )}>
                       <FadeImage
                         fit="contain"
+                        loading="lazy"
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
                         className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
@@ -454,8 +456,8 @@ export default function SearchPage() {
                       )}
                     </div>
                   </Link>
-                ))}
-              </div>
+                )}
+              />
             )}
           </>
         )}

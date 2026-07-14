@@ -10,9 +10,18 @@ A pnpm-workspace monorepo photo album app: Express API + React web frontend + Ex
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from `lib/api-spec/openapi.yaml`
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm run test` — run tests across packages (api-server integration tests need a Postgres `targetvision_test` DB; see Migrations)
 - Prerequisites: Node 24 (nvm), pnpm (corepack), PostgreSQL 16 on port 5433 (brew services), Docker Desktop (for fake-gcs-server)
-- Env vars load from a root `.env` file (see `.env.example`). The api-server reads it via `--env-file-if-exists`; `lib/db`'s `push`/`seed` scripts use `dotenv-cli` (`dotenv -e ../../.env -- <cmd>`).
+- Env vars load from a root `.env` file (see `.env.example`). The api-server reads it via `--env-file-if-exists`; `lib/db`'s scripts use `dotenv-cli` (`dotenv -e ../../.env -- <cmd>`).
+
+## Database & migrations
+
+- Schema lives in `lib/db/src/schema/*` (Drizzle). Generated migrations live in `lib/db/drizzle/` with a `meta/_journal.json`.
+- **Forward workflow (versioned):** edit the schema → `pnpm --filter @workspace/db run generate` (writes a new `NNNN_*.sql` migration) → `pnpm --filter @workspace/db run migrate` (applies pending migrations; safe to re-run, tracked in `drizzle.__drizzle_migrations`). CI applies migrations this way against a fresh Postgres before running tests.
+- **`pnpm --filter @workspace/db run push`** still works for quick local iteration but does not create migration files — prefer generate+migrate so schema history is captured.
+- **Existing databases** are baselined against `0000_secret_cable.sql` (the local dev DB already was), so `migrate` is a no-op there until a new migration is generated. A brand-new database gets the full schema from `migrate`.
+- The older hand-written `lib/db/migrations/*.sql` files predate this system and are historical only — not applied by `migrate`.
+- Tests: api-server integration tests run against a dedicated `targetvision_test` database (never the dev DB — `testDb.ts` refuses a non-"test" `DATABASE_URL`). Create it once with `createdb targetvision_test` (or the SQL equivalent) then `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5433/targetvision_test pnpm --filter @workspace/db exec tsx src/migrate.ts`.
 
 ## Auth (Better Auth)
 

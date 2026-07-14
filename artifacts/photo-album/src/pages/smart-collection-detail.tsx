@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
+import { MasonryGrid } from "@/components/MasonryGrid";
 import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, X, RefreshCw, Wand2, ImageIcon } from "lucide-react";
 import { collectionKeywords } from "@/lib/aiSuggestions";
 import { useToast } from "@/hooks/use-toast";
@@ -407,11 +408,11 @@ export default function SmartCollectionDetail() {
             </p>
           </div>
         ) : (
-          <div
-            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
+          <MasonryGrid
+            items={photos}
+            getKey={(photo) => photo.id}
             data-testid="smart-collection-photo-grid"
-          >
-            {photos.map((photo) => {
+            renderItem={(photo) => {
               const inCollection = collectionPhotoIds.has(photo.id);
               const isAdding = addingIds.has(photo.id);
               return (
@@ -424,6 +425,7 @@ export default function SmartCollectionDetail() {
                 >
                   <FadeImage
                     fit="contain"
+                    loading="lazy"
                     src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                     alt={photo.filename ?? "Photo"}
                     className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
@@ -490,8 +492,8 @@ export default function SmartCollectionDetail() {
                   </div>
                 </button>
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
 

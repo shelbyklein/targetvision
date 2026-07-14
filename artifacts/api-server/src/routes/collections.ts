@@ -18,7 +18,7 @@ import {
   SetCollectionCoverResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { buildPhotoResponse } from "../lib/photoHelpers";
+import { buildPhotosResponse } from "../lib/photoHelpers";
 import { generateCollectionKeywords } from "../lib/aiKeywordGeneration";
 
 const router: IRouter = Router();
@@ -152,11 +152,9 @@ router.get("/collections/:id", requireAuth, async (req, res): Promise<void> => {
     .where(eq(photoCollectionsTable.collectionId, params.data.id))
     .orderBy(photoCollectionsTable.photoId);
 
-  const photos = await Promise.all(
-    photoRows.map((p) => buildPhotoResponse(p.id, req.dbUser?.id))
-  );
+  const photos = await buildPhotosResponse(photoRows.map((p) => p.id), req.dbUser?.id);
 
-  res.json(GetCollectionResponse.parse({ ...full, photos: photos.filter(Boolean) }));
+  res.json(GetCollectionResponse.parse({ ...full, photos }));
 });
 
 router.patch("/collections/:id", requireAuth, async (req, res): Promise<void> => {

@@ -43,6 +43,7 @@ import type {
   HealthStatus,
   ListAlbumPhotosPagedResponse,
   ListAlbumPhotosParams,
+  ListDuplicatePhotoGroupsResponse,
   ListPhotosParams,
   Photo,
   PhotoCategoryInput,
@@ -3434,6 +3435,85 @@ export const useRetryAiAnalysisEvent = <
 > => {
   return useMutation(getRetryAiAnalysisEventMutationOptions(options));
 };
+
+/**
+ * @summary List groups of exact-duplicate photos sharing a content hash (admin only)
+ */
+export const getListDuplicatePhotoGroupsUrl = () => {
+  return `/api/admin/photos/duplicates`;
+};
+
+export const listDuplicatePhotoGroups = async (
+  options?: RequestInit,
+): Promise<ListDuplicatePhotoGroupsResponse> => {
+  return customFetch<ListDuplicatePhotoGroupsResponse>(
+    getListDuplicatePhotoGroupsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListDuplicatePhotoGroupsQueryKey = () => {
+  return [`/api/admin/photos/duplicates`] as const;
+};
+
+export const getListDuplicatePhotoGroupsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDuplicatePhotoGroupsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDuplicatePhotoGroups>>
+  > = ({ signal }) => listDuplicatePhotoGroups({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDuplicatePhotoGroupsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDuplicatePhotoGroups>>
+>;
+export type ListDuplicatePhotoGroupsQueryError = ErrorType<void>;
+
+/**
+ * @summary List groups of exact-duplicate photos sharing a content hash (admin only)
+ */
+
+export function useListDuplicatePhotoGroups<
+  TData = Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDuplicatePhotoGroupsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get dashboard summary statistics

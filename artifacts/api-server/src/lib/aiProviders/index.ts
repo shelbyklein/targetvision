@@ -38,7 +38,7 @@ export interface ProviderStatus {
   availableModels: ModelOption[];
   hasKey: boolean;
   keyPreview: string | null;
-  replitFallbackAvailable: boolean;
+  envKeyFallbackAvailable: boolean;
   usable: boolean;
 }
 
@@ -62,7 +62,10 @@ export async function loadAppSettings(): Promise<AppSettings> {
   return created;
 }
 
-function replitFallbackFor(id: ProviderId): boolean {
+// True when the AI_INTEGRATIONS_* env vars supply a base URL + API key for this
+// provider, i.e. a server-configured fallback used when no admin key is set in
+// the UI. (Formerly Replit's built-in AI gateway; now a generic env fallback.)
+function envKeyFallbackFor(id: ProviderId): boolean {
   if (id === "openai") {
     return Boolean(
       process.env.AI_INTEGRATIONS_OPENAI_API_KEY &&
@@ -115,7 +118,7 @@ export function summarizeSettings(settings: AppSettings): ResolvedSettings {
   const providers = {} as Record<ProviderId, ProviderStatus>;
   for (const id of PROVIDER_IDS) {
     const hasKey = providerHasKey(settings, id);
-    const fallback = replitFallbackFor(id);
+    const fallback = envKeyFallbackFor(id);
     providers[id] = {
       id,
       label: PROVIDER_LABELS[id],
@@ -123,7 +126,7 @@ export function summarizeSettings(settings: AppSettings): ResolvedSettings {
       availableModels: PROVIDER_MODEL_DETAILS[id],
       hasKey,
       keyPreview: providerPreview(settings, id),
-      replitFallbackAvailable: fallback,
+      envKeyFallbackAvailable: fallback,
       usable: hasKey || fallback,
     };
   }
@@ -201,7 +204,7 @@ export async function getActiveProvider(): Promise<{
   if (id === "openai") {
     if (adminKey)
       return { provider: new OpenAIProvider(adminKey, null, model), settings };
-    if (replitFallbackFor("openai")) {
+    if (envKeyFallbackFor("openai")) {
       return {
         provider: new OpenAIProvider(
           process.env.AI_INTEGRATIONS_OPENAI_API_KEY!,
@@ -219,7 +222,7 @@ export async function getActiveProvider(): Promise<{
         provider: new AnthropicProvider(adminKey, null, model),
         settings,
       };
-    if (replitFallbackFor("anthropic")) {
+    if (envKeyFallbackFor("anthropic")) {
       return {
         provider: new AnthropicProvider(
           process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY!,
@@ -233,7 +236,7 @@ export async function getActiveProvider(): Promise<{
   }
   if (adminKey)
     return { provider: new GeminiProvider(adminKey, undefined, model), settings };
-  if (replitFallbackFor("gemini")) {
+  if (envKeyFallbackFor("gemini")) {
     return {
       provider: new GeminiProvider(
         process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,

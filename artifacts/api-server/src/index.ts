@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { generateAndStoreThumbnail } from "./lib/thumbnailGeneration";
+import { backfillContentHashes } from "./lib/contentHash";
 import { startAiAutoBackfillScheduler } from "./lib/aiAutoBackfillScheduler";
 import { db, photosTable } from "@workspace/db";
 import { isNull, isNotNull, and, eq } from "drizzle-orm";
@@ -62,6 +63,19 @@ async function backfillMissingThumbnails(): Promise<void> {
   }
 }
 
+async function backfillMissingContentHashes(): Promise<void> {
+  try {
+    const result = await backfillContentHashes();
+    if (result.processed === 0) {
+      logger.info("Startup content hash backfill: no photos missing a content hash");
+      return;
+    }
+    logger.info(result, "Startup content hash backfill: complete");
+  } catch (err) {
+    logger.error({ err }, "Startup content hash backfill: unexpected error");
+  }
+}
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -71,5 +85,6 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
 
   void backfillMissingThumbnails();
+  void backfillMissingContentHashes();
   startAiAutoBackfillScheduler();
 });

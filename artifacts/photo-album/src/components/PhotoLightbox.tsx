@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, Bot, Sparkles, Trash2 } from "lucide-react";
+import { X, Star, FolderOpen, Loader2, ExternalLink, ChevronLeft, ChevronRight, Download, EyeOff, Eye, Check, Plus, ImageIcon, ImageOff, Bot, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import {
@@ -607,8 +607,12 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
   }, [coverPhotoId]);
 
   const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
   useLayoutEffect(() => {
-    if (photo?.id != null) setImageLoading(true);
+    if (photo?.id != null) {
+      setImageLoading(true);
+      setImageError(false);
+    }
   }, [photo?.id]);
 
   const handleAdvance = useCallback(() => {
@@ -749,9 +753,15 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
             <div className="flex flex-col lg:flex-row items-center lg:items-start gap-6 max-w-6xl w-full max-h-[90vh]">
               <div className="flex-1 flex flex-col items-center gap-3 min-w-0 overflow-hidden">
                 <div className="relative flex items-center justify-center max-h-[65vh] lg:max-h-[80vh] w-full">
-                  {imageLoading && (
+                  {imageLoading && !imageError && (
                     <div className="absolute inset-0 flex items-center justify-center z-10">
                       <Loader2 className="h-10 w-10 text-white/60 animate-spin" />
+                    </div>
+                  )}
+                  {imageError && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10 text-white/60" data-testid="lightbox-image-error">
+                      <ImageOff className="h-10 w-10" />
+                      <span className="text-sm">Failed to load image</span>
                     </div>
                   )}
                   <FadeImage
@@ -761,6 +771,10 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                     fit="contain"
                     className="max-h-[65vh] lg:max-h-[80vh] max-w-full rounded-lg object-contain shadow-2xl"
                     onLoad={() => setImageLoading(false)}
+                    onError={() => {
+                      setImageLoading(false);
+                      setImageError(true);
+                    }}
                     data-testid="lightbox-image"
                   />
                 </div>
