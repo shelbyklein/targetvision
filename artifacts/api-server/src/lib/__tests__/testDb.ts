@@ -6,6 +6,8 @@ import {
   ratingsTable,
   collectionsTable,
   photoCollectionsTable,
+  projectsTable,
+  projectPhotosTable,
   aiAnalysisEventsTable,
 } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -22,7 +24,7 @@ if (!/test/i.test(dbUrl)) {
 
 export async function resetDb(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE TABLE ai_analysis_events, photo_collections, collections, ratings, photos, albums, "user", session, account, verification, users RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE ai_analysis_events, photo_collections, project_photos, projects, collections, ratings, photos, albums, "user", session, account, verification, users RESTART IDENTITY CASCADE`,
   );
 }
 
@@ -81,6 +83,15 @@ export async function createCollection(createdById: number, title = "Test Collec
 
 export async function addPhotoToCollection(collectionId: number, photoId: number) {
   await db.insert(photoCollectionsTable).values({ collectionId, photoId });
+}
+
+export async function createProject(createdById: number, name = "Test Project") {
+  const [project] = await db.insert(projectsTable).values({ createdById, name }).returning();
+  return project;
+}
+
+export async function addPhotoToProject(projectId: number, photoId: number) {
+  await db.insert(projectPhotosTable).values({ projectId, photoId });
 }
 
 export async function addAiEvent(

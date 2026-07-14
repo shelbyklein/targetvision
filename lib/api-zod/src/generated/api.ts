@@ -197,6 +197,15 @@ export const GetAlbumTopRatedResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -320,6 +329,17 @@ export const ListAlbumPhotosResponse = zod.object({
           }),
         )
         .optional(),
+      photoProjects: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            name: zod.string(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Projects this photo currently belongs to (membership only).",
+        ),
       aiDescription: zod.string().nullish(),
       latestAiStatus: zod
         .union([
@@ -428,6 +448,15 @@ export const SearchPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -522,6 +551,15 @@ export const ListPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -631,6 +669,15 @@ export const GetPhotoResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -720,6 +767,15 @@ export const UpdatePhotoResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -814,6 +870,15 @@ export const AddPhotoTagResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -898,6 +963,15 @@ export const RemovePhotoTagResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -985,6 +1059,15 @@ export const AddPhotoCategoryResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1069,6 +1152,15 @@ export const RemovePhotoCategoryResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1158,6 +1250,15 @@ export const RatePhotoResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1241,6 +1342,15 @@ export const ClearPhotoRatingResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1710,6 +1820,17 @@ export const GetDashboardStatsResponse = zod.object({
           }),
         )
         .optional(),
+      photoProjects: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            name: zod.string(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Projects this photo currently belongs to (membership only).",
+        ),
       aiDescription: zod.string().nullish(),
       latestAiStatus: zod
         .union([
@@ -1791,6 +1912,15 @@ export const GetRecentPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1871,6 +2001,15 @@ export const GetTopRatedPhotosResponseItem = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2035,6 +2174,17 @@ export const GetCollectionResponse = zod.object({
             }),
           )
           .optional(),
+        photoProjects: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Projects this photo currently belongs to (membership only).",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -2143,6 +2293,17 @@ export const UpdateCollectionResponse = zod.object({
             }),
           )
           .optional(),
+        photoProjects: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Projects this photo currently belongs to (membership only).",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -2274,6 +2435,17 @@ export const SetCollectionCoverResponse = zod.object({
             }),
           )
           .optional(),
+        photoProjects: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Projects this photo currently belongs to (membership only).",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -2405,6 +2577,17 @@ export const GetProjectResponse = zod.object({
             }),
           )
           .optional(),
+        photoProjects: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Projects this photo currently belongs to (membership only).",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -2509,6 +2692,17 @@ export const UpdateProjectResponse = zod.object({
             }),
           )
           .optional(),
+        photoProjects: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Projects this photo currently belongs to (membership only).",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -2624,6 +2818,15 @@ export const AcceptPhotoSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2708,6 +2911,15 @@ export const DismissPhotoSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2792,6 +3004,15 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2876,6 +3097,15 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2960,6 +3190,15 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3044,6 +3283,15 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3132,6 +3380,15 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3216,6 +3473,15 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
       }),
     )
     .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([

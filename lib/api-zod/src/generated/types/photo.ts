@@ -7,6 +7,7 @@
  */
 import type { CollectionSummary } from "./collectionSummary";
 import type { PhotoLatestAiStatus } from "./photoLatestAiStatus";
+import type { PhotoProjectMembership } from "./photoProjectMembership";
 import type { PhotoRating } from "./photoRating";
 import type { SuggestedCollection } from "./suggestedCollection";
 import type { SuggestedNewCollection } from "./suggestedNewCollection";
@@ -41,6 +42,8 @@ export interface Photo {
   /** @nullable */
   myRating?: number | null;
   photoCollections?: CollectionSummary[];
+  /** Projects this photo currently belongs to (membership only). */
+  photoProjects?: PhotoProjectMembership[];
   /** @nullable */
   aiDescription?: string | null;
   /**

@@ -9,6 +9,8 @@ import {
   ratePhoto,
   createCollection,
   addPhotoToCollection,
+  createProject,
+  addPhotoToProject,
   addAiEvent,
 } from "./testDb";
 
@@ -48,6 +50,10 @@ describe("buildPhotosResponse (batched, N+1-free)", () => {
     const collection = await createCollection(owner.id, "Highlights");
     await addPhotoToCollection(collection.id, p2.id);
 
+    // p2 also belongs to a project (p1 belongs to none).
+    const project = await createProject(owner.id, "Summer Campaign");
+    await addPhotoToProject(project.id, p2.id);
+
     // p1's latest AI event is success (older failed, newer success).
     await addAiEvent(p1.id, "failed", { createdAt: new Date("2024-01-01T00:00:00Z") });
     await addAiEvent(p1.id, "success", { createdAt: new Date("2024-06-01T00:00:00Z") });
@@ -65,6 +71,11 @@ describe("buildPhotosResponse (batched, N+1-free)", () => {
     expect(r2!.myRating).toBeNull();
     expect(r2!.photoCollections).toHaveLength(1);
     expect(r2!.photoCollections[0].title).toBe("Highlights");
+
+    // Project membership is reported on photoProjects (p1 has none, p2 has one).
+    expect(r1!.photoProjects).toHaveLength(0);
+    expect(r2!.photoProjects).toHaveLength(1);
+    expect(r2!.photoProjects[0].name).toBe("Summer Campaign");
   });
 
   it("returns an empty array for an empty id list without querying", async () => {

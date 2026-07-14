@@ -1927,6 +1927,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CollectionSummary"
+        photoProjects:
+          type: array
+          description: Projects this photo currently belongs to (membership only).
+          items:
+            $ref: "#/components/schemas/PhotoProjectMembership"
         aiDescription:
           type: ["string", "null"]
         latestAiStatus:
@@ -2138,6 +2143,15 @@ components:
       properties:
         photoId:
           type: integer
+
+    PhotoProjectMembership:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
 
     PhotoUpdate:
       type: object

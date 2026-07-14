@@ -49,6 +49,7 @@ export * from "./listPhotosParams";
 export * from "./photo";
 export * from "./photoCategoryInput";
 export * from "./photoLatestAiStatus";
+export * from "./photoProjectMembership";
 export * from "./photoRating";
 export * from "./photoTagInput";
 export * from "./photoUpdate";

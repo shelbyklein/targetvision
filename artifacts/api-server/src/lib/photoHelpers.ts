@@ -1,4 +1,4 @@
-import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable, aiAnalysisEventsTable } from "@workspace/db";
+import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable, aiAnalysisEventsTable, projectsTable, projectPhotosTable } from "@workspace/db";
 import { eq, and, avg, count, desc, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
@@ -95,7 +95,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
 
   if (!photo) return null;
 
-  const [photoCollections, ratingDataArr, ratingsList, suggestedCollections, suggestedNewCollections, latestAiEvents] = await Promise.all([
+  const [photoCollections, photoProjects, ratingDataArr, ratingsList, suggestedCollections, suggestedNewCollections, latestAiEvents] = await Promise.all([
     db
       .select({
         id: collectionsTable.id,
@@ -107,6 +107,11 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
       .from(collectionsTable)
       .innerJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
       .where(eq(photoCollectionsTable.photoId, photoId)),
+    db
+      .select({ id: projectsTable.id, name: projectsTable.name })
+      .from(projectsTable)
+      .innerJoin(projectPhotosTable, eq(projectsTable.id, projectPhotosTable.projectId))
+      .where(eq(projectPhotosTable.photoId, photoId)),
     db
       .select({
         averageRating: avg(ratingsTable.score),
@@ -182,6 +187,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
       photoCount: 0,
       coverPhotoUrl: null,
     })),
+    photoProjects: photoProjects.map((pr) => ({ id: pr.id, name: pr.name })),
     averageRating: ratingData?.averageRating ? parseFloat(String(ratingData.averageRating)) : null,
     ratingCount: Number(ratingData?.ratingCount ?? 0),
     myRating,
@@ -211,6 +217,7 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
   const [
     photoRows,
     collectionRows,
+    projectRows,
     ratingAggRows,
     ratingRows,
     suggestedCollectionRows,
@@ -235,6 +242,15 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
       .from(collectionsTable)
       .innerJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
       .where(inArray(photoCollectionsTable.photoId, photoIds)),
+    db
+      .select({
+        photoId: projectPhotosTable.photoId,
+        id: projectsTable.id,
+        name: projectsTable.name,
+      })
+      .from(projectsTable)
+      .innerJoin(projectPhotosTable, eq(projectsTable.id, projectPhotosTable.projectId))
+      .where(inArray(projectPhotosTable.photoId, photoIds)),
     db
       .select({
         photoId: ratingsTable.photoId,
@@ -306,6 +322,10 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
   for (const row of collectionRows) {
     (collectionsByPhoto.get(row.photoId) ?? collectionsByPhoto.set(row.photoId, []).get(row.photoId)!).push(row);
   }
+  const projectsByPhoto = new Map<number, typeof projectRows>();
+  for (const row of projectRows) {
+    (projectsByPhoto.get(row.photoId) ?? projectsByPhoto.set(row.photoId, []).get(row.photoId)!).push(row);
+  }
   const ratingAggByPhoto = new Map(ratingAggRows.map((r) => [r.photoId, r]));
   const ratingsByPhoto = new Map<number, typeof ratingRows>();
   for (const row of ratingRows) {
@@ -342,6 +362,7 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
           photoCount: 0,
           coverPhotoUrl: null,
         })),
+        photoProjects: (projectsByPhoto.get(id) ?? []).map((pr) => ({ id: pr.id, name: pr.name })),
         averageRating: ratingData?.averageRating ? parseFloat(String(ratingData.averageRating)) : null,
         ratingCount: Number(ratingData?.ratingCount ?? 0),
         myRating: myRatingByPhoto.get(id) ?? null,
