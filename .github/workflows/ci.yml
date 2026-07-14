@@ -9,6 +9,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# pnpm-workspace.yaml pins scriptShell to a Windows Git Bash path for local dev.
+# That path doesn't exist on the Linux runners, so dependency lifecycle scripts
+# (sharp/esbuild/protobufjs postinstall) fail to spawn. Override it here — env
+# vars outrank pnpm-workspace.yaml — so CI uses the runner's bash.
+env:
+  npm_config_script_shell: /usr/bin/bash
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
