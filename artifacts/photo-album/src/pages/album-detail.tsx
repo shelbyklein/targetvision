@@ -27,6 +27,7 @@ import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { AddPhotoDialog } from "@/components/AddPhotoDialog";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { startPhotoDrag } from "@/lib/photoDrag";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -654,6 +655,8 @@ export default function AlbumDetail() {
               return (
               <div
                 key={photo.id}
+                draggable
+                onDragStart={(e) => startPhotoDrag(e, photo.id)}
                 className={`relative group mb-3 break-inside-avoid rounded-lg overflow-hidden bg-muted${isSelected ? " ring-2 ring-primary" : ""}`}
                 data-testid="photo-grid-item"
               >

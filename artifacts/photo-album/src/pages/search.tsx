@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { startPhotoDrag } from "@/lib/photoDrag";
 import { useLocation, useSearch } from "wouter";
 import {
   useSearchPhotos,
@@ -415,6 +416,8 @@ export default function SearchPage() {
                 renderItem={(photo) => (
                   <Link
                     key={photo.id}
+                    draggable
+                    onDragStart={(e) => startPhotoDrag(e, photo.id)}
                     href={`/photos/${photo.id}`}
                     data-testid="search-result-item"
                   >

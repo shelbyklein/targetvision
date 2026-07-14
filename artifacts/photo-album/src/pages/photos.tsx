@@ -3,6 +3,7 @@ import { FadeImage } from "@/components/ui/fade-image";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { startPhotoDrag } from "@/lib/photoDrag";
 import { useLocation, useSearch, Link } from "wouter";
 import {
   useListPhotos,
@@ -545,6 +546,8 @@ export default function PhotosPage() {
                 return (
                   <div
                     key={photo.id}
+                    draggable
+                    onDragStart={(e) => startPhotoDrag(e, photo.id)}
                     className={cn(
                       "group relative mb-3 break-inside-avoid rounded-lg overflow-hidden border bg-muted",
                       isSelected ? "border-primary ring-2 ring-primary" : "border-border"
