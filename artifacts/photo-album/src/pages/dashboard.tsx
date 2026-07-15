@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import {
   useGetDashboardStats,
@@ -6,15 +6,83 @@ import {
   useGetTopRatedPhotos,
   useListCollections,
   useListAlbums,
+  useListProjects,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Images, Camera, Users, FolderOpen, Star, Sparkles } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Images,
+  Camera,
+  Users,
+  FolderOpen,
+  FolderKanban,
+  Star,
+  Sparkles,
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  SlidersHorizontal,
+  RotateCcw,
+} from "lucide-react";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { MasonryGrid } from "@/components/MasonryGrid";
 import { startPhotoDrag } from "@/lib/photoDrag";
+import { cn } from "@/lib/utils";
 import { Link } from "wouter";
+
+// ── Dashboard layout (order + visibility), persisted per browser ─────────────
+const SECTION_IDS = ["stats", "smart", "collections", "projects", "albums", "favorites", "recent"] as const;
+type SectionId = (typeof SECTION_IDS)[number];
+
+const SECTION_LABELS: Record<SectionId, string> = {
+  stats: "Stats",
+  smart: "Smart Collections",
+  collections: "Collections",
+  projects: "Projects",
+  albums: "Albums",
+  favorites: "Favorites",
+  recent: "Recent",
+};
+
+const DEFAULT_ORDER: SectionId[] = [...SECTION_IDS];
+const LAYOUT_KEY = "dashboard_layout_v1";
+
+interface Layout {
+  order: SectionId[];
+  hidden: SectionId[];
+}
+
+function isSectionId(x: unknown): x is SectionId {
+  return typeof x === "string" && (SECTION_IDS as readonly string[]).includes(x);
+}
+
+function loadLayout(): Layout {
+  const fallback: Layout = { order: [...DEFAULT_ORDER], hidden: [] };
+  if (typeof localStorage === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(LAYOUT_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<Layout>;
+    const order = (parsed.order ?? []).filter(isSectionId);
+    // Append any sections added since the layout was saved (e.g. new "projects"),
+    // so upgrades don't hide new content for existing users.
+    for (const id of DEFAULT_ORDER) if (!order.includes(id)) order.push(id);
+    const hidden = (parsed.hidden ?? []).filter(isSectionId);
+    return { order, hidden };
+  } catch {
+    return fallback;
+  }
+}
 
 function StatCard({
   label,
@@ -140,14 +208,147 @@ function PhotoStrip({
   );
 }
 
+// A reusable cover-card grid used by Collections, Projects and Albums.
+function CoverCard({
+  href,
+  title,
+  photoCount,
+  coverUrl,
+  fallbackIcon: FallbackIcon,
+}: {
+  href: string;
+  title: string;
+  photoCount: number;
+  coverUrl?: string | null;
+  fallbackIcon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <Link href={href}>
+      <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-primary/40 transition-colors cursor-pointer">
+        <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+          {coverUrl ? (
+            <FadeImage
+              src={coverUrl}
+              alt={title}
+              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+            />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center">
+              <FallbackIcon className="h-10 w-10 text-muted-foreground/30" />
+            </div>
+          )}
+        </div>
+        <div className="p-3">
+          <p className="font-medium text-sm text-foreground truncate">{title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {photoCount} photo{photoCount !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function CustomizeDialog({ layout, onChange }: { layout: Layout; onChange: (l: Layout) => void }) {
+  const hidden = new Set(layout.hidden);
+
+  function move(index: number, dir: -1 | 1) {
+    const j = index + dir;
+    if (j < 0 || j >= layout.order.length) return;
+    const order = [...layout.order];
+    [order[index], order[j]] = [order[j], order[index]];
+    onChange({ ...layout, order });
+  }
+
+  function toggle(id: SectionId) {
+    onChange({
+      ...layout,
+      hidden: hidden.has(id) ? layout.hidden.filter((h) => h !== id) : [...layout.hidden, id],
+    });
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2 shrink-0" data-testid="customize-dashboard-btn">
+          <SlidersHorizontal className="h-4 w-4" />
+          Customize
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Customize dashboard</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Reorder the sections and choose which ones appear. Saved to this browser.
+        </p>
+        <div className="space-y-1.5 pt-1" data-testid="customize-section-list">
+          {layout.order.map((id, i) => {
+            const isHidden = hidden.has(id);
+            return (
+              <div
+                key={id}
+                className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5"
+                data-testid={`customize-row-${id}`}
+              >
+                <span className={cn("flex-1 text-sm font-medium", isHidden && "text-muted-foreground line-through")}>
+                  {SECTION_LABELS[id]}
+                </span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${SECTION_LABELS[id]} up`}>
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => move(i, 1)} disabled={i === layout.order.length - 1} aria-label={`Move ${SECTION_LABELS[id]} down`}>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => toggle(id)}
+                  aria-label={`${isHidden ? "Show" : "Hide"} ${SECTION_LABELS[id]}`}
+                  data-testid={`customize-toggle-${id}`}
+                >
+                  {isHidden ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-end pt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2"
+            onClick={() => onChange({ order: [...DEFAULT_ORDER], hidden: [] })}
+            data-testid="customize-reset"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset to default
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentPhotos, isLoading: recentLoading } = useGetRecentPhotos();
   const { data: topRated, isLoading: topLoading } = useGetTopRatedPhotos();
   const { data: collections, isLoading: collectionsLoading } = useListCollections();
   const { data: albums, isLoading: albumsLoading } = useListAlbums();
+  const { data: projects, isLoading: projectsLoading } = useListProjects();
 
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
+  const [layout, setLayout] = useState<Layout>(loadLayout);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+    } catch {
+      // localStorage unavailable — customization just won't persist.
+    }
+  }, [layout]);
 
   const allPhotos = useMemo<LightboxPhoto[]>(() => {
     const seen = new Set<number>();
@@ -172,125 +373,131 @@ export default function Dashboard() {
     if (hasNext) setSelectedPhoto(allPhotos[selectedIndex + 1]);
   }
 
+  const sectionRenderers: Record<SectionId, () => React.ReactNode> = {
+    stats: () => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="stats-grid">
+        <StatCard label="Albums" value={stats?.totalAlbums} icon={Images} loading={statsLoading} />
+        <StatCard label="Photos" value={stats?.totalPhotos} icon={Camera} loading={statsLoading} />
+        <StatCard label="Team Members" value={stats?.totalUsers} icon={Users} loading={statsLoading} />
+        <StatCard label="Collections" value={stats?.totalCollections} icon={FolderOpen} loading={statsLoading} />
+      </div>
+    ),
+    smart: () => (
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <h2 className="text-base font-semibold text-foreground">Smart Collections</h2>
+          </div>
+        </div>
+        {collectionsLoading ? (
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-7 w-24 rounded-full" />
+            ))}
+          </div>
+        ) : !collections || collections.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">Nothing here yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2" data-testid="dashboard-smart-collections">
+            {collections.map((col) => (
+              <Link key={col.id} href={`/smart-collections/${col.id}`}>
+                <Badge
+                  variant="secondary"
+                  className="rounded-full gap-1.5 px-3 py-1 cursor-pointer hover:border-amber-400/60"
+                  data-testid={`smart-collection-pill-${col.id}`}
+                >
+                  <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                  {col.title}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    ),
+    collections: () => (
+      <section>
+        <SectionHeader title="Collections" href="/collections" />
+        <CardGrid loading={collectionsLoading} empty={!collections || collections.length === 0}>
+          {(collections ?? []).map((col) => (
+            <CoverCard
+              key={col.id}
+              href={`/collections/${col.id}`}
+              title={col.title}
+              photoCount={col.photoCount}
+              coverUrl={col.coverPhotoUrl}
+              fallbackIcon={FolderOpen}
+            />
+          ))}
+        </CardGrid>
+      </section>
+    ),
+    projects: () => (
+      <section>
+        <SectionHeader title="Projects" href="/projects" />
+        <CardGrid loading={projectsLoading} empty={!projects || projects.length === 0}>
+          {(projects ?? []).map((project) => (
+            <CoverCard
+              key={project.id}
+              href={`/projects/${project.id}`}
+              title={project.name}
+              photoCount={project.photoCount}
+              coverUrl={project.coverPhotoThumbnailKey ? `/api/storage${project.coverPhotoThumbnailKey}` : project.coverPhotoUrl}
+              fallbackIcon={FolderKanban}
+            />
+          ))}
+        </CardGrid>
+      </section>
+    ),
+    albums: () => (
+      <section>
+        <SectionHeader title="Albums" href="/albums" />
+        <CardGrid loading={albumsLoading} empty={!albums || albums.length === 0}>
+          {(albums ?? []).map((album) => (
+            <CoverCard
+              key={album.id}
+              href={`/albums/${album.id}`}
+              title={album.title}
+              photoCount={album.photoCount}
+              coverUrl={album.coverPhotoUrl}
+              fallbackIcon={Images}
+            />
+          ))}
+        </CardGrid>
+      </section>
+    ),
+    favorites: () => (
+      <section>
+        <SectionHeader title="Favorites" href="/photos?sort=top-rated" />
+        <PhotoStrip photos={topRated ?? []} loading={topLoading} onPhotoClick={setSelectedPhoto} />
+      </section>
+    ),
+    recent: () => (
+      <section>
+        <SectionHeader title="Recent" href="/photos?sort=recent" />
+        <PhotoStrip photos={recentPhotos ?? []} loading={recentLoading} onPhotoClick={setSelectedPhoto} />
+      </section>
+    ),
+  };
+
+  const hiddenSet = new Set(layout.hidden);
+  const visibleSections = layout.order.filter((id) => !hiddenSet.has(id));
+
   return (
     <AppLayout>
       <div className="space-y-8" data-testid="dashboard-page">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Your marketing photo selection workspace at a glance.</p>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="stats-grid">
-          <StatCard label="Albums" value={stats?.totalAlbums} icon={Images} loading={statsLoading} />
-          <StatCard label="Photos" value={stats?.totalPhotos} icon={Camera} loading={statsLoading} />
-          <StatCard label="Team Members" value={stats?.totalUsers} icon={Users} loading={statsLoading} />
-          <StatCard label="Collections" value={stats?.totalCollections} icon={FolderOpen} loading={statsLoading} />
-        </div>
-
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-amber-500" />
-              <h2 className="text-base font-semibold text-foreground">Smart Collections</h2>
-            </div>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">Your marketing photo selection workspace at a glance.</p>
           </div>
-          {collectionsLoading ? (
-            <div className="flex flex-wrap gap-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-7 w-24 rounded-full" />
-              ))}
-            </div>
-          ) : !collections || collections.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Nothing here yet.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2" data-testid="dashboard-smart-collections">
-              {collections.map((col) => (
-                <Link key={col.id} href={`/smart-collections/${col.id}`}>
-                  <Badge
-                    variant="secondary"
-                    className="rounded-full gap-1.5 px-3 py-1 cursor-pointer hover:border-amber-400/60"
-                    data-testid={`smart-collection-pill-${col.id}`}
-                  >
-                    <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                    {col.title}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
+          <CustomizeDialog layout={layout} onChange={setLayout} />
+        </div>
 
-        <section>
-          <SectionHeader title="Collections" href="/collections" />
-          <CardGrid loading={collectionsLoading} empty={!collections || collections.length === 0}>
-            {(collections ?? []).map((col) => (
-              <Link key={col.id} href={`/collections/${col.id}`}>
-                <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-primary/40 transition-colors cursor-pointer">
-                  <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                    {col.coverPhotoUrl ? (
-                      <FadeImage
-                        src={col.coverPhotoUrl}
-                        alt={col.title}
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center">
-                        <FolderOpen className="h-10 w-10 text-muted-foreground/30" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="font-medium text-sm text-foreground truncate">{col.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {col.photoCount} photo{col.photoCount !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </CardGrid>
-        </section>
-
-        <section>
-          <SectionHeader title="Albums" href="/albums" />
-          <CardGrid loading={albumsLoading} empty={!albums || albums.length === 0}>
-            {(albums ?? []).map((album) => (
-              <Link key={album.id} href={`/albums/${album.id}`}>
-                <div className="group rounded-xl border border-border overflow-hidden bg-card hover:border-primary/40 transition-colors cursor-pointer">
-                  <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                    {album.coverPhotoUrl ? (
-                      <FadeImage
-                        src={album.coverPhotoUrl}
-                        alt={album.title}
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center">
-                        <Images className="h-10 w-10 text-muted-foreground/30" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="font-medium text-sm text-foreground truncate">{album.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </CardGrid>
-        </section>
-
-        <section>
-          <SectionHeader title="Favorites" href="/photos?sort=top-rated" />
-          <PhotoStrip photos={topRated ?? []} loading={topLoading} onPhotoClick={setSelectedPhoto} />
-        </section>
-
-        <section>
-          <SectionHeader title="Recent" href="/photos?sort=recent" />
-          <PhotoStrip photos={recentPhotos ?? []} loading={recentLoading} onPhotoClick={setSelectedPhoto} />
-        </section>
+        {visibleSections.map((id) => (
+          <Fragment key={id}>{sectionRenderers[id]()}</Fragment>
+        ))}
       </div>
 
       <PhotoLightbox
