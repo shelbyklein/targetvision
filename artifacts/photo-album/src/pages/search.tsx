@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Link } from "wouter";
+import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { Search, SlidersHorizontal, X, Star, Images, EyeOff, Eye, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -130,6 +130,20 @@ export default function SearchPage() {
     query: { enabled: !!q && isSemantic, queryKey: getSemanticSearchPhotosQueryKey(semanticParams) },
   });
   const { data: results, isLoading, isFetching } = isSemantic ? semantic : keyword;
+
+  // Open results in the lightbox (like the dashboard) instead of navigating to
+  // the detail page, so the user stays in their search results.
+  const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
+  const photos = results ?? [];
+  const selectedIndex = selectedPhoto ? photos.findIndex((p) => p.id === selectedPhoto.id) : -1;
+  const hasPrev = selectedIndex > 0;
+  const hasNext = selectedIndex >= 0 && selectedIndex < photos.length - 1;
+  function handlePrev() {
+    if (hasPrev) setSelectedPhoto(photos[selectedIndex - 1]);
+  }
+  function handleNext() {
+    if (hasNext) setSelectedPhoto(photos[selectedIndex + 1]);
+  }
 
   function navigate(next: Partial<ReturnType<typeof parseSearch>>) {
     const merged = { ...urlParams, ...next };
@@ -468,12 +482,15 @@ export default function SearchPage() {
                 getKey={(photo) => photo.id}
                 data-testid="search-results"
                 renderItem={(photo) => (
-                  <Link
+                  <button
                     key={photo.id}
+                    type="button"
                     draggable
                     onDragStart={(e) => startPhotoDrag(e, photo.id)}
-                    href={`/photos/${photo.id}`}
+                    onClick={() => setSelectedPhoto(photo)}
+                    className="block w-full text-left"
                     data-testid="search-result-item"
+                    aria-label="Open photo"
                   >
                     <div className={cn(
                       "group relative mb-3 break-inside-avoid rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
@@ -512,13 +529,22 @@ export default function SearchPage() {
                         </div>
                       )}
                     </div>
-                  </Link>
+                  </button>
                 )}
               />
             )}
           </>
         )}
       </div>
+
+      <PhotoLightbox
+        photo={selectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
+        hasPrev={hasPrev}
+        hasNext={hasNext}
+        onPrev={handlePrev}
+        onNext={handleNext}
+      />
     </AppLayout>
   );
 }
