@@ -28,6 +28,7 @@ import { DuplicateCheckPhase } from "@/components/bulk-upload/DuplicateCheckPhas
 import { DropZone } from "@/components/bulk-upload/DropZone";
 import { FolderList } from "@/components/bulk-upload/FolderList";
 import { DestinationPanel } from "@/components/bulk-upload/DestinationPanel";
+import { extractImagesFromZip } from "@/lib/extractImagesFromZip";
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
@@ -97,6 +98,7 @@ export default function BulkUpload() {
   const { data: batchHistory, isLoading: batchHistoryLoading } = useListBulkUploadBatches();
 
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-suggest album name from folder names (only if name is empty)
   useEffect(() => {
@@ -124,20 +126,55 @@ export default function BulkUpload() {
     setIsProcessingDrop(false);
   }
 
+  async function addFoldersFromZip(zip: File) {
+    setIsProcessingDrop(true);
+    try {
+      const newFolders = await extractImagesFromZip(zip);
+      if (newFolders.length === 0) {
+        toast({ title: "No images found in that .zip", variant: "destructive" });
+        return;
+      }
+      await addFolders(newFolders);
+    } catch {
+      toast({ title: "Couldn't read that .zip file", variant: "destructive" });
+    } finally {
+      setIsProcessingDrop(false);
+    }
+  }
+
+  async function handleZipInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) await addFoldersFromZip(file);
+    if (zipInputRef.current) zipInputRef.current.value = "";
+  }
+
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setIsDragOver(false);
     const items = Array.from(e.dataTransfer.items);
-    const entries: FileSystemDirectoryEntry[] = [];
+    const dtFiles = Array.from(e.dataTransfer.files); // capture before any await
+    const dirEntries: FileSystemDirectoryEntry[] = [];
+    const zipEntries: FileSystemFileEntry[] = [];
     for (const item of items) {
       const entry = item.webkitGetAsEntry?.();
-      if (entry?.isDirectory) entries.push(entry as FileSystemDirectoryEntry);
+      if (entry?.isDirectory) dirEntries.push(entry as FileSystemDirectoryEntry);
+      else if (entry?.isFile && /\.zip$/i.test(entry.name)) zipEntries.push(entry as FileSystemFileEntry);
     }
-    if (entries.length === 0) {
-      toast({ title: "Drop folders, not individual files", variant: "destructive" });
+
+    const zipFiles: File[] = [];
+    for (const ze of zipEntries) {
+      zipFiles.push(await new Promise<File>((resolve, reject) => ze.file(resolve, reject)));
+    }
+    if (dirEntries.length === 0 && zipFiles.length === 0) {
+      for (const f of dtFiles) if (/\.zip$/i.test(f.name)) zipFiles.push(f);
+    }
+
+    if (dirEntries.length === 0 && zipFiles.length === 0) {
+      toast({ title: "Drop folders or a .zip file", variant: "destructive" });
       return;
     }
-    await addFoldersFromEntries(entries);
+    if (dirEntries.length > 0) await addFoldersFromEntries(dirEntries);
+    for (const zip of zipFiles) await addFoldersFromZip(zip);
   }
 
   async function handleFolderInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -391,8 +428,10 @@ export default function BulkUpload() {
               setIsDragOver={setIsDragOver}
               isProcessingDrop={isProcessingDrop}
               folderInputRef={folderInputRef}
+              zipInputRef={zipInputRef}
               onDrop={handleDrop}
               onFolderInput={handleFolderInput}
+              onZipInput={handleZipInput}
             />
 
             {/* Folder list */}

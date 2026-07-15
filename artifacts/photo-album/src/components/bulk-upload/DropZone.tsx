@@ -1,6 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, FolderInput, Loader2 } from "lucide-react";
+import { FolderOpen, FolderInput, FileArchive, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DropZoneProps {
@@ -8,8 +8,10 @@ interface DropZoneProps {
   setIsDragOver: Dispatch<SetStateAction<boolean>>;
   isProcessingDrop: boolean;
   folderInputRef: RefObject<HTMLInputElement | null>;
+  zipInputRef: RefObject<HTMLInputElement | null>;
   onDrop: (e: React.DragEvent) => void;
   onFolderInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onZipInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export function DropZone({
@@ -17,8 +19,10 @@ export function DropZone({
   setIsDragOver,
   isProcessingDrop,
   folderInputRef,
+  zipInputRef,
   onDrop,
   onFolderInput,
+  onZipInput,
 }: DropZoneProps) {
   return (
     <div
@@ -33,19 +37,25 @@ export function DropZone({
       {isProcessingDrop ? (
         <>
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm font-medium text-foreground">Reading folder contents…</p>
+          <p className="text-sm font-medium text-foreground">Reading contents…</p>
         </>
       ) : (
         <>
           <FolderInput className="h-9 w-9 text-muted-foreground" />
           <div className="text-center">
-            <p className="text-sm font-medium text-foreground">Drop folders here</p>
-            <p className="text-xs text-muted-foreground mt-1">Drag and drop one or more folders at once</p>
+            <p className="text-sm font-medium text-foreground">Drop folders or a .zip here</p>
+            <p className="text-xs text-muted-foreground mt-1">Drag and drop one or more folders, or a .zip of folders</p>
           </div>
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => folderInputRef.current?.click()}>
-            <FolderOpen className="h-4 w-4" />
-            Pick Folder
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => folderInputRef.current?.click()}>
+              <FolderOpen className="h-4 w-4" />
+              Pick Folder
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => zipInputRef.current?.click()} data-testid="pick-zip-btn">
+              <FileArchive className="h-4 w-4" />
+              Upload .zip
+            </Button>
+          </div>
           <input
             ref={folderInputRef}
             type="file"
@@ -54,6 +64,14 @@ export function DropZone({
             multiple
             className="hidden"
             onChange={onFolderInput}
+          />
+          <input
+            ref={zipInputRef}
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            className="hidden"
+            onChange={onZipInput}
+            data-testid="zip-input"
           />
         </>
       )}
