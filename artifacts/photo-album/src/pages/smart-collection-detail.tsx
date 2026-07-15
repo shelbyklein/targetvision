@@ -497,6 +497,7 @@ export default function SmartCollectionDetail() {
         hasNext={hasNext}
         onPrev={() => hasPrev && setSelectedPhoto(toLight(photos[selectedIndex - 1]))}
         onNext={() => hasNext && setSelectedPhoto(toLight(photos[selectedIndex + 1]))}
+        onMarkNotApplicable={(photoId) => addNegativeMutation.mutate({ id: collectionId, data: { photoId } })}
       />
     </AppLayout>
   );
