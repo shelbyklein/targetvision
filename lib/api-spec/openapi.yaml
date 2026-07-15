@@ -393,6 +393,14 @@ paths:
           required: false
           schema:
             type: integer
+        - name: exclude
+          in: query
+          required: false
+          description: Terms to exclude — photos whose AI description matches any are dropped.
+          schema:
+            type: array
+            items:
+              type: string
       responses:
         "200":
           description: Search results (one page)
@@ -424,6 +432,14 @@ paths:
           required: false
           schema:
             type: boolean
+        - name: exclude
+          in: query
+          required: false
+          description: Concepts to steer away from — the query vector is pushed away from their embedding.
+          schema:
+            type: array
+            items:
+              type: string
       responses:
         "200":
           description: Photos ranked by semantic similarity (most similar first)

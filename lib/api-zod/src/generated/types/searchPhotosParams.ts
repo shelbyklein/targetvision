@@ -16,4 +16,8 @@ export type SearchPhotosParams = {
   includeHidden?: boolean;
   limit?: number;
   offset?: number;
+  /**
+   * Terms to exclude — photos whose AI description matches any are dropped.
+   */
+  exclude?: string[];
 };
