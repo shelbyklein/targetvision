@@ -166,7 +166,7 @@ export default function Albums() {
                   </div>
                   <div className="p-3">
                     <p className="font-medium text-foreground text-sm truncate">{album.title}</p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-1.5 text-[11px] text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Camera className="h-3 w-3" />
                         {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
