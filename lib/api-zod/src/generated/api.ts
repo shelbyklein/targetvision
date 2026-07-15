@@ -410,6 +410,12 @@ export const SearchPhotosQueryParams = zod.object({
   includeHidden: zod.coerce.boolean().optional(),
   limit: zod.coerce.number().optional(),
   offset: zod.coerce.number().optional(),
+  exclude: zod
+    .array(zod.coerce.string())
+    .optional()
+    .describe(
+      "Terms to exclude — photos whose AI description matches any are dropped.",
+    ),
 });
 
 export const SearchPhotosResponse = zod.object({
@@ -511,6 +517,12 @@ export const SemanticSearchPhotosQueryParams = zod.object({
   q: zod.coerce.string(),
   topK: zod.coerce.number().optional(),
   includeHidden: zod.coerce.boolean().optional(),
+  exclude: zod
+    .array(zod.coerce.string())
+    .optional()
+    .describe(
+      "Concepts to steer away from — the query vector is pushed away from their embedding.",
+    ),
 });
 
 export const SemanticSearchPhotosResponseItem = zod.object({

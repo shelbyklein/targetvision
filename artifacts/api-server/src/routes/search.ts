@@ -19,6 +19,20 @@ import { embedText } from "../lib/aiEmbedding";
 
 const router: IRouter = Router();
 
+// How hard an excluded concept pushes the semantic query vector away from it.
+const NEGATIVE_LAMBDA = 0.75;
+
+// Parse repeated `?exclude=` query params (or a single one) into trimmed terms.
+function parseExcludeTerms(raw: unknown): string[] {
+  const arr = Array.isArray(raw) ? raw : raw != null ? [raw] : [];
+  return arr.map((t) => String(t).trim()).filter((t) => t.length > 0);
+}
+
+function normalizeVec(v: number[]): number[] {
+  const m = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+  return v.map((x) => x / m);
+}
+
 interface PhotoFilterOptions {
   search?: string;
   tag?: string;
@@ -243,7 +257,19 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     ]),
   ];
 
-  if (uniqueIds.length === 0) {
+  // Drop photos whose AI description matches any excluded term.
+  const excludeTerms = parseExcludeTerms(req.query.exclude);
+  let candidateIds = uniqueIds;
+  if (excludeTerms.length > 0 && uniqueIds.length > 0) {
+    const excludedRows = await db
+      .select({ id: photosTable.id })
+      .from(photosTable)
+      .where(or(...excludeTerms.map((t) => ilike(photosTable.aiDescription, `%${t}%`))));
+    const excludeSet = new Set(excludedRows.map((r) => r.id));
+    candidateIds = uniqueIds.filter((id) => !excludeSet.has(id));
+  }
+
+  if (candidateIds.length === 0) {
     res.json(SearchPhotosPagedResponse.parse({ photos: [], hasMore: false }));
     return;
   }
@@ -253,7 +279,7 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
   const orderedRows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(inArray(photosTable.id, uniqueIds))
+    .where(inArray(photosTable.id, candidateIds))
     .orderBy(desc(photosTable.createdAt), desc(photosTable.id));
 
   const filtered = await applyFiltersAndFetchIds(orderedRows.map((r) => r.id), {
@@ -285,10 +311,22 @@ router.get("/search/semantic", requireAuth, async (req, res): Promise<void> => {
 
   // Embed the query into the same space as the image embeddings. Returns null
   // when embeddings aren't enabled/configured — degrade to no results.
-  const queryVec = await embedText(q);
-  if (!queryVec) {
+  const posVec = await embedText(q);
+  if (!posVec) {
     res.json(SemanticSearchPhotosResponse.parse([]));
     return;
+  }
+
+  // Steer the query away from excluded concepts: query = norm(pos) - λ·norm(neg).
+  let queryVec = posVec;
+  const excludeTerms = parseExcludeTerms(req.query.exclude);
+  if (excludeTerms.length > 0) {
+    const negVec = await embedText(excludeTerms.join(", "));
+    if (negVec) {
+      const p = normalizeVec(posVec);
+      const n = normalizeVec(negVec);
+      queryVec = p.map((x, i) => x - NEGATIVE_LAMBDA * n[i]);
+    }
   }
   const vecLiteral = `[${queryVec.join(",")}]`;
 

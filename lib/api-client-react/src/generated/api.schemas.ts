@@ -575,12 +575,20 @@ export type SearchPhotosParams = {
   includeHidden?: boolean;
   limit?: number;
   offset?: number;
+  /**
+   * Terms to exclude — photos whose AI description matches any are dropped.
+   */
+  exclude?: string[];
 };
 
 export type SemanticSearchPhotosParams = {
   q: string;
   topK?: number;
   includeHidden?: boolean;
+  /**
+   * Concepts to steer away from — the query vector is pushed away from their embedding.
+   */
+  exclude?: string[];
 };
 
 export type ListSimilarPhotosParams = {

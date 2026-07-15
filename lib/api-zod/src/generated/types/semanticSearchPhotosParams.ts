@@ -10,4 +10,8 @@ export type SemanticSearchPhotosParams = {
   q: string;
   topK?: number;
   includeHidden?: boolean;
+  /**
+   * Concepts to steer away from — the query vector is pushed away from their embedding.
+   */
+  exclude?: string[];
 };

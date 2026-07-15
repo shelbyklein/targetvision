@@ -42,6 +42,7 @@ function parseSearch(search: string) {
     dateFrom: p.get("dateFrom") ?? "",
     dateTo: p.get("dateTo") ?? "",
     uploaderId: p.get("uploaderId") ?? "",
+    exclude: p.get("exclude") ?? "",
   };
 }
 
@@ -92,10 +93,14 @@ export default function SearchPage() {
   const searchString = useSearch();
 
   const urlParams = parseSearch(searchString);
-  const { q, mode, ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = urlParams;
+  const { q, mode, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, exclude } = urlParams;
   const isSemantic = mode === "semantic";
 
+  // Exclusion terms (dedicated field) — comma-joined in the URL, applied in both modes.
+  const excludeTerms = exclude ? exclude.split(",").map((t) => t.trim()).filter(Boolean) : [];
+
   const [inputValue, setInputValue] = useState(q);
+  const [excludeInput, setExcludeInput] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
@@ -122,6 +127,7 @@ export default function SearchPage() {
     ...(dateTo && { dateTo }),
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
     ...(showHidden && { includeHidden: true }),
+    ...(excludeTerms.length && { exclude: excludeTerms }),
     limit: PAGE_SIZE,
     offset,
   };
@@ -131,6 +137,7 @@ export default function SearchPage() {
   const semanticParams = {
     q,
     ...(showHidden && { includeHidden: true }),
+    ...(excludeTerms.length && { exclude: excludeTerms }),
   };
 
   const keyword = useSearchPhotos(searchParams, {
@@ -143,7 +150,7 @@ export default function SearchPage() {
   const keywordPage = keyword.data;
   const [keywordHasMore, setKeywordHasMore] = useState(false);
   // Reset the keyword accumulator when the query / filters / mode change.
-  const resetKey = JSON.stringify({ q, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, showHidden, isSemantic });
+  const resetKey = JSON.stringify({ q, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, showHidden, isSemantic, exclude });
   useEffect(() => {
     setOffset(0);
     setAllKeywordPhotos([]);
@@ -205,6 +212,20 @@ export default function SearchPage() {
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     navigate({ q: inputValue.trim() });
+  }
+
+  function addExclude(term: string) {
+    const t = term.trim();
+    if (!t || excludeTerms.includes(t)) {
+      setExcludeInput("");
+      return;
+    }
+    navigate({ exclude: [...excludeTerms, t].join(",") });
+    setExcludeInput("");
+  }
+
+  function removeExclude(term: string) {
+    navigate({ exclude: excludeTerms.filter((x) => x !== term).join(",") });
   }
 
   function handleFilterChange(field: string, value: string) {
@@ -305,6 +326,48 @@ export default function SearchPage() {
             </Button>
           )}
         </form>
+
+        {q && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="exclude-bar">
+            <span className="text-xs font-medium text-muted-foreground">Exclude:</span>
+            {excludeTerms.map((t) => (
+              <span
+                key={t}
+                className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-xs font-medium text-destructive"
+                data-testid="exclude-chip"
+              >
+                {t}
+                <button
+                  type="button"
+                  onClick={() => removeExclude(t)}
+                  aria-label={`Remove exclusion ${t}`}
+                  data-testid={`remove-exclude-${t}`}
+                  className="ml-0.5 rounded-full hover:opacity-70"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                addExclude(excludeInput);
+              }}
+              className="inline-flex items-center gap-1"
+            >
+              <Input
+                value={excludeInput}
+                onChange={(e) => setExcludeInput(e.target.value)}
+                placeholder="add a term to exclude…"
+                className="h-7 w-48 text-xs"
+                data-testid="exclude-input"
+              />
+              <Button type="submit" size="sm" variant="outline" className="h-7 text-xs" disabled={!excludeInput.trim()} data-testid="add-exclude-btn">
+                Exclude
+              </Button>
+            </form>
+          </div>
+        )}
 
         {isSemantic && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="semantic-hint">
