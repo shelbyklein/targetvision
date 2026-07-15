@@ -7,4 +7,5 @@ export * from "./thumbnails";
 export * from "./exifDateBackfill";
 export * from "./aiAnalysisBackfill";
 export * from "./contentHashBackfill";
+export * from "./embeddings";
 export * from "./bulkUploadBatches";

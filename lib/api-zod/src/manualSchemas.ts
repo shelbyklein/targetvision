@@ -99,3 +99,28 @@ export const UpdateAiAutoBackfillSettingsBody = z.object({
 });
 
 export const UpdateAiAutoBackfillSettingsResponse = AiAutoBackfillSettings;
+
+// --- Image embeddings (Vertex AI) ---
+export const EmbeddingStatusResponse = z.object({
+  enabled: z.boolean(),
+  projectConfigured: z.boolean(),
+  credentialsConfigured: z.boolean(),
+  model: z.string(),
+  location: z.string(),
+  embeddedCount: z.number(),
+  missingCount: z.number(),
+});
+
+export const UpdateEmbeddingSettingsBody = z.object({
+  enabled: z.boolean(),
+});
+
+export const BackfillEmbeddingsBody = z.object({
+  limit: z.number().int().positive().max(1000).optional(),
+});
+
+export const BackfillEmbeddingsResponse = z.object({
+  processed: z.number(),
+  succeeded: z.number(),
+  failed: z.number(),
+});
