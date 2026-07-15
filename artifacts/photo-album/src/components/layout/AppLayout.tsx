@@ -98,7 +98,7 @@ function BulkUploadBanner() {
     const totalFailed = queueFiles.filter((f) => f.status === "error").length;
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+        <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4">
           <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
           <div className="flex-1 min-w-0">
             <span className="text-sm font-medium text-foreground">Upload complete — </span>
@@ -130,7 +130,7 @@ function BulkUploadBanner() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4">
+      <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4">
         <Upload className="h-4 w-4 text-primary shrink-0" />
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -485,7 +485,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className={cn(
-          "flex-1 w-full mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8",
+          "flex-1 w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8",
           bannerVisible && "pb-20"
         )}>
           {children}
@@ -493,7 +493,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {!bannerVisible && (
           <footer className="hidden sm:block border-t border-border py-6 text-sm text-muted-foreground">
-            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+            <div className="px-4 sm:px-6 lg:px-8 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span>Copyright</span>
                 <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
