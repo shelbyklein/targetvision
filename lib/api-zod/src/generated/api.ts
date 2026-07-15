@@ -497,6 +497,202 @@ export const SearchPhotosResponseItem = zod.object({
 export const SearchPhotosResponse = zod.array(SearchPhotosResponseItem);
 
 /**
+ * @summary Semantic photo search — ranks photos by image-embedding similarity to the query text
+ */
+export const SemanticSearchPhotosQueryParams = zod.object({
+  q: zod.coerce.string(),
+  topK: zod.coerce.number().optional(),
+  includeHidden: zod.coerce.boolean().optional(),
+});
+
+export const SemanticSearchPhotosResponseItem = zod.object({
+  id: zod.number(),
+  albumId: zod.number(),
+  albumTitle: zod.string().nullish(),
+  uploaderId: zod.number(),
+  storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
+  url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
+  takenAt: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  isHidden: zod.boolean(),
+  averageRating: zod.number().nullish(),
+  ratingCount: zod.number(),
+  myRating: zod.number().nullish(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        photoCount: zod.number(),
+        coverPhotoId: zod.number().nullish(),
+        coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
+  aiDescription: zod.string().nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
+  suggestedCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+      }),
+    )
+    .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
+});
+export const SemanticSearchPhotosResponse = zod.array(
+  SemanticSearchPhotosResponseItem,
+);
+
+/**
+ * @summary Photos most visually similar to the given photo (by image embedding)
+ */
+export const ListSimilarPhotosParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListSimilarPhotosQueryParams = zod.object({
+  topK: zod.coerce.number().optional(),
+});
+
+export const ListSimilarPhotosResponseItem = zod.object({
+  id: zod.number(),
+  albumId: zod.number(),
+  albumTitle: zod.string().nullish(),
+  uploaderId: zod.number(),
+  storageKey: zod.string().nullish(),
+  thumbnailKey: zod.string().nullish(),
+  url: zod.string(),
+  filename: zod.string().nullish(),
+  filesize: zod.number().nullish(),
+  contentHash: zod
+    .string()
+    .nullish()
+    .describe(
+      "SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.",
+    ),
+  takenAt: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  isHidden: zod.boolean(),
+  averageRating: zod.number().nullish(),
+  ratingCount: zod.number(),
+  myRating: zod.number().nullish(),
+  photoCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+        description: zod.string().nullish(),
+        createdById: zod.number(),
+        photoCount: zod.number(),
+        coverPhotoId: zod.number().nullish(),
+        coverPhotoUrl: zod.string().nullish(),
+        coverPhotoThumbnailKey: zod.string().nullish(),
+        tags: zod.array(zod.string()).optional(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
+  photoProjects: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Projects this photo currently belongs to (membership only)."),
+  aiDescription: zod.string().nullish(),
+  latestAiStatus: zod
+    .union([
+      zod.literal("success"),
+      zod.literal("skipped"),
+      zod.literal("failed"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe("Status of the most recent AI analysis event for this photo"),
+  suggestedCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        title: zod.string(),
+      }),
+    )
+    .optional(),
+  suggestedNewCollections: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        suggestedName: zod.string(),
+      }),
+    )
+    .optional(),
+  ratings: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        userName: zod.string().nullish(),
+        score: zod.number(),
+        createdAt: zod.coerce.date(),
+      }),
+    )
+    .optional(),
+});
+export const ListSimilarPhotosResponse = zod.array(
+  ListSimilarPhotosResponseItem,
+);
+
+/**
  * @summary List all photos with optional filters
  */
 export const ListPhotosQueryParams = zod.object({

@@ -395,6 +395,69 @@ paths:
         "401":
           description: Unauthorized
 
+  /search/semantic:
+    get:
+      operationId: semanticSearchPhotos
+      tags: [photos]
+      summary: Semantic photo search — ranks photos by image-embedding similarity to the query text
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: topK
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: includeHidden
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Photos ranked by semantic similarity (most similar first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+
+  /photos/{id}/similar:
+    get:
+      operationId: listSimilarPhotos
+      tags: [photos]
+      summary: Photos most visually similar to the given photo (by image embedding)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: topK
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Similar photos, most similar first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
   /photos:
     get:
       operationId: listPhotos

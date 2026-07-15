@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray, desc } from "drizzle-orm";
-import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
+import { eq, and, inArray, desc, ne, sql } from "drizzle-orm";
+import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, photoEmbeddingsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStorePhotoEmbedding } from "../lib/aiEmbedding";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
@@ -19,6 +19,7 @@ import {
   ListPhotosResponse,
   GetPhotoParams,
   GetPhotoResponse,
+  ListSimilarPhotosResponse,
   UpdatePhotoParams,
   UpdatePhotoBody,
   UpdatePhotoResponse,
@@ -725,6 +726,45 @@ router.post("/photos/:id/rerun-analysis", requireAuth, async (req, res): Promise
   }
 
   res.json(RerunPhotoAnalysisResponse.parse(event));
+});
+
+router.get("/photos/:id/similar", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid photo ID" });
+    return;
+  }
+  const topKRaw = req.query.topK ? parseInt(String(req.query.topK), 10) : 12;
+  const topK = Number.isInteger(topKRaw) && topKRaw > 0 ? Math.min(topKRaw, 50) : 12;
+
+  // This photo's own embedding — empty result if it hasn't been embedded yet.
+  const [self] = await db
+    .select({ embedding: photoEmbeddingsTable.embedding })
+    .from(photoEmbeddingsTable)
+    .where(eq(photoEmbeddingsTable.photoId, id));
+  if (!self) {
+    res.json(ListSimilarPhotosResponse.parse([]));
+    return;
+  }
+  const vecLiteral = `[${self.embedding.join(",")}]`;
+
+  const canSeeHidden = req.dbUser!.role === "admin";
+  const rows = await db
+    .select({ id: photoEmbeddingsTable.photoId })
+    .from(photoEmbeddingsTable)
+    .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
+    .where(
+      and(
+        ne(photoEmbeddingsTable.photoId, id),
+        canSeeHidden ? undefined : eq(photosTable.isHidden, false),
+      ),
+    )
+    .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
+    .limit(topK);
+
+  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);
+  res.json(ListSimilarPhotosResponse.parse(photos));
 });
 
 export default router;

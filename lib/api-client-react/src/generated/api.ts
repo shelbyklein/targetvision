@@ -45,6 +45,7 @@ import type {
   ListAlbumPhotosParams,
   ListDuplicatePhotoGroupsResponse,
   ListPhotosParams,
+  ListSimilarPhotosParams,
   Photo,
   PhotoCategoryInput,
   PhotoTagInput,
@@ -59,6 +60,7 @@ import type {
   RegistrationSettings,
   RegistrationSettingsUpdate,
   SearchPhotosParams,
+  SemanticSearchPhotosParams,
   Tag,
   TagCount,
   TagInput,
@@ -1242,6 +1244,216 @@ export function useSearchPhotos<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getSearchPhotosQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Semantic photo search — ranks photos by image-embedding similarity to the query text
+ */
+export const getSemanticSearchPhotosUrl = (
+  params: SemanticSearchPhotosParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/search/semantic?${stringifiedParams}`
+    : `/api/search/semantic`;
+};
+
+export const semanticSearchPhotos = async (
+  params: SemanticSearchPhotosParams,
+  options?: RequestInit,
+): Promise<Photo[]> => {
+  return customFetch<Photo[]>(getSemanticSearchPhotosUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSemanticSearchPhotosQueryKey = (
+  params?: SemanticSearchPhotosParams,
+) => {
+  return [`/api/search/semantic`, ...(params ? [params] : [])] as const;
+};
+
+export const getSemanticSearchPhotosQueryOptions = <
+  TData = Awaited<ReturnType<typeof semanticSearchPhotos>>,
+  TError = ErrorType<void>,
+>(
+  params: SemanticSearchPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof semanticSearchPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSemanticSearchPhotosQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof semanticSearchPhotos>>
+  > = ({ signal }) =>
+    semanticSearchPhotos(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof semanticSearchPhotos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SemanticSearchPhotosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof semanticSearchPhotos>>
+>;
+export type SemanticSearchPhotosQueryError = ErrorType<void>;
+
+/**
+ * @summary Semantic photo search — ranks photos by image-embedding similarity to the query text
+ */
+
+export function useSemanticSearchPhotos<
+  TData = Awaited<ReturnType<typeof semanticSearchPhotos>>,
+  TError = ErrorType<void>,
+>(
+  params: SemanticSearchPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof semanticSearchPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSemanticSearchPhotosQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Photos most visually similar to the given photo (by image embedding)
+ */
+export const getListSimilarPhotosUrl = (
+  id: number,
+  params?: ListSimilarPhotosParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/photos/${id}/similar?${stringifiedParams}`
+    : `/api/photos/${id}/similar`;
+};
+
+export const listSimilarPhotos = async (
+  id: number,
+  params?: ListSimilarPhotosParams,
+  options?: RequestInit,
+): Promise<Photo[]> => {
+  return customFetch<Photo[]>(getListSimilarPhotosUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListSimilarPhotosQueryKey = (
+  id: number,
+  params?: ListSimilarPhotosParams,
+) => {
+  return [`/api/photos/${id}/similar`, ...(params ? [params] : [])] as const;
+};
+
+export const getListSimilarPhotosQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSimilarPhotos>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params?: ListSimilarPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSimilarPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListSimilarPhotosQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSimilarPhotos>>
+  > = ({ signal }) =>
+    listSimilarPhotos(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSimilarPhotos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSimilarPhotosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSimilarPhotos>>
+>;
+export type ListSimilarPhotosQueryError = ErrorType<void>;
+
+/**
+ * @summary Photos most visually similar to the given photo (by image embedding)
+ */
+
+export function useListSimilarPhotos<
+  TData = Awaited<ReturnType<typeof listSimilarPhotos>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params?: ListSimilarPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSimilarPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSimilarPhotosQueryOptions(id, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
