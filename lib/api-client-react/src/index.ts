@@ -9,4 +9,5 @@ export * from "./aiAnalysisBackfill";
 export * from "./contentHashBackfill";
 export * from "./perceptualHash";
 export * from "./embeddings";
+export * from "./imageOptimization";
 export * from "./bulkUploadBatches";

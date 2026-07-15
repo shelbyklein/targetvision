@@ -36,6 +36,13 @@
       "when": 1784103505800,
       "tag": "0004_spicy_weapon_omega",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784125590046,
+      "tag": "0005_ancient_leo",
+      "breakpoints": true
     }
   ]
 }

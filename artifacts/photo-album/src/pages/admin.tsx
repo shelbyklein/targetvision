@@ -23,6 +23,7 @@ import { AiServicesSection } from "@/components/admin/AiServicesSection";
 import { AiAnalysisBackfillSection } from "@/components/admin/AiAnalysisBackfillSection";
 import { EmbeddingsSection } from "@/components/admin/EmbeddingsSection";
 import { RegistrationSection } from "@/components/admin/RegistrationSection";
+import { ImageOptimizationSection } from "@/components/admin/ImageOptimizationSection";
 import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
 import { CapturedDatesSection } from "@/components/admin/CapturedDatesSection";
 import { DuplicatesSection } from "@/components/admin/DuplicatesSection";
@@ -93,6 +94,8 @@ export default function Admin() {
         <AiAnalysisBackfillSection />
 
         <EmbeddingsSection />
+
+        <ImageOptimizationSection />
 
         <ThumbnailsSection />
 

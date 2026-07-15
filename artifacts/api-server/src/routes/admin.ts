@@ -45,6 +45,8 @@ import {
   UpdateEmbeddingSettingsBody,
   BackfillEmbeddingsBody,
   BackfillEmbeddingsResponse,
+  ImageOptimizationStatusResponse,
+  UpdateImageOptimizationSettingsBody,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -69,6 +71,7 @@ import {
 import { countPhotosNeedingAiAnalysis, backfillAiAnalysis, listAiBackfillRuns } from "../lib/aiAnalysisBackfill";
 import { getAiAutoBackfillSettings, updateAiAutoBackfillSettings } from "../lib/aiAutoBackfillScheduler";
 import { getEmbeddingConfigStatus } from "../lib/aiEmbedding";
+import { IMAGE_OPTIMIZATION_SETTINGS } from "../lib/imageOptimization";
 import { countPhotosNeedingEmbedding, backfillEmbeddings } from "../lib/embeddingBackfill";
 import { logger } from "../lib/logger";
 
@@ -479,6 +482,35 @@ router.post("/admin/embeddings/backfill", requireAdmin, async (req, res): Promis
   }
   const result = await backfillEmbeddings(body.data.limit);
   res.json(BackfillEmbeddingsResponse.parse(result));
+});
+
+async function buildImageOptimizationStatus() {
+  const [s] = await db
+    .select({ enabled: appSettingsTable.imageOptimizationEnabled })
+    .from(appSettingsTable)
+    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
+  return {
+    enabled: s ? Boolean(s.enabled) : true,
+    quality: IMAGE_OPTIMIZATION_SETTINGS.quality,
+    maxEdge: IMAGE_OPTIMIZATION_SETTINGS.maxEdge,
+  };
+}
+
+router.get("/admin/image-optimization/status", requireAdmin, async (_req, res): Promise<void> => {
+  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus()));
+});
+
+router.patch("/admin/image-optimization/settings", requireAdmin, async (req, res): Promise<void> => {
+  const body = UpdateImageOptimizationSettingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  await db
+    .update(appSettingsTable)
+    .set({ imageOptimizationEnabled: body.data.enabled })
+    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
+  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus()));
 });
 
 router.get("/admin/photos/duplicates", requireAdmin, async (_req, res): Promise<void> => {

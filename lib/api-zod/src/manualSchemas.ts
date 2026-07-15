@@ -159,3 +159,14 @@ export const BackfillEmbeddingsResponse = z.object({
   succeeded: z.number(),
   failed: z.number(),
 });
+
+// --- Image optimization (WebP on import) ---
+export const ImageOptimizationStatusResponse = z.object({
+  enabled: z.boolean(),
+  quality: z.number(),
+  maxEdge: z.number(),
+});
+
+export const UpdateImageOptimizationSettingsBody = z.object({
+  enabled: z.boolean(),
+});
