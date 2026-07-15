@@ -29,6 +29,13 @@ export const appSettingsTable = pgTable("app_settings", {
   geminiKeyPreview: text("gemini_key_preview"),
   geminiModel: text("gemini_model"),
 
+  // Image embeddings via Google Vertex AI (multimodalembedding@001). Auth is
+  // ADC (GOOGLE_APPLICATION_CREDENTIALS) and the GCP project/location come from
+  // env — matching how object storage uses ADC — so only the on/off toggle and
+  // an optional model override live here.
+  embeddingEnabled: boolean("embedding_enabled").notNull().default(false),
+  embeddingModel: text("embedding_model"),
+
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

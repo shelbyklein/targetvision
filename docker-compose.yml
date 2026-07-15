@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:16
+    # pgvector/pgvector bundles the `vector` extension on top of stock Postgres
+    # 16 (same major → the existing postgres-data volume stays compatible).
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
