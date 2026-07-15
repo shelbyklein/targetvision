@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
+import { generateAndStorePhotoEmbedding } from "../lib/aiEmbedding";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { computeAndStoreContentHash } from "../lib/contentHash";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -137,6 +138,10 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
     });
     void computeAndStoreContentHash(photo.id, photo.storageKey).catch((err) => {
       logger.error({ err, photoId: photo.id }, "Background content hash computation failed");
+    });
+    // No-ops unless image embeddings are enabled + Vertex is configured.
+    void generateAndStorePhotoEmbedding(photo.id).catch((err) => {
+      logger.error({ err, photoId: photo.id }, "Background embedding generation failed");
     });
   }
 

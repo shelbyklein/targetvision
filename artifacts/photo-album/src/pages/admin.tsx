@@ -21,6 +21,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { AiServicesSection } from "@/components/admin/AiServicesSection";
 import { AiAnalysisBackfillSection } from "@/components/admin/AiAnalysisBackfillSection";
+import { EmbeddingsSection } from "@/components/admin/EmbeddingsSection";
 import { RegistrationSection } from "@/components/admin/RegistrationSection";
 import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
 import { CapturedDatesSection } from "@/components/admin/CapturedDatesSection";
@@ -89,6 +90,8 @@ export default function Admin() {
         <AiServicesSection />
 
         <AiAnalysisBackfillSection />
+
+        <EmbeddingsSection />
 
         <ThumbnailsSection />
 

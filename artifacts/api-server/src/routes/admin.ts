@@ -6,6 +6,7 @@ import {
   APP_SETTINGS_SINGLETON_ID,
   aiAnalysisEventsTable,
   photosTable,
+  photoEmbeddingsTable,
 } from "@workspace/db";
 import {
   GetRegistrationSettingsResponse,
@@ -37,6 +38,10 @@ import {
   GetAiAutoBackfillSettingsResponse,
   UpdateAiAutoBackfillSettingsBody,
   UpdateAiAutoBackfillSettingsResponse,
+  EmbeddingStatusResponse,
+  UpdateEmbeddingSettingsBody,
+  BackfillEmbeddingsBody,
+  BackfillEmbeddingsResponse,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 import {
@@ -53,6 +58,8 @@ import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDat
 import { countPhotosWithoutContentHash, backfillContentHashes, listDuplicatePhotoGroups } from "../lib/contentHash";
 import { countPhotosNeedingAiAnalysis, backfillAiAnalysis, listAiBackfillRuns } from "../lib/aiAnalysisBackfill";
 import { getAiAutoBackfillSettings, updateAiAutoBackfillSettings } from "../lib/aiAutoBackfillScheduler";
+import { getEmbeddingConfigStatus } from "../lib/aiEmbedding";
+import { countPhotosNeedingEmbedding, backfillEmbeddings } from "../lib/embeddingBackfill";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -426,6 +433,42 @@ router.get("/admin/photos/content-hash-backfill-status", requireAdmin, async (_r
 router.post("/admin/photos/content-hash-backfill", requireAdmin, async (_req, res): Promise<void> => {
   const result = await backfillContentHashes();
   res.json(BackfillContentHashesResponse.parse(result));
+});
+
+async function buildEmbeddingStatus() {
+  const cfg = await getEmbeddingConfigStatus();
+  const missingCount = await countPhotosNeedingEmbedding();
+  const embeddedCount = (
+    await db.select({ id: photoEmbeddingsTable.photoId }).from(photoEmbeddingsTable)
+  ).length;
+  return { ...cfg, embeddedCount, missingCount };
+}
+
+router.get("/admin/embeddings/status", requireAdmin, async (_req, res): Promise<void> => {
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus()));
+});
+
+router.patch("/admin/embeddings/settings", requireAdmin, async (req, res): Promise<void> => {
+  const body = UpdateEmbeddingSettingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  await db
+    .update(appSettingsTable)
+    .set({ embeddingEnabled: body.data.enabled })
+    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus()));
+});
+
+router.post("/admin/embeddings/backfill", requireAdmin, async (req, res): Promise<void> => {
+  const body = BackfillEmbeddingsBody.safeParse(req.body ?? {});
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const result = await backfillEmbeddings(body.data.limit);
+  res.json(BackfillEmbeddingsResponse.parse(result));
 });
 
 router.get("/admin/photos/duplicates", requireAdmin, async (_req, res): Promise<void> => {

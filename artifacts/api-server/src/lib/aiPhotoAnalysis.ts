@@ -30,7 +30,7 @@ interface ResolvedImage {
   contentType: string;
 }
 
-async function resolveImageForAI(
+export async function resolveImageForAI(
   imageUrl: string,
   storageKey: string | null,
 ): Promise<ResolvedImage> {

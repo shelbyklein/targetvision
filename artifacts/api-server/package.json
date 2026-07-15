@@ -24,6 +24,7 @@
     "drizzle-orm": "catalog:",
     "exif-reader": "^2.0.3",
     "express": "^5",
+    "google-auth-library": "^10.9.0",
     "openai": "^6.37.0",
     "pino": "^9",
     "pino-http": "^10",
