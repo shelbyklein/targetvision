@@ -57,6 +57,25 @@ const SECTION_LABELS: Record<SectionId, string> = {
 const DEFAULT_ORDER: SectionId[] = [...SECTION_IDS];
 const LAYOUT_KEY = "dashboard_layout_v1";
 
+// Favorites star-rating floor: show photos whose (rounded) average rating is at
+// least this many stars. Defaults to 5 (only top picks); persisted per browser.
+const FAV_MIN_RATING_KEY = "dashboard_fav_min_rating";
+const DEFAULT_FAV_MIN_RATING = 5;
+
+function loadFavMinRating(): number {
+  if (typeof localStorage === "undefined") return DEFAULT_FAV_MIN_RATING;
+  const raw = Number(localStorage.getItem(FAV_MIN_RATING_KEY));
+  return Number.isInteger(raw) && raw >= 1 && raw <= 5 ? raw : DEFAULT_FAV_MIN_RATING;
+}
+
+const FAV_RATING_OPTIONS: { value: number; label: string }[] = [
+  { value: 5, label: "5★" },
+  { value: 4, label: "4+" },
+  { value: 3, label: "3+" },
+  { value: 2, label: "2+" },
+  { value: 1, label: "All" },
+];
+
 interface Layout {
   order: SectionId[];
   hidden: SectionId[];
@@ -331,6 +350,42 @@ function CustomizeDialog({ layout, onChange }: { layout: Layout; onChange: (l: L
   );
 }
 
+// Segmented star-rating floor for the Favorites section: "5★" shows only 5-star
+// photos, "4+" adds 4-star, … "All" shows everything. Selecting a level shows
+// that level and above.
+function RatingFilter({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div
+      className="flex items-center gap-0.5 rounded-lg border border-border p-0.5"
+      role="group"
+      aria-label="Filter favorites by minimum star rating"
+      data-testid="favorites-rating-filter"
+    >
+      <Star className="h-3.5 w-3.5 text-amber-400 ml-1 mr-0.5 shrink-0" aria-hidden />
+      {FAV_RATING_OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            aria-pressed={active}
+            data-testid={`fav-rating-${opt.value}`}
+            className={cn(
+              "h-6 rounded-md px-2 text-xs font-medium transition-colors",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentPhotos, isLoading: recentLoading } = useGetRecentPhotos();
@@ -341,6 +396,7 @@ export default function Dashboard() {
 
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
   const [layout, setLayout] = useState<Layout>(loadLayout);
+  const [favMinRating, setFavMinRating] = useState<number>(loadFavMinRating);
 
   useEffect(() => {
     try {
@@ -349,6 +405,21 @@ export default function Dashboard() {
       // localStorage unavailable — customization just won't persist.
     }
   }, [layout]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FAV_MIN_RATING_KEY, String(favMinRating));
+    } catch {
+      // localStorage unavailable — the filter choice just won't persist.
+    }
+  }, [favMinRating]);
+
+  // Favorites filtered to the chosen star floor. Ratings are averages, so round
+  // to the nearest star before comparing (a 4.7-avg photo counts as 5★).
+  const filteredFavorites = useMemo<LightboxPhoto[]>(
+    () => (topRated ?? []).filter((p) => Math.round(p.averageRating ?? 0) >= favMinRating),
+    [topRated, favMinRating],
+  );
 
   const allPhotos = useMemo<LightboxPhoto[]>(() => {
     const seen = new Set<number>();
@@ -469,8 +540,22 @@ export default function Dashboard() {
     ),
     favorites: () => (
       <section>
-        <SectionHeader title="Favorites" href="/photos?sort=top-rated" />
-        <PhotoStrip photos={topRated ?? []} loading={topLoading} onPhotoClick={setSelectedPhoto} />
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold text-foreground">Favorites</h2>
+            <RatingFilter value={favMinRating} onChange={setFavMinRating} />
+          </div>
+          <Link href="/photos?sort=top-rated" className="text-sm text-primary hover:underline shrink-0">
+            View all
+          </Link>
+        </div>
+        {!topLoading && (topRated?.length ?? 0) > 0 && filteredFavorites.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4" data-testid="favorites-empty-filtered">
+            No favorites rated {favMinRating === 5 ? "5★" : `${favMinRating}★ or higher`}. Lower the filter to see more.
+          </p>
+        ) : (
+          <PhotoStrip photos={filteredFavorites} loading={topLoading} onPhotoClick={setSelectedPhoto} />
+        )}
       </section>
     ),
     recent: () => (
