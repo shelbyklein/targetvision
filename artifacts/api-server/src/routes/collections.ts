@@ -19,7 +19,6 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
-import { generateCollectionKeywords } from "../lib/aiKeywordGeneration";
 
 const router: IRouter = Router();
 
@@ -326,29 +325,6 @@ router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<vo
 
   const full = await buildCollectionResponse(params.data.id);
   res.json(SetCollectionCoverResponse.parse(full));
-});
-
-router.post("/collections/:id/generate-keywords", requireAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
-  if (!Number.isInteger(id)) {
-    res.status(400).json({ error: "Invalid collection ID" });
-    return;
-  }
-
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, id));
-  if (!collection) {
-    res.status(404).json({ error: "Collection not found" });
-    return;
-  }
-
-  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-
-  await generateCollectionKeywords(id, collection.title, collection.description);
-  res.sendStatus(204);
 });
 
 export default router;

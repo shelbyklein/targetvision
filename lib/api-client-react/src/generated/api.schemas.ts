@@ -223,7 +223,7 @@ export interface Collection {
   /** @nullable */
   coverPhotoUrl?: string | null;
   /** @nullable */
-  aiKeywords?: string | null;
+  smartQuery?: string | null;
   tags?: string[];
   createdAt: string;
   photos?: Photo[];
@@ -243,7 +243,7 @@ export interface CollectionUpdate {
   /** @nullable */
   coverPhotoId?: number | null;
   /** @nullable */
-  aiKeywords?: string | null;
+  smartQuery?: string | null;
 }
 
 export interface CollectionPhotoInput {

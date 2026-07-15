@@ -1,0 +1,1 @@
+ALTER TABLE "collections" DROP COLUMN "ai_keywords";

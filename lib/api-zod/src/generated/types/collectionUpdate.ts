@@ -14,5 +14,5 @@ export interface CollectionUpdate {
   /** @nullable */
   coverPhotoId?: number | null;
   /** @nullable */
-  aiKeywords?: string | null;
+  smartQuery?: string | null;
 }

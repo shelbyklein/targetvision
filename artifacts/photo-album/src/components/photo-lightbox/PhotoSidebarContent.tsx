@@ -199,7 +199,6 @@ export function PhotoSidebarContent({
       { data: { title: trimmedTitle, description: newDesc.trim() || undefined } },
       {
         onSuccess: (newCollection) => {
-          fetch(`/api/collections/${newCollection.id}/generate-keywords`, { method: "POST" }).catch(() => {});
           addToCollection(
             { id: newCollection.id, data: { photoId } },
             {
