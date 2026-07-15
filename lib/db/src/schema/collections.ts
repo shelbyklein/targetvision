@@ -9,7 +9,10 @@ export const collectionsTable = pgTable("collections", {
   createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   coverPhotoId: integer("cover_photo_id").references(() => photosTable.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  aiKeywords: text("ai_keywords"),
+  // Optional semantic-search term for this collection. When viewing the
+  // collection as a "smart collection", photos are ranked by embedding
+  // similarity to this term (falls back to the title when null).
+  smartQuery: text("smart_query"),
 });
 
 export const photoCollectionsTable = pgTable("photo_collections", {

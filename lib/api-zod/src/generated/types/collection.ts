@@ -19,7 +19,7 @@ export interface Collection {
   /** @nullable */
   coverPhotoUrl?: string | null;
   /** @nullable */
-  aiKeywords?: string | null;
+  smartQuery?: string | null;
   tags?: string[];
   createdAt: Date;
   photos?: Photo[];

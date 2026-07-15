@@ -4,12 +4,11 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
-import { collectionKeywords } from "@/lib/aiSuggestions";
 
 export default function SmartCollections() {
   const { data: collections, isLoading } = useListCollections();
 
-  const withKeywords = (collections ?? []).filter((c) => !!collectionKeywords(c));
+  const smartCollections = collections ?? [];
 
   return (
     <AppLayout>
@@ -19,7 +18,8 @@ export default function SmartCollections() {
           <h1 className="text-2xl font-bold text-foreground">Smart Collections</h1>
         </div>
         <p className="text-sm text-muted-foreground -mt-3">
-          AI-suggested photos automatically matched to each collection by description.
+          Browse each collection by visual similarity — photos are ranked by how closely they match
+          the collection's search term.
         </p>
 
         {isLoading ? (
@@ -28,17 +28,17 @@ export default function SmartCollections() {
               <Skeleton key={i} className="h-7 w-24 rounded-full" />
             ))}
           </div>
-        ) : withKeywords.length === 0 ? (
+        ) : smartCollections.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-xl">
             <Sparkles className="h-10 w-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm font-medium text-foreground mb-1">No smart collections yet</p>
             <p className="text-xs text-muted-foreground max-w-sm">
-              Create a collection with a descriptive title or description and the AI will start matching photos to it.
+              Create a collection and open it here to browse matching photos by visual similarity.
             </p>
           </div>
         ) : (
           <div className="flex flex-wrap gap-2" data-testid="smart-collections-list">
-            {withKeywords.map((col) => (
+            {smartCollections.map((col) => (
               <Link key={col.id} href={`/smart-collections/${col.id}`}>
                 <Badge
                   variant="secondary"

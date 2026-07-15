@@ -43,6 +43,20 @@
       "when": 1784125590046,
       "tag": "0005_ancient_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784141027069,
+      "tag": "0006_bitter_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784141048695,
+      "tag": "0007_brief_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

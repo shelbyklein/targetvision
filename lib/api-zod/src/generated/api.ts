@@ -2327,7 +2327,7 @@ export const GetCollectionResponse = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
-  aiKeywords: zod.string().nullish(),
+  smartQuery: zod.string().nullish(),
   tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
@@ -2435,7 +2435,7 @@ export const UpdateCollectionBody = zod.object({
   title: zod.string().min(1).optional(),
   description: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
-  aiKeywords: zod.string().nullish(),
+  smartQuery: zod.string().nullish(),
 });
 
 export const UpdateCollectionResponse = zod.object({
@@ -2446,7 +2446,7 @@ export const UpdateCollectionResponse = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
-  aiKeywords: zod.string().nullish(),
+  smartQuery: zod.string().nullish(),
   tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
@@ -2588,7 +2588,7 @@ export const SetCollectionCoverResponse = zod.object({
   photoCount: zod.number(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
-  aiKeywords: zod.string().nullish(),
+  smartQuery: zod.string().nullish(),
   tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
@@ -2683,13 +2683,6 @@ export const SetCollectionCoverResponse = zod.object({
       }),
     )
     .optional(),
-});
-
-/**
- * @summary Trigger AI keyword generation for a smart collection
- */
-export const GenerateCollectionKeywordsParams = zod.object({
-  id: zod.coerce.number(),
 });
 
 /**
