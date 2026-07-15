@@ -45,6 +45,7 @@ import type {
   ListAlbumPhotosPagedResponse,
   ListAlbumPhotosParams,
   ListDuplicatePhotoGroupsResponse,
+  ListPhotosPagedResponse,
   ListPhotosParams,
   ListSimilarPhotosParams,
   Photo,
@@ -60,6 +61,7 @@ import type {
   RatingInput,
   RegistrationSettings,
   RegistrationSettingsUpdate,
+  SearchPhotosPagedResponse,
   SearchPhotosParams,
   SemanticSearchPhotosParams,
   Tag,
@@ -1181,8 +1183,8 @@ export const getSearchPhotosUrl = (params: SearchPhotosParams) => {
 export const searchPhotos = async (
   params: SearchPhotosParams,
   options?: RequestInit,
-): Promise<Photo[]> => {
-  return customFetch<Photo[]>(getSearchPhotosUrl(params), {
+): Promise<SearchPhotosPagedResponse> => {
+  return customFetch<SearchPhotosPagedResponse>(getSearchPhotosUrl(params), {
     ...options,
     method: "GET",
   });
@@ -1485,8 +1487,8 @@ export const getListPhotosUrl = (params?: ListPhotosParams) => {
 export const listPhotos = async (
   params?: ListPhotosParams,
   options?: RequestInit,
-): Promise<Photo[]> => {
-  return customFetch<Photo[]>(getListPhotosUrl(params), {
+): Promise<ListPhotosPagedResponse> => {
+  return customFetch<ListPhotosPagedResponse>(getListPhotosUrl(params), {
     ...options,
     method: "GET",
   });

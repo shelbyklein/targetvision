@@ -27,7 +27,9 @@ export default function PhotosScreen() {
   const [lightboxVisible, setLightboxVisible] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  const allPhotos = photos ?? [];
+  // The /photos endpoint is now paged ({ photos, hasMore }); this screen just
+  // shows the first page for now.
+  const allPhotos = photos?.photos ?? [];
 
   const handlePhotoPress = useCallback((_: Photo, index: number) => {
     setLightboxIndex(index);

@@ -383,15 +383,23 @@ paths:
           required: false
           schema:
             type: boolean
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
-          description: Search results
+          description: Search results (one page)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Photo"
+                $ref: "#/components/schemas/SearchPhotosPagedResponse"
         "401":
           description: Unauthorized
 
@@ -520,15 +528,23 @@ paths:
           schema:
             type: string
             enum: ["has_description", "failed", "not_analysed"]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
-          description: List of photos
+          description: List of photos (one page)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Photo"
+                $ref: "#/components/schemas/ListPhotosPagedResponse"
 
   /photos/bulk:
     patch:
@@ -2024,6 +2040,28 @@ components:
             $ref: "#/components/schemas/PhotoRating"
 
     ListAlbumPhotosPagedResponse:
+      type: object
+      required: [photos, hasMore]
+      properties:
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Photo"
+        hasMore:
+          type: boolean
+
+    ListPhotosPagedResponse:
+      type: object
+      required: [photos, hasMore]
+      properties:
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Photo"
+        hasMore:
+          type: boolean
+
+    SearchPhotosPagedResponse:
       type: object
       required: [photos, hasMore]
       properties:

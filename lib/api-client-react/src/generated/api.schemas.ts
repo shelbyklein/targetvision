@@ -211,6 +211,16 @@ export interface ListAlbumPhotosPagedResponse {
   hasMore: boolean;
 }
 
+export interface ListPhotosPagedResponse {
+  photos: Photo[];
+  hasMore: boolean;
+}
+
+export interface SearchPhotosPagedResponse {
+  photos: Photo[];
+  hasMore: boolean;
+}
+
 export interface Collection {
   id: number;
   title: string;
@@ -563,6 +573,8 @@ export type SearchPhotosParams = {
   dateTo?: string;
   uploaderId?: number;
   includeHidden?: boolean;
+  limit?: number;
+  offset?: number;
 };
 
 export type SemanticSearchPhotosParams = {
@@ -587,6 +599,8 @@ export type ListPhotosParams = {
   includeHidden?: boolean;
   albumId?: number;
   aiStatus?: ListPhotosAiStatus;
+  limit?: number;
+  offset?: number;
 };
 
 export type ListPhotosAiStatus =

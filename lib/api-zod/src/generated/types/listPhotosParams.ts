@@ -19,4 +19,6 @@ export type ListPhotosParams = {
   includeHidden?: boolean;
   albumId?: number;
   aiStatus?: ListPhotosAiStatus;
+  limit?: number;
+  offset?: number;
 };

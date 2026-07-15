@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { useLocation, useSearch } from "wouter";
+import type { Photo } from "@workspace/api-client-react";
 import {
   useSearchPhotos,
   useSemanticSearchPhotos,
@@ -25,8 +27,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
-import { Search, SlidersHorizontal, X, Star, Images, EyeOff, Eye, Sparkles } from "lucide-react";
+import { Search, SlidersHorizontal, X, Star, Images, EyeOff, Eye, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const PAGE_SIZE = 48;
 
 function parseSearch(search: string) {
   const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -106,6 +110,10 @@ export default function SearchPage() {
   const hasActiveFilters =
     !!ratingMin || !!ratingMax || !!dateFrom || !!dateTo || !!uploaderId;
 
+  // Keyword search paginates (infinite scroll); semantic returns one ranked page.
+  const [offset, setOffset] = useState(0);
+  const [allKeywordPhotos, setAllKeywordPhotos] = useState<Photo[]>([]);
+
   const searchParams = {
     q,
     ...(ratingMin && { ratingMin: parseFloat(ratingMin) }),
@@ -114,10 +122,12 @@ export default function SearchPage() {
     ...(dateTo && { dateTo }),
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
     ...(showHidden && { includeHidden: true }),
+    limit: PAGE_SIZE,
+    offset,
   };
 
-  // Semantic search ignores the keyword filters — it ranks by image-embedding
-  // similarity to the query, and only respects hidden visibility.
+  // Semantic search ignores the keyword filters + pagination — it ranks by
+  // image-embedding similarity to the query, and only respects hidden visibility.
   const semanticParams = {
     q,
     ...(showHidden && { includeHidden: true }),
@@ -129,21 +139,63 @@ export default function SearchPage() {
   const semantic = useSemanticSearchPhotos(semanticParams, {
     query: { enabled: !!q && isSemantic, queryKey: getSemanticSearchPhotosQueryKey(semanticParams) },
   });
-  const { data: results, isLoading, isFetching } = isSemantic ? semantic : keyword;
+
+  const keywordPage = keyword.data;
+  const [keywordHasMore, setKeywordHasMore] = useState(false);
+  // Reset the keyword accumulator when the query / filters / mode change.
+  const resetKey = JSON.stringify({ q, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, showHidden, isSemantic });
+  useEffect(() => {
+    setOffset(0);
+    setAllKeywordPhotos([]);
+    setKeywordHasMore(false);
+  }, [resetKey]);
+  // Sticky hasMore (see photos.tsx) so it doesn't flicker false mid-fetch.
+  useEffect(() => {
+    if (isSemantic || !keywordPage) return;
+    setKeywordHasMore(keywordPage.hasMore);
+    setAllKeywordPhotos((prev) => {
+      if (offset === 0) return keywordPage.photos;
+      const byId = new Map(prev.map((p) => [p.id, p]));
+      for (const p of keywordPage.photos) byId.set(p.id, p);
+      return Array.from(byId.values());
+    });
+  }, [keywordPage, offset, isSemantic]);
+
+  const photos: Photo[] = isSemantic ? semantic.data ?? [] : allKeywordPhotos;
+  const hasMore = isSemantic ? false : keywordHasMore;
+  const isFetching = isSemantic ? semantic.isFetching : keyword.isFetching;
+  const isInitialLoading = (isSemantic ? semantic.isLoading : keyword.isLoading) && photos.length === 0;
+  const sentinelRef = useInfiniteScroll(() => {
+    if (!isFetching) setOffset((o) => o + PAGE_SIZE);
+  }, hasMore);
 
   // Open results in the lightbox (like the dashboard) instead of navigating to
   // the detail page, so the user stays in their search results.
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
-  const photos = results ?? [];
+  const [pendingAdvance, setPendingAdvance] = useState(false);
   const selectedIndex = selectedPhoto ? photos.findIndex((p) => p.id === selectedPhoto.id) : -1;
   const hasPrev = selectedIndex > 0;
-  const hasNext = selectedIndex >= 0 && selectedIndex < photos.length - 1;
+  const hasNext = selectedIndex >= 0 && (selectedIndex < photos.length - 1 || hasMore);
   function handlePrev() {
     if (hasPrev) setSelectedPhoto(photos[selectedIndex - 1]);
   }
   function handleNext() {
-    if (hasNext) setSelectedPhoto(photos[selectedIndex + 1]);
+    const nextIdx = selectedIndex + 1;
+    if (nextIdx < photos.length) setSelectedPhoto(photos[nextIdx]);
+    else if (hasMore) {
+      setPendingAdvance(true);
+      setOffset((o) => o + PAGE_SIZE);
+    }
   }
+  useEffect(() => {
+    if (!pendingAdvance || !selectedPhoto) return;
+    const idx = photos.findIndex((p) => p.id === selectedPhoto.id);
+    if (idx >= 0 && idx < photos.length - 1) {
+      setSelectedPhoto(photos[idx + 1]);
+      setPendingAdvance(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos, pendingAdvance]);
 
   function navigate(next: Partial<ReturnType<typeof parseSearch>>) {
     const merged = { ...urlParams, ...next };
@@ -440,7 +492,7 @@ export default function SearchPage() {
           </div>
         )}
 
-        {q && (isLoading || isFetching) && (
+        {q && isInitialLoading && (
           <div
             className="columns-2 sm:columns-3 lg:columns-4 gap-3"
             data-testid="search-loading"
@@ -451,14 +503,14 @@ export default function SearchPage() {
           </div>
         )}
 
-        {q && !isLoading && !isFetching && results && (
+        {q && !isInitialLoading && (
           <>
             <p className="text-sm text-muted-foreground" data-testid="search-result-count">
-              {results.length} result{results.length !== 1 ? "s" : ""} for &ldquo;{q}&rdquo;
+              {photos.length}{hasMore ? "+" : ""} result{photos.length !== 1 ? "s" : ""} for &ldquo;{q}&rdquo;
               {hasActiveFilters && " with active filters"}
             </p>
 
-            {results.length === 0 ? (
+            {photos.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center py-24 text-center rounded-xl border border-border bg-card"
                 data-testid="search-no-results"
@@ -477,8 +529,9 @@ export default function SearchPage() {
                 )}
               </div>
             ) : (
+              <>
               <MasonryGrid
-                items={results}
+                items={photos}
                 getKey={(photo) => photo.id}
                 data-testid="search-results"
                 renderItem={(photo) => (
@@ -532,6 +585,16 @@ export default function SearchPage() {
                   </button>
                 )}
               />
+              {hasMore && (
+                <div
+                  ref={sentinelRef}
+                  className="flex items-center justify-center py-8 text-sm text-muted-foreground"
+                  data-testid="search-load-more"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading more…
+                </div>
+              )}
+              </>
             )}
           </>
         )}
