@@ -135,8 +135,13 @@ export default function BulkUpload() {
         return;
       }
       await addFolders(newFolders);
-    } catch {
-      toast({ title: "Couldn't read that .zip file", variant: "destructive" });
+    } catch (err) {
+      console.error("ZIP extraction failed", err);
+      toast({
+        title: "Couldn't read that .zip file",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
     } finally {
       setIsProcessingDrop(false);
     }
