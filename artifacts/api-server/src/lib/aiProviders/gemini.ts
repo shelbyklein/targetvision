@@ -98,8 +98,10 @@ export class GeminiProvider implements AnalysisProvider {
           : [],
       };
     } catch (err) {
+      // Surface the real provider error so it lands on the ai_analysis_events
+      // row instead of being masked as a generic "Provider returned no result".
       logger.error({ err }, "Gemini photo analysis failed");
-      return null;
+      throw err;
     }
   }
 }
