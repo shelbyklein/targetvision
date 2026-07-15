@@ -16,9 +16,11 @@ import {
   SetCollectionCoverParams,
   SetCollectionCoverBody,
   SetCollectionCoverResponse,
+  GetSmartCollectionPhotosResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
+import { resolveSmartCollectionPhotoIds } from "../lib/smartCollectionPhotos";
 
 const router: IRouter = Router();
 
@@ -325,6 +327,28 @@ router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<vo
 
   const full = await buildCollectionResponse(params.data.id);
   res.json(SetCollectionCoverResponse.parse(full));
+});
+
+router.get("/collections/:id/smart-photos", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid collection ID" });
+    return;
+  }
+
+  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+
+  const topKRaw = req.query.topK ? parseInt(String(req.query.topK), 10) : 100;
+  const topK = Number.isInteger(topKRaw) && topKRaw > 0 ? Math.min(topKRaw, 200) : 100;
+
+  const { ids } = await resolveSmartCollectionPhotoIds(collection, topK);
+  const photos = await buildPhotosResponse(ids, req.dbUser?.id);
+  res.json(GetSmartCollectionPhotosResponse.parse(photos));
 });
 
 export default router;

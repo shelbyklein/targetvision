@@ -39,6 +39,7 @@ export * from "./collectionUpdate";
 export * from "./dashboardStats";
 export * from "./duplicatePhoto";
 export * from "./duplicatePhotoGroup";
+export * from "./getSmartCollectionPhotosParams";
 export * from "./healthStatus";
 export * from "./listAlbumPhotosAiStatus";
 export * from "./listAlbumPhotosPagedResponse";

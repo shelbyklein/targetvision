@@ -3,12 +3,12 @@ import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCollection,
-  useSemanticSearchPhotos,
+  useGetSmartCollectionPhotos,
   useAddPhotoToCollection,
   useUpdateCollection,
   useSetCollectionCover,
   getGetCollectionQueryKey,
-  getSemanticSearchPhotosQueryKey,
+  getGetSmartCollectionPhotosQueryKey,
 } from "@workspace/api-client-react";
 import type { Photo } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -29,9 +29,8 @@ import { startPhotoDrag } from "@/lib/photoDrag";
 import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, ImageIcon, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// How many nearest-neighbour photos to pull for a smart collection (the
-// semantic endpoint caps at 100). A distance threshold could replace this later.
-const SEMANTIC_TOP_K = 100;
+// How many suggestions to pull for a smart collection (the endpoint caps at 200).
+const SMART_TOP_K = 100;
 
 type SortOption = "relevance" | "newest" | "oldest" | "top-rated" | "name-az";
 
@@ -88,13 +87,20 @@ export default function SmartCollectionDetail() {
   }, [collection?.smartQuery, collection?.title]);
 
   const term = termInput.trim();
+  // Members drive the matches (centroid of their embeddings); the term is only
+  // the fallback when the collection is empty.
+  const memberCount = collection?.photoCount ?? 0;
+  const isMemberDriven = memberCount > 0;
 
   const { mutate: updateCollection } = useUpdateCollection();
 
-  const semanticParams = { q: term, topK: SEMANTIC_TOP_K };
-  const { data: rawPhotos, isLoading: photosLoading } = useSemanticSearchPhotos(semanticParams, {
-    query: { enabled: !!term, queryKey: getSemanticSearchPhotosQueryKey(semanticParams) },
-  });
+  const smartParams = { topK: SMART_TOP_K };
+  const smartPhotosKey = getGetSmartCollectionPhotosQueryKey(collectionId, smartParams);
+  const { data: rawPhotos, isLoading: photosLoading } = useGetSmartCollectionPhotos(
+    collectionId,
+    smartParams,
+    { query: { enabled: !!collectionId, queryKey: smartPhotosKey } },
+  );
 
   const [sort, setSort] = useState<SortOption>("relevance");
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
@@ -109,6 +115,8 @@ export default function SmartCollectionDetail() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+        // Re-rank: the new member sharpens the centroid and drops from suggestions.
+        queryClient.invalidateQueries({ queryKey: smartPhotosKey });
       },
     },
   });
@@ -141,6 +149,7 @@ export default function SmartCollectionDetail() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+          queryClient.invalidateQueries({ queryKey: smartPhotosKey });
           toast({ title: "Search term saved" });
         },
         onError: () => toast({ title: "Failed to save term", variant: "destructive" }),
@@ -176,7 +185,7 @@ export default function SmartCollectionDetail() {
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex >= 0 && selectedIndex < photos.length - 1;
 
-  const isLoading = collectionLoading || (!!term && photosLoading);
+  const isLoading = collectionLoading || photosLoading;
 
   if (!collectionLoading && !collection) {
     return (
@@ -210,7 +219,9 @@ export default function SmartCollectionDetail() {
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              Photos ranked by visual similarity to the search term
+              {isMemberDriven
+                ? `Photos similar to the ${memberCount} in this collection`
+                : "Photos ranked by visual similarity to the search term"}
             </p>
             {collection?.description && (
               <p className="text-xs text-muted-foreground max-w-xl">{collection.description}</p>
@@ -222,8 +233,12 @@ export default function SmartCollectionDetail() {
         <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2" data-testid="smart-term-panel">
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
-            <span className="text-sm font-semibold">Search term</span>
-            <span className="text-xs text-muted-foreground">— what these photos should look like</span>
+            <span className="text-sm font-semibold">Fallback search term</span>
+            <span className="text-xs text-muted-foreground">
+              {isMemberDriven
+                ? "— used only when the collection is empty"
+                : "— used until you add photos"}
+            </span>
           </div>
           <form onSubmit={handleSaveTerm} className="flex items-end gap-2" data-testid="smart-term-form">
             <div className="relative flex-1">
@@ -248,7 +263,8 @@ export default function SmartCollectionDetail() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground">
-            Defaults to the collection title. Photos must be embedded (Admin → Image Embeddings) to appear here.
+            Add photos to this collection to drive matches from them; otherwise this term (default: the
+            title) is used. Photos must be embedded (Admin → Image Embeddings) to appear.
           </p>
         </div>
 
@@ -284,20 +300,14 @@ export default function SmartCollectionDetail() {
               <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
             ))}
           </div>
-        ) : !term ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-xl">
-            <Sparkles className="h-10 w-10 text-muted-foreground/30 mb-3" />
-            <p className="text-sm font-medium text-foreground mb-1">No search term</p>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              Enter a term above to rank photos by how closely they match it.
-            </p>
-          </div>
         ) : photos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-xl">
             <Sparkles className="h-10 w-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm font-medium text-foreground mb-1">No matches yet</p>
             <p className="text-xs text-muted-foreground max-w-sm">
-              Nothing matched “{term}”. Make sure photos are embedded (Admin → Image Embeddings) and try a different term.
+              {isMemberDriven
+                ? "No similar photos found. Make sure your library is embedded (Admin → Image Embeddings)."
+                : `Nothing matched “${term}”. Make sure photos are embedded (Admin → Image Embeddings) and try a different term.`}
             </p>
           </div>
         ) : (
