@@ -1,0 +1,1 @@
+ALTER TABLE "app_settings" ADD COLUMN "image_optimization_enabled" boolean DEFAULT true NOT NULL;

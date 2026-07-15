@@ -36,6 +36,10 @@ export const appSettingsTable = pgTable("app_settings", {
   embeddingEnabled: boolean("embedding_enabled").notNull().default(false),
   embeddingModel: text("embedding_model"),
 
+  // Re-encode newly-uploaded originals to WebP on import (server-side, via
+  // sharp) to save storage while preserving EXIF/orientation. On by default.
+  imageOptimizationEnabled: boolean("image_optimization_enabled").notNull().default(true),
+
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
