@@ -90,8 +90,11 @@ export class OpenAIProvider implements AnalysisProvider {
           : [],
       };
     } catch (err) {
+      // Surface the real provider error (e.g. a 400 "unsupported image") to the
+      // caller so it's recorded on the ai_analysis_events row, instead of being
+      // masked as a generic "Provider returned no result".
       logger.error({ err }, "OpenAI photo analysis failed");
-      return null;
+      throw err;
     }
   }
 }

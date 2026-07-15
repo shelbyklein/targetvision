@@ -121,8 +121,10 @@ export class AnthropicProvider implements AnalysisProvider {
           : [],
       };
     } catch (err) {
+      // Surface the real provider error so it lands on the ai_analysis_events
+      // row instead of being masked as a generic "Provider returned no result".
       logger.error({ err }, "Anthropic photo analysis failed");
-      return null;
+      throw err;
     }
   }
 }
