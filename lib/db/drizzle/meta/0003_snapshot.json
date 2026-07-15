@@ -1,5 +1,5 @@
 {
-  "id": "97c948f4-89d6-45e8-9dc9-7f7c7595a3c5",
+  "id": "e8ebf894-ef65-4b93-a1bf-b7724b7f32f9",
   "prevId": "aec40dd5-83e6-4b6c-a8e3-e0ebda59de39",
   "version": "7",
   "dialect": "postgresql",
@@ -1321,7 +1321,7 @@
         },
         "embedding": {
           "name": "embedding",
-          "type": "vector(1024)",
+          "type": "vector(1408)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1505,30 +1505,6 @@
         },
         "embedding_model": {
           "name": "embedding_model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "embedding_key_ciphertext": {
-          "name": "embedding_key_ciphertext",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "embedding_key_iv": {
-          "name": "embedding_key_iv",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "embedding_key_tag": {
-          "name": "embedding_key_tag",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "embedding_key_preview": {
-          "name": "embedding_key_preview",
           "type": "text",
           "primaryKey": false,
           "notNull": false

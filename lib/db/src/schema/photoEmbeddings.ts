@@ -1,10 +1,11 @@
 import { pgTable, integer, text, timestamp, customType } from "drizzle-orm/pg-core";
 import { photosTable } from "./photos";
 
-// Fixed by the embedding model. Cohere embed-multilingual-v3.0 outputs 1024-dim
-// vectors. Changing the model to a different dimension requires a re-embed and a
-// new migration (the pgvector column dimension is part of the column type).
-export const EMBEDDING_DIMENSION = 1024;
+// Fixed by the embedding model. Google Vertex AI multimodalembedding@001 outputs
+// 1408-dim vectors (image + text share this space). Changing the model to a
+// different dimension requires a re-embed and a new migration (the pgvector
+// column dimension is part of the column type).
+export const EMBEDDING_DIMENSION = 1408;
 
 // pgvector column type. drizzle-kit has no native `vector` type, so it's declared
 // via customType. On the wire pgvector uses the text form "[1,2,3]"; we convert
@@ -29,7 +30,7 @@ export const photoEmbeddingsTable = pgTable("photo_embeddings", {
     .primaryKey()
     .references(() => photosTable.id, { onDelete: "cascade" }),
   embedding: vector("embedding").notNull(),
-  // e.g. "cohere/embed-multilingual-v3.0" — tracks which model produced the
+  // e.g. "vertex/multimodalembedding@001" — tracks which model produced the
   // vector, so a model change can be detected for re-embedding.
   model: text("model").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

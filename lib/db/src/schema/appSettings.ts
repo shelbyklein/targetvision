@@ -29,15 +29,12 @@ export const appSettingsTable = pgTable("app_settings", {
   geminiKeyPreview: text("gemini_key_preview"),
   geminiModel: text("gemini_model"),
 
-  // Image-embedding provider (Cohere) — separate from the vision providers
-  // above because embeddings use a different provider/model. Key encrypted with
-  // the same AES-GCM scheme (secretCrypto).
+  // Image embeddings via Google Vertex AI (multimodalembedding@001). Auth is
+  // ADC (GOOGLE_APPLICATION_CREDENTIALS) and the GCP project/location come from
+  // env — matching how object storage uses ADC — so only the on/off toggle and
+  // an optional model override live here.
   embeddingEnabled: boolean("embedding_enabled").notNull().default(false),
   embeddingModel: text("embedding_model"),
-  embeddingKeyCiphertext: text("embedding_key_ciphertext"),
-  embeddingKeyIv: text("embedding_key_iv"),
-  embeddingKeyTag: text("embedding_key_tag"),
-  embeddingKeyPreview: text("embedding_key_preview"),
 
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
