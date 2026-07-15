@@ -597,3 +597,7 @@ export const ListPhotosAiStatus = {
   failed: "failed",
   not_analysed: "not_analysed",
 } as const;
+
+export type GetSmartCollectionPhotosParams = {
+  topK?: number;
+};

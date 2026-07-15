@@ -40,6 +40,7 @@ import type {
   CollectionSummary,
   CollectionUpdate,
   DashboardStats,
+  GetSmartCollectionPhotosParams,
   HealthStatus,
   ListAlbumPhotosPagedResponse,
   ListAlbumPhotosParams,
@@ -4726,6 +4727,123 @@ export const useSetCollectionCover = <
 > => {
   return useMutation(getSetCollectionCoverMutationOptions(options));
 };
+
+/**
+ * @summary Photos most similar to a collection — ranked by the average embedding of its members, falling back to its search term when empty
+ */
+export const getGetSmartCollectionPhotosUrl = (
+  id: number,
+  params?: GetSmartCollectionPhotosParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/collections/${id}/smart-photos?${stringifiedParams}`
+    : `/api/collections/${id}/smart-photos`;
+};
+
+export const getSmartCollectionPhotos = async (
+  id: number,
+  params?: GetSmartCollectionPhotosParams,
+  options?: RequestInit,
+): Promise<Photo[]> => {
+  return customFetch<Photo[]>(getGetSmartCollectionPhotosUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSmartCollectionPhotosQueryKey = (
+  id: number,
+  params?: GetSmartCollectionPhotosParams,
+) => {
+  return [
+    `/api/collections/${id}/smart-photos`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetSmartCollectionPhotosQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSmartCollectionPhotos>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params?: GetSmartCollectionPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSmartCollectionPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSmartCollectionPhotosQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSmartCollectionPhotos>>
+  > = ({ signal }) =>
+    getSmartCollectionPhotos(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSmartCollectionPhotos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSmartCollectionPhotosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSmartCollectionPhotos>>
+>;
+export type GetSmartCollectionPhotosQueryError = ErrorType<void>;
+
+/**
+ * @summary Photos most similar to a collection — ranked by the average embedding of its members, falling back to its search term when empty
+ */
+
+export function useGetSmartCollectionPhotos<
+  TData = Awaited<ReturnType<typeof getSmartCollectionPhotos>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params?: GetSmartCollectionPhotosParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSmartCollectionPhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSmartCollectionPhotosQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List all projects
