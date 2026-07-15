@@ -5,8 +5,12 @@ import {
   useGetMe,
   useListProjects,
   useAddPhotoToProject,
+  useListCollections,
+  useAddPhotoToCollection,
   getListProjectsQueryKey,
   getGetProjectQueryKey,
+  getListCollectionsQueryKey,
+  getGetCollectionQueryKey,
   getGetPhotoQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -346,6 +350,145 @@ function ProjectsNav({ location }: { location: string }) {
   );
 }
 
+const COLLECTIONS_NAV_OPEN_KEY = "collections_nav_open";
+
+// The "Collections" nav entry as a collapsible tree, mirroring ProjectsNav: the
+// label links to /collections, a chevron expands to list each collection (with
+// its photo count), and each row is a drop target — drag a photo from any grid
+// onto it to add it to that collection.
+function CollectionsNav({ location }: { location: string }) {
+  const { data: collections } = useListCollections();
+  const { mutate: addToCollection } = useAddPhotoToCollection();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [open, setOpen] = useState<boolean>(() =>
+    typeof localStorage !== "undefined" && localStorage.getItem(COLLECTIONS_NAV_OPEN_KEY) === "true"
+  );
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [justAddedId, setJustAddedId] = useState<number | null>(null);
+
+  // While any photo is being dragged, auto-reveal the collections (so they're
+  // droppable) and light up the drop zone. Cleared when the drag ends.
+  useEffect(() => {
+    function onDragStartWin(ev: globalThis.DragEvent) {
+      if (ev.dataTransfer?.types.includes(PHOTO_DND_MIME)) {
+        setDragActive(true);
+        setOpen(true);
+      }
+    }
+    function onDragEndWin() {
+      setDragActive(false);
+      setDragOverId(null);
+    }
+    window.addEventListener("dragstart", onDragStartWin);
+    window.addEventListener("dragend", onDragEndWin);
+    return () => {
+      window.removeEventListener("dragstart", onDragStartWin);
+      window.removeEventListener("dragend", onDragEndWin);
+    };
+  }, []);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    try {
+      localStorage.setItem(COLLECTIONS_NAV_OPEN_KEY, String(next));
+    } catch {
+      // localStorage unavailable (private mode) — expansion just won't persist.
+    }
+  }
+
+  function handleDrop(e: DragEvent, collectionId: number, collectionTitle: string) {
+    e.preventDefault();
+    setDragOverId(null);
+    const photoId = getDraggedPhotoId(e);
+    if (photoId == null) return;
+    addToCollection(
+      { id: collectionId, data: { photoId } },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+          qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
+          setJustAddedId(collectionId);
+          window.setTimeout(
+            () => setJustAddedId((cur) => (cur === collectionId ? null : cur)),
+            1100,
+          );
+          toast({ title: `Added to "${collectionTitle}"` });
+        },
+        onError: () => toast({ title: "Failed to add to collection", variant: "destructive" }),
+      }
+    );
+  }
+
+  return (
+    <Collapsible asChild open={open} onOpenChange={handleOpenChange} className="group/collections">
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild isActive={location === "/collections"} tooltip="Collections">
+          <Link href="/collections" data-testid="nav-collections">
+            <FolderOpen />
+            <span>Collections</span>
+          </Link>
+        </SidebarMenuButton>
+        {collections && collections.length > 0 && (
+          <>
+            <CollapsibleTrigger asChild>
+              <SidebarMenuAction
+                className="transition-transform data-[state=open]:rotate-90"
+                data-testid="collections-nav-toggle"
+                aria-label={open ? "Collapse collections" : "Expand collections"}
+              >
+                <ChevronRight />
+              </SidebarMenuAction>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarMenuSub data-testid="collections-nav-sub">
+                {collections.map((collection) => (
+                  <SidebarMenuSubItem key={collection.id}>
+                    <SidebarMenuSubButton
+                      asChild
+                      isActive={location === `/collections/${collection.id}`}
+                      className={cn(
+                        "origin-left transition-all duration-150",
+                        dragActive && "border border-dashed border-primary/50",
+                        dragOverId === collection.id &&
+                          "scale-[1.05] border-solid border-primary bg-primary/15 shadow-lg ring-2 ring-primary",
+                        justAddedId === collection.id &&
+                          "border-solid border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500",
+                      )}
+                      onDragOver={(e: DragEvent) => {
+                        if (isPhotoDrag(e)) {
+                          e.preventDefault();
+                          setDragOverId(collection.id);
+                        }
+                      }}
+                      onDragLeave={() => setDragOverId((cur) => (cur === collection.id ? null : cur))}
+                      onDrop={(e: DragEvent) => handleDrop(e, collection.id, collection.title)}
+                    >
+                      <Link href={`/collections/${collection.id}`} data-testid={`collections-nav-item-${collection.id}`}>
+                        <span className="truncate">{collection.title}</span>
+                        <SidebarMenuBadge
+                          className={cn(
+                            "transition-transform duration-200",
+                            justAddedId === collection.id && "scale-150 text-emerald-400",
+                          )}
+                        >
+                          {collection.photoCount}
+                        </SidebarMenuBadge>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                ))}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </>
+        )}
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
 function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean }) {
   const { data: session } = useSession();
   const user = session?.user;
@@ -377,6 +520,9 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarMenu data-testid="main-nav">
             {items.map((item) => {
+              if (item.href === "/collections") {
+                return <CollectionsNav key={item.href} location={location} />;
+              }
               if (item.href === "/projects") {
                 return <ProjectsNav key={item.href} location={location} />;
               }
