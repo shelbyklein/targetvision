@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, avg, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, notInArray, or } from "drizzle-orm";
+import { and, avg, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import {
   db,
   albumsTable,
@@ -9,11 +9,13 @@ import {
   tagsTable,
   collectionTagsTable,
   photoCollectionsTable,
+  photoEmbeddingsTable,
   aiAnalysisEventsTable,
 } from "@workspace/db";
-import { SearchPhotosResponse } from "@workspace/api-zod";
+import { SearchPhotosResponse, SemanticSearchPhotosResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
+import { embedText } from "../lib/aiEmbedding";
 
 const router: IRouter = Router();
 
@@ -246,6 +248,42 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
 
   const photos = await buildPhotosResponse(filtered, req.dbUser?.id);
   res.json(SearchPhotosResponse.parse(photos));
+});
+
+router.get("/search/semantic", requireAuth, async (req, res): Promise<void> => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!q) {
+    res.json(SemanticSearchPhotosResponse.parse([]));
+    return;
+  }
+
+  const topKRaw = req.query.topK ? parseInt(String(req.query.topK), 10) : 30;
+  const topK = Number.isInteger(topKRaw) && topKRaw > 0 ? Math.min(topKRaw, 100) : 30;
+  const includeHidden = req.query.includeHidden === "true";
+  const canSeeHidden = req.dbUser!.role === "admin" && includeHidden;
+
+  // Embed the query into the same space as the image embeddings. Returns null
+  // when embeddings aren't enabled/configured — degrade to no results.
+  const queryVec = await embedText(q);
+  if (!queryVec) {
+    res.json(SemanticSearchPhotosResponse.parse([]));
+    return;
+  }
+  const vecLiteral = `[${queryVec.join(",")}]`;
+
+  // Nearest neighbours by cosine distance (matches the HNSW vector_cosine_ops
+  // index). Join photos to respect hidden visibility.
+  const rows = await db
+    .select({ id: photoEmbeddingsTable.photoId })
+    .from(photoEmbeddingsTable)
+    .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
+    .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
+    .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
+    .limit(topK);
+
+  // buildPhotosResponse preserves input id order → results stay ranked.
+  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);
+  res.json(SemanticSearchPhotosResponse.parse(photos));
 });
 
 export { applyFiltersAndFetchIds };

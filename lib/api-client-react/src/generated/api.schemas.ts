@@ -565,6 +565,16 @@ export type SearchPhotosParams = {
   includeHidden?: boolean;
 };
 
+export type SemanticSearchPhotosParams = {
+  q: string;
+  topK?: number;
+  includeHidden?: boolean;
+};
+
+export type ListSimilarPhotosParams = {
+  topK?: number;
+};
+
 export type ListPhotosParams = {
   search?: string;
   tag?: string;

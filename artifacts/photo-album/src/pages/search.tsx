@@ -5,10 +5,12 @@ import { startPhotoDrag } from "@/lib/photoDrag";
 import { useLocation, useSearch } from "wouter";
 import {
   useSearchPhotos,
+  useSemanticSearchPhotos,
   useListUsers,
   useGetMe,
   getListUsersQueryKey,
   getSearchPhotosQueryKey,
+  getSemanticSearchPhotosQueryKey,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
@@ -23,13 +25,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Link } from "wouter";
-import { Search, SlidersHorizontal, X, Star, Images, EyeOff, Eye } from "lucide-react";
+import { Search, SlidersHorizontal, X, Star, Images, EyeOff, Eye, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function parseSearch(search: string) {
   const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   return {
     q: p.get("q") ?? "",
+    mode: p.get("mode") === "semantic" ? "semantic" : "keyword",
     ratingMin: p.get("ratingMin") ?? "",
     ratingMax: p.get("ratingMax") ?? "",
     dateFrom: p.get("dateFrom") ?? "",
@@ -85,7 +88,8 @@ export default function SearchPage() {
   const searchString = useSearch();
 
   const urlParams = parseSearch(searchString);
-  const { q, ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = urlParams;
+  const { q, mode, ratingMin, ratingMax, dateFrom, dateTo, uploaderId } = urlParams;
+  const isSemantic = mode === "semantic";
 
   const [inputValue, setInputValue] = useState(q);
   const [showFilters, setShowFilters] = useState(false);
@@ -112,9 +116,20 @@ export default function SearchPage() {
     ...(showHidden && { includeHidden: true }),
   };
 
-  const { data: results, isLoading, isFetching } = useSearchPhotos(searchParams, {
-    query: { enabled: !!q, queryKey: getSearchPhotosQueryKey(searchParams) },
+  // Semantic search ignores the keyword filters — it ranks by image-embedding
+  // similarity to the query, and only respects hidden visibility.
+  const semanticParams = {
+    q,
+    ...(showHidden && { includeHidden: true }),
+  };
+
+  const keyword = useSearchPhotos(searchParams, {
+    query: { enabled: !!q && !isSemantic, queryKey: getSearchPhotosQueryKey(searchParams) },
   });
+  const semantic = useSemanticSearchPhotos(semanticParams, {
+    query: { enabled: !!q && isSemantic, queryKey: getSemanticSearchPhotosQueryKey(semanticParams) },
+  });
+  const { data: results, isLoading, isFetching } = isSemantic ? semantic : keyword;
 
   function navigate(next: Partial<ReturnType<typeof parseSearch>>) {
     const merged = { ...urlParams, ...next };
@@ -162,13 +177,43 @@ export default function SearchPage() {
           </div>
         </div>
 
+        <div
+          className="flex w-fit items-center gap-0.5 rounded-lg border border-border p-0.5"
+          data-testid="search-mode-toggle"
+        >
+          <button
+            type="button"
+            onClick={() => navigate({ mode: "keyword" })}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              !isSemantic ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+            data-testid="search-mode-keyword"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Keyword
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate({ mode: "semantic" })}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              isSemantic ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+            data-testid="search-mode-semantic"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Semantic
+          </button>
+        </div>
+
         <form onSubmit={handleSearch} className="flex gap-2" data-testid="search-form">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Search photos, albums, uploaders..."
+              placeholder={isSemantic ? "Describe what you're looking for…" : "Search photos, albums, uploaders..."}
               className="pl-9"
               data-testid="search-input"
             />
@@ -176,24 +221,33 @@ export default function SearchPage() {
           <Button type="submit" data-testid="search-submit">
             Search
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className={cn("gap-1.5", hasActiveFilters && "border-primary text-primary")}
-            onClick={() => setShowFilters((v) => !v)}
-            data-testid="toggle-filters"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                {[ratingMin, ratingMax, dateFrom, dateTo, uploaderId].filter(Boolean).length}
-              </span>
-            )}
-          </Button>
+          {!isSemantic && (
+            <Button
+              type="button"
+              variant="outline"
+              className={cn("gap-1.5", hasActiveFilters && "border-primary text-primary")}
+              onClick={() => setShowFilters((v) => !v)}
+              data-testid="toggle-filters"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                  {[ratingMin, ratingMax, dateFrom, dateTo, uploaderId].filter(Boolean).length}
+                </span>
+              )}
+            </Button>
+          )}
         </form>
 
-        {showFilters && (
+        {isSemantic && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="semantic-hint">
+            <Sparkles className="h-3 w-3 text-primary" />
+            Ranked by visual similarity to your description (needs photos to be embedded in Admin → Image Embeddings).
+          </p>
+        )}
+
+        {!isSemantic && showFilters && (
           <div
             className="rounded-xl border border-border bg-card p-5 space-y-4"
             data-testid="filter-panel"

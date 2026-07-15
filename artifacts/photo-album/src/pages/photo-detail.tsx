@@ -40,6 +40,7 @@ import { AiDescriptionPanel } from "@/components/photo-detail/AiDescriptionPanel
 import { RatingsPanel } from "@/components/photo-detail/RatingsPanel";
 import { CollectionsPanel } from "@/components/photo-detail/CollectionsPanel";
 import { PhotoActions } from "@/components/photo-detail/PhotoActions";
+import { SimilarPhotosPanel } from "@/components/photo-detail/SimilarPhotosPanel";
 import {
   ConfirmNewCollectionDialog,
   type ConfirmNewCollectionState,
@@ -428,6 +429,8 @@ export default function PhotoDetail() {
             />
           </div>
         </div>
+
+        <SimilarPhotosPanel photoId={photoId} />
       </div>
       <ConfirmNewCollectionDialog
         confirmNewCollection={confirmNewCollection}
