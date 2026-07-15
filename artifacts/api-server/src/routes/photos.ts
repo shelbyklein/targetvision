@@ -5,6 +5,7 @@ import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStorePhotoEmbedding } from "../lib/aiEmbedding";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { computeAndStoreContentHash } from "../lib/contentHash";
+import { computeAndStorePerceptualHash } from "../lib/perceptualHash";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { readMagicBytes, detectImageMimeType } from "../lib/magicBytes";
 import { logger } from "../lib/logger";
@@ -139,6 +140,9 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
     });
     void computeAndStoreContentHash(photo.id, photo.storageKey).catch((err) => {
       logger.error({ err, photoId: photo.id }, "Background content hash computation failed");
+    });
+    void computeAndStorePerceptualHash(photo.id, photo.storageKey).catch((err) => {
+      logger.error({ err, photoId: photo.id }, "Background perceptual hash computation failed");
     });
     // No-ops unless image embeddings are enabled + Vertex is configured.
     void generateAndStorePhotoEmbedding(photo.id).catch((err) => {

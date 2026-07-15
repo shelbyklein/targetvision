@@ -34,6 +34,9 @@ import {
   BackfillContentHashesStatusResponse,
   BackfillContentHashesResponse,
   ListDuplicatePhotoGroupsResponse,
+  PerceptualHashBackfillStatusResponse,
+  BackfillPerceptualHashesResponse,
+  NearDuplicatePhotoGroupsResponse,
   ListAiBackfillRunsResponse,
   GetAiAutoBackfillSettingsResponse,
   UpdateAiAutoBackfillSettingsBody,
@@ -56,6 +59,13 @@ import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDateBackfill";
 import { countPhotosWithoutContentHash, backfillContentHashes, listDuplicatePhotoGroups } from "../lib/contentHash";
+import {
+  countPhotosWithoutPerceptualHash,
+  backfillPerceptualHashes,
+  listNearDuplicatePhotoGroups,
+  DEFAULT_NEAR_DUP_THRESHOLD,
+  MAX_NEAR_DUP_THRESHOLD,
+} from "../lib/perceptualHash";
 import { countPhotosNeedingAiAnalysis, backfillAiAnalysis, listAiBackfillRuns } from "../lib/aiAnalysisBackfill";
 import { getAiAutoBackfillSettings, updateAiAutoBackfillSettings } from "../lib/aiAutoBackfillScheduler";
 import { getEmbeddingConfigStatus } from "../lib/aiEmbedding";
@@ -477,6 +487,43 @@ router.get("/admin/photos/duplicates", requireAdmin, async (_req, res): Promise<
     ListDuplicatePhotoGroupsResponse.parse({
       groups: groups.map((g) => ({
         contentHash: g.contentHash,
+        photos: g.photos.map((p) => ({
+          id: p.id,
+          albumId: p.albumId,
+          albumTitle: p.albumTitle,
+          filename: p.filename,
+          thumbnailUrl: resolvePhotoThumbnailUrl({ url: p.url, thumbnailKey: p.thumbnailKey }),
+          createdAt: p.createdAt.toISOString(),
+          isAlbumCover: p.isAlbumCover,
+          collectionCount: p.collectionCount,
+        })),
+      })),
+    }),
+  );
+});
+
+router.get("/admin/photos/perceptual-hash-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutPerceptualHash();
+  res.json(PerceptualHashBackfillStatusResponse.parse({ missingCount }));
+});
+
+router.post("/admin/photos/perceptual-hash-backfill", requireAdmin, async (req, res): Promise<void> => {
+  const rawLimit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
+  const limit = rawLimit && Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
+  const result = await backfillPerceptualHashes(limit);
+  res.json(BackfillPerceptualHashesResponse.parse(result));
+});
+
+router.get("/admin/photos/near-duplicates", requireAdmin, async (req, res): Promise<void> => {
+  const raw = req.query.threshold ? parseInt(String(req.query.threshold), 10) : DEFAULT_NEAR_DUP_THRESHOLD;
+  const threshold = Number.isInteger(raw) ? Math.min(Math.max(raw, 0), MAX_NEAR_DUP_THRESHOLD) : DEFAULT_NEAR_DUP_THRESHOLD;
+  const groups = await listNearDuplicatePhotoGroups(threshold);
+  res.json(
+    NearDuplicatePhotoGroupsResponse.parse({
+      threshold,
+      groups: groups.map((g) => ({
+        key: g.key,
+        distance: g.distance,
         photos: g.photos.map((p) => ({
           id: p.id,
           albumId: p.albumId,

@@ -58,6 +58,41 @@ export const BackfillContentHashesResponse = z.object({
   failed: z.number(),
 });
 
+export const PerceptualHashBackfillStatusResponse = z.object({
+  missingCount: z.number(),
+});
+
+export const BackfillPerceptualHashesResponse = z.object({
+  processed: z.number(),
+  updated: z.number(),
+  skipped: z.number(),
+  failed: z.number(),
+});
+
+// Shape matches the generated DuplicatePhoto type so the admin UI can reuse the
+// same photo card for near-duplicate groups.
+const NearDuplicatePhotoSchema = z.object({
+  id: z.number(),
+  albumId: z.number(),
+  albumTitle: z.string().nullable(),
+  filename: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
+  createdAt: z.string(),
+  isAlbumCover: z.boolean(),
+  collectionCount: z.number(),
+});
+
+export const NearDuplicatePhotoGroupsResponse = z.object({
+  threshold: z.number(),
+  groups: z.array(
+    z.object({
+      key: z.string(),
+      distance: z.number(),
+      photos: z.array(NearDuplicatePhotoSchema),
+    }),
+  ),
+});
+
 export const BackfillAiAnalysisStatusResponse = z.object({
   missingCount: z.number(),
 });
