@@ -18,7 +18,7 @@ import {
   CheckDuplicatesBody,
   CheckDuplicatesResponse,
   ListPhotosQueryParams,
-  ListPhotosResponse,
+  ListPhotosPagedResponse,
   GetPhotoParams,
   GetPhotoResponse,
   ListSimilarPhotosResponse,
@@ -259,7 +259,8 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     .select({ id: photosTable.id })
     .from(photosTable)
     .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
-    .orderBy(desc(photosTable.createdAt));
+    // createdAt DESC, id DESC for a stable order across pages (ties on createdAt).
+    .orderBy(desc(photosTable.createdAt), desc(photosTable.id));
 
   const allIds = allPhotos.map((p) => p.id);
   const { search, tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, albumId, aiStatus } = query.data;
@@ -277,8 +278,13 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     aiStatus,
   });
 
-  const full = await buildPhotosResponse(filteredIds, req.dbUser?.id);
-  res.json(ListPhotosResponse.parse(full));
+  const limit = Math.min(Math.max(query.data.limit ?? 48, 1), 200);
+  const offset = Math.max(query.data.offset ?? 0, 0);
+  const pageIds = filteredIds.slice(offset, offset + limit);
+  const hasMore = filteredIds.length > offset + limit;
+
+  const photos = await buildPhotosResponse(pageIds, req.dbUser?.id);
+  res.json(ListPhotosPagedResponse.parse({ photos, hasMore }));
 });
 
 router.patch("/photos/bulk", requireAuth, async (req, res): Promise<void> => {

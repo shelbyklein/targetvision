@@ -12,7 +12,7 @@ import {
   photoEmbeddingsTable,
   aiAnalysisEventsTable,
 } from "@workspace/db";
-import { SearchPhotosResponse, SemanticSearchPhotosResponse } from "@workspace/api-zod";
+import { SearchPhotosPagedResponse, SemanticSearchPhotosResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
 import { embedText } from "../lib/aiEmbedding";
@@ -197,9 +197,14 @@ async function applyFiltersAndFetchIds(
 router.get("/search", requireAuth, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!q) {
-    res.json(SearchPhotosResponse.parse([]));
+    res.json(SearchPhotosPagedResponse.parse({ photos: [], hasMore: false }));
     return;
   }
+
+  const limitRaw = req.query.limit ? parseInt(String(req.query.limit), 10) : 48;
+  const limit = Math.min(Math.max(Number.isInteger(limitRaw) ? limitRaw : 48, 1), 200);
+  const offsetRaw = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
+  const offset = Math.max(Number.isInteger(offsetRaw) ? offsetRaw : 0, 0);
 
   const ratingMin = req.query.ratingMin ? parseFloat(String(req.query.ratingMin)) : undefined;
   const ratingMax = req.query.ratingMax ? parseFloat(String(req.query.ratingMax)) : undefined;
@@ -238,7 +243,20 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     ]),
   ];
 
-  const filtered = await applyFiltersAndFetchIds(uniqueIds, {
+  if (uniqueIds.length === 0) {
+    res.json(SearchPhotosPagedResponse.parse({ photos: [], hasMore: false }));
+    return;
+  }
+
+  // The ILIKE union has no inherent order — impose a stable one (newest-first,
+  // id tiebreaker) so offset pagination is consistent across pages.
+  const orderedRows = await db
+    .select({ id: photosTable.id })
+    .from(photosTable)
+    .where(inArray(photosTable.id, uniqueIds))
+    .orderBy(desc(photosTable.createdAt), desc(photosTable.id));
+
+  const filtered = await applyFiltersAndFetchIds(orderedRows.map((r) => r.id), {
     ratingMin,
     ratingMax,
     dateFrom,
@@ -246,8 +264,11 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     uploaderId,
   });
 
-  const photos = await buildPhotosResponse(filtered, req.dbUser?.id);
-  res.json(SearchPhotosResponse.parse(photos));
+  const pageIds = filtered.slice(offset, offset + limit);
+  const hasMore = filtered.length > offset + limit;
+
+  const photos = await buildPhotosResponse(pageIds, req.dbUser?.id);
+  res.json(SearchPhotosPagedResponse.parse({ photos, hasMore }));
 });
 
 router.get("/search/semantic", requireAuth, async (req, res): Promise<void> => {

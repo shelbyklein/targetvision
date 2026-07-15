@@ -6,6 +6,16 @@ export const ListAlbumPhotosPagedResponse = z.object({
   hasMore: z.boolean(),
 });
 
+export const ListPhotosPagedResponse = z.object({
+  photos: z.array(GetPhotoResponse),
+  hasMore: z.boolean(),
+});
+
+export const SearchPhotosPagedResponse = z.object({
+  photos: z.array(GetPhotoResponse),
+  hasMore: z.boolean(),
+});
+
 export const CheckDuplicatesBody = z.object({
   files: z.array(
     z.object({

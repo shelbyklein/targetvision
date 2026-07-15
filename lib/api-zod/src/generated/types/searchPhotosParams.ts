@@ -14,4 +14,6 @@ export type SearchPhotosParams = {
   dateTo?: string;
   uploaderId?: number;
   includeHidden?: boolean;
+  limit?: number;
+  offset?: number;
 };

@@ -3,6 +3,7 @@ import { FadeImage } from "@/components/ui/fade-image";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { useLocation, useSearch, Link } from "wouter";
 import {
@@ -17,6 +18,7 @@ import {
   getGetRecentPhotosQueryKey,
   getGetTopRatedPhotosQueryKey,
 } from "@workspace/api-client-react";
+import type { Photo } from "@workspace/api-client-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +46,7 @@ import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, 
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 48;
 
 function parseSearch(search: string) {
   const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -56,7 +58,6 @@ function parseSearch(search: string) {
     dateFrom: p.get("dateFrom") ?? "",
     dateTo: p.get("dateTo") ?? "",
     aiStatus: p.get("aiStatus") ?? "",
-    page: p.get("page") ?? "1",
   };
 }
 
@@ -106,7 +107,7 @@ export default function PhotosPage() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const urlParams = parseSearch(searchString);
-  const { search, ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus, page } = urlParams;
+  const { search, ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus } = urlParams;
   const [inputValue, setInputValue] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
@@ -148,7 +149,7 @@ export default function PhotosPage() {
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin", queryKey: getListUsersQueryKey() } });
   const { data: albums } = useListAlbums();
 
-  const apiParams = {
+  const filters = {
     ...(search && { search }),
     ...(ratingMin && { ratingMin: parseFloat(ratingMin) }),
     ...(uploaderId && { uploaderId: parseInt(uploaderId, 10) }),
@@ -159,46 +160,83 @@ export default function PhotosPage() {
     ...(aiStatus && { aiStatus: aiStatus as "has_description" | "failed" | "not_analysed" }),
   };
 
-  const { data: photos, isLoading } = useListPhotos(
-    Object.keys(apiParams).length > 0 ? apiParams : undefined
-  );
-
   const hasActiveFilters = !!(ratingMin || uploaderId || albumId || dateFrom || dateTo || aiStatus);
 
-  const pageNum = Math.max(1, parseInt(page, 10) || 1);
-  const totalPhotos = photos?.length ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalPhotos / PAGE_SIZE));
-  const currentPage = Math.min(pageNum, totalPages);
-  const paginatedPhotos = photos?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Server-side pagination with an infinite-scroll accumulator (mirrors album-detail).
+  const [offset, setOffset] = useState(0);
+  const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
+  const [pendingAdvance, setPendingAdvance] = useState(false);
 
-  const selectedPhotoIndex = selectedPhoto && photos
-    ? photos.findIndex((p) => p.id === selectedPhoto.id)
-    : -1;
+  const [hasMore, setHasMore] = useState(false);
+  const apiParams = { ...filters, limit: PAGE_SIZE, offset };
+  const filterKey = JSON.stringify(filters);
 
+  // Reset to the first page whenever the filters/search change.
+  useEffect(() => {
+    setOffset(0);
+    setAllPhotos([]);
+    setHasMore(false);
+  }, [filterKey]);
+
+  const { data: photoPage, isLoading, isFetching } = useListPhotos(apiParams, {
+    query: { queryKey: getListPhotosQueryKey(apiParams) },
+  });
+
+  // Accumulate pages: page 0 replaces, later pages merge-by-id (dedupe). hasMore
+  // is sticky state (updated only when a page arrives) so it doesn't flicker to
+  // false mid-fetch and tear down the infinite-scroll observer.
+  useEffect(() => {
+    if (!photoPage) return;
+    setHasMore(photoPage.hasMore);
+    setAllPhotos((prev) => {
+      if (offset === 0) return photoPage.photos;
+      const byId = new Map(prev.map((p) => [p.id, p]));
+      for (const p of photoPage.photos) byId.set(p.id, p);
+      return Array.from(byId.values());
+    });
+  }, [photoPage, offset]);
+
+  const sentinelRef = useInfiniteScroll(() => {
+    if (!isFetching) setOffset((o) => o + PAGE_SIZE);
+  }, hasMore);
+
+  const isInitialLoading = isLoading && allPhotos.length === 0;
+
+  const selectedPhotoIndex = selectedPhoto ? allPhotos.findIndex((p) => p.id === selectedPhoto.id) : -1;
   const lightboxHasPrev = selectedPhotoIndex > 0;
-  const lightboxHasNext = selectedPhotoIndex >= 0 && selectedPhotoIndex < totalPhotos - 1;
+  const lightboxHasNext = selectedPhotoIndex >= 0 && (selectedPhotoIndex < allPhotos.length - 1 || hasMore);
 
   function lightboxPhotoAt(idx: number): LightboxPhoto | null {
-    if (!photos || idx < 0 || idx >= photos.length) return null;
-    const p = photos[idx];
+    if (idx < 0 || idx >= allPhotos.length) return null;
+    const p = allPhotos[idx];
     return { id: p.id, url: p.url, thumbnailKey: p.thumbnailKey, name: p.filename, averageRating: p.averageRating, albumId: p.albumId };
   }
 
   function handleLightboxPrev() {
-    if (!lightboxHasPrev) return;
-    const newIdx = selectedPhotoIndex - 1;
-    setSelectedPhoto(lightboxPhotoAt(newIdx));
-    const newPage = Math.floor(newIdx / PAGE_SIZE) + 1;
-    if (newPage !== currentPage) navigate({ page: String(newPage) });
+    if (lightboxHasPrev) setSelectedPhoto(lightboxPhotoAt(selectedPhotoIndex - 1));
   }
 
   function handleLightboxNext() {
-    if (!lightboxHasNext) return;
-    const newIdx = selectedPhotoIndex + 1;
-    setSelectedPhoto(lightboxPhotoAt(newIdx));
-    const newPage = Math.floor(newIdx / PAGE_SIZE) + 1;
-    if (newPage !== currentPage) navigate({ page: String(newPage) });
+    const nextIdx = selectedPhotoIndex + 1;
+    if (nextIdx < allPhotos.length) {
+      setSelectedPhoto(lightboxPhotoAt(nextIdx));
+    } else if (hasMore) {
+      // Past the last loaded photo — load the next page, then advance once it arrives.
+      setPendingAdvance(true);
+      setOffset((o) => o + PAGE_SIZE);
+    }
   }
+
+  // Advance the lightbox to the newly-loaded photo after a "next past end".
+  useEffect(() => {
+    if (!pendingAdvance || !selectedPhoto) return;
+    const idx = allPhotos.findIndex((p) => p.id === selectedPhoto.id);
+    if (idx >= 0 && idx < allPhotos.length - 1) {
+      setSelectedPhoto(lightboxPhotoAt(idx + 1));
+      setPendingAdvance(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPhotos, pendingAdvance]);
 
   function navigate(next: Partial<ReturnType<typeof parseSearch>>) {
     const merged = { ...urlParams, ...next };
@@ -207,11 +245,11 @@ export default function PhotosPage() {
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    navigate({ search: inputValue.trim(), page: "1" });
+    navigate({ search: inputValue.trim() });
   }
 
   function handleFilterChange(field: string, value: string) {
-    navigate({ [field]: value, page: "1" });
+    navigate({ [field]: value });
   }
 
   function clearFilters() {
@@ -222,13 +260,12 @@ export default function PhotosPage() {
       dateFrom: "",
       dateTo: "",
       aiStatus: "",
-      page: "1",
     });
   }
 
   function clearSearch() {
     setInputValue("");
-    navigate({ search: "", page: "1" });
+    navigate({ search: "" });
   }
 
   function toggleSelection(id: number) {
@@ -253,6 +290,7 @@ export default function PhotosPage() {
       {
         onSuccess: (result) => {
           toast({ title: `${result.deleted} photo${result.deleted !== 1 ? "s" : ""} deleted` });
+          setAllPhotos((prev) => prev.filter((p) => !ids.includes(p.id)));
           qc.invalidateQueries({ queryKey: getListPhotosQueryKey().slice(0, 1) });
           qc.invalidateQueries({ queryKey: getGetRecentPhotosQueryKey() });
           qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
@@ -264,11 +302,6 @@ export default function PhotosPage() {
     setConfirmBulkDelete(false);
   }
 
-  function goToPage(p: number) {
-    navigate({ page: String(p) });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
   return (
     <AppLayout>
       <div className="space-y-6" data-testid="photos-page">
@@ -276,10 +309,10 @@ export default function PhotosPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">All Photos</h1>
             <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-              {isLoading
+              {isInitialLoading
                 ? "Loading…"
-                : `${totalPhotos.toLocaleString()} photo${totalPhotos !== 1 ? "s" : ""} across all albums`}
-              {me?.role === "admin" && !isLoading && (
+                : `${allPhotos.length.toLocaleString()}${hasMore ? "+" : ""} photo${allPhotos.length !== 1 ? "s" : ""}${hasMore ? " loaded" : ""}`}
+              {me?.role === "admin" && !isInitialLoading && (
                 <button
                   type="button"
                   onClick={() => setShowHidden((v) => !v)}
@@ -528,16 +561,16 @@ export default function PhotosPage() {
           </div>
         )}
 
-        {isLoading ? (
+        {isInitialLoading ? (
           <div className="columns-2 sm:columns-3 lg:columns-4 gap-3" data-testid="photos-loading">
             {Array.from({ length: PAGE_SIZE }).map((_, i) => (
               <Skeleton key={i} className="aspect-square rounded-lg mb-3 break-inside-avoid" />
             ))}
           </div>
-        ) : paginatedPhotos && paginatedPhotos.length > 0 ? (
+        ) : allPhotos.length > 0 ? (
           <>
             <MasonryGrid
-              items={paginatedPhotos}
+              items={allPhotos}
               getKey={(photo) => photo.id}
               data-testid="photos-grid"
               renderItem={(photo) => {
@@ -682,57 +715,13 @@ export default function PhotosPage() {
               }}
             />
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-2" data-testid="pagination">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage <= 1}
-                  data-testid="pagination-prev"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
-                    .reduce<(number | "…")[]>((acc, p, idx, arr) => {
-                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("…");
-                      acc.push(p);
-                      return acc;
-                    }, [])
-                    .map((item, idx) =>
-                      item === "…" ? (
-                        <span key={`ellipsis-${idx}`} className="px-1 text-muted-foreground text-sm">…</span>
-                      ) : (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => goToPage(item as number)}
-                          className={cn(
-                            "h-8 w-8 rounded text-sm font-medium transition-colors",
-                            currentPage === item
-                              ? "bg-primary text-primary-foreground"
-                              : "hover:bg-accent text-muted-foreground hover:text-foreground"
-                          )}
-                          data-testid={`pagination-page-${item}`}
-                        >
-                          {item}
-                        </button>
-                      )
-                    )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage >= totalPages}
-                  data-testid="pagination-next"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="flex items-center justify-center py-8 text-sm text-muted-foreground"
+                data-testid="photos-load-more"
+              >
+                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading more…
               </div>
             )}
           </>
