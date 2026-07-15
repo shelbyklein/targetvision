@@ -22,6 +22,13 @@
       "when": 1784005386192,
       "tag": "0002_graceful_tusk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784084418471,
+      "tag": "0003_broken_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }
