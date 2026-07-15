@@ -22,5 +22,18 @@ export const photoCollectionsTable = pgTable("photo_collections", {
   primaryKey({ columns: [table.collectionId, table.photoId] }),
 ]);
 
+// Photos explicitly marked "not applicable" to a collection. Used as negative
+// examples when ranking a smart collection: their average embedding is
+// subtracted from the query, and they're excluded from suggestions. Mutually
+// exclusive with photo_collections (a photo is a positive, a negative, or
+// neither).
+export const collectionNegativePhotosTable = pgTable("collection_negative_photos", {
+  collectionId: integer("collection_id").notNull().references(() => collectionsTable.id, { onDelete: "cascade" }),
+  photoId: integer("photo_id").notNull().references(() => photosTable.id, { onDelete: "cascade" }),
+}, (table) => [
+  primaryKey({ columns: [table.collectionId, table.photoId] }),
+]);
+
 export type Collection = typeof collectionsTable.$inferSelect;
 export type PhotoCollection = typeof photoCollectionsTable.$inferSelect;
+export type CollectionNegativePhoto = typeof collectionNegativePhotosTable.$inferSelect;

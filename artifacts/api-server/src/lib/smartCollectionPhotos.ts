@@ -1,6 +1,15 @@
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
-import { db, photoCollectionsTable, photoEmbeddingsTable, photosTable } from "@workspace/db";
+import {
+  db,
+  photoCollectionsTable,
+  collectionNegativePhotosTable,
+  photoEmbeddingsTable,
+  photosTable,
+} from "@workspace/db";
 import { embedText } from "./aiEmbedding";
+
+// How hard the negative examples push the query vector away from their concept.
+const NEGATIVE_LAMBDA = 0.75;
 
 export interface SmartCollectionResult {
   // "members": ranked by similarity to the average of the collection's own
@@ -8,6 +17,21 @@ export interface SmartCollectionResult {
   // ranking by the collection's smartQuery/title.
   mode: "members" | "term";
   ids: number[];
+}
+
+function centroid(embeddings: { embedding: number[] }[]): number[] {
+  const dim = embeddings[0].embedding.length;
+  const c = new Array<number>(dim).fill(0);
+  for (const { embedding } of embeddings) {
+    for (let i = 0; i < dim; i++) c[i] += embedding[i];
+  }
+  for (let i = 0; i < dim; i++) c[i] /= embeddings.length;
+  return c;
+}
+
+function normalize(v: number[]): number[] {
+  const m = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+  return v.map((x) => x / m);
 }
 
 /**
@@ -23,42 +47,50 @@ export async function resolveSmartCollectionPhotoIds(
   collection: { id: number; title: string; smartQuery: string | null },
   topK: number,
 ): Promise<SmartCollectionResult> {
-  const memberRows = await db
-    .select({ photoId: photoCollectionsTable.photoId })
-    .from(photoCollectionsTable)
-    .where(eq(photoCollectionsTable.collectionId, collection.id));
+  const [memberRows, negativeRows] = await Promise.all([
+    db
+      .select({ photoId: photoCollectionsTable.photoId })
+      .from(photoCollectionsTable)
+      .where(eq(photoCollectionsTable.collectionId, collection.id)),
+    db
+      .select({ photoId: collectionNegativePhotosTable.photoId })
+      .from(collectionNegativePhotosTable)
+      .where(eq(collectionNegativePhotosTable.collectionId, collection.id)),
+  ]);
   const memberIds = memberRows.map((r) => r.photoId);
+  const negativeIds = negativeRows.map((r) => r.photoId);
 
-  const memberEmbeddings = memberIds.length
-    ? await db
-        .select({ embedding: photoEmbeddingsTable.embedding })
-        .from(photoEmbeddingsTable)
-        .where(inArray(photoEmbeddingsTable.photoId, memberIds))
-    : [];
+  const [memberEmbeddings, negativeEmbeddings] = await Promise.all([
+    memberIds.length
+      ? db.select({ embedding: photoEmbeddingsTable.embedding }).from(photoEmbeddingsTable).where(inArray(photoEmbeddingsTable.photoId, memberIds))
+      : Promise.resolve([]),
+    negativeIds.length
+      ? db.select({ embedding: photoEmbeddingsTable.embedding }).from(photoEmbeddingsTable).where(inArray(photoEmbeddingsTable.photoId, negativeIds))
+      : Promise.resolve([]),
+  ]);
 
-  let queryVec: number[] | null;
+  // Positive base vector: the member centroid, else the collection's term.
+  let posVec: number[] | null;
   let mode: "members" | "term";
-
   if (memberEmbeddings.length > 0) {
     mode = "members";
-    // Centroid = component-wise average of the member embeddings. Cosine
-    // distance (<=>) ignores magnitude, so the raw average captures the
-    // "average concept" direction of the collection.
-    const dim = memberEmbeddings[0].embedding.length;
-    const centroid = new Array<number>(dim).fill(0);
-    for (const { embedding } of memberEmbeddings) {
-      for (let i = 0; i < dim; i++) centroid[i] += embedding[i];
-    }
-    for (let i = 0; i < dim; i++) centroid[i] /= memberEmbeddings.length;
-    queryVec = centroid;
+    posVec = centroid(memberEmbeddings);
   } else {
     mode = "term";
     const term = (collection.smartQuery ?? collection.title).trim();
-    queryVec = term ? await embedText(term) : null;
+    posVec = term ? await embedText(term) : null;
+  }
+  if (!posVec) return { mode, ids: [] };
+
+  // Steer away from the negative examples: query = norm(pos) - λ·norm(negCentroid).
+  let queryVec = posVec;
+  if (negativeEmbeddings.length > 0) {
+    const p = normalize(posVec);
+    const n = normalize(centroid(negativeEmbeddings));
+    queryVec = p.map((x, i) => x - NEGATIVE_LAMBDA * n[i]);
   }
 
-  if (!queryVec) return { mode, ids: [] };
-
+  const excludeIds = [...memberIds, ...negativeIds];
   const vecLiteral = `[${queryVec.join(",")}]`;
   const rows = await db
     .select({ id: photoEmbeddingsTable.photoId })
@@ -67,8 +99,8 @@ export async function resolveSmartCollectionPhotoIds(
     .where(
       and(
         eq(photosTable.isHidden, false),
-        // Exclude the seed photos — they're already in the collection.
-        memberIds.length ? notInArray(photoEmbeddingsTable.photoId, memberIds) : undefined,
+        // Exclude the seed members and the negative examples from suggestions.
+        excludeIds.length ? notInArray(photoEmbeddingsTable.photoId, excludeIds) : undefined,
       ),
     )
     .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)

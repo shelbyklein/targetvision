@@ -7,8 +7,12 @@ import {
   useAddPhotoToCollection,
   useUpdateCollection,
   useSetCollectionCover,
+  useListCollectionNegativePhotos,
+  useAddNegativePhotoToCollection,
+  useRemoveNegativePhotoFromCollection,
   getGetCollectionQueryKey,
   getGetSmartCollectionPhotosQueryKey,
+  getListCollectionNegativePhotosQueryKey,
 } from "@workspace/api-client-react";
 import type { Photo } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -26,7 +30,7 @@ import {
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { MasonryGrid } from "@/components/MasonryGrid";
 import { startPhotoDrag } from "@/lib/photoDrag";
-import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, ImageIcon, Search } from "lucide-react";
+import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, ImageIcon, Search, Ban, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // How many suggestions to pull for a smart collection (the endpoint caps at 200).
@@ -102,23 +106,36 @@ export default function SmartCollectionDetail() {
     { query: { enabled: !!collectionId, queryKey: smartPhotosKey } },
   );
 
+  const negativesKey = getListCollectionNegativePhotosQueryKey(collectionId);
+  const { data: negativePhotos } = useListCollectionNegativePhotos(collectionId, {
+    query: { enabled: !!collectionId, queryKey: negativesKey },
+  });
+
   const [sort, setSort] = useState<SortOption>("relevance");
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
   const [addingIds, setAddingIds] = useState<Set<number>>(new Set());
+  const [markingIds, setMarkingIds] = useState<Set<number>>(new Set());
 
   const collectionPhotoIds = useMemo(
     () => new Set((collection?.photos ?? []).map((p) => p.id)),
     [collection?.photos],
   );
 
+  // After any positive/negative change the centroid shifts — re-rank + refresh both lists.
+  function invalidateSmart() {
+    queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
+    queryClient.invalidateQueries({ queryKey: smartPhotosKey });
+    queryClient.invalidateQueries({ queryKey: negativesKey });
+  }
+
   const addPhotoMutation = useAddPhotoToCollection({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetCollectionQueryKey(collectionId) });
-        // Re-rank: the new member sharpens the centroid and drops from suggestions.
-        queryClient.invalidateQueries({ queryKey: smartPhotosKey });
-      },
-    },
+    mutation: { onSuccess: invalidateSmart },
+  });
+  const addNegativeMutation = useAddNegativePhotoToCollection({
+    mutation: { onSuccess: invalidateSmart },
+  });
+  const removeNegativeMutation = useRemoveNegativePhotoFromCollection({
+    mutation: { onSuccess: invalidateSmart },
   });
 
   const [settingCoverId, setSettingCoverId] = useState<number | null>(null);
@@ -174,6 +191,27 @@ export default function SmartCollectionDetail() {
         },
       },
     );
+  }
+
+  function handleMarkNegative(photoId: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (markingIds.has(photoId)) return;
+    setMarkingIds((prev) => new Set(prev).add(photoId));
+    addNegativeMutation.mutate(
+      { id: collectionId, data: { photoId } },
+      {
+        onSettled: () =>
+          setMarkingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(photoId);
+            return next;
+          }),
+      },
+    );
+  }
+
+  function handleUnmarkNegative(photoId: number) {
+    removeNegativeMutation.mutate({ id: collectionId, photoId });
   }
 
   const photos = useMemo(() => {
@@ -386,6 +424,21 @@ export default function SmartCollectionDetail() {
                       )}
                       {inCollection ? "In collection" : "Add"}
                     </button>
+                    <button
+                      onClick={(e) => handleMarkNegative(photo.id, e)}
+                      disabled={markingIds.has(photo.id)}
+                      aria-label="Not applicable to this collection"
+                      data-testid="mark-negative-btn"
+                      title="Not this — steer suggestions away from it"
+                      className="ml-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium bg-white/20 hover:bg-destructive/80 text-white backdrop-blur-sm transition-colors focus:outline-none focus:ring-2 focus:ring-white/60"
+                    >
+                      {markingIds.has(photo.id) ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Ban className="h-3 w-3" />
+                      )}
+                      Not this
+                    </button>
                     {photo.averageRating != null && (
                       <div className="flex items-center gap-0.5 ml-auto bg-black/60 rounded px-1.5 py-0.5">
                         <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
@@ -399,6 +452,41 @@ export default function SmartCollectionDetail() {
               );
             }}
           />
+        )}
+
+        {negativePhotos && negativePhotos.length > 0 && (
+          <div className="space-y-2 pt-2" data-testid="excluded-photos">
+            <div className="flex items-center gap-1.5">
+              <Ban className="h-4 w-4 text-destructive shrink-0" />
+              <span className="text-sm font-semibold text-foreground">Excluded ({negativePhotos.length})</span>
+              <span className="text-xs text-muted-foreground">— marked not applicable; suggestions steer away from these</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {negativePhotos.map((p) => (
+                <div
+                  key={p.id}
+                  className="relative h-16 w-16 rounded-lg overflow-hidden border border-destructive/40 bg-muted"
+                  data-testid={`excluded-photo-${p.id}`}
+                >
+                  <img
+                    src={p.thumbnailKey ? `/api/storage${p.thumbnailKey}` : p.url}
+                    alt={p.filename ?? "Photo"}
+                    className="h-full w-full object-cover opacity-70"
+                    loading="lazy"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleUnmarkNegative(p.id)}
+                    aria-label={`Un-exclude ${p.filename ?? "photo"}`}
+                    data-testid={`unmark-negative-${p.id}`}
+                    className="absolute top-0.5 right-0.5 flex items-center justify-center h-5 w-5 rounded-full bg-black/70 text-white hover:bg-black/90"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

@@ -57,6 +57,13 @@
       "when": 1784141048695,
       "tag": "0007_brief_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784155639841,
+      "tag": "0008_busy_boomerang",
+      "breakpoints": true
     }
   ]
 }
