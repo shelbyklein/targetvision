@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import {
   Dialog,
   DialogContent,
@@ -105,11 +107,25 @@ function CreateAlbumDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+// How many album cards to reveal per "page" as the user scrolls (3 rows of the
+// 4-column grid). The full list is fetched at once; this just renders a growing
+// window so we don't mount every card + cover image up front.
+const ALBUMS_PAGE_SIZE = 12;
+
 export default function Albums() {
   const qc = useQueryClient();
   const [, navigate] = useLocation();
   const { data: albums, isLoading } = useListAlbums();
   const { data: me } = useGetMe();
+  const [visibleCount, setVisibleCount] = useState(ALBUMS_PAGE_SIZE);
+
+  const totalAlbums = albums?.length ?? 0;
+  const visibleAlbums = albums?.slice(0, visibleCount) ?? [];
+  const hasMore = totalAlbums > visibleCount;
+  const sentinelRef = useInfiniteScroll(
+    () => setVisibleCount((c) => c + ALBUMS_PAGE_SIZE),
+    hasMore,
+  );
 
   function refetch() {
     qc.invalidateQueries({ queryKey: getListAlbumsQueryKey() });
@@ -147,8 +163,9 @@ export default function Albums() {
             ))}
           </div>
         ) : albums && albums.length > 0 ? (
+          <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="albums-grid">
-            {albums.map((album) => (
+            {visibleAlbums.map((album) => (
               <Link key={album.id} href={`/albums/${album.id}`}>
                 <div className="rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow" data-testid="album-card">
                   <div className="aspect-[4/3] bg-muted overflow-hidden">
@@ -156,6 +173,7 @@ export default function Albums() {
                       <FadeImage
                         src={album.coverPhotoThumbnailKey ? `/api/storage${album.coverPhotoThumbnailKey}` : album.coverPhotoUrl}
                         alt={album.title}
+                        loading="lazy"
                         className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
                       />
                     ) : (
@@ -195,6 +213,16 @@ export default function Albums() {
               </Link>
             ))}
           </div>
+          {hasMore && (
+            <div
+              ref={sentinelRef}
+              className="flex items-center justify-center py-8 text-sm text-muted-foreground"
+              data-testid="albums-load-more"
+            >
+              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading more albums…
+            </div>
+          )}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center" data-testid="albums-empty">
             <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
