@@ -26,6 +26,7 @@ import { RegistrationSection } from "@/components/admin/RegistrationSection";
 import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
 import { CapturedDatesSection } from "@/components/admin/CapturedDatesSection";
 import { DuplicatesSection } from "@/components/admin/DuplicatesSection";
+import { NearDuplicatesSection } from "@/components/admin/NearDuplicatesSection";
 
 export default function Admin() {
   const qc = useQueryClient();
@@ -98,6 +99,8 @@ export default function Admin() {
         <CapturedDatesSection />
 
         <DuplicatesSection />
+
+        <NearDuplicatesSection />
 
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">

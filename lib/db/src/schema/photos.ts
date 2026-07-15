@@ -23,6 +23,11 @@ export const photosTable = pgTable(
     // (byte-identical) duplicate photos. Nullable: populated on upload and via
     // a background backfill for rows that predate this column.
     contentHash: text("content_hash"),
+    // dHash perceptual hash (16-char hex = 64 bits) of the downscaled image.
+    // Used to detect near-duplicate (re-encoded/resized) photos via Hamming
+    // distance — a superset of the byte-identical contentHash match. Nullable:
+    // populated on upload and via a background backfill for older rows.
+    perceptualHash: text("perceptual_hash"),
     takenAt: timestamp("taken_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -36,6 +41,9 @@ export const photosTable = pgTable(
     index("photos_taken_at_idx").on(table.takenAt),
     // Duplicate detection groups photos by their content hash.
     index("photos_content_hash_idx").on(table.contentHash),
+    // Near-duplicate detection: exact perceptual-hash matches (distance 0) are
+    // common for re-encodes, so an equality index still helps the scan.
+    index("photos_perceptual_hash_idx").on(table.perceptualHash),
   ],
 );
 
