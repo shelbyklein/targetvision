@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, count, sql, and } from "drizzle-orm";
-import { db, collectionsTable, photoCollectionsTable, photosTable, collectionTagsTable, tagsTable } from "@workspace/db";
+import { db, collectionsTable, photoCollectionsTable, collectionNegativePhotosTable, photosTable, collectionTagsTable, tagsTable } from "@workspace/db";
 import {
   ListCollectionsResponse,
   CreateCollectionBody,
@@ -17,6 +17,11 @@ import {
   SetCollectionCoverBody,
   SetCollectionCoverResponse,
   GetSmartCollectionPhotosResponse,
+  AddNegativePhotoToCollectionParams,
+  AddNegativePhotoToCollectionBody,
+  RemoveNegativePhotoFromCollectionParams,
+  ListCollectionNegativePhotosParams,
+  ListCollectionNegativePhotosResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
@@ -246,6 +251,10 @@ router.post("/collections/:id/photos", requireAuth, async (req, res): Promise<vo
     .insert(photoCollectionsTable)
     .values({ collectionId: params.data.id, photoId: body.data.photoId })
     .onConflictDoNothing();
+  // A photo can't be both a positive member and a negative example.
+  await db
+    .delete(collectionNegativePhotosTable)
+    .where(and(eq(collectionNegativePhotosTable.collectionId, params.data.id), eq(collectionNegativePhotosTable.photoId, body.data.photoId)));
 
   res.sendStatus(204);
 });
@@ -349,6 +358,87 @@ router.get("/collections/:id/smart-photos", requireAuth, async (req, res): Promi
   const { ids } = await resolveSmartCollectionPhotoIds(collection, topK);
   const photos = await buildPhotosResponse(ids, req.dbUser?.id);
   res.json(GetSmartCollectionPhotosResponse.parse(photos));
+});
+
+router.get("/collections/:id/negative-photos", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = ListCollectionNegativePhotosParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+  const rows = await db
+    .select({ id: collectionNegativePhotosTable.photoId })
+    .from(collectionNegativePhotosTable)
+    .where(eq(collectionNegativePhotosTable.collectionId, params.data.id))
+    .orderBy(collectionNegativePhotosTable.photoId);
+  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);
+  res.json(ListCollectionNegativePhotosResponse.parse(photos));
+});
+
+router.post("/collections/:id/negative-photos", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = AddNegativePhotoToCollectionParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = AddNegativePhotoToCollectionBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, body.data.photoId));
+  if (!photo) {
+    res.status(404).json({ error: "Photo not found" });
+    return;
+  }
+  await db
+    .insert(collectionNegativePhotosTable)
+    .values({ collectionId: params.data.id, photoId: body.data.photoId })
+    .onConflictDoNothing();
+  // A photo can't be both a negative example and a positive member.
+  await db
+    .delete(photoCollectionsTable)
+    .where(and(eq(photoCollectionsTable.collectionId, params.data.id), eq(photoCollectionsTable.photoId, body.data.photoId)));
+  res.sendStatus(204);
+});
+
+router.delete("/collections/:id/negative-photos/:photoId", requireAuth, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawPhoto = Array.isArray(req.params.photoId) ? req.params.photoId[0] : req.params.photoId;
+  const params = RemoveNegativePhotoFromCollectionParams.safeParse({ id: parseInt(rawId, 10), photoId: parseInt(rawPhoto, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  if (!collection) {
+    res.status(404).json({ error: "Collection not found" });
+    return;
+  }
+  if (collection.createdById !== req.dbUser!.id && req.dbUser!.role !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  await db
+    .delete(collectionNegativePhotosTable)
+    .where(and(eq(collectionNegativePhotosTable.collectionId, params.data.id), eq(collectionNegativePhotosTable.photoId, params.data.photoId)));
+  res.sendStatus(204);
 });
 
 export default router;

@@ -1350,6 +1350,78 @@ paths:
         "404":
           description: Not found
 
+  /collections/{id}/negative-photos:
+    get:
+      operationId: listCollectionNegativePhotos
+      tags: [collections]
+      summary: Photos marked "not applicable" to a smart collection (negative examples)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Negative-example photos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    post:
+      operationId: addNegativePhotoToCollection
+      tags: [collections]
+      summary: Mark a photo as not applicable to a collection (removes it as a positive member)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectionPhotoInput"
+      responses:
+        "204":
+          description: Marked
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /collections/{id}/negative-photos/{photoId}:
+    delete:
+      operationId: removeNegativePhotoFromCollection
+      tags: [collections]
+      summary: Un-mark a photo as not applicable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Un-marked
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
   /collections/{id}/cover:
     patch:
       operationId: setCollectionCover

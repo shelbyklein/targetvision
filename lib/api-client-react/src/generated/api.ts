@@ -4644,6 +4644,276 @@ export const useRemovePhotoFromCollection = <
 };
 
 /**
+ * @summary Photos marked "not applicable" to a smart collection (negative examples)
+ */
+export const getListCollectionNegativePhotosUrl = (id: number) => {
+  return `/api/collections/${id}/negative-photos`;
+};
+
+export const listCollectionNegativePhotos = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Photo[]> => {
+  return customFetch<Photo[]>(getListCollectionNegativePhotosUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCollectionNegativePhotosQueryKey = (id: number) => {
+  return [`/api/collections/${id}/negative-photos`] as const;
+};
+
+export const getListCollectionNegativePhotosQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCollectionNegativePhotos>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCollectionNegativePhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCollectionNegativePhotosQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCollectionNegativePhotos>>
+  > = ({ signal }) =>
+    listCollectionNegativePhotos(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCollectionNegativePhotos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCollectionNegativePhotosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCollectionNegativePhotos>>
+>;
+export type ListCollectionNegativePhotosQueryError = ErrorType<void>;
+
+/**
+ * @summary Photos marked "not applicable" to a smart collection (negative examples)
+ */
+
+export function useListCollectionNegativePhotos<
+  TData = Awaited<ReturnType<typeof listCollectionNegativePhotos>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCollectionNegativePhotos>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCollectionNegativePhotosQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Mark a photo as not applicable to a collection (removes it as a positive member)
+ */
+export const getAddNegativePhotoToCollectionUrl = (id: number) => {
+  return `/api/collections/${id}/negative-photos`;
+};
+
+export const addNegativePhotoToCollection = async (
+  id: number,
+  collectionPhotoInput: CollectionPhotoInput,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getAddNegativePhotoToCollectionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(collectionPhotoInput),
+  });
+};
+
+export const getAddNegativePhotoToCollectionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addNegativePhotoToCollection>>,
+    TError,
+    { id: number; data: BodyType<CollectionPhotoInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addNegativePhotoToCollection>>,
+  TError,
+  { id: number; data: BodyType<CollectionPhotoInput> },
+  TContext
+> => {
+  const mutationKey = ["addNegativePhotoToCollection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addNegativePhotoToCollection>>,
+    { id: number; data: BodyType<CollectionPhotoInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addNegativePhotoToCollection(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddNegativePhotoToCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addNegativePhotoToCollection>>
+>;
+export type AddNegativePhotoToCollectionMutationBody =
+  BodyType<CollectionPhotoInput>;
+export type AddNegativePhotoToCollectionMutationError = ErrorType<void>;
+
+/**
+ * @summary Mark a photo as not applicable to a collection (removes it as a positive member)
+ */
+export const useAddNegativePhotoToCollection = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addNegativePhotoToCollection>>,
+    TError,
+    { id: number; data: BodyType<CollectionPhotoInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addNegativePhotoToCollection>>,
+  TError,
+  { id: number; data: BodyType<CollectionPhotoInput> },
+  TContext
+> => {
+  return useMutation(getAddNegativePhotoToCollectionMutationOptions(options));
+};
+
+/**
+ * @summary Un-mark a photo as not applicable
+ */
+export const getRemoveNegativePhotoFromCollectionUrl = (
+  id: number,
+  photoId: number,
+) => {
+  return `/api/collections/${id}/negative-photos/${photoId}`;
+};
+
+export const removeNegativePhotoFromCollection = async (
+  id: number,
+  photoId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(
+    getRemoveNegativePhotoFromCollectionUrl(id, photoId),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getRemoveNegativePhotoFromCollectionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeNegativePhotoFromCollection>>,
+    TError,
+    { id: number; photoId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeNegativePhotoFromCollection>>,
+  TError,
+  { id: number; photoId: number },
+  TContext
+> => {
+  const mutationKey = ["removeNegativePhotoFromCollection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeNegativePhotoFromCollection>>,
+    { id: number; photoId: number }
+  > = (props) => {
+    const { id, photoId } = props ?? {};
+
+    return removeNegativePhotoFromCollection(id, photoId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveNegativePhotoFromCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeNegativePhotoFromCollection>>
+>;
+
+export type RemoveNegativePhotoFromCollectionMutationError = ErrorType<void>;
+
+/**
+ * @summary Un-mark a photo as not applicable
+ */
+export const useRemoveNegativePhotoFromCollection = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeNegativePhotoFromCollection>>,
+    TError,
+    { id: number; photoId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removeNegativePhotoFromCollection>>,
+  TError,
+  { id: number; photoId: number },
+  TContext
+> => {
+  return useMutation(
+    getRemoveNegativePhotoFromCollectionMutationOptions(options),
+  );
+};
+
+/**
  * @summary Set the cover photo for a collection
  */
 export const getSetCollectionCoverUrl = (id: number) => {
