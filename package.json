@@ -10,6 +10,7 @@
     "test": "pnpm -r --if-present run test",
     "dev:api": "pnpm --filter @workspace/api-server run dev",
     "dev:web": "PORT=8083 pnpm --filter @workspace/photo-album run dev",
+    "dev:web:dev": "PORT=8085 API_PORT=8084 pnpm --filter @workspace/photo-album run dev",
     "dev:mobile": "pnpm --filter @workspace/mobile run dev",
     "dev:storage": "docker compose up -d",
     "dev": "pnpm run dev:storage && concurrently -n api,web \"pnpm run dev:api\" \"pnpm run dev:web\""
