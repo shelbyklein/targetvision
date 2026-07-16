@@ -31,7 +31,10 @@ if (-not (Test-Path (Join-Path $repo '.env'))) {
 $logDir = Join-Path $repo 'scripts\logs'
 New-Item -ItemType Directory -Force $logDir | Out-Null
 
-$pnpm = "$env:APPDATA\npm\pnpm.cmd"
+# Resolve pnpm from the (registry-rebuilt) PATH; corepack installs it next to
+# node (e.g. C:\Program Files\nodejs\pnpm.cmd), not under %APPDATA%\npm.
+$pnpm = (Get-Command pnpm.cmd -ErrorAction SilentlyContinue).Source
+if (-not $pnpm) { $pnpm = "$env:APPDATA\npm\pnpm.cmd" }
 
 function Start-IfNotListening([int]$port, [string]$script, [string]$log) {
     $listening = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
