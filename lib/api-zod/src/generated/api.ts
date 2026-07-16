@@ -25,6 +25,32 @@ export const GetMeResponse = zod.object({
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
   createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
+});
+
+/**
+ * @summary Save the current user's preferred sidebar nav order
+ */
+export const UpdateNavOrderBody = zod.object({
+  navOrder: zod
+    .array(zod.string())
+    .describe("Nav hrefs in the user's preferred order."),
+});
+
+export const UpdateNavOrderResponse = zod.object({
+  id: zod.number(),
+  authUserId: zod.string(),
+  name: zod.string(),
+  email: zod.string(),
+  role: zod.enum(["admin", "member"]),
+  createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
 });
 
 /**
@@ -37,6 +63,10 @@ export const ListUsersResponseItem = zod.object({
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
   createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
 });
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
 
@@ -58,6 +88,10 @@ export const UpdateUserRoleResponse = zod.object({
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
   createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
 });
 
 /**

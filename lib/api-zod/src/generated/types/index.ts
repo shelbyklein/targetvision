@@ -52,6 +52,7 @@ export * from "./listPhotosAiStatus";
 export * from "./listPhotosPagedResponse";
 export * from "./listPhotosParams";
 export * from "./listSimilarPhotosParams";
+export * from "./navOrderUpdate";
 export * from "./photo";
 export * from "./photoCategoryInput";
 export * from "./photoLatestAiStatus";

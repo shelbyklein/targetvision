@@ -51,6 +51,7 @@ import type {
   ListPhotosPagedResponse,
   ListPhotosParams,
   ListSimilarPhotosParams,
+  NavOrderUpdate,
   Photo,
   PhotoCategoryInput,
   PhotoTagInput,
@@ -223,6 +224,92 @@ export function useGetMe<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Save the current user's preferred sidebar nav order
+ */
+export const getUpdateNavOrderUrl = () => {
+  return `/api/users/me/nav-order`;
+};
+
+export const updateNavOrder = async (
+  navOrderUpdate: NavOrderUpdate,
+  options?: RequestInit,
+): Promise<User> => {
+  return customFetch<User>(getUpdateNavOrderUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(navOrderUpdate),
+  });
+};
+
+export const getUpdateNavOrderMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNavOrder>>,
+    TError,
+    { data: BodyType<NavOrderUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateNavOrder>>,
+  TError,
+  { data: BodyType<NavOrderUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateNavOrder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateNavOrder>>,
+    { data: BodyType<NavOrderUpdate> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateNavOrder(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateNavOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateNavOrder>>
+>;
+export type UpdateNavOrderMutationBody = BodyType<NavOrderUpdate>;
+export type UpdateNavOrderMutationError = ErrorType<void>;
+
+/**
+ * @summary Save the current user's preferred sidebar nav order
+ */
+export const useUpdateNavOrder = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNavOrder>>,
+    TError,
+    { data: BodyType<NavOrderUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateNavOrder>>,
+  TError,
+  { data: BodyType<NavOrderUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateNavOrderMutationOptions(options));
+};
 
 /**
  * @summary List all users (admin only)

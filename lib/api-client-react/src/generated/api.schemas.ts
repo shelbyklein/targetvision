@@ -23,6 +23,16 @@ export interface User {
   email: string;
   role: UserRole;
   createdAt: string;
+  /**
+   * Preferred sidebar nav order (nav hrefs). Null = default order.
+   * @nullable
+   */
+  navOrder?: string[] | null;
+}
+
+export interface NavOrderUpdate {
+  /** Nav hrefs in the user's preferred order. */
+  navOrder: string[];
 }
 
 export type UserRoleUpdateRole =

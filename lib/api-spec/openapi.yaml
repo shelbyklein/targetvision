@@ -62,6 +62,29 @@ paths:
         "401":
           description: Unauthorized
 
+  /users/me/nav-order:
+    patch:
+      operationId: updateNavOrder
+      tags: [users]
+      summary: Save the current user's preferred sidebar nav order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NavOrderUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid payload
+        "401":
+          description: Unauthorized
+
   /users:
     get:
       operationId: listUsers
@@ -1984,6 +2007,21 @@ components:
         createdAt:
           type: string
           format: date-time
+        navOrder:
+          type: ["array", "null"]
+          items:
+            type: string
+          description: Preferred sidebar nav order (nav hrefs). Null = default order.
+
+    NavOrderUpdate:
+      type: object
+      required: [navOrder]
+      properties:
+        navOrder:
+          type: array
+          items:
+            type: string
+          description: Nav hrefs in the user's preferred order.
 
     UserRoleUpdate:
       type: object
