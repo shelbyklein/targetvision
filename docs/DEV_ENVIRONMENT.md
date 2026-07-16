@@ -30,7 +30,9 @@ photos and your account works on both.
 From the prod checkout (`C:\Vibes\Targetvision\Targetvision`):
 
 ```sh
-git worktree add ../targetvision-dev main   # start it on main; check out branches later
+# `main` is already checked out in the prod worktree, so create the dev worktree
+# detached at main's commit; you'll check out feature branches into it later.
+git worktree add --detach ../targetvision-dev main
 cd ../targetvision-dev
 pnpm install
 ```
@@ -65,7 +67,13 @@ DNS/account):
 
 1. Cloudflare **Zero Trust** → **Networks** → **Tunnels** → your tunnel → **Public Hostname** → **Add a public hostname**.
 2. Subdomain `targetvisiondev`, domain `shelbyklein.com`.
-3. Service: **HTTP** → `localhost:8085`.
+3. Service: **HTTP** → `host.docker.internal:8085`.
+   The `cloudflared` for this tunnel runs **inside a Docker container**
+   (`homechart-cloudflared-1`, token-managed), so from its perspective the host's
+   port 8085 is `host.docker.internal:8085` — **not** `localhost:8085` (that would
+   point at the container itself). Tip: open the existing `targetvision` public
+   hostname to see exactly what host reference the prod entry uses for port 8083,
+   and copy it verbatim with `8085`.
 4. Save. Cloudflare auto-creates the DNS record.
 
 ## Daily use
