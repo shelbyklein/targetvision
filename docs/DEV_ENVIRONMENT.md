@@ -76,6 +76,20 @@ DNS/account):
    and copy it verbatim with `8085`.
 4. Save. Cloudflare auto-creates the DNS record.
 
+## Branch workflow (dev → main releases)
+
+Day-to-day work lives on the long-running **`dev` branch**, which this worktree
+keeps checked out — the dev site always shows it. `main` is the release line:
+the prod checkout stays on it, and the live site serves it.
+
+- **Work:** commit directly to `dev` (or merge short feature branches into it).
+  The dev web server HMRs each commit; **API changes need a dev API restart**
+  (kill port 8084, re-run `pnpm run dev:api` here).
+- **Release** (at a good release point): PR `dev` → `main`, merge with a
+  **merge commit** (not squash, so the next release PR diffs cleanly), then in
+  the prod checkout `git pull` — and restart the prod API if api-server code
+  changed (web updates via HMR).
+
 ## Daily use
 
 **Preview a branch:**
