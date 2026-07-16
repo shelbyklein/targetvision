@@ -106,6 +106,19 @@ export interface DuplicatePhotoGroup {
 
 export interface ListDuplicatePhotoGroupsResponse {
   groups: DuplicatePhotoGroup[];
+  /** True when more groups exist beyond this page. */
+  hasMore: boolean;
+}
+
+export interface DuplicatesSummaryResponse {
+  /** Number of duplicate groups (2+ byte-identical photos). */
+  groupCount: number;
+  /** Deletable extra copies across all groups (keeping covers, else one per group). */
+  extraCount: number;
+}
+
+export interface DeleteDuplicateExtrasResponse {
+  deleted: number;
 }
 
 /**
@@ -619,6 +632,17 @@ export const ListPhotosAiStatus = {
   failed: "failed",
   not_analysed: "not_analysed",
 } as const;
+
+export type ListDuplicatePhotoGroupsParams = {
+  /**
+   * Max groups per page (default 20, capped at 100).
+   */
+  limit?: number;
+  /**
+   * Number of groups to skip (hash-ordered).
+   */
+  offset?: number;
+};
 
 export type GetSmartCollectionPhotosParams = {
   topK?: number;

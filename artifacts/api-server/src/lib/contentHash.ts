@@ -119,15 +119,24 @@ export interface DuplicatePhotoGroup {
  * Find groups of photos that share a content hash (byte-identical duplicates).
  * Only groups with 2+ members are returned. Each photo is annotated with
  * whether it is an album cover and how many collections it belongs to, so the
- * UI can warn before deleting a referenced photo.
+ * UI can warn before deleting a referenced photo. Groups are ordered by hash
+ * for a stable pagination order; pass limit/offset to page through them.
  */
-export async function listDuplicatePhotoGroups(): Promise<DuplicatePhotoGroup[]> {
-  const dupHashes = await db
+export async function listDuplicatePhotoGroups(opts?: {
+  limit?: number;
+  offset?: number;
+}): Promise<DuplicatePhotoGroup[]> {
+  let dupHashesQuery = db
     .select({ contentHash: photosTable.contentHash })
     .from(photosTable)
     .where(isNotNull(photosTable.contentHash))
     .groupBy(photosTable.contentHash)
-    .having(sql`count(*) > 1`);
+    .having(sql`count(*) > 1`)
+    .orderBy(photosTable.contentHash)
+    .$dynamic();
+  if (opts?.limit != null) dupHashesQuery = dupHashesQuery.limit(opts.limit);
+  if (opts?.offset != null) dupHashesQuery = dupHashesQuery.offset(opts.offset);
+  const dupHashes = await dupHashesQuery;
 
   const hashes = dupHashes.map((d) => d.contentHash).filter((h): h is string => h !== null);
   if (hashes.length === 0) return [];
@@ -182,4 +191,45 @@ export async function listDuplicatePhotoGroups(): Promise<DuplicatePhotoGroup[]>
   }
 
   return Array.from(groups.values());
+}
+
+/**
+ * Cheap aggregate for the admin summary: how many duplicate groups exist and
+ * how many "extra" copies could be deleted (keeping album covers when a group
+ * has any, otherwise one photo per group) — without fetching any group rows.
+ */
+export async function getDuplicatesSummary(): Promise<{ groupCount: number; extraCount: number }> {
+  const result = await db.execute<{ group_count: number; extra_count: number }>(sql`
+    SELECT
+      count(*)::int AS group_count,
+      coalesce(sum(n - greatest(covers, 1)), 0)::int AS extra_count
+    FROM (
+      SELECT p.content_hash,
+             count(*) AS n,
+             count(*) FILTER (WHERE a.cover_photo_id = p.id) AS covers
+      FROM photos p
+      LEFT JOIN albums a ON p.album_id = a.id
+      WHERE p.content_hash IS NOT NULL
+      GROUP BY p.content_hash
+      HAVING count(*) > 1
+    ) t
+  `);
+  const row = result.rows[0];
+  return { groupCount: row?.group_count ?? 0, extraCount: row?.extra_count ?? 0 };
+}
+
+/**
+ * Ids of every deletable duplicate copy, mirroring the UI rule: per group keep
+ * the album covers when there are any (covers can't be deleted), otherwise the
+ * first (newest) photo, and mark the rest for deletion.
+ */
+export async function computeDuplicateExtraIds(): Promise<number[]> {
+  const groups = await listDuplicatePhotoGroups();
+  return groups.flatMap((group) => {
+    const hasCover = group.photos.some((p) => p.isAlbumCover);
+    const deletable = hasCover
+      ? group.photos.filter((p) => !p.isAlbumCover)
+      : group.photos.slice(1);
+    return deletable.map((p) => p.id);
+  });
 }

@@ -1109,13 +1109,60 @@ paths:
       operationId: listDuplicatePhotoGroups
       tags: [admin]
       summary: List groups of exact-duplicate photos sharing a content hash (admin only)
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Max groups per page (default 20, capped at 100).
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Number of groups to skip (hash-ordered).
       responses:
         "200":
-          description: Duplicate photo groups (only groups with 2+ members)
+          description: One page of duplicate photo groups (only groups with 2+ members)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListDuplicatePhotoGroupsResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+  /admin/photos/duplicates/summary:
+    get:
+      operationId: getDuplicatesSummary
+      tags: [admin]
+      summary: Lightweight duplicate counts for the admin summary (admin only)
+      responses:
+        "200":
+          description: Number of duplicate groups and deletable extra copies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicatesSummaryResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+  /admin/photos/duplicates/delete-extras:
+    post:
+      operationId: deleteDuplicateExtras
+      tags: [admin]
+      summary: Delete every extra duplicate copy, keeping covers or one photo per group (admin only)
+      responses:
+        "200":
+          description: Number of photos deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteDuplicateExtrasResponse"
         "401":
           description: Unauthorized
         "403":
@@ -2054,12 +2101,33 @@ components:
 
     ListDuplicatePhotoGroupsResponse:
       type: object
-      required: [groups]
+      required: [groups, hasMore]
       properties:
         groups:
           type: array
           items:
             $ref: "#/components/schemas/DuplicatePhotoGroup"
+        hasMore:
+          type: boolean
+          description: True when more groups exist beyond this page.
+
+    DuplicatesSummaryResponse:
+      type: object
+      required: [groupCount, extraCount]
+      properties:
+        groupCount:
+          type: integer
+          description: Number of duplicate groups (2+ byte-identical photos).
+        extraCount:
+          type: integer
+          description: Deletable extra copies across all groups (keeping covers, else one per group).
+
+    DeleteDuplicateExtrasResponse:
+      type: object
+      required: [deleted]
+      properties:
+        deleted:
+          type: integer
 
     Photo:
       type: object

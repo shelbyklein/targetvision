@@ -40,10 +40,13 @@ import type {
   CollectionSummary,
   CollectionUpdate,
   DashboardStats,
+  DeleteDuplicateExtrasResponse,
+  DuplicatesSummaryResponse,
   GetSmartCollectionPhotosParams,
   HealthStatus,
   ListAlbumPhotosPagedResponse,
   ListAlbumPhotosParams,
+  ListDuplicatePhotoGroupsParams,
   ListDuplicatePhotoGroupsResponse,
   ListPhotosPagedResponse,
   ListPhotosParams,
@@ -3659,15 +3662,30 @@ export const useRetryAiAnalysisEvent = <
 /**
  * @summary List groups of exact-duplicate photos sharing a content hash (admin only)
  */
-export const getListDuplicatePhotoGroupsUrl = () => {
-  return `/api/admin/photos/duplicates`;
+export const getListDuplicatePhotoGroupsUrl = (
+  params?: ListDuplicatePhotoGroupsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/photos/duplicates?${stringifiedParams}`
+    : `/api/admin/photos/duplicates`;
 };
 
 export const listDuplicatePhotoGroups = async (
+  params?: ListDuplicatePhotoGroupsParams,
   options?: RequestInit,
 ): Promise<ListDuplicatePhotoGroupsResponse> => {
   return customFetch<ListDuplicatePhotoGroupsResponse>(
-    getListDuplicatePhotoGroupsUrl(),
+    getListDuplicatePhotoGroupsUrl(params),
     {
       ...options,
       method: "GET",
@@ -3675,29 +3693,35 @@ export const listDuplicatePhotoGroups = async (
   );
 };
 
-export const getListDuplicatePhotoGroupsQueryKey = () => {
-  return [`/api/admin/photos/duplicates`] as const;
+export const getListDuplicatePhotoGroupsQueryKey = (
+  params?: ListDuplicatePhotoGroupsParams,
+) => {
+  return [`/api/admin/photos/duplicates`, ...(params ? [params] : [])] as const;
 };
 
 export const getListDuplicatePhotoGroupsQueryOptions = <
   TData = Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
   TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListDuplicatePhotoGroupsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListDuplicatePhotoGroupsQueryKey();
+    queryOptions?.queryKey ?? getListDuplicatePhotoGroupsQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listDuplicatePhotoGroups>>
-  > = ({ signal }) => listDuplicatePhotoGroups({ signal, ...requestOptions });
+  > = ({ signal }) =>
+    listDuplicatePhotoGroups(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
@@ -3718,15 +3742,18 @@ export type ListDuplicatePhotoGroupsQueryError = ErrorType<void>;
 export function useListDuplicatePhotoGroups<
   TData = Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
   TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListDuplicatePhotoGroupsQueryOptions(options);
+>(
+  params?: ListDuplicatePhotoGroupsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDuplicatePhotoGroups>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDuplicatePhotoGroupsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -3734,6 +3761,165 @@ export function useListDuplicatePhotoGroups<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Lightweight duplicate counts for the admin summary (admin only)
+ */
+export const getGetDuplicatesSummaryUrl = () => {
+  return `/api/admin/photos/duplicates/summary`;
+};
+
+export const getDuplicatesSummary = async (
+  options?: RequestInit,
+): Promise<DuplicatesSummaryResponse> => {
+  return customFetch<DuplicatesSummaryResponse>(getGetDuplicatesSummaryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDuplicatesSummaryQueryKey = () => {
+  return [`/api/admin/photos/duplicates/summary`] as const;
+};
+
+export const getGetDuplicatesSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDuplicatesSummary>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDuplicatesSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDuplicatesSummaryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDuplicatesSummary>>
+  > = ({ signal }) => getDuplicatesSummary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDuplicatesSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDuplicatesSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDuplicatesSummary>>
+>;
+export type GetDuplicatesSummaryQueryError = ErrorType<void>;
+
+/**
+ * @summary Lightweight duplicate counts for the admin summary (admin only)
+ */
+
+export function useGetDuplicatesSummary<
+  TData = Awaited<ReturnType<typeof getDuplicatesSummary>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDuplicatesSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDuplicatesSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Delete every extra duplicate copy, keeping covers or one photo per group (admin only)
+ */
+export const getDeleteDuplicateExtrasUrl = () => {
+  return `/api/admin/photos/duplicates/delete-extras`;
+};
+
+export const deleteDuplicateExtras = async (
+  options?: RequestInit,
+): Promise<DeleteDuplicateExtrasResponse> => {
+  return customFetch<DeleteDuplicateExtrasResponse>(
+    getDeleteDuplicateExtrasUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getDeleteDuplicateExtrasMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDuplicateExtras>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteDuplicateExtras>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["deleteDuplicateExtras"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteDuplicateExtras>>,
+    void
+  > = () => {
+    return deleteDuplicateExtras(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteDuplicateExtrasMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteDuplicateExtras>>
+>;
+
+export type DeleteDuplicateExtrasMutationError = ErrorType<void>;
+
+/**
+ * @summary Delete every extra duplicate copy, keeping covers or one photo per group (admin only)
+ */
+export const useDeleteDuplicateExtras = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDuplicateExtras>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteDuplicateExtras>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getDeleteDuplicateExtrasMutationOptions(options));
+};
 
 /**
  * @summary Get dashboard summary statistics
