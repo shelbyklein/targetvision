@@ -67,7 +67,13 @@ DNS/account):
 
 1. Cloudflare **Zero Trust** → **Networks** → **Tunnels** → your tunnel → **Public Hostname** → **Add a public hostname**.
 2. Subdomain `targetvisiondev`, domain `shelbyklein.com`.
-3. Service: **HTTP** → `localhost:8085`.
+3. Service: **HTTP** → `host.docker.internal:8085`.
+   The `cloudflared` for this tunnel runs **inside a Docker container**
+   (`homechart-cloudflared-1`, token-managed), so from its perspective the host's
+   port 8085 is `host.docker.internal:8085` — **not** `localhost:8085` (that would
+   point at the container itself). Tip: open the existing `targetvision` public
+   hostname to see exactly what host reference the prod entry uses for port 8083,
+   and copy it verbatim with `8085`.
 4. Save. Cloudflare auto-creates the DNS record.
 
 ## Daily use
