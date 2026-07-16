@@ -67,12 +67,21 @@ export async function fetchAlbumPhotoPage(
  * Best-effort delete of a photo's original and thumbnail objects from storage.
  * Failures are logged, not thrown — the DB row is the source of truth and is
  * already gone by the time this runs.
+ *
+ * When PHOTO_STORAGE_DELETE_DISABLED=true, object deletion is skipped and only
+ * logged. Used by the dev stack: it has its own database but shares the prod
+ * storage bucket, so deleting a dev photo row must not remove image files the
+ * prod rows still reference.
  */
 export async function deletePhotoStorageObjects(photo: {
   id: number;
   storageKey: string | null;
   thumbnailKey: string | null;
 }): Promise<void> {
+  if (process.env.PHOTO_STORAGE_DELETE_DISABLED === "true") {
+    logger.info({ photoId: photo.id }, "Storage delete skipped (PHOTO_STORAGE_DELETE_DISABLED)");
+    return;
+  }
   for (const key of [photo.storageKey, photo.thumbnailKey]) {
     if (!key) continue;
     try {

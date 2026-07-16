@@ -9,19 +9,24 @@ check out in a separate git worktree.
 | Checkout | `C:\Vibes\Targetvision\Targetvision` (`main`) | `C:\Vibes\Targetvision\targetvision-dev` (worktree, any branch) |
 | Web (Vite) | 8083 | **8085** |
 | API | 8080 | **8084** |
-| Database | `targetvision` @ 5433 | **same (shared)** |
-| Object storage | fake-gcs @ 4443 | **same (shared)** |
+| Database | `targetvision` @ 5433 | **`targetvision_dev` @ 5433** (cloned from prod) |
+| Object storage | fake-gcs @ 4443 | same bucket (deletes disabled — see below) |
 | Public URL | targetvision.shelbyklein.com | **targetvisiondev.shelbyklein.com** |
 
 Both stacks share the Postgres + fake-gcs containers (started by the prod
-`scripts/start-targetvision.ps1`) and the same secrets, so dev renders the same
-photos and your account works on both.
+`scripts/start-targetvision.ps1`) and the same secrets. Dev has its **own
+database**, snapshot-cloned from prod (photos, users, sessions and all), so it
+renders the same library and your account works on both — but **schema changes,
+migrations, and destructive testing on dev are completely safe**: they only
+touch `targetvision_dev`.
 
-> ⚠️ **Shared database.** Dev is safe for **code / UI previews** only. Because it
-> points at the **prod database and storage**, a schema push/migration or a
-> destructive action (delete/edit) on dev hits **real prod data**. Never run
-> `pnpm db push` / migrations against the shared DB from dev. To preview a
-> branch that changes the schema, use the isolated-DB switch at the bottom.
+> ⚠️ **One shared piece remains: the storage bucket.** Dev's photo rows reference
+> the same image objects as prod's, so the dev API runs with
+> `PHOTO_STORAGE_DELETE_DISABLED=true` — deleting a photo on dev removes the dev
+> DB row but leaves the image file alone. Keep that flag set in the dev `.env`.
+> (Photos *uploaded* on dev create new objects prod never references; those are
+> only cleaned up by a dev delete's skipped storage pass, i.e. never — an
+> acceptable leak for a dev box.)
 
 ## One-time setup
 
@@ -37,7 +42,15 @@ cd ../targetvision-dev
 pnpm install
 ```
 
-### 2. Create the dev `.env`
+### 2. Create the dev database
+
+Clone prod into `targetvision_dev` (also how you refresh dev data later):
+
+```powershell
+scripts\clone-dev-db.ps1
+```
+
+### 3. Create the dev `.env`
 
 The dev API binds its port from the worktree's own `.env`. Copy prod's env and
 apply the dev overrides (use `.env.dev.example` in the repo root as the
@@ -51,16 +64,17 @@ Then edit `.env` in the worktree so these lines read:
 
 ```
 PORT=8084
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/targetvision_dev
 BETTER_AUTH_URL=http://localhost:8084/api/auth
 CORS_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
 TRUSTED_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
+PHOTO_STORAGE_DELETE_DISABLED=true
 ```
 
-Leave `DATABASE_URL`, `GCS_*`, `BETTER_AUTH_SECRET`, and
-`AI_KEY_ENCRYPTION_SECRET` identical to prod (shared DB/storage + shared
-sessions/AI keys).
+Leave `GCS_*`, `BETTER_AUTH_SECRET`, and `AI_KEY_ENCRYPTION_SECRET` identical to
+prod (shared storage + the cloned sessions/AI keys must still validate).
 
-### 3. Add the Cloudflare public hostname
+### 4. Add the Cloudflare public hostname
 
 The tunnel is dashboard-managed, so add the subdomain there (I can't change your
 DNS/account):
@@ -120,27 +134,34 @@ again on the dev origin (same account, separate cookie host). Prod at
 close their windows, or `Get-NetTCPConnection -LocalPort 8085,8084 -State Listen`
 → `Stop-Process`).
 
-## Previewing a schema change (isolated DB)
+## Schema changes on dev
 
-When a branch changes the Drizzle schema, do **not** run it against the shared
-prod DB. Point dev at an isolated database first:
-
-```sh
-createdb targetvision_dev    # once (or the SQL equivalent on 5433)
-```
-
-In the worktree `.env`, switch `DATABASE_URL` to the dev DB:
-
-```
-DATABASE_URL=postgres://postgres:postgres@localhost:5433/targetvision_dev
-```
-
-Then apply the branch's migrations to that DB only:
+Dev owns `targetvision_dev`, so the normal workflow just works here:
 
 ```sh
-pnpm --filter @workspace/db run migrate
+# in the dev worktree, after editing lib/db/src/schema/*
+pnpm --filter @workspace/db run generate    # writes the migration
+pnpm --filter @workspace/db run migrate     # applies it to targetvision_dev
+# restart the dev API (kill port 8084, re-run scripts/start-targetvision-dev.ps1)
 ```
 
-Now dev runs against its own database and can no longer affect prod data. (Note:
-an isolated DB starts empty — you'll need to seed or re-upload test photos, and
-the shared fake-gcs bucket won't match its rows.)
+**At release**, after merging `dev` → `main` and pulling in the prod checkout,
+apply the same migrations to prod:
+
+```sh
+# in the PROD checkout
+pnpm --filter @workspace/db run migrate     # applies pending migrations to targetvision
+# restart the prod API
+```
+
+## Refreshing dev data (re-clone from prod)
+
+Dev's data is a point-in-time snapshot; prod moves on without it. To resync:
+
+```powershell
+scripts\clone-dev-db.ps1
+```
+
+Drops and recreates `targetvision_dev` from a fresh prod dump (prod is only
+read). If the dev branch carries migrations prod doesn't have yet, re-run
+`pnpm --filter @workspace/db run migrate` in the worktree afterwards.
