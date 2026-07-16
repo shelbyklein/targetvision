@@ -49,6 +49,7 @@ export function PhotoSidebarContent({
   onAdvance,
   onCoverSet,
   onDeleted,
+  topActions,
 }: {
   photoId: number;
   albumId?: number | null;
@@ -57,6 +58,9 @@ export function PhotoSidebarContent({
   onAdvance?: () => void;
   onCoverSet?: (photoId: number) => void;
   onDeleted?: (photoId: number) => void;
+  // Extra action buttons (view details, download, …) rendered by the lightbox
+  // into the same single actions row as set-cover/hide/delete.
+  topActions?: React.ReactNode;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -246,8 +250,15 @@ export function PhotoSidebarContent({
 
   if (photoLoading || collectionsLoading) {
     return (
-      <div className="flex items-center justify-center py-4">
-        <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+      <div className="space-y-3">
+        {topActions && (
+          <div className="flex flex-wrap gap-2" data-testid="lightbox-photo-actions">
+            {topActions}
+          </div>
+        )}
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+        </div>
       </div>
     );
   }
@@ -256,8 +267,9 @@ export function PhotoSidebarContent({
 
   return (
     <div className="space-y-4" data-testid="lightbox-collection-manager">
-      {(coverAlbumId != null || me?.role === "admin" || canDelete) && (
+      {(topActions || coverAlbumId != null || me?.role === "admin" || canDelete) && (
         <div className="flex flex-wrap gap-2" data-testid="lightbox-photo-actions">
+      {topActions}
       {coverAlbumId != null && (
         <button
           type="button"
