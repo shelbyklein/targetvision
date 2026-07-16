@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CopyCheck, CheckCircle2, Loader2, Check, Trash2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { cn } from "@/lib/utils";
 import { DuplicatePhotoCard } from "@/components/admin/DuplicatePhotoCard";
 
@@ -74,6 +75,11 @@ export default function AdminNearDuplicatesPage() {
   const totalGroups = page?.totalGroups ?? null;
   const hasMore = page?.hasMore ?? false;
   const initialLoading = pageLoading && allGroups.length === 0;
+
+  // Auto-load the next page at the bottom; the button stays as a fallback.
+  const sentinelRef = useInfiniteScroll(() => {
+    if (!isFetching) setOffset(allGroups.length);
+  }, hasMore);
 
   // Changing sensitivity or page size restarts the list (and the selection —
   // selected photos may no longer be on screen).
@@ -320,7 +326,7 @@ export default function AdminNearDuplicatesPage() {
           ))}
 
           {hasMore && (
-            <div className="flex justify-center pt-2">
+            <div ref={sentinelRef} className="flex justify-center pt-2">
               <Button
                 type="button"
                 variant="outline"

@@ -27,6 +27,7 @@ import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { AddPhotoDialog } from "@/components/AddPhotoDialog";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -182,6 +183,13 @@ export default function AlbumDetail() {
   const photosLoading = photosPageLoading && allPhotos.length === 0;
   const loadingMore = photosFetching && allPhotos.length > 0;
   const hasMore = photosPage?.hasMore ?? false;
+
+  // Auto-load the next page when the bottom sentinel scrolls into view; the
+  // "Load more" button stays as a manual fallback (e.g. observer not firing
+  // in background tabs).
+  const sentinelRef = useInfiniteScroll(() => {
+    if (!photosFetching) setOffset((prev) => prev + PAGE_SIZE);
+  }, hasMore);
 
   useEffect(() => {
     setOffset(0);
@@ -821,7 +829,7 @@ export default function AlbumDetail() {
             }}
           />
           {hasMore && (
-            <div className="flex justify-center pt-4">
+            <div ref={sentinelRef} className="flex justify-center pt-4">
               <Button
                 variant="outline"
                 onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
