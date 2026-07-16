@@ -33,11 +33,14 @@ interface PhotoLightboxProps {
   // When set (smart-collection context), a "Not applicable" action appears that
   // marks the photo as a negative example for that collection.
   onMarkNotApplicable?: (photoId: number) => void;
+  // Whether submitting a rating moves to the next photo (keyboard digits and
+  // star clicks). Album review flows want this; search/smart-collection don't.
+  advanceOnRate?: boolean;
 }
 
 const SWIPE_THRESHOLD = 50;
 
-export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext, albumId, coverPhotoId, onDeleted, onMarkNotApplicable }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext, albumId, coverPhotoId, onDeleted, onMarkNotApplicable, advanceOnRate = true }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
   const touchStartX = useRef<number | null>(null);
   const qc = useQueryClient();
@@ -102,11 +105,11 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photo.id) });
           qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
-          handleAdvance();
+          if (advanceOnRate) handleAdvance();
         },
       }
     );
-  }, [photo, ratePhotoKb, qc, handleAdvance]);
+  }, [photo, ratePhotoKb, qc, handleAdvance, advanceOnRate]);
 
   useEffect(() => {
     if (!photo) return;
@@ -215,6 +218,7 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                   coverAlbumId={albumId}
                   coverPhotoId={localCoverPhotoId}
                   onAdvance={handleAdvance}
+                  advanceOnRate={advanceOnRate}
                   onCoverSet={(newCoverId) => setLocalCoverPhotoId(newCoverId)}
                   onDeleted={(deletedId) => { onDeleted?.(deletedId); onClose(); }}
                   topActions={
