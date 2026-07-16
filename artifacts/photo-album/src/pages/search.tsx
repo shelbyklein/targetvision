@@ -670,6 +670,7 @@ export default function SearchPage() {
         hasNext={hasNext}
         onPrev={handlePrev}
         onNext={handleNext}
+        advanceOnRate={false}
       />
     </AppLayout>
   );

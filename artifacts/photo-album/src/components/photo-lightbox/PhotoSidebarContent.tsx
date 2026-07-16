@@ -47,16 +47,24 @@ export function PhotoSidebarContent({
   coverAlbumId,
   coverPhotoId,
   onAdvance,
+  advanceOnRate = true,
   onCoverSet,
   onDeleted,
+  topActions,
 }: {
   photoId: number;
   albumId?: number | null;
   coverAlbumId?: number | null;
   coverPhotoId?: number | null;
   onAdvance?: () => void;
+  // Whether submitting a star rating advances to the next photo. Hiding a
+  // photo always advances regardless.
+  advanceOnRate?: boolean;
   onCoverSet?: (photoId: number) => void;
   onDeleted?: (photoId: number) => void;
+  // Extra action buttons (view details, download, …) rendered by the lightbox
+  // into the same single actions row as set-cover/hide/delete.
+  topActions?: React.ReactNode;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -78,6 +86,7 @@ export function PhotoSidebarContent({
   const [showNewForm, setShowNewForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [showAllCollections, setShowAllCollections] = useState(false);
   const newTitleRef = useRef<HTMLInputElement>(null);
 
   function invalidate() {
@@ -246,8 +255,15 @@ export function PhotoSidebarContent({
 
   if (photoLoading || collectionsLoading) {
     return (
-      <div className="flex items-center justify-center py-4">
-        <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+      <div className="space-y-3">
+        {topActions && (
+          <div className="flex flex-wrap gap-2" data-testid="lightbox-photo-actions">
+            {topActions}
+          </div>
+        )}
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+        </div>
       </div>
     );
   }
@@ -256,8 +272,9 @@ export function PhotoSidebarContent({
 
   return (
     <div className="space-y-4" data-testid="lightbox-collection-manager">
-      {(coverAlbumId != null || me?.role === "admin" || canDelete) && (
+      {(topActions || coverAlbumId != null || me?.role === "admin" || canDelete) && (
         <div className="flex flex-wrap gap-2" data-testid="lightbox-photo-actions">
+      {topActions}
       {coverAlbumId != null && (
         <button
           type="button"
@@ -344,7 +361,7 @@ export function PhotoSidebarContent({
           averageRating={fullPhoto?.averageRating}
           currentUserId={me?.id}
           onRated={invalidate}
-          onAdvance={onAdvance}
+          onAdvance={advanceOnRate ? onAdvance : undefined}
         />
       </div>
 
@@ -424,12 +441,18 @@ export function PhotoSidebarContent({
           <div className="flex flex-wrap gap-1.5" data-testid="lightbox-collection-pills">
             {(() => {
               const suggested = suggestCollections(fullPhoto?.aiDescription, allCollections);
-              const sorted = [...allCollections].sort((a, b) => {
-                const aS = suggested.has(a.id) ? 0 : 1;
-                const bS = suggested.has(b.id) ? 0 : 1;
-                return aS - bS;
-              });
-              return sorted.map((col) => {
+              // Members first (they're current state), then AI suggestions, then
+              // the rest. Collapsed view shows the top 5 (always including all
+              // members); the remainder hides behind a "+N more" toggle.
+              const rank = (c: (typeof allCollections)[number]) =>
+                currentCollections.some((cc) => cc.id === c.id) ? 0 : suggested.has(c.id) ? 1 : 2;
+              const sorted = [...allCollections].sort((a, b) => rank(a) - rank(b));
+              const memberCount = currentCollections.length;
+              const visibleCount = Math.max(5, memberCount);
+              const hiddenCount = sorted.length - visibleCount;
+              const shown =
+                showAllCollections || hiddenCount <= 0 ? sorted : sorted.slice(0, visibleCount);
+              const pills = shown.map((col) => {
                 const isIn = currentCollections.some((c) => c.id === col.id);
                 const isSuggested = suggested.has(col.id);
                 return (
@@ -470,6 +493,22 @@ export function PhotoSidebarContent({
                   </button>
                 );
               });
+              return (
+                <>
+                  {pills}
+                  {hiddenCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllCollections((v) => !v)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-white/30 text-white/55 hover:bg-white/10 hover:text-white transition-colors"
+                      data-testid="lightbox-collections-toggle"
+                      aria-expanded={showAllCollections}
+                    >
+                      {showAllCollections ? "Show less" : `+${hiddenCount} more`}
+                    </button>
+                  )}
+                </>
+              );
             })()}
           </div>
         ) : !showNewForm ? (

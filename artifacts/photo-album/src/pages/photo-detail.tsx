@@ -405,6 +405,7 @@ export default function PhotoDetail() {
             <CollectionsPanel
               photoCollections={photo.photoCollections}
               availableCollections={availableCollections}
+              aiDescription={photo.aiDescription}
               projects={allProjects}
               newCollectionName={newCollectionName}
               setNewCollectionName={setNewCollectionName}

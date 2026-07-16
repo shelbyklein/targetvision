@@ -33,11 +33,14 @@ interface PhotoLightboxProps {
   // When set (smart-collection context), a "Not applicable" action appears that
   // marks the photo as a negative example for that collection.
   onMarkNotApplicable?: (photoId: number) => void;
+  // Whether submitting a rating moves to the next photo (keyboard digits and
+  // star clicks). Album review flows want this; search/smart-collection don't.
+  advanceOnRate?: boolean;
 }
 
 const SWIPE_THRESHOLD = 50;
 
-export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext, albumId, coverPhotoId, onDeleted, onMarkNotApplicable }: PhotoLightboxProps) {
+export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext, isLoadingNext, albumId, coverPhotoId, onDeleted, onMarkNotApplicable, advanceOnRate = true }: PhotoLightboxProps) {
   const imgSrc = photo?.url ?? undefined;
   const touchStartX = useRef<number | null>(null);
   const qc = useQueryClient();
@@ -102,11 +105,11 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photo.id) });
           qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
-          handleAdvance();
+          if (advanceOnRate) handleAdvance();
         },
       }
     );
-  }, [photo, ratePhotoKb, qc, handleAdvance]);
+  }, [photo, ratePhotoKb, qc, handleAdvance, advanceOnRate]);
 
   useEffect(() => {
     if (!photo) return;
@@ -209,57 +212,57 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                 onClick={(e) => e.stopPropagation()}
                 data-testid="lightbox-sidebar"
               >
-                <div className="flex flex-wrap gap-2" data-testid="lightbox-actions">
-                  <Link
-                    href={`/photos/${photo.id}`}
-                    onClick={onClose}
-                    className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
-                    data-testid="lightbox-view-details-link"
-                    title="View full details"
-                    aria-label="View full details"
-                  >
-                    <ExternalLink className="h-4 w-4 shrink-0" />
-                  </Link>
+                <PhotoSidebarContent
+                  photoId={photo.id}
+                  albumId={photo.albumId}
+                  coverAlbumId={albumId}
+                  coverPhotoId={localCoverPhotoId}
+                  onAdvance={handleAdvance}
+                  advanceOnRate={advanceOnRate}
+                  onCoverSet={(newCoverId) => setLocalCoverPhotoId(newCoverId)}
+                  onDeleted={(deletedId) => { onDeleted?.(deletedId); onClose(); }}
+                  topActions={
+                    <>
+                      <Link
+                        href={`/photos/${photo.id}`}
+                        onClick={onClose}
+                        className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
+                        data-testid="lightbox-view-details-link"
+                        title="View full details"
+                        aria-label="View full details"
+                      >
+                        <ExternalLink className="h-4 w-4 shrink-0" />
+                      </Link>
 
-                  <a
-                    href={photo.url}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
-                    data-testid="lightbox-download"
-                    title="Download"
-                    aria-label="Download"
-                  >
-                    <Download className="h-4 w-4 shrink-0" />
-                  </a>
+                      <a
+                        href={photo.url}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
+                        data-testid="lightbox-download"
+                        title="Download"
+                        aria-label="Download"
+                      >
+                        <Download className="h-4 w-4 shrink-0" />
+                      </a>
 
-                  {onMarkNotApplicable && (
-                    <button
-                      type="button"
-                      onClick={handleMarkNotApplicable}
-                      className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-destructive/70 border border-white/20 text-white transition-colors"
-                      data-testid="lightbox-mark-not-applicable"
-                      title="Not applicable — steer this collection's suggestions away from it"
-                      aria-label="Not applicable"
-                    >
-                      <Ban className="h-4 w-4 shrink-0" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="border-t border-white/10 pt-3">
-                  <PhotoSidebarContent
-                    photoId={photo.id}
-                    albumId={photo.albumId}
-                    coverAlbumId={albumId}
-                    coverPhotoId={localCoverPhotoId}
-                    onAdvance={handleAdvance}
-                    onCoverSet={(newCoverId) => setLocalCoverPhotoId(newCoverId)}
-                    onDeleted={(deletedId) => { onDeleted?.(deletedId); onClose(); }}
-                  />
-                </div>
+                      {onMarkNotApplicable && (
+                        <button
+                          type="button"
+                          onClick={handleMarkNotApplicable}
+                          className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-destructive/70 border border-white/20 text-white transition-colors"
+                          data-testid="lightbox-mark-not-applicable"
+                          title="Not applicable — steer this collection's suggestions away from it"
+                          aria-label="Not applicable"
+                        >
+                          <Ban className="h-4 w-4 shrink-0" />
+                        </button>
+                      )}
+                    </>
+                  }
+                />
               </div>
             </div>
           )}
