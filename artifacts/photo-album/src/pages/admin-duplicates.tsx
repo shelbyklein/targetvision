@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Copy, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { DuplicatePhotoCard } from "@/components/admin/DuplicatePhotoCard";
 import { DuplicatesSection } from "@/components/admin/DuplicatesSection";
 import { AdminSectionShell } from "@/components/admin/AdminSectionShell";
@@ -59,6 +60,11 @@ export default function AdminDuplicatesPage() {
 
   const hasMore = page?.hasMore ?? false;
   const initialLoading = pageLoading && allGroups.length === 0;
+
+  // Auto-load the next page at the bottom; the button stays as a fallback.
+  const sentinelRef = useInfiniteScroll(() => {
+    if (!isFetching) setOffset(allGroups.length);
+  }, hasMore);
 
   useEffect(() => {
     if (!page) return;
@@ -203,7 +209,7 @@ export default function AdminDuplicatesPage() {
             })}
 
             {hasMore && (
-              <div className="flex justify-center pt-2">
+              <div ref={sentinelRef} className="flex justify-center pt-2">
                 <Button
                   type="button"
                   variant="outline"
