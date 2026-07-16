@@ -30,7 +30,9 @@ photos and your account works on both.
 From the prod checkout (`C:\Vibes\Targetvision\Targetvision`):
 
 ```sh
-git worktree add ../targetvision-dev main   # start it on main; check out branches later
+# `main` is already checked out in the prod worktree, so create the dev worktree
+# detached at main's commit; you'll check out feature branches into it later.
+git worktree add --detach ../targetvision-dev main
 cd ../targetvision-dev
 pnpm install
 ```
