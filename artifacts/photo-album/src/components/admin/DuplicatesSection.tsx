@@ -33,10 +33,11 @@ type BackfillResult = {
   failed: number;
 };
 
-// Summary-only admin card: counts + hash backfill + "delete all extras". The
-// per-group review UI lives on the dedicated /admin/duplicates page — this
-// section never fetches the (potentially hundreds of) groups themselves.
-export function DuplicatesSection() {
+// Summary-only card: counts + hash backfill + "delete all extras". The
+// per-group review UI lives on the /admin/duplicates page (which embeds this
+// card with showManageLink=false) — this section never fetches the
+// (potentially hundreds of) groups themselves.
+export function DuplicatesSection({ showManageLink = true }: { showManageLink?: boolean }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [lastBackfill, setLastBackfill] = useState<BackfillResult | null>(null);
@@ -158,12 +159,14 @@ export function DuplicatesSection() {
               <span className="font-semibold">{extraCount}</span> deletable extra{extraCount !== 1 ? "s" : ""}
             </p>
             <div className="flex items-center gap-2">
-              <Link href="/admin/duplicates">
-                <Button type="button" size="sm" variant="outline" className="gap-1.5" data-testid="manage-duplicates-link">
-                  Manage duplicates
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </Link>
+              {showManageLink && (
+                <Link href="/admin/duplicates">
+                  <Button type="button" size="sm" variant="outline" className="gap-1.5" data-testid="manage-duplicates-link">
+                    Manage duplicates
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
+              )}
               {extraCount > 0 && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>

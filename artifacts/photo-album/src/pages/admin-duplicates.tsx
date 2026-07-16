@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
 import {
   useListDuplicatePhotoGroups,
   getListDuplicatePhotoGroupsQueryKey,
@@ -13,9 +12,7 @@ import {
 } from "@workspace/api-client-react";
 import type { DuplicatePhotoGroup } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,9 +24,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Copy, CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import { Copy, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DuplicatePhotoCard } from "@/components/admin/DuplicatePhotoCard";
+import { DuplicatesSection } from "@/components/admin/DuplicatesSection";
+import { AdminSectionShell } from "@/components/admin/AdminSectionShell";
 
 const PAGE_SIZE = 20;
 
@@ -43,7 +42,7 @@ function groupExtras(group: DuplicatePhotoGroup) {
 export default function AdminDuplicatesPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { data: me, isLoading: meLoading } = useGetMe();
+  const { data: me } = useGetMe();
 
   const [offset, setOffset] = useState(0);
   const [allGroups, setAllGroups] = useState<DuplicatePhotoGroup[]>([]);
@@ -122,51 +121,18 @@ export default function AdminDuplicatesPage() {
     );
   }
 
-  if (meLoading) {
-    return (
-      <AppLayout>
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-48 w-full rounded-xl" />
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (!me || me.role !== "admin") {
-    return (
-      <AppLayout>
-        <div className="text-center py-24">
-          <p className="text-muted-foreground">You do not have permission to view this page.</p>
-          <Link href="/dashboard"><Button variant="outline" className="mt-4">Back to Dashboard</Button></Link>
-        </div>
-      </AppLayout>
-    );
-  }
-
   return (
-    <AppLayout>
+    <AdminSectionShell
+      title="Duplicate Photos"
+      icon={Copy}
+      description={
+        (summary
+          ? `${summary.groupCount} group${summary.groupCount !== 1 ? "s" : ""} · ${summary.extraCount} deletable extra${summary.extraCount !== 1 ? "s" : ""}`
+          : "…") + " — keep the copy you want and delete the rest. Album covers can't be deleted here."
+      }
+    >
+      <DuplicatesSection showManageLink={false} />
       <div className="space-y-6" data-testid="admin-duplicates-page">
-        <div className="flex items-start gap-3">
-          <Link href="/admin">
-            <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" data-testid="back-to-admin">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2">
-              <Copy className="h-5 w-5 text-muted-foreground" />
-              Duplicate Photos
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1" data-testid="duplicates-page-summary">
-              {summary
-                ? `${summary.groupCount} group${summary.groupCount !== 1 ? "s" : ""} · ${summary.extraCount} deletable extra${summary.extraCount !== 1 ? "s" : ""}`
-                : "…"}{" "}
-              — keep the copy you want and delete the rest. Album covers can't be deleted here.
-            </p>
-          </div>
-        </div>
-
         {initialLoading ? (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading duplicates…
@@ -258,6 +224,6 @@ export default function AdminDuplicatesPage() {
           </div>
         )}
       </div>
-    </AppLayout>
+    </AdminSectionShell>
   );
 }

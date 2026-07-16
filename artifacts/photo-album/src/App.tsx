@@ -158,18 +158,31 @@ function AppRoutes() {
             </>
           )}
         </Route>
-        <Route path="/admin/duplicates">
-          {() => (
-            <>
-              <AuthGate when="signed-in">
-                <LazyPage load={() => import("@/pages/admin-duplicates")} />
-              </AuthGate>
-              <AuthGate when="signed-out">
-                <Redirect to="/sign-in" />
-              </AuthGate>
-            </>
-          )}
-        </Route>
+        {([
+          ["/admin/duplicates", () => import("@/pages/admin-duplicates")],
+          ["/admin/near-duplicates", () => import("@/pages/admin-near-duplicates")],
+          ["/admin/registration", () => import("@/pages/admin-registration")],
+          ["/admin/ai-services", () => import("@/pages/admin-ai-services")],
+          ["/admin/ai-analysis", () => import("@/pages/admin-ai-analysis")],
+          ["/admin/embeddings", () => import("@/pages/admin-embeddings")],
+          ["/admin/image-optimization", () => import("@/pages/admin-image-optimization")],
+          ["/admin/thumbnails", () => import("@/pages/admin-thumbnails")],
+          ["/admin/captured-dates", () => import("@/pages/admin-captured-dates")],
+          ["/admin/team", () => import("@/pages/admin-team")],
+        ] as const).map(([path, load]) => (
+          <Route key={path} path={path}>
+            {() => (
+              <>
+                <AuthGate when="signed-in">
+                  <LazyPage load={load} />
+                </AuthGate>
+                <AuthGate when="signed-out">
+                  <Redirect to="/sign-in" />
+                </AuthGate>
+              </>
+            )}
+          </Route>
+        ))}
         <Route path="/settings">
           {() => (
             <>

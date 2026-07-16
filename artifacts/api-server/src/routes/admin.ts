@@ -600,11 +600,21 @@ router.post("/admin/photos/perceptual-hash-backfill", requireAdmin, async (req, 
 router.get("/admin/photos/near-duplicates", requireAdmin, async (req, res): Promise<void> => {
   const raw = req.query.threshold ? parseInt(String(req.query.threshold), 10) : DEFAULT_NEAR_DUP_THRESHOLD;
   const threshold = Number.isInteger(raw) ? Math.min(Math.max(raw, 0), MAX_NEAR_DUP_THRESHOLD) : DEFAULT_NEAR_DUP_THRESHOLD;
-  const groups = await listNearDuplicatePhotoGroups(threshold);
+  const rawLimit = req.query.limit ? parseInt(String(req.query.limit), 10) : DUPLICATES_DEFAULT_LIMIT;
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, DUPLICATES_MAX_LIMIT) : DUPLICATES_DEFAULT_LIMIT;
+  const rawOffset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
+  const offset = Number.isInteger(rawOffset) && rawOffset > 0 ? rawOffset : 0;
+
+  // Clustering is inherently whole-library (union-find over all hashes); the
+  // page slice just keeps the response payload small.
+  const allGroups = await listNearDuplicatePhotoGroups(threshold);
+  const page = allGroups.slice(offset, offset + limit);
   res.json(
     NearDuplicatePhotoGroupsResponse.parse({
       threshold,
-      groups: groups.map((g) => ({
+      totalGroups: allGroups.length,
+      hasMore: offset + limit < allGroups.length,
+      groups: page.map((g) => ({
         key: g.key,
         distance: g.distance,
         photos: g.photos.map((p) => ({
