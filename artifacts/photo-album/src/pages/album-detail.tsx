@@ -450,38 +450,38 @@ export default function AlbumDetail() {
             </Link>
             <div>
               <h1
-                className="text-2xl font-bold text-foreground"
+                className="text-lg sm:text-2xl font-bold text-foreground"
                 data-testid="album-title"
               >
                 {album.title}
               </h1>
-              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
                 {album.eventDate && (
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 whitespace-nowrap">
                     <CalendarDays className="h-3.5 w-3.5" />
                     {formatDate(album.eventDate)}
                   </span>
                 )}
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 whitespace-nowrap">
                   <Camera className="h-3.5 w-3.5" />
                   {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
-                  {me?.role === "admin" && !!album.hiddenCount && (
-                    <span className="flex items-center gap-1 text-muted-foreground/70">
-                      <EyeOff className="h-3 w-3" />
-                      {album.hiddenCount} hidden
-                      <button
-                        type="button"
-                        onClick={() => setShowHiddenLocal((v) => !v)}
-                        className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${showHiddenLocal ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground/70 hover:text-muted-foreground"}`}
-                        data-testid="toggle-hidden-photos"
-                        title={showHiddenLocal ? "Hide hidden photos" : "Show hidden photos"}
-                      >
-                        {showHiddenLocal ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                        {showHiddenLocal ? "hide" : "show"}
-                      </button>
-                    </span>
-                  )}
                 </span>
+                {me?.role === "admin" && !!album.hiddenCount && (
+                  <span className="flex items-center gap-1 text-muted-foreground/70 whitespace-nowrap">
+                    <EyeOff className="h-3 w-3" />
+                    {album.hiddenCount} hidden
+                    <button
+                      type="button"
+                      onClick={() => setShowHiddenLocal((v) => !v)}
+                      className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium transition-colors ${showHiddenLocal ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground/70 hover:text-muted-foreground"}`}
+                      data-testid="toggle-hidden-photos"
+                      title={showHiddenLocal ? "Hide hidden photos" : "Show hidden photos"}
+                    >
+                      {showHiddenLocal ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      {showHiddenLocal ? "hide" : "show"}
+                    </button>
+                  </span>
+                )}
               </div>
               {album.description && (
                 <p className="text-sm text-muted-foreground mt-2 max-w-xl">
@@ -492,7 +492,8 @@ export default function AlbumDetail() {
           </div>
 
           <TooltipProvider delayDuration={500}>
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Phones: 2x2 grid of compact actions; sm and up: single row. */}
+          <div className="grid grid-cols-2 gap-2 shrink-0 sm:flex sm:items-center">
             {me?.role === "admin" && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -541,6 +542,7 @@ export default function AlbumDetail() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="w-full sm:w-9"
                     data-testid="delete-album-btn"
                     title="Delete album"
                   >
