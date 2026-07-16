@@ -8,7 +8,8 @@ A pnpm-workspace monorepo photo album app: Express API + React web frontend + Ex
 - The prod checkout (`C:\Vibes\Targetvision\Targetvision`) stays on `main` and is the live site (targetvision.shelbyklein.com, web 8083 / API 8080). Don't switch its branch or leave its tree dirty.
 - **Release** (only when the user says so): open a PR `dev` → `main`, merge with a **merge commit** (not squash — keeps the long-lived `dev` history connected), then `git pull` in the prod checkout and restart the prod API if api-server code changed (the API is a prebuilt bundle, no watch; the web is Vite HMR and updates itself).
 - The web dev server picks up `dev` commits via HMR; **API changes need a dev API restart** (kill port 8084, re-run `pnpm run dev:api` in the worktree or `scripts/start-targetvision-dev.ps1`).
-- ⚠️ Dev shares the **prod database/storage**. Schema-changing work still requires the isolated-DB switch first — see `docs/DEV_ENVIRONMENT.md`.
+- Dev has its **own database** (`targetvision_dev`, cloned from prod via `scripts/clone-dev-db.ps1`) — schema changes, migrations, and destructive testing on dev are safe. **At release, run `pnpm --filter @workspace/db run migrate` in the prod checkout** to apply any new migrations to the prod DB.
+- ⚠️ Dev still shares the prod **storage bucket**; the dev `.env` sets `PHOTO_STORAGE_DELETE_DISABLED=true` so dev photo deletes never remove image files prod references. Keep it set.
 
 ## Run & Operate
 

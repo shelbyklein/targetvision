@@ -4,6 +4,8 @@ import { db, usersTable } from "@workspace/db";
 import {
   ListUsersResponse,
   GetMeResponse,
+  UpdateNavOrderBody,
+  UpdateNavOrderResponse,
   UpdateUserRoleParams,
   UpdateUserRoleBody,
   UpdateUserRoleResponse,
@@ -14,6 +16,22 @@ const router: IRouter = Router();
 
 router.get("/users/me", requireAuth, async (req, res): Promise<void> => {
   res.json(GetMeResponse.parse(req.dbUser));
+});
+
+router.patch("/users/me/nav-order", requireAuth, async (req, res): Promise<void> => {
+  const body = UpdateNavOrderBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [user] = await db
+    .update(usersTable)
+    .set({ navOrder: body.data.navOrder })
+    .where(eq(usersTable.id, req.dbUser!.id))
+    .returning();
+
+  res.json(UpdateNavOrderResponse.parse(user));
 });
 
 router.get("/users", requireAdmin, async (req, res): Promise<void> => {

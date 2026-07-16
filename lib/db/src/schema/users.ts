@@ -9,6 +9,9 @@ export const usersTable = pgTable("users", {
   email: text("email").notNull().unique(),
   role: text("role").notNull().default("member"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // The user's preferred sidebar nav order (array of nav hrefs). Null = default
+  // order; unknown/new items render after the saved ones in default order.
+  navOrder: text("nav_order").array(),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });

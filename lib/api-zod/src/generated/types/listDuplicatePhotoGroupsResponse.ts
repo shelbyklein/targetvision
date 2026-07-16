@@ -9,4 +9,6 @@ import type { DuplicatePhotoGroup } from "./duplicatePhotoGroup";
 
 export interface ListDuplicatePhotoGroupsResponse {
   groups: DuplicatePhotoGroup[];
+  /** True when more groups exist beyond this page. */
+  hasMore: boolean;
 }

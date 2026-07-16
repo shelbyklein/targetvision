@@ -14,4 +14,9 @@ export interface User {
   email: string;
   role: UserRole;
   createdAt: Date;
+  /**
+   * Preferred sidebar nav order (nav hrefs). Null = default order.
+   * @nullable
+   */
+  navOrder?: string[] | null;
 }

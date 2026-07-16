@@ -158,6 +158,18 @@ function AppRoutes() {
             </>
           )}
         </Route>
+        <Route path="/admin/duplicates">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/admin-duplicates")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
         <Route path="/settings">
           {() => (
             <>

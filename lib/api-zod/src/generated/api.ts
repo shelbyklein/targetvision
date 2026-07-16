@@ -25,6 +25,32 @@ export const GetMeResponse = zod.object({
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
   createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
+});
+
+/**
+ * @summary Save the current user's preferred sidebar nav order
+ */
+export const UpdateNavOrderBody = zod.object({
+  navOrder: zod
+    .array(zod.string())
+    .describe("Nav hrefs in the user's preferred order."),
+});
+
+export const UpdateNavOrderResponse = zod.object({
+  id: zod.number(),
+  authUserId: zod.string(),
+  name: zod.string(),
+  email: zod.string(),
+  role: zod.enum(["admin", "member"]),
+  createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
 });
 
 /**
@@ -37,6 +63,10 @@ export const ListUsersResponseItem = zod.object({
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
   createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
 });
 export const ListUsersResponse = zod.array(ListUsersResponseItem);
 
@@ -58,6 +88,10 @@ export const UpdateUserRoleResponse = zod.object({
   email: zod.string(),
   role: zod.enum(["admin", "member"]),
   createdAt: zod.coerce.date(),
+  navOrder: zod
+    .array(zod.string())
+    .nullish()
+    .describe("Preferred sidebar nav order (nav hrefs). Null = default order."),
 });
 
 /**
@@ -1970,6 +2004,17 @@ export const RetryAiAnalysisEventResponse = zod.object({
 /**
  * @summary List groups of exact-duplicate photos sharing a content hash (admin only)
  */
+export const ListDuplicatePhotoGroupsQueryParams = zod.object({
+  limit: zod.coerce
+    .number()
+    .optional()
+    .describe("Max groups per page (default 20, capped at 100)."),
+  offset: zod.coerce
+    .number()
+    .optional()
+    .describe("Number of groups to skip (hash-ordered)."),
+});
+
 export const ListDuplicatePhotoGroupsResponse = zod.object({
   groups: zod.array(
     zod.object({
@@ -1994,6 +2039,30 @@ export const ListDuplicatePhotoGroupsResponse = zod.object({
       ),
     }),
   ),
+  hasMore: zod
+    .boolean()
+    .describe("True when more groups exist beyond this page."),
+});
+
+/**
+ * @summary Lightweight duplicate counts for the admin summary (admin only)
+ */
+export const GetDuplicatesSummaryResponse = zod.object({
+  groupCount: zod
+    .number()
+    .describe("Number of duplicate groups (2+ byte-identical photos)."),
+  extraCount: zod
+    .number()
+    .describe(
+      "Deletable extra copies across all groups (keeping covers, else one per group).",
+    ),
+});
+
+/**
+ * @summary Delete every extra duplicate copy, keeping covers or one photo per group (admin only)
+ */
+export const DeleteDuplicateExtrasResponse = zod.object({
+  deleted: zod.number(),
 });
 
 /**

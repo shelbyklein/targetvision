@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, isNull, isNotNull, and } from "drizzle-orm";
+import { eq, desc, isNull, isNotNull, and, inArray } from "drizzle-orm";
 import {
   db,
   appSettingsTable,
@@ -34,6 +34,8 @@ import {
   BackfillContentHashesStatusResponse,
   BackfillContentHashesResponse,
   ListDuplicatePhotoGroupsResponse,
+  GetDuplicatesSummaryResponse,
+  DeleteDuplicateExtrasResponse,
   PerceptualHashBackfillStatusResponse,
   BackfillPerceptualHashesResponse,
   NearDuplicatePhotoGroupsResponse,
@@ -60,7 +62,14 @@ import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDateBackfill";
-import { countPhotosWithoutContentHash, backfillContentHashes, listDuplicatePhotoGroups } from "../lib/contentHash";
+import {
+  countPhotosWithoutContentHash,
+  backfillContentHashes,
+  listDuplicatePhotoGroups,
+  getDuplicatesSummary,
+  computeDuplicateExtraIds,
+} from "../lib/contentHash";
+import { deletePhotoStorageObjects } from "../lib/photoHelpers";
 import {
   countPhotosWithoutPerceptualHash,
   backfillPerceptualHashes,
@@ -513,11 +522,24 @@ router.patch("/admin/image-optimization/settings", requireAdmin, async (req, res
   res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus()));
 });
 
-router.get("/admin/photos/duplicates", requireAdmin, async (_req, res): Promise<void> => {
-  const groups = await listDuplicatePhotoGroups();
+const DUPLICATES_DEFAULT_LIMIT = 20;
+const DUPLICATES_MAX_LIMIT = 100;
+
+router.get("/admin/photos/duplicates", requireAdmin, async (req, res): Promise<void> => {
+  const rawLimit = req.query.limit ? parseInt(String(req.query.limit), 10) : DUPLICATES_DEFAULT_LIMIT;
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, DUPLICATES_MAX_LIMIT) : DUPLICATES_DEFAULT_LIMIT;
+  const rawOffset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
+  const offset = Number.isInteger(rawOffset) && rawOffset > 0 ? rawOffset : 0;
+
+  // Fetch one extra group to know whether another page exists.
+  const groups = await listDuplicatePhotoGroups({ limit: limit + 1, offset });
+  const hasMore = groups.length > limit;
+  const page = hasMore ? groups.slice(0, limit) : groups;
+
   res.json(
     ListDuplicatePhotoGroupsResponse.parse({
-      groups: groups.map((g) => ({
+      hasMore,
+      groups: page.map((g) => ({
         contentHash: g.contentHash,
         photos: g.photos.map((p) => ({
           id: p.id,
@@ -532,6 +554,35 @@ router.get("/admin/photos/duplicates", requireAdmin, async (_req, res): Promise<
       })),
     }),
   );
+});
+
+router.get("/admin/photos/duplicates/summary", requireAdmin, async (_req, res): Promise<void> => {
+  res.json(GetDuplicatesSummaryResponse.parse(await getDuplicatesSummary()));
+});
+
+// Server-side "delete all extras": computes the deletable copies (keeping album
+// covers, else one per group) and removes them in one shot, so the admin
+// summary never has to download every group to bulk-delete.
+router.post("/admin/photos/duplicates/delete-extras", requireAdmin, async (_req, res): Promise<void> => {
+  const extraIds = await computeDuplicateExtraIds();
+  if (extraIds.length === 0) {
+    res.json(DeleteDuplicateExtrasResponse.parse({ deleted: 0 }));
+    return;
+  }
+
+  const toDelete = await db
+    .select({ id: photosTable.id, storageKey: photosTable.storageKey, thumbnailKey: photosTable.thumbnailKey })
+    .from(photosTable)
+    .where(inArray(photosTable.id, extraIds));
+
+  const deleted = await db
+    .delete(photosTable)
+    .where(inArray(photosTable.id, extraIds))
+    .returning({ id: photosTable.id });
+
+  await Promise.all(toDelete.map((photo) => deletePhotoStorageObjects(photo)));
+
+  res.json(DeleteDuplicateExtrasResponse.parse({ deleted: deleted.length }));
 });
 
 router.get("/admin/photos/perceptual-hash-backfill-status", requireAdmin, async (_req, res): Promise<void> => {

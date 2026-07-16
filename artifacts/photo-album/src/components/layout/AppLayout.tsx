@@ -7,6 +7,8 @@ import {
   useAddPhotoToProject,
   useListCollections,
   useAddPhotoToCollection,
+  useUpdateNavOrder,
+  getGetMeQueryKey,
   getListProjectsQueryKey,
   getGetProjectQueryKey,
   getListCollectionsQueryKey,
@@ -64,6 +66,23 @@ const navItems = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/smart-collections", label: "Smart", icon: Sparkles },
 ];
+
+// Drag type for reordering the top-level nav; distinct from PHOTO_DND_MIME so
+// nav reordering and photo-onto-collection drags never interfere.
+const NAV_DND_MIME = "application/x-targetvision-nav";
+
+// Apply the user's saved order (array of hrefs) to navItems. Hrefs that no
+// longer exist are dropped; nav items missing from the saved order (added
+// after the user saved) keep their default relative position at the end.
+function applyNavOrder(order: string[] | null | undefined) {
+  if (!order || order.length === 0) return navItems;
+  const byHref = new Map(navItems.map((i) => [i.href, i]));
+  const ordered = order
+    .map((h) => byHref.get(h))
+    .filter((i): i is (typeof navItems)[number] => i !== undefined);
+  const seen = new Set(order);
+  return [...ordered, ...navItems.filter((i) => !seen.has(i.href))];
+}
 
 // Reads the persisted sidebar open/collapsed state (written as a cookie by
 // SidebarProvider) so the choice survives reloads without a flash of the
@@ -217,7 +236,7 @@ const PROJECTS_NAV_OPEN_KEY = "projects_nav_open";
 // The "Projects" nav entry as a collapsible tree: the label links to /projects,
 // a chevron expands to list each project (with its photo count), and each
 // project row is a drop target — drag a photo from any grid onto it to add it.
-function ProjectsNav({ location }: { location: string }) {
+function ProjectsNav({ location, dragProps }: { location: string; dragProps?: React.LiHTMLAttributes<HTMLLIElement> }) {
   const { data: projects } = useListProjects();
   const { mutate: addToProject } = useAddPhotoToProject();
   const qc = useQueryClient();
@@ -285,7 +304,7 @@ function ProjectsNav({ location }: { location: string }) {
 
   return (
     <Collapsible asChild open={open} onOpenChange={handleOpenChange} className="group/projects">
-      <SidebarMenuItem>
+      <SidebarMenuItem {...dragProps}>
         <SidebarMenuButton asChild isActive={location === "/projects"} tooltip="Projects">
           <Link href="/projects" data-testid="nav-projects">
             <FolderKanban />
@@ -356,7 +375,7 @@ const COLLECTIONS_NAV_OPEN_KEY = "collections_nav_open";
 // label links to /collections, a chevron expands to list each collection (with
 // its photo count), and each row is a drop target — drag a photo from any grid
 // onto it to add it to that collection.
-function CollectionsNav({ location }: { location: string }) {
+function CollectionsNav({ location, dragProps }: { location: string; dragProps?: React.LiHTMLAttributes<HTMLLIElement> }) {
   const { data: collections } = useListCollections();
   const { mutate: addToCollection } = useAddPhotoToCollection();
   const qc = useQueryClient();
@@ -424,7 +443,7 @@ function CollectionsNav({ location }: { location: string }) {
 
   return (
     <Collapsible asChild open={open} onOpenChange={handleOpenChange} className="group/collections">
-      <SidebarMenuItem>
+      <SidebarMenuItem {...dragProps}>
         <SidebarMenuButton asChild isActive={location === "/collections"} tooltip="Collections">
           <Link href="/collections" data-testid="nav-collections">
             <FolderOpen />
@@ -494,11 +513,61 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
   const user = session?.user;
   const firstName = user?.name?.split(" ")[0];
   const { data: me } = useGetMe();
+  const qc = useQueryClient();
+  const { mutate: saveNavOrder } = useUpdateNavOrder();
 
+  // Drag-to-reorder for the top-level nav. localNavOrder holds the live order
+  // during/after a drag (optimistic); the server copy arrives via me.navOrder.
+  const [draggingNav, setDraggingNav] = useState<string | null>(null);
+  const [localNavOrder, setLocalNavOrder] = useState<string[] | null>(null);
+
+  const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
   const items = [
-    ...navItems,
+    ...orderedNav,
+    // Admin is pinned last and not reorderable.
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
   ];
+
+  function navDragProps(href: string): React.LiHTMLAttributes<HTMLLIElement> {
+    return {
+      draggable: true,
+      title: "Drag to reorder",
+      className: cn(draggingNav === href && "opacity-50"),
+      onDragStart: (e) => {
+        e.dataTransfer.setData(NAV_DND_MIME, href);
+        e.dataTransfer.effectAllowed = "move";
+        setDraggingNav(href);
+      },
+      onDragOver: (e) => {
+        if (!draggingNav || draggingNav === href) return;
+        e.preventDefault();
+        // Live-reorder while hovering: move the dragged item to this slot.
+        setLocalNavOrder((cur) => {
+          const order = cur ?? applyNavOrder(me?.navOrder).map((i) => i.href);
+          const from = order.indexOf(draggingNav);
+          const to = order.indexOf(href);
+          if (from === -1 || to === -1 || from === to) return cur;
+          const next = [...order];
+          next.splice(from, 1);
+          next.splice(to, 0, draggingNav);
+          return next;
+        });
+      },
+      onDrop: (e) => e.preventDefault(),
+      onDragEnd: () => {
+        setDraggingNav(null);
+        setLocalNavOrder((cur) => {
+          if (cur) {
+            saveNavOrder(
+              { data: { navOrder: cur } },
+              { onSuccess: () => qc.invalidateQueries({ queryKey: getGetMeQueryKey() }) },
+            );
+          }
+          return cur;
+        });
+      },
+    };
+  }
 
   return (
     <Sidebar collapsible="icon" data-testid="app-sidebar">
@@ -520,16 +589,17 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarMenu data-testid="main-nav">
             {items.map((item) => {
+              const dragProps = item.href === "/admin" ? undefined : navDragProps(item.href);
               if (item.href === "/collections") {
-                return <CollectionsNav key={item.href} location={location} />;
+                return <CollectionsNav key={item.href} location={location} dragProps={dragProps} />;
               }
               if (item.href === "/projects") {
-                return <ProjectsNav key={item.href} location={location} />;
+                return <ProjectsNav key={item.href} location={location} dragProps={dragProps} />;
               }
               const Icon = item.icon;
               const active = location === item.href || location.startsWith(item.href + "/");
               return (
-                <SidebarMenuItem key={item.href}>
+                <SidebarMenuItem key={item.href} {...dragProps}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
                     <Link href={item.href} data-testid={`nav-${item.label.toLowerCase()}`}>
                       <Icon />
