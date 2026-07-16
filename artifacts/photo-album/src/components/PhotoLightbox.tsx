@@ -209,41 +209,45 @@ export function PhotoLightbox({ photo, onClose, onPrev, onNext, hasPrev, hasNext
                 onClick={(e) => e.stopPropagation()}
                 data-testid="lightbox-sidebar"
               >
-                <Link
-                  href={`/photos/${photo.id}`}
-                  onClick={onClose}
-                  className="flex items-center gap-2 w-full rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-2 text-sm font-medium text-white transition-colors"
-                  data-testid="lightbox-view-details-link"
-                >
-                  <ExternalLink className="h-4 w-4 shrink-0" />
-                  View full details
-                </Link>
-
-                <a
-                  href={photo.url}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-2 w-full rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-2 text-sm font-medium text-white transition-colors"
-                  data-testid="lightbox-download"
-                >
-                  <Download className="h-4 w-4 shrink-0" />
-                  Download
-                </a>
-
-                {onMarkNotApplicable && (
-                  <button
-                    type="button"
-                    onClick={handleMarkNotApplicable}
-                    className="flex items-center gap-2 w-full rounded-lg bg-white/15 hover:bg-destructive/70 border border-white/20 px-3 py-2 text-sm font-medium text-white transition-colors"
-                    data-testid="lightbox-mark-not-applicable"
-                    title="Not applicable — steer this collection's suggestions away from it"
+                <div className="flex flex-wrap gap-2" data-testid="lightbox-actions">
+                  <Link
+                    href={`/photos/${photo.id}`}
+                    onClick={onClose}
+                    className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
+                    data-testid="lightbox-view-details-link"
+                    title="View full details"
+                    aria-label="View full details"
                   >
-                    <Ban className="h-4 w-4 shrink-0" />
-                    Not applicable
-                  </button>
-                )}
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                  </Link>
+
+                  <a
+                    href={photo.url}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
+                    data-testid="lightbox-download"
+                    title="Download"
+                    aria-label="Download"
+                  >
+                    <Download className="h-4 w-4 shrink-0" />
+                  </a>
+
+                  {onMarkNotApplicable && (
+                    <button
+                      type="button"
+                      onClick={handleMarkNotApplicable}
+                      className="flex items-center justify-center h-9 w-9 rounded-lg bg-white/15 hover:bg-destructive/70 border border-white/20 text-white transition-colors"
+                      data-testid="lightbox-mark-not-applicable"
+                      title="Not applicable — steer this collection's suggestions away from it"
+                      aria-label="Not applicable"
+                    >
+                      <Ban className="h-4 w-4 shrink-0" />
+                    </button>
+                  )}
+                </div>
 
                 <div className="border-t border-white/10 pt-3">
                   <PhotoSidebarContent

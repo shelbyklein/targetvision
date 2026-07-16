@@ -256,25 +256,28 @@ export function PhotoSidebarContent({
 
   return (
     <div className="space-y-4" data-testid="lightbox-collection-manager">
+      {(coverAlbumId != null || me?.role === "admin" || canDelete) && (
+        <div className="flex flex-wrap gap-2" data-testid="lightbox-photo-actions">
       {coverAlbumId != null && (
         <button
           type="button"
           onClick={handleSetCover}
           disabled={isCover || settingCover}
           className={cn(
-            "flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed",
+            "flex items-center justify-center h-9 w-9 rounded-lg border transition-colors disabled:cursor-not-allowed",
             isCover
               ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-300 opacity-80"
               : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20 disabled:opacity-50"
           )}
           data-testid="lightbox-set-cover-btn"
+          title={isCover ? "Current cover" : "Set as cover"}
+          aria-label={isCover ? "Current cover" : "Set as cover"}
         >
           {settingCover ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           ) : (
             <ImageIcon className="h-4 w-4 shrink-0" />
           )}
-          {isCover ? "Current cover" : "Set as cover"}
         </button>
       )}
 
@@ -284,15 +287,16 @@ export function PhotoSidebarContent({
           onClick={handleToggleHidden}
           disabled={updatingVisibility}
           className={cn(
-            "flex items-center gap-2 w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50",
+            "flex items-center justify-center h-9 w-9 rounded-lg border transition-colors disabled:opacity-50",
             isHidden
               ? "bg-amber-500/20 border-amber-400/40 text-amber-300 hover:bg-amber-500/30"
               : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20"
           )}
           data-testid="lightbox-toggle-hidden"
+          title={isHidden ? "Unhide photo" : "Hide photo"}
+          aria-label={isHidden ? "Unhide photo" : "Hide photo"}
         >
           {isHidden ? <Eye className="h-4 w-4 shrink-0" /> : <EyeOff className="h-4 w-4 shrink-0" />}
-          {isHidden ? "Unhide photo" : "Hide photo"}
         </button>
       )}
 
@@ -302,11 +306,12 @@ export function PhotoSidebarContent({
             <button
               type="button"
               disabled={deleting}
-              className="flex items-center gap-2 w-full rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center h-9 w-9 rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="lightbox-delete-btn"
+              title="Delete photo"
+              aria-label="Delete photo"
             >
               {deleting ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Trash2 className="h-4 w-4 shrink-0" />}
-              Delete photo
             </button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -328,6 +333,8 @@ export function PhotoSidebarContent({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      )}
+        </div>
       )}
 
       <div className="border-t border-white/10 pt-3">
