@@ -1,43 +1,42 @@
-import { useState } from "react";
-import {
-  useListUsers,
-  useUpdateUserRole,
-  getListUsersQueryKey,
-  useGetMe,
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useGetMe } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Shield } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+  Shield,
+  UserPlus,
+  Bot,
+  Sparkles,
+  Braces,
+  ImageDown,
+  Image as ImageIcon,
+  CalendarDays,
+  Copy,
+  CopyCheck,
+  Users,
+  ChevronRight,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { AiServicesSection } from "@/components/admin/AiServicesSection";
-import { AiAnalysisBackfillSection } from "@/components/admin/AiAnalysisBackfillSection";
-import { EmbeddingsSection } from "@/components/admin/EmbeddingsSection";
-import { RegistrationSection } from "@/components/admin/RegistrationSection";
-import { ImageOptimizationSection } from "@/components/admin/ImageOptimizationSection";
-import { ThumbnailsSection } from "@/components/admin/ThumbnailsSection";
-import { CapturedDatesSection } from "@/components/admin/CapturedDatesSection";
-import { DuplicatesSection } from "@/components/admin/DuplicatesSection";
-import { NearDuplicatesSection } from "@/components/admin/NearDuplicatesSection";
+
+// The hub deliberately runs NO queries (beyond the auth check): every section
+// lives on its own /admin/<slug> page, so its status scans and library-wide
+// queries only run when that page is opened.
+const SECTIONS: { href: string; title: string; description: string; icon: LucideIcon }[] = [
+  { href: "/admin/registration", title: "Registration", description: "Allow or pause new account sign-ups.", icon: UserPlus },
+  { href: "/admin/ai-services", title: "AI Services", description: "Providers, API keys, models, and analysis events.", icon: Bot },
+  { href: "/admin/ai-analysis", title: "AI Analysis", description: "Backfill photo descriptions and monitor runs.", icon: Sparkles },
+  { href: "/admin/embeddings", title: "Embeddings", description: "Semantic-search embeddings status and backfill.", icon: Braces },
+  { href: "/admin/image-optimization", title: "Image Optimization", description: "Resize/compress settings for uploads.", icon: ImageDown },
+  { href: "/admin/thumbnails", title: "Thumbnails", description: "Generate missing photo thumbnails.", icon: ImageIcon },
+  { href: "/admin/captured-dates", title: "Captured Dates", description: "Fill missing capture dates from EXIF data.", icon: CalendarDays },
+  { href: "/admin/duplicates", title: "Duplicates", description: "Byte-identical copies — review or bulk-delete extras.", icon: Copy },
+  { href: "/admin/near-duplicates", title: "Near-Duplicates", description: "Visually similar photos — select and delete.", icon: CopyCheck },
+  { href: "/admin/team", title: "Team Members", description: "Manage member roles.", icon: Users },
+];
 
 export default function Admin() {
-  const qc = useQueryClient();
-  const { toast } = useToast();
   const { data: me, isLoading: meLoading } = useGetMe();
-  const isAdmin = me?.role === "admin";
-  const { data: users, isLoading: usersLoading } = useListUsers({
-    query: { enabled: isAdmin, queryKey: getListUsersQueryKey() },
-  });
-  const { mutate: updateRole } = useUpdateUserRole();
 
   if (meLoading) {
     return (
@@ -61,19 +60,6 @@ export default function Admin() {
     );
   }
 
-  function handleRoleChange(userId: number, role: "admin" | "member") {
-    updateRole(
-      { id: userId, data: { role } },
-      {
-        onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
-          toast({ title: "Role updated" });
-        },
-        onError: () => toast({ title: "Failed to update role", variant: "destructive" }),
-      }
-    );
-  }
-
   return (
     <AppLayout>
       <div className="space-y-8" data-testid="admin-page">
@@ -83,80 +69,33 @@ export default function Admin() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-sm text-muted-foreground">Manage team member roles and AI services.</p>
+            <p className="text-sm text-muted-foreground">Each area opens on its own page.</p>
           </div>
         </div>
 
-        <RegistrationSection />
-
-        <AiServicesSection />
-
-        <AiAnalysisBackfillSection />
-
-        <EmbeddingsSection />
-
-        <ImageOptimizationSection />
-
-        <ThumbnailsSection />
-
-        <CapturedDatesSection />
-
-        <DuplicatesSection />
-
-        <NearDuplicatesSection />
-
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground">Team Members</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{users?.length ?? 0} members registered</p>
-          </div>
-
-          {usersLoading ? (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-48" />
-                  </div>
-                  <Skeleton className="h-8 w-28" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="admin-hub-grid">
+          {SECTIONS.map((section) => {
+            const Icon = section.icon;
+            return (
+              <Link
+                key={section.href}
+                href={section.href}
+                className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/50"
+                data-testid={`admin-card-${section.href.split("/").pop()}`}
+              >
+                <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon className="h-[18px] w-[18px] text-primary" />
                 </div>
-              ))}
-            </div>
-          ) : users && users.length > 0 ? (
-            <div className="divide-y divide-border" data-testid="users-list">
-              {users.map((user) => (
-                <div key={user.id} className="flex items-center justify-between px-5 py-3.5" data-testid={`user-row-${user.id}`}>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Select
-                      value={user.role}
-                      onValueChange={(val) => handleRoleChange(user.id, val as "admin" | "member")}
-                      disabled={user.id === me?.id}
-                    >
-                      <SelectTrigger className="h-8 w-28 text-sm" data-testid={`role-select-${user.id}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="member">Member</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {user.id === me?.id && (
-                      <span className="text-xs text-muted-foreground">(you)</span>
-                    )}
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1">
+                    {section.title}
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="px-5 py-10 text-center">
-              <p className="text-sm text-muted-foreground">No users yet.</p>
-            </div>
-          )}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </AppLayout>

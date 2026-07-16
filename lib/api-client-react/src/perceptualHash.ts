@@ -19,13 +19,21 @@ export type NearDuplicateGroup = {
 
 type NearDuplicatePhotoGroupsResult = {
   threshold: number;
+  totalGroups: number;
+  hasMore: boolean;
   groups: NearDuplicateGroup[];
+};
+
+export type NearDuplicatePhotoGroupsParams = {
+  threshold: number;
+  limit?: number;
+  offset?: number;
 };
 
 const PERCEPTUAL_HASH_BACKFILL_STATUS_KEY = ["admin", "photos", "perceptual-hash-backfill-status"] as const;
 
-export function getNearDuplicatePhotoGroupsQueryKey(threshold: number) {
-  return ["admin", "photos", "near-duplicates", threshold] as const;
+export function getNearDuplicatePhotoGroupsQueryKey(params: NearDuplicatePhotoGroupsParams) {
+  return ["admin", "photos", "near-duplicates", params.threshold, params.limit ?? null, params.offset ?? null] as const;
 }
 
 export function usePerceptualHashBackfillStatus() {
@@ -49,12 +57,15 @@ export function useBackfillPerceptualHashes() {
   });
 }
 
-export function useNearDuplicatePhotoGroups(threshold: number) {
+export function useNearDuplicatePhotoGroups(params: NearDuplicatePhotoGroupsParams) {
+  const search = new URLSearchParams({ threshold: String(params.threshold) });
+  if (params.limit != null) search.set("limit", String(params.limit));
+  if (params.offset != null) search.set("offset", String(params.offset));
   return useQuery({
-    queryKey: getNearDuplicatePhotoGroupsQueryKey(threshold),
+    queryKey: getNearDuplicatePhotoGroupsQueryKey(params),
     queryFn: () =>
       customFetch<NearDuplicatePhotoGroupsResult>(
-        `/api/admin/photos/near-duplicates?threshold=${threshold}`,
+        `/api/admin/photos/near-duplicates?${search.toString()}`,
       ),
   });
 }

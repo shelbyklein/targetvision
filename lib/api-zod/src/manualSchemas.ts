@@ -94,6 +94,8 @@ const NearDuplicatePhotoSchema = z.object({
 
 export const NearDuplicatePhotoGroupsResponse = z.object({
   threshold: z.number(),
+  totalGroups: z.number(),
+  hasMore: z.boolean(),
   groups: z.array(
     z.object({
       key: z.string(),
