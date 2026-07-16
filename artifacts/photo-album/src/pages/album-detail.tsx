@@ -58,6 +58,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Star,
   CalendarDays,
   Camera,
@@ -485,34 +491,47 @@ export default function AlbumDetail() {
             </div>
           </div>
 
+          <TooltipProvider delayDuration={500}>
           <div className="flex items-center gap-2 shrink-0">
             {me?.role === "admin" && (
-              <Button
-                variant={isSelectMode ? "default" : "outline"}
-                size="sm"
-                className="gap-1.5"
-                onClick={() => isSelectMode ? exitSelectMode() : setIsSelectMode(true)}
-                data-testid="toggle-select-mode"
-              >
-                <CheckSquare className="h-4 w-4" />
-                {isSelectMode ? "Cancel" : "Select"}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isSelectMode ? "default" : "outline"}
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => isSelectMode ? exitSelectMode() : setIsSelectMode(true)}
+                    data-testid="toggle-select-mode"
+                    aria-label={isSelectMode ? "Cancel selection" : "Select photos"}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    <span className="hidden sm:inline">{isSelectMode ? "Cancel" : "Select"}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isSelectMode ? "Cancel selection" : "Select photos"}</TooltipContent>
+              </Tooltip>
             )}
             {!photosLoading && unratedPhotos.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => {
-                  const first = unratedPhotos[0];
-                  setUnratedReviewMode(true);
-                  setSelectedPhoto({ id: first.id, url: first.url, thumbnailKey: first.thumbnailKey, name: first.filename, averageRating: first.averageRating, albumId });
-                }}
-                data-testid="review-unrated-btn"
-              >
-                <Star className="h-4 w-4" />
-                Review Unrated ({album.unratedCount ?? unratedPhotos.length})
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      const first = unratedPhotos[0];
+                      setUnratedReviewMode(true);
+                      setSelectedPhoto({ id: first.id, url: first.url, thumbnailKey: first.thumbnailKey, name: first.filename, averageRating: first.averageRating, albumId });
+                    }}
+                    data-testid="review-unrated-btn"
+                    aria-label={`Review unrated photos (${album.unratedCount ?? unratedPhotos.length})`}
+                  >
+                    <Star className="h-4 w-4" />
+                    <span className="hidden sm:inline">Review Unrated ({album.unratedCount ?? unratedPhotos.length})</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Review unrated ({album.unratedCount ?? unratedPhotos.length})</TooltipContent>
+              </Tooltip>
             )}
             <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
 
@@ -550,6 +569,7 @@ export default function AlbumDetail() {
               </AlertDialog>
             )}
           </div>
+          </TooltipProvider>
         </div>
 
         {!photosLoading && album && (album.photoCount > 0 || hasActiveFilters) && (
