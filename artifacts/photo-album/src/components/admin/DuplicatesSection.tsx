@@ -3,12 +3,26 @@ import {
   useListDuplicatePhotoGroups,
   getListDuplicatePhotoGroupsQueryKey,
   useDeletePhoto,
+  useBulkDeletePhotos,
   useContentHashBackfillStatus,
   useBackfillContentHashes,
+  getGetRecentPhotosQueryKey,
+  getGetTopRatedPhotosQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Copy, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Copy, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DuplicatePhotoCard } from "./DuplicatePhotoCard";
 
@@ -28,13 +42,43 @@ export function DuplicatesSection() {
   const { mutate: backfill, isPending: isBackfilling } = useBackfillContentHashes();
   const { data: dupData, isLoading: isDupLoading } = useListDuplicatePhotoGroups();
   const { mutate: deletePhoto, isPending: isDeleting } = useDeletePhoto();
+  const { mutate: bulkDelete, isPending: isBulkDeleting } = useBulkDeletePhotos();
 
   const missingCount = statusData?.missingCount ?? null;
   const groups = dupData?.groups ?? [];
 
+  // Per group keep one photo — a cover if the group has any (covers can't be
+  // deleted), otherwise the first — and mark every other non-cover copy for
+  // deletion. `extras` is the full set of deletable duplicate ids.
+  const extras = groups.flatMap((group) => {
+    const hasCover = group.photos.some((p) => p.isAlbumCover);
+    const deletable = hasCover
+      ? group.photos.filter((p) => !p.isAlbumCover)
+      : group.photos.slice(1);
+    return deletable;
+  });
+  const extraIds = extras.map((p) => p.id);
+  const extrasInCollections = extras.filter((p) => p.collectionCount > 0).length;
+
   function refresh() {
     qc.invalidateQueries({ queryKey: getListDuplicatePhotoGroupsQueryKey() });
     qc.invalidateQueries({ queryKey: ["admin", "photos", "content-hash-backfill-status"] });
+    qc.invalidateQueries({ queryKey: getGetRecentPhotosQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetTopRatedPhotosQueryKey() });
+  }
+
+  function handleBulkDelete() {
+    if (extraIds.length === 0) return;
+    bulkDelete(
+      { data: { ids: extraIds } },
+      {
+        onSuccess: (result) => {
+          toast({ title: `Deleted ${result.deleted} duplicate${result.deleted !== 1 ? "s" : ""}` });
+          refresh();
+        },
+        onError: () => toast({ title: "Bulk delete failed", variant: "destructive" }),
+      },
+    );
   }
 
   function handleBackfill() {
@@ -79,7 +123,7 @@ export function DuplicatesSection() {
         <div className="flex-1">
           <h2 className="text-sm font-semibold text-foreground">Duplicate Photos</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Find byte-identical duplicate photos and remove the extras. Deletion is always a manual, per-photo action.
+            Find byte-identical duplicate photos and remove the extras — one at a time, or all at once (keeping one per group).
           </p>
         </div>
       </div>
@@ -135,10 +179,55 @@ export function DuplicatesSection() {
           </div>
         ) : (
           <div className="space-y-5" data-testid="duplicate-groups">
-            <p className="text-sm text-muted-foreground">
-              {groups.length} duplicate group{groups.length !== 1 ? "s" : ""} found. Keep the copy you want and
-              delete the rest. Album covers can't be deleted here — change the album's cover first.
-            </p>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <p className="text-sm text-muted-foreground flex-1 min-w-[16rem]">
+                {groups.length} duplicate group{groups.length !== 1 ? "s" : ""} found. Keep the copy you want and
+                delete the rest, or delete all extras at once. Album covers can't be deleted here — change the
+                album's cover first.
+              </p>
+              {extraIds.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={isBulkDeleting}
+                      className="shrink-0 gap-1.5"
+                      data-testid="delete-all-duplicates-btn"
+                    >
+                      {isBulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      Delete {extraIds.length} extra{extraIds.length !== 1 ? "s" : ""}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {extraIds.length} duplicate photo{extraIds.length !== 1 ? "s" : ""}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This keeps one photo from each identical group (an album cover when there is one) and
+                        permanently deletes the rest, including their stored files. This cannot be undone.
+                        {extrasInCollections > 0 && (
+                          <>
+                            {" "}
+                            {extrasInCollections} of them belong to collections and will be removed from those too.
+                          </>
+                        )}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleBulkDelete}
+                        className="bg-destructive hover:bg-destructive/90"
+                        data-testid="confirm-delete-all-duplicates"
+                      >
+                        Delete {extraIds.length} photo{extraIds.length !== 1 ? "s" : ""}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
             {groups.map((group) => (
               <div key={group.contentHash} className="rounded-lg border border-border p-3 space-y-2" data-testid={`duplicate-group-${group.contentHash}`}>
                 <div className="flex items-center justify-between">
