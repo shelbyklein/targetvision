@@ -248,9 +248,9 @@ export function AddPhotoDialog({ albumId, onAdded }: { albumId: number; onAdded:
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogTrigger asChild>
-        <Button className="gap-2" size="sm" data-testid="add-photo-btn">
+        <Button className="gap-2" size="sm" data-testid="add-photo-btn" title="Add photos" aria-label="Add photos">
           <Plus className="h-4 w-4" />
-          Add Photos
+          <span className="hidden sm:inline">Add Photos</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
