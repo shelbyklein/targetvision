@@ -1,8 +1,8 @@
 import type { CollectionSummary, Collection, Project } from "@workspace/api-client-react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,11 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, FolderOpen, FolderKanban, Loader2, Plus } from "lucide-react";
+import { FolderOpen, FolderKanban, Loader2, Plus, Check, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { suggestCollections } from "@/lib/aiSuggestions";
 
 export function CollectionsPanel({
   photoCollections,
   availableCollections,
+  aiDescription,
   projects,
   newCollectionName,
   setNewCollectionName,
@@ -27,6 +30,7 @@ export function CollectionsPanel({
 }: {
   photoCollections?: CollectionSummary[];
   availableCollections?: Collection[];
+  aiDescription?: string | null;
   projects?: Project[];
   newCollectionName: string;
   setNewCollectionName: (value: string) => void;
@@ -36,6 +40,27 @@ export function CollectionsPanel({
   onCreateNewCollection: (e: React.FormEvent) => void;
   onAddProject: (projectId: string) => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
+
+  // One toggle-pill cloud, mirroring the lightbox sidebar: members first (click
+  // removes), then AI-suggested (click adds), then the rest. Collapsed view
+  // shows the top 5 (always including all members) behind a "+N more" toggle.
+  const members = photoCollections ?? [];
+  const nonMembers = availableCollections ?? [];
+  const suggested = suggestCollections(aiDescription, nonMembers);
+  const sortedNonMembers = [...nonMembers].sort((a, b) => {
+    const aS = suggested.has(a.id) ? 0 : 1;
+    const bS = suggested.has(b.id) ? 0 : 1;
+    return aS - bS;
+  });
+  const all = [
+    ...members.map((c) => ({ id: c.id, title: c.title, isIn: true })),
+    ...sortedNonMembers.map((c) => ({ id: c.id, title: c.title, isIn: false })),
+  ];
+  const visibleCount = Math.max(5, members.length);
+  const hiddenCount = all.length - visibleCount;
+  const shown = showAll || hiddenCount <= 0 ? all : all.slice(0, visibleCount);
+
   return (
     <>
       <div className="space-y-2">
@@ -43,38 +68,61 @@ export function CollectionsPanel({
           <FolderOpen className="h-3.5 w-3.5" />
           Collections
         </Label>
-        <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="photo-collections">
-          {photoCollections?.map((col) => (
-            <Badge key={col.id} variant="outline" className="gap-1 pr-1">
-              <Link href={`/collections/${col.id}`} className="hover:underline">
-                {col.title}
-              </Link>
-              <button
-                onClick={() => onRemoveFromCollection(col.id)}
-                className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 p-0.5"
-                data-testid={`remove-collection-${col.id}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          {(!photoCollections || photoCollections.length === 0) && (
-            <span className="text-xs text-muted-foreground">Not in any collection</span>
-          )}
-        </div>
-        {availableCollections && availableCollections.length > 0 && (
-          <Select onValueChange={onAddCollection} data-testid="add-collection-select">
-            <SelectTrigger className="h-8 text-sm w-full">
-              <SelectValue placeholder="Add to collection..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableCollections.map((col) => (
-                <SelectItem key={col.id} value={String(col.id)} data-testid={`collection-option-${col.id}`}>
+        {all.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5" data-testid="photo-collections">
+            {shown.map((col) => {
+              const isSuggested = !col.isIn && suggested.has(col.id);
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  onClick={() =>
+                    col.isIn ? onRemoveFromCollection(col.id) : onAddCollection(String(col.id))
+                  }
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                    col.isIn
+                      ? "bg-primary text-primary-foreground border-primary hover:bg-primary/85"
+                      : isSuggested
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/50 hover:bg-amber-500/25"
+                      : "bg-transparent text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                  )}
+                  data-testid={`photo-collection-pill-${col.id}`}
+                  aria-label={
+                    col.isIn
+                      ? `Remove from ${col.title}`
+                      : isSuggested
+                      ? `AI suggested: Add to ${col.title}`
+                      : `Add to ${col.title}`
+                  }
+                  aria-pressed={col.isIn}
+                  title={isSuggested ? "AI suggested based on photo description" : undefined}
+                >
+                  {col.isIn ? (
+                    <Check className="h-3 w-3 shrink-0" />
+                  ) : isSuggested ? (
+                    <Sparkles className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <Plus className="h-3 w-3 shrink-0" />
+                  )}
                   {col.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                </button>
+              );
+            })}
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                data-testid="photo-collections-toggle"
+                aria-expanded={showAll}
+              >
+                {showAll ? "Show less" : `+${hiddenCount} more`}
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No collections yet.</p>
         )}
         <form
           onSubmit={onCreateNewCollection}
