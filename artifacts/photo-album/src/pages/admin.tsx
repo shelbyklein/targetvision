@@ -12,6 +12,7 @@ import {
   CalendarDays,
   Copy,
   CopyCheck,
+  Copyright,
   Users,
   ChevronRight,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const SECTIONS: { href: string; title: string; description: string; icon: Lucide
   { href: "/admin/captured-dates", title: "Captured Dates", description: "Fill missing capture dates from EXIF data.", icon: CalendarDays },
   { href: "/admin/duplicates", title: "Duplicates", description: "Byte-identical copies — review or bulk-delete extras.", icon: Copy },
   { href: "/admin/near-duplicates", title: "Near-Duplicates", description: "Visually similar photos — select and delete.", icon: CopyCheck },
+  { href: "/admin/attribution-tags", title: "Attribution Tags", description: "Usage-rights tags photos can be cleared for.", icon: Copyright },
   { href: "/admin/team", title: "Team Members", description: "Manage member roles.", icon: Users },
 ];
 

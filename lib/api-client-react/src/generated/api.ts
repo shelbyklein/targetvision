@@ -23,9 +23,15 @@ import type {
   AiSettings,
   AiSettingsUpdate,
   Album,
+  AlbumAttributionSummary,
+  AlbumAttributionUpdate,
   AlbumCoverUpdate,
   AlbumInput,
   AlbumUpdate,
+  AttributionTag,
+  AttributionTagInput,
+  BulkAttributionTags,
+  BulkAttributionTagsResult,
   BulkPhotoDelete,
   BulkPhotoDeleteResult,
   BulkPhotoUpdate,
@@ -53,6 +59,7 @@ import type {
   ListSimilarPhotosParams,
   NavOrderUpdate,
   Photo,
+  PhotoAttributionTagInput,
   PhotoCategoryInput,
   PhotoTagInput,
   PhotoUpdate,
@@ -1819,6 +1826,779 @@ export const useBulkDeletePhotos = <
   TContext
 > => {
   return useMutation(getBulkDeletePhotosMutationOptions(options));
+};
+
+/**
+ * @summary List attribution / usage-rights tags
+ */
+export const getListAttributionTagsUrl = () => {
+  return `/api/attribution-tags`;
+};
+
+export const listAttributionTags = async (
+  options?: RequestInit,
+): Promise<AttributionTag[]> => {
+  return customFetch<AttributionTag[]>(getListAttributionTagsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAttributionTagsQueryKey = () => {
+  return [`/api/attribution-tags`] as const;
+};
+
+export const getListAttributionTagsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAttributionTags>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAttributionTags>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAttributionTagsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAttributionTags>>
+  > = ({ signal }) => listAttributionTags({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAttributionTags>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAttributionTagsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAttributionTags>>
+>;
+export type ListAttributionTagsQueryError = ErrorType<void>;
+
+/**
+ * @summary List attribution / usage-rights tags
+ */
+
+export function useListAttributionTags<
+  TData = Awaited<ReturnType<typeof listAttributionTags>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAttributionTags>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAttributionTagsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create an attribution tag (admin only)
+ */
+export const getCreateAttributionTagUrl = () => {
+  return `/api/attribution-tags`;
+};
+
+export const createAttributionTag = async (
+  attributionTagInput: AttributionTagInput,
+  options?: RequestInit,
+): Promise<AttributionTag> => {
+  return customFetch<AttributionTag>(getCreateAttributionTagUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(attributionTagInput),
+  });
+};
+
+export const getCreateAttributionTagMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAttributionTag>>,
+    TError,
+    { data: BodyType<AttributionTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAttributionTag>>,
+  TError,
+  { data: BodyType<AttributionTagInput> },
+  TContext
+> => {
+  const mutationKey = ["createAttributionTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAttributionTag>>,
+    { data: BodyType<AttributionTagInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAttributionTag(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateAttributionTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAttributionTag>>
+>;
+export type CreateAttributionTagMutationBody = BodyType<AttributionTagInput>;
+export type CreateAttributionTagMutationError = ErrorType<void>;
+
+/**
+ * @summary Create an attribution tag (admin only)
+ */
+export const useCreateAttributionTag = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAttributionTag>>,
+    TError,
+    { data: BodyType<AttributionTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createAttributionTag>>,
+  TError,
+  { data: BodyType<AttributionTagInput> },
+  TContext
+> => {
+  return useMutation(getCreateAttributionTagMutationOptions(options));
+};
+
+/**
+ * @summary Rename an attribution tag (admin only)
+ */
+export const getUpdateAttributionTagUrl = (id: number) => {
+  return `/api/attribution-tags/${id}`;
+};
+
+export const updateAttributionTag = async (
+  id: number,
+  attributionTagInput: AttributionTagInput,
+  options?: RequestInit,
+): Promise<AttributionTag> => {
+  return customFetch<AttributionTag>(getUpdateAttributionTagUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(attributionTagInput),
+  });
+};
+
+export const getUpdateAttributionTagMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAttributionTag>>,
+    TError,
+    { id: number; data: BodyType<AttributionTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAttributionTag>>,
+  TError,
+  { id: number; data: BodyType<AttributionTagInput> },
+  TContext
+> => {
+  const mutationKey = ["updateAttributionTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAttributionTag>>,
+    { id: number; data: BodyType<AttributionTagInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateAttributionTag(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAttributionTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAttributionTag>>
+>;
+export type UpdateAttributionTagMutationBody = BodyType<AttributionTagInput>;
+export type UpdateAttributionTagMutationError = ErrorType<void>;
+
+/**
+ * @summary Rename an attribution tag (admin only)
+ */
+export const useUpdateAttributionTag = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAttributionTag>>,
+    TError,
+    { id: number; data: BodyType<AttributionTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAttributionTag>>,
+  TError,
+  { id: number; data: BodyType<AttributionTagInput> },
+  TContext
+> => {
+  return useMutation(getUpdateAttributionTagMutationOptions(options));
+};
+
+/**
+ * @summary Delete an attribution tag (admin only)
+ */
+export const getDeleteAttributionTagUrl = (id: number) => {
+  return `/api/attribution-tags/${id}`;
+};
+
+export const deleteAttributionTag = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteAttributionTagUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteAttributionTagMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAttributionTag>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAttributionTag>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteAttributionTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAttributionTag>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteAttributionTag(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAttributionTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAttributionTag>>
+>;
+
+export type DeleteAttributionTagMutationError = ErrorType<void>;
+
+/**
+ * @summary Delete an attribution tag (admin only)
+ */
+export const useDeleteAttributionTag = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAttributionTag>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAttributionTag>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteAttributionTagMutationOptions(options));
+};
+
+/**
+ * @summary Per-tag counts of how many of an album's photos carry each attribution tag
+ */
+export const getGetAlbumAttributionSummaryUrl = (id: number) => {
+  return `/api/albums/${id}/attribution-tags`;
+};
+
+export const getAlbumAttributionSummary = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AlbumAttributionSummary> => {
+  return customFetch<AlbumAttributionSummary>(
+    getGetAlbumAttributionSummaryUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAlbumAttributionSummaryQueryKey = (id: number) => {
+  return [`/api/albums/${id}/attribution-tags`] as const;
+};
+
+export const getGetAlbumAttributionSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAlbumAttributionSummaryQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAlbumAttributionSummary>>
+  > = ({ signal }) =>
+    getAlbumAttributionSummary(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAlbumAttributionSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAlbumAttributionSummary>>
+>;
+export type GetAlbumAttributionSummaryQueryError = ErrorType<void>;
+
+/**
+ * @summary Per-tag counts of how many of an album's photos carry each attribution tag
+ */
+
+export function useGetAlbumAttributionSummary<
+  TData = Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAlbumAttributionSummaryQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add or remove one attribution tag on every photo in an album (admin only)
+ */
+export const getSetAlbumAttributionUrl = (id: number) => {
+  return `/api/albums/${id}/attribution-tags`;
+};
+
+export const setAlbumAttribution = async (
+  id: number,
+  albumAttributionUpdate: AlbumAttributionUpdate,
+  options?: RequestInit,
+): Promise<BulkAttributionTagsResult> => {
+  return customFetch<BulkAttributionTagsResult>(getSetAlbumAttributionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(albumAttributionUpdate),
+  });
+};
+
+export const getSetAlbumAttributionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAlbumAttribution>>,
+    TError,
+    { id: number; data: BodyType<AlbumAttributionUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAlbumAttribution>>,
+  TError,
+  { id: number; data: BodyType<AlbumAttributionUpdate> },
+  TContext
+> => {
+  const mutationKey = ["setAlbumAttribution"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAlbumAttribution>>,
+    { id: number; data: BodyType<AlbumAttributionUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setAlbumAttribution(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetAlbumAttributionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setAlbumAttribution>>
+>;
+export type SetAlbumAttributionMutationBody = BodyType<AlbumAttributionUpdate>;
+export type SetAlbumAttributionMutationError = ErrorType<void>;
+
+/**
+ * @summary Add or remove one attribution tag on every photo in an album (admin only)
+ */
+export const useSetAlbumAttribution = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAlbumAttribution>>,
+    TError,
+    { id: number; data: BodyType<AlbumAttributionUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setAlbumAttribution>>,
+  TError,
+  { id: number; data: BodyType<AlbumAttributionUpdate> },
+  TContext
+> => {
+  return useMutation(getSetAlbumAttributionMutationOptions(options));
+};
+
+/**
+ * @summary Add or remove one attribution tag on many photos (admin only)
+ */
+export const getBulkSetAttributionTagsUrl = () => {
+  return `/api/photos/attribution-tags/bulk`;
+};
+
+export const bulkSetAttributionTags = async (
+  bulkAttributionTags: BulkAttributionTags,
+  options?: RequestInit,
+): Promise<BulkAttributionTagsResult> => {
+  return customFetch<BulkAttributionTagsResult>(
+    getBulkSetAttributionTagsUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(bulkAttributionTags),
+    },
+  );
+};
+
+export const getBulkSetAttributionTagsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkSetAttributionTags>>,
+    TError,
+    { data: BodyType<BulkAttributionTags> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkSetAttributionTags>>,
+  TError,
+  { data: BodyType<BulkAttributionTags> },
+  TContext
+> => {
+  const mutationKey = ["bulkSetAttributionTags"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkSetAttributionTags>>,
+    { data: BodyType<BulkAttributionTags> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkSetAttributionTags(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkSetAttributionTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkSetAttributionTags>>
+>;
+export type BulkSetAttributionTagsMutationBody = BodyType<BulkAttributionTags>;
+export type BulkSetAttributionTagsMutationError = ErrorType<void>;
+
+/**
+ * @summary Add or remove one attribution tag on many photos (admin only)
+ */
+export const useBulkSetAttributionTags = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkSetAttributionTags>>,
+    TError,
+    { data: BodyType<BulkAttributionTags> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkSetAttributionTags>>,
+  TError,
+  { data: BodyType<BulkAttributionTags> },
+  TContext
+> => {
+  return useMutation(getBulkSetAttributionTagsMutationOptions(options));
+};
+
+/**
+ * @summary Tag a photo with an attribution tag
+ */
+export const getAddPhotoAttributionTagUrl = (id: number) => {
+  return `/api/photos/${id}/attribution-tags`;
+};
+
+export const addPhotoAttributionTag = async (
+  id: number,
+  photoAttributionTagInput: PhotoAttributionTagInput,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getAddPhotoAttributionTagUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(photoAttributionTagInput),
+  });
+};
+
+export const getAddPhotoAttributionTagMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPhotoAttributionTag>>,
+    TError,
+    { id: number; data: BodyType<PhotoAttributionTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addPhotoAttributionTag>>,
+  TError,
+  { id: number; data: BodyType<PhotoAttributionTagInput> },
+  TContext
+> => {
+  const mutationKey = ["addPhotoAttributionTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addPhotoAttributionTag>>,
+    { id: number; data: BodyType<PhotoAttributionTagInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addPhotoAttributionTag(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddPhotoAttributionTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addPhotoAttributionTag>>
+>;
+export type AddPhotoAttributionTagMutationBody =
+  BodyType<PhotoAttributionTagInput>;
+export type AddPhotoAttributionTagMutationError = ErrorType<void>;
+
+/**
+ * @summary Tag a photo with an attribution tag
+ */
+export const useAddPhotoAttributionTag = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPhotoAttributionTag>>,
+    TError,
+    { id: number; data: BodyType<PhotoAttributionTagInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addPhotoAttributionTag>>,
+  TError,
+  { id: number; data: BodyType<PhotoAttributionTagInput> },
+  TContext
+> => {
+  return useMutation(getAddPhotoAttributionTagMutationOptions(options));
+};
+
+/**
+ * @summary Remove an attribution tag from a photo
+ */
+export const getRemovePhotoAttributionTagUrl = (id: number, tagId: number) => {
+  return `/api/photos/${id}/attribution-tags/${tagId}`;
+};
+
+export const removePhotoAttributionTag = async (
+  id: number,
+  tagId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getRemovePhotoAttributionTagUrl(id, tagId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getRemovePhotoAttributionTagMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removePhotoAttributionTag>>,
+    TError,
+    { id: number; tagId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removePhotoAttributionTag>>,
+  TError,
+  { id: number; tagId: number },
+  TContext
+> => {
+  const mutationKey = ["removePhotoAttributionTag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removePhotoAttributionTag>>,
+    { id: number; tagId: number }
+  > = (props) => {
+    const { id, tagId } = props ?? {};
+
+    return removePhotoAttributionTag(id, tagId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemovePhotoAttributionTagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removePhotoAttributionTag>>
+>;
+
+export type RemovePhotoAttributionTagMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove an attribution tag from a photo
+ */
+export const useRemovePhotoAttributionTag = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removePhotoAttributionTag>>,
+    TError,
+    { id: number; tagId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removePhotoAttributionTag>>,
+  TError,
+  { id: number; tagId: number },
+  TContext
+> => {
+  return useMutation(getRemovePhotoAttributionTagMutationOptions(options));
 };
 
 /**

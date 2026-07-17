@@ -1,4 +1,4 @@
-import { FolderOpen, FolderKanban, Loader2, EyeOff, Eye, Check, Plus, ImageIcon, Sparkles, Trash2 } from "lucide-react";
+import { FolderOpen, FolderKanban, Copyright, Loader2, EyeOff, Eye, Check, Plus, ImageIcon, Sparkles, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   useGetPhoto,
@@ -250,6 +250,7 @@ export function PhotoSidebarContent({
 
   const currentCollections = fullPhoto?.photoCollections ?? [];
   const currentProjects = fullPhoto?.photoProjects ?? [];
+  const currentAttributionTags = fullPhoto?.attributionTags ?? [];
   const isHidden = fullPhoto?.isHidden ?? false;
   const canDelete = me && fullPhoto && (me.id === fullPhoto.uploaderId || me.role === "admin");
 
@@ -554,6 +555,28 @@ export function PhotoSidebarContent({
           <p className="text-xs text-white/40">No projects yet.</p>
         )}
       </div>
+
+      {/* Read-only: attribution is set per album, photos just display it. */}
+      {currentAttributionTags.length > 0 && (
+        <div className="space-y-2 border-t border-white/10 pt-3">
+          <div className="flex items-center gap-1.5 text-white/70">
+            <Copyright className="h-3.5 w-3.5" />
+            <span className="text-xs font-semibold uppercase tracking-wide">Attribution</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5" data-testid="lightbox-attribution-pills">
+            {currentAttributionTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white/15 text-white border border-white/25"
+                data-testid={`lightbox-attribution-pill-${tag.id}`}
+              >
+                <Check className="h-3 w-3 shrink-0" />
+                {tag.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

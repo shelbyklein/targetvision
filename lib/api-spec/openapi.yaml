@@ -330,6 +330,18 @@ paths:
           schema:
             type: string
             enum: [has_description, failed, not_analysed]
+        - name: attributionTagId
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only photos carrying this attribution tag.
+        - name: hasAttribution
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.
       responses:
         "200":
           description: Page of photos in album
@@ -567,6 +579,18 @@ paths:
           schema:
             type: string
             enum: ["has_description", "failed", "not_analysed"]
+        - name: attributionTagId
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Only photos carrying this attribution tag.
+        - name: hasAttribution
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.
         - name: limit
           in: query
           required: false
@@ -628,6 +652,196 @@ paths:
           description: Unauthorized
         "403":
           description: Forbidden
+
+  /attribution-tags:
+    get:
+      operationId: listAttributionTags
+      tags: [attribution]
+      summary: List attribution / usage-rights tags
+      responses:
+        "200":
+          description: All attribution tags, ordered by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttributionTag"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createAttributionTag
+      tags: [attribution]
+      summary: Create an attribution tag (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttributionTagInput"
+      responses:
+        "201":
+          description: Created tag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributionTag"
+        "400":
+          description: Invalid name
+        "409":
+          description: Name already exists
+
+  /attribution-tags/{id}:
+    patch:
+      operationId: updateAttributionTag
+      tags: [attribution]
+      summary: Rename an attribution tag (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttributionTagInput"
+      responses:
+        "200":
+          description: Updated tag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributionTag"
+        "404":
+          description: Tag not found
+    delete:
+      operationId: deleteAttributionTag
+      tags: [attribution]
+      summary: Delete an attribution tag (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Tag not found
+
+  /albums/{id}/attribution-tags:
+    get:
+      operationId: getAlbumAttributionSummary
+      tags: [attribution]
+      summary: Per-tag counts of how many of an album's photos carry each attribution tag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Album attribution coverage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlbumAttributionSummary"
+        "404":
+          description: Album not found
+    post:
+      operationId: setAlbumAttribution
+      tags: [attribution]
+      summary: Add or remove one attribution tag on every photo in an album (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlbumAttributionUpdate"
+      responses:
+        "200":
+          description: Number of photo-tag links changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkAttributionTagsResult"
+        "404":
+          description: Album or tag not found
+
+  /photos/attribution-tags/bulk:
+    post:
+      operationId: bulkSetAttributionTags
+      tags: [attribution]
+      summary: Add or remove one attribution tag on many photos (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkAttributionTags"
+      responses:
+        "200":
+          description: Number of photo-tag links changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkAttributionTagsResult"
+        "404":
+          description: Tag not found
+
+  /photos/{id}/attribution-tags:
+    post:
+      operationId: addPhotoAttributionTag
+      tags: [attribution]
+      summary: Tag a photo with an attribution tag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoAttributionTagInput"
+      responses:
+        "204":
+          description: Tagged
+        "404":
+          description: Photo or tag not found
+
+  /photos/{id}/attribution-tags/{tagId}:
+    delete:
+      operationId: removePhotoAttributionTag
+      tags: [attribution]
+      summary: Remove an attribution tag from a photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: tagId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
 
   /photos/{id}:
     get:
@@ -2214,6 +2428,11 @@ components:
           description: Projects this photo currently belongs to (membership only).
           items:
             $ref: "#/components/schemas/PhotoProjectMembership"
+        attributionTags:
+          type: array
+          description: Attribution / usage-rights tags this photo is cleared for.
+          items:
+            $ref: "#/components/schemas/AttributionTag"
         aiDescription:
           type: ["string", "null"]
         latestAiStatus:
@@ -2456,6 +2675,81 @@ components:
           type: integer
         name:
           type: string
+
+    AttributionTag:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    AttributionTagInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    PhotoAttributionTagInput:
+      type: object
+      required: [tagId]
+      properties:
+        tagId:
+          type: integer
+
+    BulkAttributionTags:
+      type: object
+      required: [ids, tagId, mode]
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+        tagId:
+          type: integer
+        mode:
+          type: string
+          enum: [add, remove]
+
+    BulkAttributionTagsResult:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+
+    AlbumAttributionSummary:
+      type: object
+      required: [photoCount, tags]
+      properties:
+        photoCount:
+          type: integer
+          description: Total photos in the album.
+        tags:
+          type: array
+          items:
+            type: object
+            required: [id, name, count]
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              count:
+                type: integer
+                description: How many of the album's photos carry this tag.
+
+    AlbumAttributionUpdate:
+      type: object
+      required: [tagId, mode]
+      properties:
+        tagId:
+          type: integer
+        mode:
+          type: string
+          enum: [add, remove]
 
     PhotoUpdate:
       type: object

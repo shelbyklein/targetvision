@@ -168,6 +168,7 @@ function AppRoutes() {
           ["/admin/image-optimization", () => import("@/pages/admin-image-optimization")],
           ["/admin/thumbnails", () => import("@/pages/admin-thumbnails")],
           ["/admin/captured-dates", () => import("@/pages/admin-captured-dates")],
+          ["/admin/attribution-tags", () => import("@/pages/admin-attribution-tags")],
           ["/admin/team", () => import("@/pages/admin-team")],
         ] as const).map(([path, load]) => (
           <Route key={path} path={path}>

@@ -19,6 +19,14 @@ export type ListPhotosParams = {
   includeHidden?: boolean;
   albumId?: number;
   aiStatus?: ListPhotosAiStatus;
+  /**
+   * Only photos carrying this attribution tag.
+   */
+  attributionTagId?: number;
+  /**
+   * true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.
+   */
+  hasAttribution?: boolean;
   limit?: number;
   offset?: number;
 };

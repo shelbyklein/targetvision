@@ -5,6 +5,7 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
+import type { AttributionTag } from "./attributionTag";
 import type { CollectionSummary } from "./collectionSummary";
 import type { PhotoLatestAiStatus } from "./photoLatestAiStatus";
 import type { PhotoProjectMembership } from "./photoProjectMembership";
@@ -44,6 +45,8 @@ export interface Photo {
   photoCollections?: CollectionSummary[];
   /** Projects this photo currently belongs to (membership only). */
   photoProjects?: PhotoProjectMembership[];
+  /** Attribution / usage-rights tags this photo is cleared for. */
+  attributionTags?: AttributionTag[];
   /** @nullable */
   aiDescription?: string | null;
   /**

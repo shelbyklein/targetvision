@@ -1,4 +1,4 @@
-import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable, aiAnalysisEventsTable, projectsTable, projectPhotosTable } from "@workspace/db";
+import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, usersTable, aiAnalysisEventsTable, projectsTable, projectPhotosTable, attributionTagsTable, photoAttributionTagsTable } from "@workspace/db";
 import { eq, and, avg, count, desc, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
@@ -12,6 +12,9 @@ export interface AlbumPhotoPageOptions {
   inCollection?: boolean;
   hasRating?: boolean;
   aiStatus?: AiStatusFilter;
+  // Filter by a specific attribution tag, or by having any/none at all.
+  attributionTagId?: number;
+  hasAttribution?: boolean;
   limit: number;
   offset: number;
 }
@@ -49,6 +52,16 @@ export async function fetchAlbumPhotoPage(
     conditions.push(
       sql`(SELECT e.status FROM ai_analysis_events e WHERE e.photo_id = ${photosTable.id} ORDER BY e.created_at DESC LIMIT 1) = 'failed'`,
     );
+  }
+
+  if (opts.attributionTagId !== undefined) {
+    conditions.push(
+      sql`EXISTS (SELECT 1 FROM photo_attribution_tags pat WHERE pat.photo_id = ${photosTable.id} AND pat.tag_id = ${opts.attributionTagId})`,
+    );
+  } else if (opts.hasAttribution === true) {
+    conditions.push(sql`EXISTS (SELECT 1 FROM photo_attribution_tags pat WHERE pat.photo_id = ${photosTable.id})`);
+  } else if (opts.hasAttribution === false) {
+    conditions.push(sql`NOT EXISTS (SELECT 1 FROM photo_attribution_tags pat WHERE pat.photo_id = ${photosTable.id})`);
   }
 
   const rows = await db
@@ -104,7 +117,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
 
   if (!photo) return null;
 
-  const [photoCollections, photoProjects, ratingDataArr, ratingsList, suggestedCollections, suggestedNewCollections, latestAiEvents] = await Promise.all([
+  const [photoCollections, photoProjects, photoAttributionTags, ratingDataArr, ratingsList, suggestedCollections, suggestedNewCollections, latestAiEvents] = await Promise.all([
     db
       .select({
         id: collectionsTable.id,
@@ -121,6 +134,11 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
       .from(projectsTable)
       .innerJoin(projectPhotosTable, eq(projectsTable.id, projectPhotosTable.projectId))
       .where(eq(projectPhotosTable.photoId, photoId)),
+    db
+      .select({ id: attributionTagsTable.id, name: attributionTagsTable.name })
+      .from(attributionTagsTable)
+      .innerJoin(photoAttributionTagsTable, eq(attributionTagsTable.id, photoAttributionTagsTable.tagId))
+      .where(eq(photoAttributionTagsTable.photoId, photoId)),
     db
       .select({
         averageRating: avg(ratingsTable.score),
@@ -197,6 +215,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
       coverPhotoUrl: null,
     })),
     photoProjects: photoProjects.map((pr) => ({ id: pr.id, name: pr.name })),
+    attributionTags: photoAttributionTags.map((t) => ({ id: t.id, name: t.name })),
     averageRating: ratingData?.averageRating ? parseFloat(String(ratingData.averageRating)) : null,
     ratingCount: Number(ratingData?.ratingCount ?? 0),
     myRating,
@@ -227,6 +246,7 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
     photoRows,
     collectionRows,
     projectRows,
+    attributionRows,
     ratingAggRows,
     ratingRows,
     suggestedCollectionRows,
@@ -260,6 +280,15 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
       .from(projectsTable)
       .innerJoin(projectPhotosTable, eq(projectsTable.id, projectPhotosTable.projectId))
       .where(inArray(projectPhotosTable.photoId, photoIds)),
+    db
+      .select({
+        photoId: photoAttributionTagsTable.photoId,
+        id: attributionTagsTable.id,
+        name: attributionTagsTable.name,
+      })
+      .from(attributionTagsTable)
+      .innerJoin(photoAttributionTagsTable, eq(attributionTagsTable.id, photoAttributionTagsTable.tagId))
+      .where(inArray(photoAttributionTagsTable.photoId, photoIds)),
     db
       .select({
         photoId: ratingsTable.photoId,
@@ -335,6 +364,10 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
   for (const row of projectRows) {
     (projectsByPhoto.get(row.photoId) ?? projectsByPhoto.set(row.photoId, []).get(row.photoId)!).push(row);
   }
+  const attributionByPhoto = new Map<number, typeof attributionRows>();
+  for (const row of attributionRows) {
+    (attributionByPhoto.get(row.photoId) ?? attributionByPhoto.set(row.photoId, []).get(row.photoId)!).push(row);
+  }
   const ratingAggByPhoto = new Map(ratingAggRows.map((r) => [r.photoId, r]));
   const ratingsByPhoto = new Map<number, typeof ratingRows>();
   for (const row of ratingRows) {
@@ -372,6 +405,7 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
           coverPhotoUrl: null,
         })),
         photoProjects: (projectsByPhoto.get(id) ?? []).map((pr) => ({ id: pr.id, name: pr.name })),
+        attributionTags: (attributionByPhoto.get(id) ?? []).map((t) => ({ id: t.id, name: t.name })),
         averageRating: ratingData?.averageRating ? parseFloat(String(ratingData.averageRating)) : null,
         ratingCount: Number(ratingData?.ratingCount ?? 0),
         myRating: myRatingByPhoto.get(id) ?? null,

@@ -13,6 +13,10 @@ import {
   useDismissPhotoNewCollectionSuggestion,
   useRerunPhotoAnalysis,
   useBulkDeletePhotos,
+  useListAttributionTags,
+  useGetAlbumAttributionSummary,
+  getGetAlbumAttributionSummaryQueryKey,
+  useSetAlbumAttribution,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -78,6 +82,8 @@ import {
   Sparkles,
   Loader2,
   Check,
+  Plus,
+  Copyright,
   EyeOff,
   Eye,
   Bot,
@@ -131,6 +137,8 @@ export default function AlbumDetail() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const { mutate: bulkDelete, isPending: bulkDeleting } = useBulkDeletePhotos();
+  const { data: attributionTags } = useListAttributionTags();
+  const [filterAttribution, setFilterAttribution] = useState<string>("all");
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
@@ -144,12 +152,13 @@ export default function AlbumDetail() {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
 
-  const hasActiveFilters = filterInCollection != null || filterHasRating != null || filterAiStatus != null;
+  const hasActiveFilters = filterInCollection != null || filterHasRating != null || filterAiStatus != null || filterAttribution !== "all";
 
   function clearFilters() {
     setFilterInCollection(undefined);
     setFilterHasRating(undefined);
     setFilterAiStatus(undefined);
+    setFilterAttribution("all");
   }
 
   const photosParams = {
@@ -159,6 +168,11 @@ export default function AlbumDetail() {
     ...(filterInCollection != null ? { inCollection: filterInCollection } : {}),
     ...(filterHasRating != null ? { hasRating: filterHasRating } : {}),
     ...(filterAiStatus != null ? { aiStatus: filterAiStatus } : {}),
+    // "all" = no filter; "none" = untagged; otherwise a specific tag id.
+    ...(filterAttribution !== "all" && filterAttribution !== "none"
+      ? { attributionTagId: parseInt(filterAttribution, 10) }
+      : {}),
+    ...(filterAttribution === "none" ? { hasAttribution: false } : {}),
   };
   const { data: photosPage, isLoading: photosPageLoading, isFetching: photosFetching } = useListAlbumPhotos(albumId, photosParams, {
     query: {
@@ -194,7 +208,7 @@ export default function AlbumDetail() {
   useEffect(() => {
     setOffset(0);
     setAllPhotos([]);
-  }, [albumId, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus]);
+  }, [albumId, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus, filterAttribution]);
 
   useEffect(() => {
     if (photosPage === undefined) return;
@@ -327,6 +341,36 @@ export default function AlbumDetail() {
   function exitSelectMode() {
     setIsSelectMode(false);
     setSelectedIds(new Set());
+  }
+
+  // Attribution is decided per album: apply or remove one tag on EVERY photo
+  // in the album. Individual photos only display their tags.
+  const { data: attributionSummary } = useGetAlbumAttributionSummary(albumId, {
+    query: { enabled: !!albumId, queryKey: getGetAlbumAttributionSummaryQueryKey(albumId) },
+  });
+  const { mutate: setAlbumAttribution, isPending: settingAttribution } = useSetAlbumAttribution();
+
+  function handleAlbumAttribution(tagId: number, tagName: string, mode: "add" | "remove") {
+    setAlbumAttribution(
+      { id: albumId, data: { tagId, mode } },
+      {
+        onSuccess: (r) => {
+          toast({
+            title:
+              mode === "add"
+                ? `Album cleared for "${tagName}" (${r.updated} photo${r.updated !== 1 ? "s" : ""} tagged)`
+                : `"${tagName}" removed from the album`,
+          });
+          qc.invalidateQueries({ queryKey: getGetAlbumAttributionSummaryQueryKey(albumId) });
+          // Individual photo queries carry attributionTags — refresh any that are cached.
+          qc.invalidateQueries({
+            predicate: (q) => typeof q.queryKey[0] === "string" && /^\/api\/photos\/\d+$/.test(q.queryKey[0]),
+          });
+          qc.invalidateQueries({ queryKey: [`/api/albums/${albumId}/photos`] });
+        },
+        onError: () => toast({ title: "Failed to update album attribution", variant: "destructive" }),
+      },
+    );
   }
 
   function handleBulkDelete() {
@@ -582,6 +626,55 @@ export default function AlbumDetail() {
           </TooltipProvider>
         </div>
 
+        {/* Album-level attribution: clearing an album for a use tags every
+            photo in it. Pills are tri-state — none / partial (amber, n/total) /
+            all — and only admins can toggle them. */}
+        {attributionSummary && attributionSummary.tags.length > 0 && album && album.photoCount > 0 && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="album-attribution-row">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Copyright className="h-3.5 w-3.5" /> Attribution
+            </span>
+            {attributionSummary.tags.map((tag) => {
+              const total = attributionSummary.photoCount;
+              const all = total > 0 && tag.count === total;
+              const partial = tag.count > 0 && !all;
+              const clickable = me?.role === "admin";
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  disabled={!clickable || settingAttribution}
+                  onClick={() => clickable && handleAlbumAttribution(tag.id, tag.name, all ? "remove" : "add")}
+                  title={
+                    clickable
+                      ? all
+                        ? `Remove "${tag.name}" from every photo in this album`
+                        : `Clear every photo in this album for "${tag.name}"`
+                      : undefined
+                  }
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors disabled:opacity-70 ${
+                    all
+                      ? "bg-primary text-primary-foreground border-primary hover:bg-primary/85"
+                      : partial
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/50 hover:bg-amber-500/25"
+                      : "bg-transparent text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                  } ${!clickable ? "cursor-default" : ""}`}
+                  data-testid={`album-attribution-pill-${tag.id}`}
+                  aria-pressed={all}
+                >
+                  {all ? <Check className="h-3 w-3 shrink-0" /> : clickable ? <Plus className="h-3 w-3 shrink-0" /> : null}
+                  {tag.name}
+                  {partial && (
+                    <span className="text-[10px] opacity-80">
+                      {tag.count}/{total}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {!photosLoading && album && (album.photoCount > 0 || hasActiveFilters) && (
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
@@ -646,6 +739,21 @@ export default function AlbumDetail() {
                 <SelectItem value="failed">Analysis failed</SelectItem>
               </SelectContent>
             </Select>
+
+            {attributionTags && attributionTags.length > 0 && (
+              <Select value={filterAttribution} onValueChange={setFilterAttribution}>
+                <SelectTrigger className="h-8 w-44 text-sm" data-testid="filter-attribution-select">
+                  <SelectValue placeholder="Attribution" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any attribution</SelectItem>
+                  <SelectItem value="none">No attribution</SelectItem>
+                  {attributionTags.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             {hasActiveFilters && (
               <button
@@ -945,7 +1053,7 @@ export default function AlbumDetail() {
           <span className="text-sm text-muted-foreground">
             {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""} selected
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {me?.role === "admin" && selectedIds.size > 0 && (
               <Button
                 variant="destructive"
