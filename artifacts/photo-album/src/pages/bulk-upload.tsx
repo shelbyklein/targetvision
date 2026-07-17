@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,10 +76,19 @@ function genId() {
 
 export default function BulkUpload() {
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: albums } = useListAlbums();
   const ctx = useBulkUpload();
+
+  // When launched from an album page (/bulk-upload?albumId=N), assume that
+  // album is the destination and preselect it.
+  const presetAlbumId = (() => {
+    const raw = new URLSearchParams(searchString.startsWith("?") ? searchString.slice(1) : searchString).get("albumId");
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isInteger(n) && n > 0 ? n : undefined;
+  })();
 
   const [localPhase, setLocalPhase] = useState<LocalPhase>("staging");
   const [folders, setFolders] = useState<FolderEntry[]>([]);
@@ -91,9 +100,9 @@ export default function BulkUpload() {
   const [activeTab, setActiveTab] = useState<"upload" | "history">("upload");
 
   // Single destination for all folders
-  const [destType, setDestType] = useState<"new" | "existing">("new");
+  const [destType, setDestType] = useState<"new" | "existing">(presetAlbumId ? "existing" : "new");
   const [newAlbumName, setNewAlbumName] = useState("");
-  const [existingAlbumId, setExistingAlbumId] = useState<number | undefined>();
+  const [existingAlbumId, setExistingAlbumId] = useState<number | undefined>(presetAlbumId);
 
   const { data: batchHistory, isLoading: batchHistoryLoading } = useListBulkUploadBatches();
 

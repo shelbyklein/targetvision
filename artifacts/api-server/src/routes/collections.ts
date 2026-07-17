@@ -89,6 +89,26 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
     .groupBy(collectionsTable.id)
     .orderBy(sql`${collectionsTable.createdAt} desc`);
 
+  // Up to 5 random member photos per collection, resolved to display URLs.
+  // Feeds the smart-collection cards' crossfading thumbnails; random per
+  // request so the sample rotates between visits.
+  const sampleResult = await db.execute<{ collection_id: number; url: string; thumbnail_key: string | null }>(sql`
+    SELECT collection_id, url, thumbnail_key FROM (
+      SELECT pc.collection_id, p.url, p.thumbnail_key,
+             row_number() OVER (PARTITION BY pc.collection_id ORDER BY random()) AS rn
+      FROM photo_collections pc
+      JOIN photos p ON p.id = pc.photo_id
+      WHERE p.is_hidden = false
+    ) s WHERE rn <= 5
+  `);
+  const samplesByCollection = new Map<number, string[]>();
+  for (const r of sampleResult.rows) {
+    const url = r.thumbnail_key ? `/api/storage${r.thumbnail_key}` : r.url;
+    const list = samplesByCollection.get(r.collection_id) ?? [];
+    list.push(url);
+    samplesByCollection.set(r.collection_id, list);
+  }
+
   const collections = await Promise.all(
     rows.map(async (row) => {
       const [coverPhotoRow, tags] = await Promise.all([
@@ -114,6 +134,7 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
         photoCount: Number(row.photoCount),
         coverPhotoUrl: coverPhotoRow[0]?.url ?? null,
         coverPhotoThumbnailKey: coverPhotoRow[0]?.thumbnailKey ?? null,
+        sampleThumbnailUrls: samplesByCollection.get(row.collection.id) ?? [],
         tags,
       };
     })

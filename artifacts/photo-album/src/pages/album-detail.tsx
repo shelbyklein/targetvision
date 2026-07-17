@@ -586,6 +586,17 @@ export default function AlbumDetail() {
                 <TooltipContent>Review unrated ({album.unratedCount ?? unratedPhotos.length})</TooltipContent>
               </Tooltip>
             )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="outline" size="sm" className="gap-1.5" data-testid="album-bulk-upload-btn">
+                  <Link href={`/bulk-upload?albumId=${albumId}`} aria-label="Bulk upload to this album">
+                    <Upload className="h-4 w-4" />
+                    <span className="hidden sm:inline">Bulk Upload</span>
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Bulk upload to this album</TooltipContent>
+            </Tooltip>
             <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
 
             {me?.role === "admin" && (

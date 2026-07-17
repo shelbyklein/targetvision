@@ -226,6 +226,12 @@ export const GetAlbumTopRatedResponseItem = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -377,6 +383,12 @@ export const ListAlbumPhotosResponse = zod.object({
             coverPhotoId: zod.number().nullish(),
             coverPhotoUrl: zod.string().nullish(),
             coverPhotoThumbnailKey: zod.string().nullish(),
+            sampleThumbnailUrls: zod
+              .array(zod.string())
+              .optional()
+              .describe(
+                "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+              ),
             tags: zod.array(zod.string()).optional(),
             createdAt: zod.coerce.date(),
           }),
@@ -517,6 +529,12 @@ export const SearchPhotosResponse = zod.object({
             coverPhotoId: zod.number().nullish(),
             coverPhotoUrl: zod.string().nullish(),
             coverPhotoThumbnailKey: zod.string().nullish(),
+            sampleThumbnailUrls: zod
+              .array(zod.string())
+              .optional()
+              .describe(
+                "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+              ),
             tags: zod.array(zod.string()).optional(),
             createdAt: zod.coerce.date(),
           }),
@@ -633,6 +651,12 @@ export const SemanticSearchPhotosResponseItem = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -741,6 +765,12 @@ export const ListSimilarPhotosResponseItem = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -869,6 +899,12 @@ export const ListPhotosResponse = zod.object({
             coverPhotoId: zod.number().nullish(),
             coverPhotoUrl: zod.string().nullish(),
             coverPhotoThumbnailKey: zod.string().nullish(),
+            sampleThumbnailUrls: zod
+              .array(zod.string())
+              .optional()
+              .describe(
+                "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+              ),
             tags: zod.array(zod.string()).optional(),
             createdAt: zod.coerce.date(),
           }),
@@ -1111,6 +1147,12 @@ export const GetPhotoResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -1218,6 +1260,12 @@ export const UpdatePhotoResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -1330,6 +1378,12 @@ export const AddPhotoTagResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -1432,6 +1486,12 @@ export const RemovePhotoTagResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -1537,6 +1597,12 @@ export const AddPhotoCategoryResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -1639,6 +1705,12 @@ export const RemovePhotoCategoryResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -1746,6 +1818,12 @@ export const RatePhotoResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -1847,6 +1925,12 @@ export const ClearPhotoRatingResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -2369,6 +2453,12 @@ export const GetDashboardStatsResponse = zod.object({
             coverPhotoId: zod.number().nullish(),
             coverPhotoUrl: zod.string().nullish(),
             coverPhotoThumbnailKey: zod.string().nullish(),
+            sampleThumbnailUrls: zod
+              .array(zod.string())
+              .optional()
+              .describe(
+                "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+              ),
             tags: zod.array(zod.string()).optional(),
             createdAt: zod.coerce.date(),
           }),
@@ -2472,6 +2562,12 @@ export const GetRecentPhotosResponseItem = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -2570,6 +2666,12 @@ export const GetTopRatedPhotosResponseItem = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -2685,6 +2787,12 @@ export const ListCollectionsResponseItem = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   coverPhotoThumbnailKey: zod.string().nullish(),
+  sampleThumbnailUrls: zod
+    .array(zod.string())
+    .optional()
+    .describe(
+      "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+    ),
   tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
 });
@@ -2752,6 +2860,12 @@ export const GetCollectionResponse = zod.object({
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
               coverPhotoThumbnailKey: zod.string().nullish(),
+              sampleThumbnailUrls: zod
+                .array(zod.string())
+                .optional()
+                .describe(
+                  "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+                ),
               tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
@@ -2882,6 +2996,12 @@ export const UpdateCollectionResponse = zod.object({
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
               coverPhotoThumbnailKey: zod.string().nullish(),
+              sampleThumbnailUrls: zod
+                .array(zod.string())
+                .optional()
+                .describe(
+                  "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+                ),
               tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
@@ -3018,6 +3138,12 @@ export const ListCollectionNegativePhotosResponseItem = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -3158,6 +3284,12 @@ export const SetCollectionCoverResponse = zod.object({
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
               coverPhotoThumbnailKey: zod.string().nullish(),
+              sampleThumbnailUrls: zod
+                .array(zod.string())
+                .optional()
+                .describe(
+                  "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+                ),
               tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
@@ -3272,6 +3404,12 @@ export const GetSmartCollectionPhotosResponseItem = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -3419,6 +3557,12 @@ export const GetProjectResponse = zod.object({
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
               coverPhotoThumbnailKey: zod.string().nullish(),
+              sampleThumbnailUrls: zod
+                .array(zod.string())
+                .optional()
+                .describe(
+                  "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+                ),
               tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
@@ -3545,6 +3689,12 @@ export const UpdateProjectResponse = zod.object({
               coverPhotoId: zod.number().nullish(),
               coverPhotoUrl: zod.string().nullish(),
               coverPhotoThumbnailKey: zod.string().nullish(),
+              sampleThumbnailUrls: zod
+                .array(zod.string())
+                .optional()
+                .describe(
+                  "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+                ),
               tags: zod.array(zod.string()).optional(),
               createdAt: zod.coerce.date(),
             }),
@@ -3682,6 +3832,12 @@ export const AcceptPhotoSuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -3784,6 +3940,12 @@ export const DismissPhotoSuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -3886,6 +4048,12 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -3988,6 +4156,12 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -4090,6 +4264,12 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -4192,6 +4372,12 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -4298,6 +4484,12 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
@@ -4400,6 +4592,12 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
         coverPhotoId: zod.number().nullish(),
         coverPhotoUrl: zod.string().nullish(),
         coverPhotoThumbnailKey: zod.string().nullish(),
+        sampleThumbnailUrls: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
+          ),
         tags: zod.array(zod.string()).optional(),
         createdAt: zod.coerce.date(),
       }),
