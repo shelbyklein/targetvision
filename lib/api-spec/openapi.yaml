@@ -2543,6 +2543,11 @@ components:
           type: ["string", "null"]
         coverPhotoThumbnailKey:
           type: ["string", "null"]
+        sampleThumbnailUrls:
+          type: array
+          items:
+            type: string
+          description: Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.
         tags:
           type: array
           items:

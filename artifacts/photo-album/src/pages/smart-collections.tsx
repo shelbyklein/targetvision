@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { useListCollections } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Badge } from "@/components/ui/badge";
+import { CrossfadeThumb } from "@/components/CrossfadeThumb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 
@@ -23,9 +23,9 @@ export default function SmartCollections() {
         </p>
 
         {isLoading ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-7 w-24 rounded-full" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-xl" />
             ))}
           </div>
         ) : smartCollections.length === 0 ? (
@@ -37,17 +37,25 @@ export default function SmartCollections() {
             </p>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2" data-testid="smart-collections-list">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="smart-collections-list">
             {smartCollections.map((col) => (
               <Link key={col.id} href={`/smart-collections/${col.id}`}>
-                <Badge
-                  variant="secondary"
-                  className="rounded-full gap-1.5 px-3 py-1 cursor-pointer hover:border-amber-400/60"
-                  data-testid={`smart-collection-pill-${col.id}`}
+                <div
+                  className="relative rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md hover:border-amber-400/50 transition-all"
+                  data-testid={`smart-collection-card-${col.id}`}
                 >
-                  <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                  {col.title}
-                </Badge>
+                  <CrossfadeThumb
+                    urls={col.sampleThumbnailUrls ?? []}
+                    alt={col.title}
+                    className="aspect-[4/3] w-full"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent pt-8 pb-2.5 px-3 pointer-events-none">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-white drop-shadow">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <span className="truncate">{col.title}</span>
+                    </span>
+                  </div>
+                </div>
               </Link>
             ))}
           </div>

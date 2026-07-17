@@ -19,6 +19,8 @@ export interface CollectionSummary {
   coverPhotoUrl?: string | null;
   /** @nullable */
   coverPhotoThumbnailKey?: string | null;
+  /** Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails. */
+  sampleThumbnailUrls?: string[];
   tags?: string[];
   createdAt: Date;
 }

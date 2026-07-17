@@ -9,6 +9,7 @@ import {
   useListProjects,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { CrossfadeThumb } from "@/components/CrossfadeThumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -462,25 +463,29 @@ export default function Dashboard() {
           </div>
         </div>
         {collectionsLoading ? (
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-7 w-24 rounded-full" />
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-square rounded-xl" />
             ))}
           </div>
         ) : !collections || collections.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">Nothing here yet.</p>
         ) : (
-          <div className="flex flex-wrap gap-2" data-testid="dashboard-smart-collections">
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3" data-testid="dashboard-smart-collections">
             {collections.map((col) => (
               <Link key={col.id} href={`/smart-collections/${col.id}`}>
-                <Badge
-                  variant="secondary"
-                  className="rounded-full gap-1.5 px-3 py-1 cursor-pointer hover:border-amber-400/60"
+                <div
+                  className="relative rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md hover:border-amber-400/50 transition-all"
                   data-testid={`smart-collection-pill-${col.id}`}
                 >
-                  <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                  {col.title}
-                </Badge>
+                  <CrossfadeThumb urls={col.sampleThumbnailUrls ?? []} alt={col.title} className="aspect-square w-full" />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent pt-6 pb-2 px-2 pointer-events-none">
+                    <span className="flex items-center gap-1 text-xs font-medium text-white drop-shadow">
+                      <Sparkles className="h-3 w-3 text-amber-400 shrink-0" />
+                      <span className="truncate">{col.title}</span>
+                    </span>
+                  </div>
+                </div>
               </Link>
             ))}
           </div>
