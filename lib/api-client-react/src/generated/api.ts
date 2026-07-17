@@ -23,6 +23,8 @@ import type {
   AiSettings,
   AiSettingsUpdate,
   Album,
+  AlbumAttributionSummary,
+  AlbumAttributionUpdate,
   AlbumCoverUpdate,
   AlbumInput,
   AlbumUpdate,
@@ -2156,6 +2158,185 @@ export const useDeleteAttributionTag = <
   TContext
 > => {
   return useMutation(getDeleteAttributionTagMutationOptions(options));
+};
+
+/**
+ * @summary Per-tag counts of how many of an album's photos carry each attribution tag
+ */
+export const getGetAlbumAttributionSummaryUrl = (id: number) => {
+  return `/api/albums/${id}/attribution-tags`;
+};
+
+export const getAlbumAttributionSummary = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AlbumAttributionSummary> => {
+  return customFetch<AlbumAttributionSummary>(
+    getGetAlbumAttributionSummaryUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAlbumAttributionSummaryQueryKey = (id: number) => {
+  return [`/api/albums/${id}/attribution-tags`] as const;
+};
+
+export const getGetAlbumAttributionSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAlbumAttributionSummaryQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAlbumAttributionSummary>>
+  > = ({ signal }) =>
+    getAlbumAttributionSummary(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAlbumAttributionSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAlbumAttributionSummary>>
+>;
+export type GetAlbumAttributionSummaryQueryError = ErrorType<void>;
+
+/**
+ * @summary Per-tag counts of how many of an album's photos carry each attribution tag
+ */
+
+export function useGetAlbumAttributionSummary<
+  TData = Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAlbumAttributionSummary>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAlbumAttributionSummaryQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add or remove one attribution tag on every photo in an album (admin only)
+ */
+export const getSetAlbumAttributionUrl = (id: number) => {
+  return `/api/albums/${id}/attribution-tags`;
+};
+
+export const setAlbumAttribution = async (
+  id: number,
+  albumAttributionUpdate: AlbumAttributionUpdate,
+  options?: RequestInit,
+): Promise<BulkAttributionTagsResult> => {
+  return customFetch<BulkAttributionTagsResult>(getSetAlbumAttributionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(albumAttributionUpdate),
+  });
+};
+
+export const getSetAlbumAttributionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAlbumAttribution>>,
+    TError,
+    { id: number; data: BodyType<AlbumAttributionUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setAlbumAttribution>>,
+  TError,
+  { id: number; data: BodyType<AlbumAttributionUpdate> },
+  TContext
+> => {
+  const mutationKey = ["setAlbumAttribution"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setAlbumAttribution>>,
+    { id: number; data: BodyType<AlbumAttributionUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setAlbumAttribution(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetAlbumAttributionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setAlbumAttribution>>
+>;
+export type SetAlbumAttributionMutationBody = BodyType<AlbumAttributionUpdate>;
+export type SetAlbumAttributionMutationError = ErrorType<void>;
+
+/**
+ * @summary Add or remove one attribution tag on every photo in an album (admin only)
+ */
+export const useSetAlbumAttribution = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setAlbumAttribution>>,
+    TError,
+    { id: number; data: BodyType<AlbumAttributionUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setAlbumAttribution>>,
+  TError,
+  { id: number; data: BodyType<AlbumAttributionUpdate> },
+  TContext
+> => {
+  return useMutation(getSetAlbumAttributionMutationOptions(options));
 };
 
 /**

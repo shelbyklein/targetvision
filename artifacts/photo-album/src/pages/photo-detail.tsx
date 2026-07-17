@@ -417,7 +417,7 @@ export default function PhotoDetail() {
               onAddProject={handleAddProject}
             />
 
-            <AttributionPanel photoId={photoId} photoTags={photo.attributionTags} />
+            <AttributionPanel photoTags={photo.attributionTags} />
 
             <Separator />
 

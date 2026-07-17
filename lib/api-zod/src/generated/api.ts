@@ -1004,6 +1004,42 @@ export const DeleteAttributionTagParams = zod.object({
 });
 
 /**
+ * @summary Per-tag counts of how many of an album's photos carry each attribution tag
+ */
+export const GetAlbumAttributionSummaryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAlbumAttributionSummaryResponse = zod.object({
+  photoCount: zod.number().describe("Total photos in the album."),
+  tags: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      count: zod
+        .number()
+        .describe("How many of the album's photos carry this tag."),
+    }),
+  ),
+});
+
+/**
+ * @summary Add or remove one attribution tag on every photo in an album (admin only)
+ */
+export const SetAlbumAttributionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SetAlbumAttributionBody = zod.object({
+  tagId: zod.number(),
+  mode: zod.enum(["add", "remove"]),
+});
+
+export const SetAlbumAttributionResponse = zod.object({
+  updated: zod.number(),
+});
+
+/**
  * @summary Add or remove one attribution tag on many photos (admin only)
  */
 export const BulkSetAttributionTagsBody = zod.object({

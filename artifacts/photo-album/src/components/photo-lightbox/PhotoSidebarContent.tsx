@@ -13,9 +13,6 @@ import {
   useListProjects,
   useAddPhotoToProject,
   useRemovePhotoFromProject,
-  useListAttributionTags,
-  useAddPhotoAttributionTag,
-  useRemovePhotoAttributionTag,
   getGetPhotoQueryKey,
   getListAlbumPhotosQueryKey,
   getListPhotosQueryKey,
@@ -84,9 +81,6 @@ export function PhotoSidebarContent({
   const { data: allProjects } = useListProjects();
   const { mutate: addToProject, isPending: addingToProject } = useAddPhotoToProject();
   const { mutate: removeFromProject, isPending: removingFromProject } = useRemovePhotoFromProject();
-  const { data: allAttributionTags } = useListAttributionTags();
-  const { mutate: addAttribution, isPending: addingAttribution } = useAddPhotoAttributionTag();
-  const { mutate: removeAttribution, isPending: removingAttribution } = useRemovePhotoAttributionTag();
   const { data: me } = useGetMe();
 
   const [showNewForm, setShowNewForm] = useState(false);
@@ -257,18 +251,6 @@ export function PhotoSidebarContent({
   const currentCollections = fullPhoto?.photoCollections ?? [];
   const currentProjects = fullPhoto?.photoProjects ?? [];
   const currentAttributionTags = fullPhoto?.attributionTags ?? [];
-
-  function handleToggleAttribution(tagId: number, tagName: string, isIn: boolean) {
-    const opts = {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(photoId) });
-        toast({ title: isIn ? `Removed "${tagName}"` : `Cleared for "${tagName}"` });
-      },
-      onError: () => toast({ title: "Failed to update attribution", variant: "destructive" }),
-    };
-    if (isIn) removeAttribution({ id: photoId, tagId }, opts);
-    else addAttribution({ id: photoId, data: { tagId } }, opts);
-  }
   const isHidden = fullPhoto?.isHidden ?? false;
   const canDelete = me && fullPhoto && (me.id === fullPhoto.uploaderId || me.role === "admin");
 
@@ -574,36 +556,24 @@ export function PhotoSidebarContent({
         )}
       </div>
 
-      {allAttributionTags && allAttributionTags.length > 0 && (
+      {/* Read-only: attribution is set per album, photos just display it. */}
+      {currentAttributionTags.length > 0 && (
         <div className="space-y-2 border-t border-white/10 pt-3">
           <div className="flex items-center gap-1.5 text-white/70">
             <Copyright className="h-3.5 w-3.5" />
             <span className="text-xs font-semibold uppercase tracking-wide">Attribution</span>
           </div>
           <div className="flex flex-wrap gap-1.5" data-testid="lightbox-attribution-pills">
-            {allAttributionTags.map((tag) => {
-              const isIn = currentAttributionTags.some((t) => t.id === tag.id);
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => handleToggleAttribution(tag.id, tag.name, isIn)}
-                  disabled={addingAttribution || removingAttribution}
-                  className={cn(
-                    "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50",
-                    isIn
-                      ? "bg-white text-gray-900 border border-white hover:bg-white/85"
-                      : "bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
-                  )}
-                  data-testid={`lightbox-attribution-pill-${tag.id}`}
-                  aria-label={isIn ? `Remove ${tag.name} clearance` : `Clear for ${tag.name}`}
-                  aria-pressed={isIn}
-                >
-                  {isIn ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
-                  {tag.name}
-                </button>
-              );
-            })}
+            {currentAttributionTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white/15 text-white border border-white/25"
+                data-testid={`lightbox-attribution-pill-${tag.id}`}
+              >
+                <Check className="h-3 w-3 shrink-0" />
+                {tag.name}
+              </span>
+            ))}
           </div>
         </div>
       )}

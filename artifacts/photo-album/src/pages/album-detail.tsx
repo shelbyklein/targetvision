@@ -14,8 +14,9 @@ import {
   useRerunPhotoAnalysis,
   useBulkDeletePhotos,
   useListAttributionTags,
-  useBulkSetAttributionTags,
-  getGetPhotoQueryKey,
+  useGetAlbumAttributionSummary,
+  getGetAlbumAttributionSummaryQueryKey,
+  useSetAlbumAttribution,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -81,6 +82,8 @@ import {
   Sparkles,
   Loader2,
   Check,
+  Plus,
+  Copyright,
   EyeOff,
   Eye,
   Bot,
@@ -134,9 +137,7 @@ export default function AlbumDetail() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const { mutate: bulkDelete, isPending: bulkDeleting } = useBulkDeletePhotos();
-  const [bulkTagId, setBulkTagId] = useState<string>("");
   const { data: attributionTags } = useListAttributionTags();
-  const { mutate: bulkSetAttribution, isPending: bulkTagging } = useBulkSetAttributionTags();
   const [filterAttribution, setFilterAttribution] = useState<string>("all");
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
@@ -342,24 +343,32 @@ export default function AlbumDetail() {
     setSelectedIds(new Set());
   }
 
-  function handleBulkAttribution(mode: "add" | "remove") {
-    const tagId = parseInt(bulkTagId, 10);
-    if (!Number.isInteger(tagId) || selectedIds.size === 0) return;
-    const ids = [...selectedIds];
-    bulkSetAttribution(
-      { data: { ids, tagId, mode } },
+  // Attribution is decided per album: apply or remove one tag on EVERY photo
+  // in the album. Individual photos only display their tags.
+  const { data: attributionSummary } = useGetAlbumAttributionSummary(albumId, {
+    query: { enabled: !!albumId, queryKey: getGetAlbumAttributionSummaryQueryKey(albumId) },
+  });
+  const { mutate: setAlbumAttribution, isPending: settingAttribution } = useSetAlbumAttribution();
+
+  function handleAlbumAttribution(tagId: number, tagName: string, mode: "add" | "remove") {
+    setAlbumAttribution(
+      { id: albumId, data: { tagId, mode } },
       {
         onSuccess: (r) => {
           toast({
             title:
               mode === "add"
-                ? `Tagged ${r.updated} photo${r.updated !== 1 ? "s" : ""}`
-                : `Removed tag from ${r.updated} photo${r.updated !== 1 ? "s" : ""}`,
+                ? `Album cleared for "${tagName}" (${r.updated} photo${r.updated !== 1 ? "s" : ""} tagged)`
+                : `"${tagName}" removed from the album`,
           });
-          // Refresh the affected photos' detail queries so lightbox pills stay accurate.
-          for (const id of ids) qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(id) });
+          qc.invalidateQueries({ queryKey: getGetAlbumAttributionSummaryQueryKey(albumId) });
+          // Individual photo queries carry attributionTags — refresh any that are cached.
+          qc.invalidateQueries({
+            predicate: (q) => typeof q.queryKey[0] === "string" && /^\/api\/photos\/\d+$/.test(q.queryKey[0]),
+          });
+          qc.invalidateQueries({ queryKey: [`/api/albums/${albumId}/photos`] });
         },
-        onError: () => toast({ title: "Bulk attribution failed", variant: "destructive" }),
+        onError: () => toast({ title: "Failed to update album attribution", variant: "destructive" }),
       },
     );
   }
@@ -616,6 +625,55 @@ export default function AlbumDetail() {
           </div>
           </TooltipProvider>
         </div>
+
+        {/* Album-level attribution: clearing an album for a use tags every
+            photo in it. Pills are tri-state — none / partial (amber, n/total) /
+            all — and only admins can toggle them. */}
+        {attributionSummary && attributionSummary.tags.length > 0 && album && album.photoCount > 0 && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="album-attribution-row">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Copyright className="h-3.5 w-3.5" /> Attribution
+            </span>
+            {attributionSummary.tags.map((tag) => {
+              const total = attributionSummary.photoCount;
+              const all = total > 0 && tag.count === total;
+              const partial = tag.count > 0 && !all;
+              const clickable = me?.role === "admin";
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  disabled={!clickable || settingAttribution}
+                  onClick={() => clickable && handleAlbumAttribution(tag.id, tag.name, all ? "remove" : "add")}
+                  title={
+                    clickable
+                      ? all
+                        ? `Remove "${tag.name}" from every photo in this album`
+                        : `Clear every photo in this album for "${tag.name}"`
+                      : undefined
+                  }
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors disabled:opacity-70 ${
+                    all
+                      ? "bg-primary text-primary-foreground border-primary hover:bg-primary/85"
+                      : partial
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/50 hover:bg-amber-500/25"
+                      : "bg-transparent text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                  } ${!clickable ? "cursor-default" : ""}`}
+                  data-testid={`album-attribution-pill-${tag.id}`}
+                  aria-pressed={all}
+                >
+                  {all ? <Check className="h-3 w-3 shrink-0" /> : clickable ? <Plus className="h-3 w-3 shrink-0" /> : null}
+                  {tag.name}
+                  {partial && (
+                    <span className="text-[10px] opacity-80">
+                      {tag.count}/{total}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {!photosLoading && album && (album.photoCount > 0 || hasActiveFilters) && (
           <div className="flex flex-wrap items-center gap-2">
@@ -996,38 +1054,6 @@ export default function AlbumDetail() {
             {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""} selected
           </span>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {attributionTags && attributionTags.length > 0 && selectedIds.size > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Select value={bulkTagId} onValueChange={setBulkTagId}>
-                  <SelectTrigger className="h-8 w-40 text-sm" data-testid="bulk-attribution-select">
-                    <SelectValue placeholder="Attribution tag…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {attributionTags.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!bulkTagId || bulkTagging}
-                  onClick={() => handleBulkAttribution("add")}
-                  data-testid="bulk-attribution-add"
-                >
-                  {bulkTagging ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tag"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!bulkTagId || bulkTagging}
-                  onClick={() => handleBulkAttribution("remove")}
-                  data-testid="bulk-attribution-remove"
-                >
-                  Untag
-                </Button>
-              </div>
-            )}
             {me?.role === "admin" && selectedIds.size > 0 && (
               <Button
                 variant="destructive"

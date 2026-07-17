@@ -362,6 +362,32 @@ export interface BulkAttributionTagsResult {
   updated: number;
 }
 
+export type AlbumAttributionSummaryTagsItem = {
+  id: number;
+  name: string;
+  /** How many of the album's photos carry this tag. */
+  count: number;
+};
+
+export interface AlbumAttributionSummary {
+  /** Total photos in the album. */
+  photoCount: number;
+  tags: AlbumAttributionSummaryTagsItem[];
+}
+
+export type AlbumAttributionUpdateMode =
+  (typeof AlbumAttributionUpdateMode)[keyof typeof AlbumAttributionUpdateMode];
+
+export const AlbumAttributionUpdateMode = {
+  add: "add",
+  remove: "remove",
+} as const;
+
+export interface AlbumAttributionUpdate {
+  tagId: number;
+  mode: AlbumAttributionUpdateMode;
+}
+
 export interface PhotoUpdate {
   /** @nullable */
   aiDescription?: string | null;

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
-import { db, attributionTagsTable, photoAttributionTagsTable, photosTable } from "@workspace/db";
+import { eq, and, inArray, sql } from "drizzle-orm";
+import { db, attributionTagsTable, photoAttributionTagsTable, photosTable, albumsTable } from "@workspace/db";
 import {
   ListAttributionTagsResponse,
   CreateAttributionTagBody,
@@ -11,6 +11,9 @@ import {
   BulkSetAttributionTagsBody,
   BulkSetAttributionTagsResponse,
   AddPhotoAttributionTagBody,
+  GetAlbumAttributionSummaryResponse,
+  SetAlbumAttributionBody,
+  SetAlbumAttributionResponse,
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin } from "../middlewares/requireAuth";
 
@@ -86,6 +89,86 @@ router.delete("/attribution-tags/:id", requireAdmin, async (req, res): Promise<v
     return;
   }
   res.status(204).send();
+});
+
+// Album-level coverage: for every attribution tag, how many of this album's
+// photos carry it. Drives the album page's tri-state pills (none/some/all).
+router.get("/albums/:id/attribution-tags", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const albumId = parseInt(raw, 10);
+  if (!Number.isInteger(albumId)) {
+    res.status(400).json({ error: "Invalid album id" });
+    return;
+  }
+  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(eq(albumsTable.id, albumId));
+  if (!album) {
+    res.status(404).json({ error: "Album not found" });
+    return;
+  }
+
+  const countResult = await db.execute<{ photo_count: number }>(
+    sql`SELECT count(*)::int AS photo_count FROM photos WHERE album_id = ${albumId}`,
+  );
+  const tagResult = await db.execute<{ id: number; name: string; count: number }>(sql`
+    SELECT t.id, t.name, count(pat.photo_id)::int AS count
+    FROM attribution_tags t
+    LEFT JOIN photo_attribution_tags pat
+      ON pat.tag_id = t.id
+      AND pat.photo_id IN (SELECT p.id FROM photos p WHERE p.album_id = ${albumId})
+    GROUP BY t.id, t.name
+    ORDER BY t.name
+  `);
+
+  res.json(
+    GetAlbumAttributionSummaryResponse.parse({
+      photoCount: countResult.rows[0]?.photo_count ?? 0,
+      tags: tagResult.rows.map((r) => ({ id: r.id, name: r.name, count: r.count })),
+    }),
+  );
+});
+
+// The album-level control: attribution is decided per album, so this adds or
+// removes one tag on EVERY photo in the album in a single statement.
+router.post("/albums/:id/attribution-tags", requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const albumId = parseInt(raw, 10);
+  if (!Number.isInteger(albumId)) {
+    res.status(400).json({ error: "Invalid album id" });
+    return;
+  }
+  const body = SetAlbumAttributionBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const { tagId, mode } = body.data;
+
+  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(eq(albumsTable.id, albumId));
+  if (!album) {
+    res.status(404).json({ error: "Album not found" });
+    return;
+  }
+  const [tag] = await db.select().from(attributionTagsTable).where(eq(attributionTagsTable.id, tagId));
+  if (!tag) {
+    res.status(404).json({ error: "Tag not found" });
+    return;
+  }
+
+  if (mode === "add") {
+    const result = await db.execute(sql`
+      INSERT INTO photo_attribution_tags (photo_id, tag_id)
+      SELECT p.id, ${tagId} FROM photos p WHERE p.album_id = ${albumId}
+      ON CONFLICT DO NOTHING
+    `);
+    res.json(SetAlbumAttributionResponse.parse({ updated: result.rowCount ?? 0 }));
+  } else {
+    const result = await db.execute(sql`
+      DELETE FROM photo_attribution_tags
+      WHERE tag_id = ${tagId}
+      AND photo_id IN (SELECT p.id FROM photos p WHERE p.album_id = ${albumId})
+    `);
+    res.json(SetAlbumAttributionResponse.parse({ updated: result.rowCount ?? 0 }));
+  }
 });
 
 // Bulk add/remove a tag on a set of photos (the album select-mode flow).

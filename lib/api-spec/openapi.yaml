@@ -733,6 +733,52 @@ paths:
         "404":
           description: Tag not found
 
+  /albums/{id}/attribution-tags:
+    get:
+      operationId: getAlbumAttributionSummary
+      tags: [attribution]
+      summary: Per-tag counts of how many of an album's photos carry each attribution tag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Album attribution coverage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlbumAttributionSummary"
+        "404":
+          description: Album not found
+    post:
+      operationId: setAlbumAttribution
+      tags: [attribution]
+      summary: Add or remove one attribution tag on every photo in an album (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlbumAttributionUpdate"
+      responses:
+        "200":
+          description: Number of photo-tag links changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkAttributionTagsResult"
+        "404":
+          description: Album or tag not found
+
   /photos/attribution-tags/bulk:
     post:
       operationId: bulkSetAttributionTags
@@ -2673,6 +2719,37 @@ components:
       properties:
         updated:
           type: integer
+
+    AlbumAttributionSummary:
+      type: object
+      required: [photoCount, tags]
+      properties:
+        photoCount:
+          type: integer
+          description: Total photos in the album.
+        tags:
+          type: array
+          items:
+            type: object
+            required: [id, name, count]
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              count:
+                type: integer
+                description: How many of the album's photos carry this tag.
+
+    AlbumAttributionUpdate:
+      type: object
+      required: [tagId, mode]
+      properties:
+        tagId:
+          type: integer
+        mode:
+          type: string
+          enum: [add, remove]
 
     PhotoUpdate:
       type: object
