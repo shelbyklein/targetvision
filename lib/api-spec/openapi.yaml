@@ -1803,6 +1803,30 @@ paths:
         "401":
           description: Unauthorized
 
+  /projects/{id}/download:
+    get:
+      operationId: downloadProjectPhotos
+      tags: [projects]
+      summary: Download all of a project's photos as a zip archive (streamed)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Zip archive of the project's original photo files
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+        "404":
+          description: Project not found or has no photos
+
   /projects/{id}:
     get:
       operationId: getProject
