@@ -184,26 +184,28 @@ export default function Albums() {
                   </div>
                   <div className="p-3">
                     <p className="font-medium text-foreground text-sm truncate">{album.title}</p>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-1.5 text-[11px] text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Camera className="h-3 w-3" />
+                    {/* Phones show half-width cards, so the stats stack one per
+                        line there; two columns only from sm up. */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 mt-1.5 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        <Camera className="h-3 w-3 shrink-0" />
                         {album.photoCount} photo{album.photoCount !== 1 ? "s" : ""}
                       </span>
                       {album.photoCount > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Star className="h-3 w-3" />
+                        <span className="flex items-center gap-1 whitespace-nowrap">
+                          <Star className="h-3 w-3 shrink-0" />
                           {album.ratedCount}/{album.photoCount} rated
                         </span>
                       )}
                       {me?.role === "admin" && !!album.hiddenCount && (
-                        <span className="flex items-center gap-0.5 text-muted-foreground/70">
-                          <EyeOff className="h-3 w-3" />
+                        <span className="flex items-center gap-0.5 whitespace-nowrap text-muted-foreground/70">
+                          <EyeOff className="h-3 w-3 shrink-0" />
                           {album.hiddenCount} hidden
                         </span>
                       )}
                       {album.eventDate && (
-                        <span className="flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" />
+                        <span className="flex items-center gap-1 whitespace-nowrap">
+                          <CalendarDays className="h-3 w-3 shrink-0" />
                           {formatDate(album.eventDate)}
                         </span>
                       )}
