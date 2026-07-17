@@ -20,6 +20,7 @@ import { FadeImage } from "@/components/ui/fade-image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -98,13 +99,18 @@ export default function SmartCollectionDetail() {
 
   const { mutate: updateCollection } = useUpdateCollection();
 
+  // The collection's own members always show; the semantic suggestions are
+  // opt-out via the checkbox (and their query doesn't even run when off).
+  const [includeSuggestions, setIncludeSuggestions] = useState(true);
+
   const smartParams = { topK: SMART_TOP_K };
   const smartPhotosKey = getGetSmartCollectionPhotosQueryKey(collectionId, smartParams);
-  const { data: rawPhotos, isLoading: photosLoading } = useGetSmartCollectionPhotos(
+  const { data: rawPhotos, isLoading: suggestionsLoading } = useGetSmartCollectionPhotos(
     collectionId,
     smartParams,
-    { query: { enabled: !!collectionId, queryKey: smartPhotosKey } },
+    { query: { enabled: !!collectionId && includeSuggestions, queryKey: smartPhotosKey } },
   );
+  const photosLoading = includeSuggestions && suggestionsLoading;
 
   const negativesKey = getListCollectionNegativePhotosQueryKey(collectionId);
   const { data: negativePhotos } = useListCollectionNegativePhotos(collectionId, {
@@ -214,10 +220,20 @@ export default function SmartCollectionDetail() {
     removeNegativeMutation.mutate({ id: collectionId, photoId });
   }
 
-  const photos = useMemo(() => {
-    if (!rawPhotos) return [];
+  // Members first (they ARE the collection), then the ranked suggestions.
+  // Suggestions already exclude members server-side, so no dedupe needed.
+  const memberPhotos = useMemo(
+    () => sortPhotos((collection?.photos ?? []) as RichPhoto[], sort),
+    [collection?.photos, sort],
+  );
+  const suggestionPhotos = useMemo(() => {
+    if (!includeSuggestions || !rawPhotos) return [];
     return sortPhotos(rawPhotos as RichPhoto[], sort);
-  }, [rawPhotos, sort]);
+  }, [includeSuggestions, rawPhotos, sort]);
+  const photos = useMemo(
+    () => [...memberPhotos, ...suggestionPhotos],
+    [memberPhotos, suggestionPhotos],
+  );
 
   const selectedIndex = selectedPhoto ? photos.findIndex((p) => p.id === selectedPhoto.id) : -1;
   const hasPrev = selectedIndex > 0;
@@ -306,15 +322,25 @@ export default function SmartCollectionDetail() {
           </p>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             {isLoading ? (
               <Skeleton className="h-4 w-24 inline-block" />
+            ) : includeSuggestions ? (
+              `${memberPhotos.length} in collection · ${suggestionPhotos.length} suggestion${suggestionPhotos.length !== 1 ? "s" : ""}`
             ) : (
-              `${photos.length} photo${photos.length !== 1 ? "s" : ""} matched`
+              `${memberPhotos.length} in collection`
             )}
           </p>
 
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none" data-testid="include-suggestions-toggle">
+              <Checkbox
+                checked={includeSuggestions}
+                onCheckedChange={(v) => setIncludeSuggestions(v === true)}
+              />
+              Include semantic results
+            </label>
           <div className="flex items-center gap-2">
             <ArrowUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
             <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
@@ -330,6 +356,7 @@ export default function SmartCollectionDetail() {
               </SelectContent>
             </Select>
           </div>
+          </div>
         </div>
 
         {isLoading ? (
@@ -341,9 +368,13 @@ export default function SmartCollectionDetail() {
         ) : photos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-xl">
             <Sparkles className="h-10 w-10 text-muted-foreground/30 mb-3" />
-            <p className="text-sm font-medium text-foreground mb-1">No matches yet</p>
+            <p className="text-sm font-medium text-foreground mb-1">
+              {includeSuggestions ? "No matches yet" : "No photos in this collection yet"}
+            </p>
             <p className="text-xs text-muted-foreground max-w-sm">
-              {isMemberDriven
+              {!includeSuggestions
+                ? "Turn on “Include semantic results” to see suggested photos, or add photos to the collection."
+                : isMemberDriven
                 ? "No similar photos found. Make sure your library is embedded (Admin → Image Embeddings)."
                 : `Nothing matched “${term}”. Make sure photos are embedded (Admin → Image Embeddings) and try a different term.`}
             </p>
@@ -373,6 +404,18 @@ export default function SmartCollectionDetail() {
                     alt={photo.filename ?? "Photo"}
                     className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
                   />
+
+                  {/* Members carry an always-visible check so they read apart
+                      from the semantic suggestions in the combined grid. */}
+                  {inCollection && (
+                    <div
+                      className="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full w-5 h-5 bg-emerald-500/90 text-white shadow"
+                      title="In this collection"
+                      data-testid="member-badge"
+                    >
+                      <Check className="h-3 w-3" />
+                    </div>
+                  )}
 
                   {/* Cover photo button — top right, always visible when active */}
                   {(() => {

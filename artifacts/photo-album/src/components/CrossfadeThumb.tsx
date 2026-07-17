@@ -1,32 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const CYCLE_MS = 4000;
+const HOVER_CYCLE_MS = 1600;
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 /**
- * Card thumbnail that slowly crossfades through a handful of photos. The cycle
- * start is staggered randomly per card so a grid of them doesn't blink in
- * unison, and prefers-reduced-motion pins it to the first image.
+ * Card thumbnail over a handful of photos. Loads showing one random image and
+ * stays static; hovering plays a crossfade cycle through the rest (stopping on
+ * whatever image is current when the pointer leaves). prefers-reduced-motion
+ * keeps it fully static.
  */
 export function CrossfadeThumb({ urls, alt, className }: { urls: string[]; alt: string; className?: string }) {
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(() => (urls.length > 0 ? Math.floor(Math.random() * urls.length) : 0));
+  const intervalRef = useRef<number | undefined>(undefined);
 
-  useEffect(() => {
-    if (urls.length < 2) return;
-    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
+  function startCycle() {
+    if (urls.length < 2 || prefersReducedMotion() || intervalRef.current !== undefined) return;
+    setIdx((i) => (i + 1) % urls.length);
+    intervalRef.current = window.setInterval(() => setIdx((i) => (i + 1) % urls.length), HOVER_CYCLE_MS);
+  }
+
+  function stopCycle() {
+    if (intervalRef.current !== undefined) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = undefined;
     }
-    let interval: number | undefined;
-    const stagger = window.setTimeout(() => {
-      interval = window.setInterval(() => setIdx((i) => (i + 1) % urls.length), CYCLE_MS);
-      setIdx((i) => (i + 1) % urls.length);
-    }, Math.random() * CYCLE_MS);
-    return () => {
-      window.clearTimeout(stagger);
-      if (interval !== undefined) window.clearInterval(interval);
-    };
-  }, [urls.length]);
+  }
+
+  useEffect(() => stopCycle, []);
 
   if (urls.length === 0) {
     return (
@@ -37,7 +42,11 @@ export function CrossfadeThumb({ urls, alt, className }: { urls: string[]; alt: 
   }
 
   return (
-    <div className={cn("relative overflow-hidden bg-muted", className)}>
+    <div
+      className={cn("relative overflow-hidden bg-muted", className)}
+      onMouseEnter={startCycle}
+      onMouseLeave={stopCycle}
+    >
       {urls.map((url, i) => (
         <img
           key={url}
@@ -45,7 +54,7 @@ export function CrossfadeThumb({ urls, alt, className }: { urls: string[]; alt: 
           alt={i === 0 ? alt : ""}
           loading="lazy"
           className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-opacity duration-1000",
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
             i === idx % urls.length ? "opacity-100" : "opacity-0",
           )}
         />
