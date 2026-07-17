@@ -230,6 +230,11 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
       ? aiStatusRaw
       : undefined;
 
+  const attributionTagIdRaw = typeof req.query.attributionTagId === "string" ? parseInt(req.query.attributionTagId, 10) : undefined;
+  const attributionTagId = attributionTagIdRaw !== undefined && Number.isInteger(attributionTagIdRaw) ? attributionTagIdRaw : undefined;
+  const hasAttributionStr = req.query.hasAttribution;
+  const hasAttribution = hasAttributionStr === "true" ? true : hasAttributionStr === "false" ? false : undefined;
+
   // Filter and paginate entirely in SQL: only the requested page of photo IDs
   // leaves the database, and only that page is expanded into full responses.
   const { ids: pageIds, hasMore } = await fetchAlbumPhotoPage(params.data.id, {
@@ -237,6 +242,8 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
     inCollection,
     hasRating,
     aiStatus,
+    attributionTagId,
+    hasAttribution,
     limit,
     offset,
   });
@@ -263,7 +270,12 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     .orderBy(desc(photosTable.createdAt), desc(photosTable.id));
 
   const allIds = allPhotos.map((p) => p.id);
-  const { search, tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, albumId, aiStatus } = query.data;
+  const { search, tag, categoryId, ratingMin, ratingMax, dateFrom, dateTo, uploaderId, albumId, aiStatus, attributionTagId } = query.data;
+  // Parsed from req.query directly: the generated zod.coerce.boolean() turns
+  // the string "false" into true (JS truthiness), which would invert the
+  // untagged filter. Same treatment includeHidden gets above.
+  const hasAttributionStr = req.query.hasAttribution;
+  const hasAttribution = hasAttributionStr === "true" ? true : hasAttributionStr === "false" ? false : undefined;
 
   const filteredIds = await applyFiltersAndFetchIds(allIds, {
     search,
@@ -276,6 +288,8 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     uploaderId,
     albumId,
     aiStatus,
+    attributionTagId,
+    hasAttribution,
   });
 
   const limit = Math.min(Math.max(query.data.limit ?? 48, 1), 200);

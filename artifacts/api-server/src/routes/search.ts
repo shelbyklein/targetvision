@@ -11,6 +11,7 @@ import {
   photoCollectionsTable,
   photoEmbeddingsTable,
   aiAnalysisEventsTable,
+  photoAttributionTagsTable,
 } from "@workspace/db";
 import { SearchPhotosPagedResponse, SemanticSearchPhotosResponse } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -46,6 +47,8 @@ interface PhotoFilterOptions {
   aiStatus?: "has_description" | "failed" | "not_analysed";
   inCollection?: boolean;
   hasRating?: boolean;
+  attributionTagId?: number;
+  hasAttribution?: boolean;
 }
 
 async function applyFiltersAndFetchIds(
@@ -101,6 +104,21 @@ async function applyFiltersAndFetchIds(
       .where(inArray(photoCollectionsTable.collectionId, collectionIds));
     const tagPhotoIds = new Set(photosInCollections.map((r) => r.photoId));
     ids = ids.filter((id) => tagPhotoIds.has(id));
+  }
+
+  if (filters.attributionTagId != null) {
+    const rows = await db
+      .select({ photoId: photoAttributionTagsTable.photoId })
+      .from(photoAttributionTagsTable)
+      .where(eq(photoAttributionTagsTable.tagId, filters.attributionTagId));
+    const tagged = new Set(rows.map((r) => r.photoId));
+    ids = ids.filter((id) => tagged.has(id));
+  } else if (filters.hasAttribution != null) {
+    const rows = await db
+      .selectDistinct({ photoId: photoAttributionTagsTable.photoId })
+      .from(photoAttributionTagsTable);
+    const tagged = new Set(rows.map((r) => r.photoId));
+    ids = ids.filter((id) => (filters.hasAttribution ? tagged.has(id) : !tagged.has(id)));
   }
 
   if (filters.dateFrom || filters.dateTo) {

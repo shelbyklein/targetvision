@@ -14,4 +14,12 @@ export type ListAlbumPhotosParams = {
   inCollection?: boolean;
   hasRating?: boolean;
   aiStatus?: ListAlbumPhotosAiStatus;
+  /**
+   * Only photos carrying this attribution tag.
+   */
+  attributionTagId?: number;
+  /**
+   * true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.
+   */
+  hasAttribution?: boolean;
 };

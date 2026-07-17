@@ -11,12 +11,15 @@ import collectionsRouter from "./collections";
 import projectsRouter from "./projects";
 import adminRouter from "./admin";
 import bulkUploadBatchesRouter from "./bulkUploadBatches";
+import attributionTagsRouter from "./attributionTags";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(usersRouter);
 router.use(albumsRouter);
+// Before photosRouter so its /photos/... routes are never shadowed.
+router.use(attributionTagsRouter);
 router.use(photosRouter);
 router.use(searchRouter);
 router.use(tagsCategoriesRouter);

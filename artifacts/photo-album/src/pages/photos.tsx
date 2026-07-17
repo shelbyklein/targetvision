@@ -11,6 +11,7 @@ import {
   useListUsers,
   getListUsersQueryKey,
   useListAlbums,
+  useListAttributionTags,
   useGetMe,
   useRerunPhotoAnalysis,
   useBulkDeletePhotos,
@@ -58,6 +59,7 @@ function parseSearch(search: string) {
     dateFrom: p.get("dateFrom") ?? "",
     dateTo: p.get("dateTo") ?? "",
     aiStatus: p.get("aiStatus") ?? "",
+    attribution: p.get("attribution") ?? "",
   };
 }
 
@@ -107,7 +109,7 @@ export default function PhotosPage() {
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const urlParams = parseSearch(searchString);
-  const { search, ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus } = urlParams;
+  const { search, ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus, attribution } = urlParams;
   const [inputValue, setInputValue] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
@@ -148,6 +150,7 @@ export default function PhotosPage() {
   const { data: me } = useGetMe();
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin", queryKey: getListUsersQueryKey() } });
   const { data: albums } = useListAlbums();
+  const { data: attributionTagList } = useListAttributionTags();
 
   const filters = {
     ...(search && { search }),
@@ -158,9 +161,12 @@ export default function PhotosPage() {
     ...(dateTo && { dateTo }),
     ...(showHidden && { includeHidden: true }),
     ...(aiStatus && { aiStatus: aiStatus as "has_description" | "failed" | "not_analysed" }),
+    // "" = no filter; "none" = untagged; otherwise a specific attribution tag id.
+    ...(attribution && attribution !== "none" && { attributionTagId: parseInt(attribution, 10) }),
+    ...(attribution === "none" && { hasAttribution: false }),
   };
 
-  const hasActiveFilters = !!(ratingMin || uploaderId || albumId || dateFrom || dateTo || aiStatus);
+  const hasActiveFilters = !!(ratingMin || uploaderId || albumId || dateFrom || dateTo || aiStatus || attribution);
 
   // Server-side pagination with an infinite-scroll accumulator (mirrors album-detail).
   const [offset, setOffset] = useState(0);
@@ -260,6 +266,7 @@ export default function PhotosPage() {
       dateFrom: "",
       dateTo: "",
       aiStatus: "",
+      attribution: "",
     });
   }
 
@@ -350,7 +357,7 @@ export default function PhotosPage() {
               Filters
               {hasActiveFilters && (
                 <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                  {[ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus].filter(Boolean).length}
+                  {[ratingMin, uploaderId, albumId, dateFrom, dateTo, aiStatus, attribution].filter(Boolean).length}
                 </span>
               )}
             </Button>
@@ -498,6 +505,29 @@ export default function PhotosPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {attributionTagList && attributionTagList.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attribution</label>
+                  <Select
+                    value={attribution || "__all__"}
+                    onValueChange={(v) =>
+                      handleFilterChange("attribution", v === "__all__" ? "" : v)
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-sm" data-testid="filter-attribution">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All</SelectItem>
+                      <SelectItem value="none">No attribution</SelectItem>
+                      {attributionTagList.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             {hasActiveFilters && (
@@ -552,6 +582,17 @@ export default function PhotosPage() {
                       ? "Failed"
                       : "Not analysed"}
                     <button type="button" onClick={() => handleFilterChange("aiStatus", "")} className="ml-1 hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                {attribution && (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    Attribution:{" "}
+                    {attribution === "none"
+                      ? "None"
+                      : attributionTagList?.find((t) => String(t.id) === attribution)?.name ?? attribution}
+                    <button type="button" onClick={() => handleFilterChange("attribution", "")} className="ml-1 hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>

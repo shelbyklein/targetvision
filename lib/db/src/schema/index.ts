@@ -11,3 +11,4 @@ export * from "./appSettings";
 export * from "./aiAnalysisEvents";
 export * from "./aiBackfillRuns";
 export * from "./bulkUploadBatches";
+export * from "./attributionTags";

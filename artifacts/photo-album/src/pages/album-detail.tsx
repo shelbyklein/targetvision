@@ -13,6 +13,9 @@ import {
   useDismissPhotoNewCollectionSuggestion,
   useRerunPhotoAnalysis,
   useBulkDeletePhotos,
+  useListAttributionTags,
+  useBulkSetAttributionTags,
+  getGetPhotoQueryKey,
   getGetAlbumQueryKey,
   getListAlbumPhotosQueryKey,
   getListAlbumsQueryKey,
@@ -131,6 +134,10 @@ export default function AlbumDetail() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const { mutate: bulkDelete, isPending: bulkDeleting } = useBulkDeletePhotos();
+  const [bulkTagId, setBulkTagId] = useState<string>("");
+  const { data: attributionTags } = useListAttributionTags();
+  const { mutate: bulkSetAttribution, isPending: bulkTagging } = useBulkSetAttributionTags();
+  const [filterAttribution, setFilterAttribution] = useState<string>("all");
   const [offset, setOffset] = useState(0);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<number>>(new Set());
@@ -144,12 +151,13 @@ export default function AlbumDetail() {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
 
-  const hasActiveFilters = filterInCollection != null || filterHasRating != null || filterAiStatus != null;
+  const hasActiveFilters = filterInCollection != null || filterHasRating != null || filterAiStatus != null || filterAttribution !== "all";
 
   function clearFilters() {
     setFilterInCollection(undefined);
     setFilterHasRating(undefined);
     setFilterAiStatus(undefined);
+    setFilterAttribution("all");
   }
 
   const photosParams = {
@@ -159,6 +167,11 @@ export default function AlbumDetail() {
     ...(filterInCollection != null ? { inCollection: filterInCollection } : {}),
     ...(filterHasRating != null ? { hasRating: filterHasRating } : {}),
     ...(filterAiStatus != null ? { aiStatus: filterAiStatus } : {}),
+    // "all" = no filter; "none" = untagged; otherwise a specific tag id.
+    ...(filterAttribution !== "all" && filterAttribution !== "none"
+      ? { attributionTagId: parseInt(filterAttribution, 10) }
+      : {}),
+    ...(filterAttribution === "none" ? { hasAttribution: false } : {}),
   };
   const { data: photosPage, isLoading: photosPageLoading, isFetching: photosFetching } = useListAlbumPhotos(albumId, photosParams, {
     query: {
@@ -194,7 +207,7 @@ export default function AlbumDetail() {
   useEffect(() => {
     setOffset(0);
     setAllPhotos([]);
-  }, [albumId, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus]);
+  }, [albumId, showHiddenLocal, filterInCollection, filterHasRating, filterAiStatus, filterAttribution]);
 
   useEffect(() => {
     if (photosPage === undefined) return;
@@ -327,6 +340,28 @@ export default function AlbumDetail() {
   function exitSelectMode() {
     setIsSelectMode(false);
     setSelectedIds(new Set());
+  }
+
+  function handleBulkAttribution(mode: "add" | "remove") {
+    const tagId = parseInt(bulkTagId, 10);
+    if (!Number.isInteger(tagId) || selectedIds.size === 0) return;
+    const ids = [...selectedIds];
+    bulkSetAttribution(
+      { data: { ids, tagId, mode } },
+      {
+        onSuccess: (r) => {
+          toast({
+            title:
+              mode === "add"
+                ? `Tagged ${r.updated} photo${r.updated !== 1 ? "s" : ""}`
+                : `Removed tag from ${r.updated} photo${r.updated !== 1 ? "s" : ""}`,
+          });
+          // Refresh the affected photos' detail queries so lightbox pills stay accurate.
+          for (const id of ids) qc.invalidateQueries({ queryKey: getGetPhotoQueryKey(id) });
+        },
+        onError: () => toast({ title: "Bulk attribution failed", variant: "destructive" }),
+      },
+    );
   }
 
   function handleBulkDelete() {
@@ -647,6 +682,21 @@ export default function AlbumDetail() {
               </SelectContent>
             </Select>
 
+            {attributionTags && attributionTags.length > 0 && (
+              <Select value={filterAttribution} onValueChange={setFilterAttribution}>
+                <SelectTrigger className="h-8 w-44 text-sm" data-testid="filter-attribution-select">
+                  <SelectValue placeholder="Attribution" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any attribution</SelectItem>
+                  <SelectItem value="none">No attribution</SelectItem>
+                  {attributionTags.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             {hasActiveFilters && (
               <button
                 type="button"
@@ -945,7 +995,39 @@ export default function AlbumDetail() {
           <span className="text-sm text-muted-foreground">
             {selectedIds.size} photo{selectedIds.size !== 1 ? "s" : ""} selected
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {attributionTags && attributionTags.length > 0 && selectedIds.size > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Select value={bulkTagId} onValueChange={setBulkTagId}>
+                  <SelectTrigger className="h-8 w-40 text-sm" data-testid="bulk-attribution-select">
+                    <SelectValue placeholder="Attribution tag…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {attributionTags.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!bulkTagId || bulkTagging}
+                  onClick={() => handleBulkAttribution("add")}
+                  data-testid="bulk-attribution-add"
+                >
+                  {bulkTagging ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tag"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!bulkTagId || bulkTagging}
+                  onClick={() => handleBulkAttribution("remove")}
+                  data-testid="bulk-attribution-remove"
+                >
+                  Untag
+                </Button>
+              </div>
+            )}
             {me?.role === "admin" && selectedIds.size > 0 && (
               <Button
                 variant="destructive"

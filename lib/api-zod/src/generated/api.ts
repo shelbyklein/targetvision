@@ -240,6 +240,15 @@ export const GetAlbumTopRatedResponseItem = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -321,6 +330,16 @@ export const ListAlbumPhotosQueryParams = zod.object({
   inCollection: zod.coerce.boolean().optional(),
   hasRating: zod.coerce.boolean().optional(),
   aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
+  attributionTagId: zod.coerce
+    .number()
+    .optional()
+    .describe("Only photos carrying this attribution tag."),
+  hasAttribution: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.",
+    ),
 });
 
 export const ListAlbumPhotosResponse = zod.object({
@@ -373,6 +392,17 @@ export const ListAlbumPhotosResponse = zod.object({
         .optional()
         .describe(
           "Projects this photo currently belongs to (membership only).",
+        ),
+      attributionTags: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            name: zod.string(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Attribution \/ usage-rights tags this photo is cleared for.",
         ),
       aiDescription: zod.string().nullish(),
       latestAiStatus: zod
@@ -503,6 +533,17 @@ export const SearchPhotosResponse = zod.object({
         .describe(
           "Projects this photo currently belongs to (membership only).",
         ),
+      attributionTags: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            name: zod.string(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Attribution \/ usage-rights tags this photo is cleared for.",
+        ),
       aiDescription: zod.string().nullish(),
       latestAiStatus: zod
         .union([
@@ -606,6 +647,15 @@ export const SemanticSearchPhotosResponseItem = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -705,6 +755,15 @@ export const ListSimilarPhotosResponseItem = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -761,6 +820,16 @@ export const ListPhotosQueryParams = zod.object({
   includeHidden: zod.coerce.boolean().optional(),
   albumId: zod.coerce.number().optional(),
   aiStatus: zod.enum(["has_description", "failed", "not_analysed"]).optional(),
+  attributionTagId: zod.coerce
+    .number()
+    .optional()
+    .describe("Only photos carrying this attribution tag."),
+  hasAttribution: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.",
+    ),
   limit: zod.coerce.number().optional(),
   offset: zod.coerce.number().optional(),
 });
@@ -815,6 +884,17 @@ export const ListPhotosResponse = zod.object({
         .optional()
         .describe(
           "Projects this photo currently belongs to (membership only).",
+        ),
+      attributionTags: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            name: zod.string(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Attribution \/ usage-rights tags this photo is cleared for.",
         ),
       aiDescription: zod.string().nullish(),
       latestAiStatus: zod
@@ -883,6 +963,79 @@ export const BulkDeletePhotosResponse = zod.object({
 });
 
 /**
+ * @summary List attribution / usage-rights tags
+ */
+export const ListAttributionTagsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+});
+export const ListAttributionTagsResponse = zod.array(
+  ListAttributionTagsResponseItem,
+);
+
+/**
+ * @summary Create an attribution tag (admin only)
+ */
+export const CreateAttributionTagBody = zod.object({
+  name: zod.string(),
+});
+
+/**
+ * @summary Rename an attribution tag (admin only)
+ */
+export const UpdateAttributionTagParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateAttributionTagBody = zod.object({
+  name: zod.string(),
+});
+
+export const UpdateAttributionTagResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+});
+
+/**
+ * @summary Delete an attribution tag (admin only)
+ */
+export const DeleteAttributionTagParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Add or remove one attribution tag on many photos (admin only)
+ */
+export const BulkSetAttributionTagsBody = zod.object({
+  ids: zod.array(zod.number()),
+  tagId: zod.number(),
+  mode: zod.enum(["add", "remove"]),
+});
+
+export const BulkSetAttributionTagsResponse = zod.object({
+  updated: zod.number(),
+});
+
+/**
+ * @summary Tag a photo with an attribution tag
+ */
+export const AddPhotoAttributionTagParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddPhotoAttributionTagBody = zod.object({
+  tagId: zod.number(),
+});
+
+/**
+ * @summary Remove an attribution tag from a photo
+ */
+export const RemovePhotoAttributionTagParams = zod.object({
+  id: zod.coerce.number(),
+  tagId: zod.coerce.number(),
+});
+
+/**
  * @summary Get a single photo by ID
  */
 export const GetPhotoParams = zod.object({
@@ -936,6 +1089,15 @@ export const GetPhotoResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1034,6 +1196,15 @@ export const UpdatePhotoResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1137,6 +1308,15 @@ export const AddPhotoTagResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1230,6 +1410,15 @@ export const RemovePhotoTagResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1326,6 +1515,15 @@ export const AddPhotoCategoryResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1419,6 +1617,15 @@ export const RemovePhotoCategoryResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1517,6 +1724,15 @@ export const RatePhotoResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -1609,6 +1825,15 @@ export const ClearPhotoRatingResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2124,6 +2349,17 @@ export const GetDashboardStatsResponse = zod.object({
         .describe(
           "Projects this photo currently belongs to (membership only).",
         ),
+      attributionTags: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            name: zod.string(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Attribution \/ usage-rights tags this photo is cleared for.",
+        ),
       aiDescription: zod.string().nullish(),
       latestAiStatus: zod
         .union([
@@ -2214,6 +2450,15 @@ export const GetRecentPhotosResponseItem = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2303,6 +2548,15 @@ export const GetTopRatedPhotosResponseItem = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2478,6 +2732,17 @@ export const GetCollectionResponse = zod.object({
           .describe(
             "Projects this photo currently belongs to (membership only).",
           ),
+        attributionTags: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Attribution \/ usage-rights tags this photo is cleared for.",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -2596,6 +2861,17 @@ export const UpdateCollectionResponse = zod.object({
           .optional()
           .describe(
             "Projects this photo currently belongs to (membership only).",
+          ),
+        attributionTags: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Attribution \/ usage-rights tags this photo is cleared for.",
           ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
@@ -2720,6 +2996,15 @@ export const ListCollectionNegativePhotosResponseItem = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -2853,6 +3138,17 @@ export const SetCollectionCoverResponse = zod.object({
           .describe(
             "Projects this photo currently belongs to (membership only).",
           ),
+        attributionTags: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Attribution \/ usage-rights tags this photo is cleared for.",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -2954,6 +3250,15 @@ export const GetSmartCollectionPhotosResponseItem = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3087,6 +3392,17 @@ export const GetProjectResponse = zod.object({
           .describe(
             "Projects this photo currently belongs to (membership only).",
           ),
+        attributionTags: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Attribution \/ usage-rights tags this photo is cleared for.",
+          ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
           .union([
@@ -3201,6 +3517,17 @@ export const UpdateProjectResponse = zod.object({
           .optional()
           .describe(
             "Projects this photo currently belongs to (membership only).",
+          ),
+        attributionTags: zod
+          .array(
+            zod.object({
+              id: zod.number(),
+              name: zod.string(),
+            }),
+          )
+          .optional()
+          .describe(
+            "Attribution \/ usage-rights tags this photo is cleared for.",
           ),
         aiDescription: zod.string().nullish(),
         latestAiStatus: zod
@@ -3326,6 +3653,15 @@ export const AcceptPhotoSuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3419,6 +3755,15 @@ export const DismissPhotoSuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3512,6 +3857,15 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3605,6 +3959,15 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3698,6 +4061,15 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3791,6 +4163,15 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3888,6 +4269,15 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([
@@ -3981,6 +4371,15 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
     )
     .optional()
     .describe("Projects this photo currently belongs to (membership only)."),
+  attributionTags: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        name: zod.string(),
+      }),
+    )
+    .optional()
+    .describe("Attribution \/ usage-rights tags this photo is cleared for."),
   aiDescription: zod.string().nullish(),
   latestAiStatus: zod
     .union([

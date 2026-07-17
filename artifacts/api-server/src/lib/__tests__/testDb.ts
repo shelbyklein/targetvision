@@ -24,7 +24,7 @@ if (!/test/i.test(dbUrl)) {
 
 export async function resetDb(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE TABLE photo_embeddings, ai_analysis_events, photo_collections, collection_negative_photos, project_photos, projects, collections, ratings, photos, albums, "user", session, account, verification, users RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE photo_embeddings, ai_analysis_events, photo_collections, collection_negative_photos, project_photos, projects, collections, ratings, photo_attribution_tags, attribution_tags, photos, albums, "user", session, account, verification, users RESTART IDENTITY CASCADE`,
   );
 }
 

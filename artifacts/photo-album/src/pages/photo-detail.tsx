@@ -39,6 +39,7 @@ import { PhotoDetailHeader } from "@/components/photo-detail/PhotoDetailHeader";
 import { AiDescriptionPanel } from "@/components/photo-detail/AiDescriptionPanel";
 import { RatingsPanel } from "@/components/photo-detail/RatingsPanel";
 import { CollectionsPanel } from "@/components/photo-detail/CollectionsPanel";
+import { AttributionPanel } from "@/components/photo-detail/AttributionPanel";
 import { PhotoActions } from "@/components/photo-detail/PhotoActions";
 import { SimilarPhotosPanel } from "@/components/photo-detail/SimilarPhotosPanel";
 import {
@@ -415,6 +416,8 @@ export default function PhotoDetail() {
               onCreateNewCollection={handleCreateNewCollection}
               onAddProject={handleAddProject}
             />
+
+            <AttributionPanel photoId={photoId} photoTags={photo.attributionTags} />
 
             <Separator />
 

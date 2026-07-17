@@ -167,6 +167,11 @@ export interface PhotoProjectMembership {
   name: string;
 }
 
+export interface AttributionTag {
+  id: number;
+  name: string;
+}
+
 export interface SuggestedCollection {
   id: number;
   title: string;
@@ -217,6 +222,8 @@ export interface Photo {
   photoCollections?: CollectionSummary[];
   /** Projects this photo currently belongs to (membership only). */
   photoProjects?: PhotoProjectMembership[];
+  /** Attribution / usage-rights tags this photo is cleared for. */
+  attributionTags?: AttributionTag[];
   /** @nullable */
   aiDescription?: string | null;
   /**
@@ -327,6 +334,32 @@ export interface ProjectUpdate {
 
 export interface ProjectPhotoInput {
   photoId: number;
+}
+
+export interface AttributionTagInput {
+  name: string;
+}
+
+export interface PhotoAttributionTagInput {
+  tagId: number;
+}
+
+export type BulkAttributionTagsMode =
+  (typeof BulkAttributionTagsMode)[keyof typeof BulkAttributionTagsMode];
+
+export const BulkAttributionTagsMode = {
+  add: "add",
+  remove: "remove",
+} as const;
+
+export interface BulkAttributionTags {
+  ids: number[];
+  tagId: number;
+  mode: BulkAttributionTagsMode;
+}
+
+export interface BulkAttributionTagsResult {
+  updated: number;
 }
 
 export interface PhotoUpdate {
@@ -577,6 +610,14 @@ export type ListAlbumPhotosParams = {
   inCollection?: boolean;
   hasRating?: boolean;
   aiStatus?: ListAlbumPhotosAiStatus;
+  /**
+   * Only photos carrying this attribution tag.
+   */
+  attributionTagId?: number;
+  /**
+   * true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.
+   */
+  hasAttribution?: boolean;
 };
 
 export type ListAlbumPhotosAiStatus =
@@ -630,6 +671,14 @@ export type ListPhotosParams = {
   includeHidden?: boolean;
   albumId?: number;
   aiStatus?: ListPhotosAiStatus;
+  /**
+   * Only photos carrying this attribution tag.
+   */
+  attributionTagId?: number;
+  /**
+   * true = photos with any attribution tag; false = untagged photos. Ignored when attributionTagId is set.
+   */
+  hasAttribution?: boolean;
   limit?: number;
   offset?: number;
 };
