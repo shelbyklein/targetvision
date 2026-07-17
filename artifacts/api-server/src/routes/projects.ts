@@ -16,8 +16,18 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { logger } from "../lib/logger";
+import { ZipArchive } from "archiver";
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
+
+// Keep only characters that are safe inside a Content-Disposition filename.
+function safeZipName(name: string): string {
+  const cleaned = name.replace(/[^a-zA-Z0-9 _.-]+/g, "").trim().replace(/\s+/g, "-");
+  return (cleaned || "project") + ".zip";
+}
 
 async function buildProjectResponse(projectId: number) {
   const [row] = await db
@@ -49,6 +59,66 @@ async function buildProjectResponse(projectId: number) {
     coverPhotoThumbnailKey: coverPhotoRow[0]?.thumbnailKey ?? null,
   };
 }
+
+// Streams a zip of every photo in the project (original files, store-level —
+// JPEGs don't recompress). Entries keep their original filenames; collisions
+// get a "-<photoId>" suffix. Missing storage objects are skipped, not fatal.
+router.get("/projects/:id/download", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const projectId = parseInt(raw, 10);
+  if (!Number.isInteger(projectId)) {
+    res.status(400).json({ error: "Invalid project id" });
+    return;
+  }
+
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const photos = await db
+    .select({ id: photosTable.id, filename: photosTable.filename, storageKey: photosTable.storageKey })
+    .from(projectPhotosTable)
+    .innerJoin(photosTable, eq(projectPhotosTable.photoId, photosTable.id))
+    .where(eq(projectPhotosTable.projectId, projectId))
+    .orderBy(sql`${projectPhotosTable.addedAt} asc`);
+
+  if (photos.length === 0) {
+    res.status(404).json({ error: "Project has no photos" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeZipName(project.name)}"`);
+
+  const archive = new ZipArchive({ store: true });
+  archive.on("warning", (err: Error) => logger.warn({ err, projectId }, "Project zip warning"));
+  archive.on("error", (err: Error) => {
+    logger.error({ err, projectId }, "Project zip failed");
+    res.destroy(err);
+  });
+  archive.pipe(res);
+
+  const usedNames = new Set<string>();
+  for (const p of photos) {
+    if (!p.storageKey) continue;
+    let name = p.filename?.trim() || `photo-${p.id}.jpg`;
+    if (usedNames.has(name)) {
+      const dot = name.lastIndexOf(".");
+      name = dot > 0 ? `${name.slice(0, dot)}-${p.id}${name.slice(dot)}` : `${name}-${p.id}`;
+    }
+    usedNames.add(name);
+    try {
+      const file = await objectStorageService.getObjectEntityFile(p.storageKey);
+      archive.append(file.createReadStream(), { name });
+    } catch (err) {
+      logger.warn({ err, photoId: p.id, projectId }, "Skipping photo missing from storage in project download");
+    }
+  }
+
+  await archive.finalize();
+});
 
 router.get("/projects", requireAuth, async (req, res): Promise<void> => {
   const rows = await db

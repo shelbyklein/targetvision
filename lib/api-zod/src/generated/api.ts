@@ -3362,6 +3362,13 @@ export const CreateProjectBody = zod.object({
 });
 
 /**
+ * @summary Download all of a project's photos as a zip archive (streamed)
+ */
+export const DownloadProjectPhotosParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Get a single project with its photos
  */
 export const GetProjectParams = zod.object({

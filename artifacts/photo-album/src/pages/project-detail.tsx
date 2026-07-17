@@ -40,7 +40,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, FolderKanban, Pencil, Trash2, Star, X, CalendarDays } from "lucide-react";
+import { ArrowLeft, FolderKanban, Pencil, Trash2, Star, X, CalendarDays, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function toLight(photo: Photo): LightboxPhoto {
@@ -257,8 +257,19 @@ export default function ProjectDetail() {
             </div>
           </div>
 
-          {canManage && (
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {project.photoCount > 0 && (
+              <Button asChild variant="outline" size="sm" className="gap-1.5" data-testid="bulk-download-btn">
+                {/* Plain link: the browser streams the zip and shows its own
+                    download progress; no client-side buffering. */}
+                <a href={`/api/projects/${projectId}/download`}>
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Bulk download</span>
+                </a>
+              </Button>
+            )}
+            {canManage && (
+              <>
               <RenameProjectDialog
                 projectId={projectId}
                 currentName={project.name}
@@ -297,8 +308,9 @@ export default function ProjectDetail() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
 
         {photos.length === 0 ? (
