@@ -15,6 +15,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { formatDate } from "@/lib/format-date";
 import { FadeImage } from "@/components/ui/fade-image";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { GridZoomControl } from "@/components/GridZoomControl";
+import { useGridZoom } from "@/hooks/useGridZoom";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { Button } from "@/components/ui/button";
@@ -155,6 +157,7 @@ export default function ProjectDetail() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
+  const { zoom, setZoom } = useGridZoom();
 
   const { data: project, isLoading } = useGetProject(projectId, {
     query: { enabled: !!projectId, queryKey: getGetProjectQueryKey(projectId) },
@@ -325,9 +328,14 @@ export default function ProjectDetail() {
             </p>
           </div>
         ) : (
+          <>
+          <div className="flex items-center justify-end">
+            <GridZoomControl zoom={zoom} setZoom={setZoom} />
+          </div>
           <MasonryGrid
             items={photos}
             getKey={(photo) => photo.id}
+            columnCountOverride={zoom}
             data-testid="project-photo-grid"
             renderItem={(photo) => (
               <div
@@ -389,6 +397,7 @@ export default function ProjectDetail() {
               </div>
             )}
           />
+          </>
         )}
       </div>
 

@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { GridZoomControl } from "@/components/GridZoomControl";
+import { useGridZoom } from "@/hooks/useGridZoom";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { useLocation, useSearch } from "wouter";
@@ -179,6 +181,7 @@ export default function SearchPage() {
   // Open results in the lightbox (like the dashboard) instead of navigating to
   // the detail page, so the user stays in their search results.
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
+  const { zoom, setZoom } = useGridZoom();
   const [pendingAdvance, setPendingAdvance] = useState(false);
   const selectedIndex = selectedPhoto ? photos.findIndex((p) => p.id === selectedPhoto.id) : -1;
   const hasPrev = selectedIndex > 0;
@@ -568,10 +571,13 @@ export default function SearchPage() {
 
         {q && !isInitialLoading && (
           <>
-            <p className="text-sm text-muted-foreground" data-testid="search-result-count">
-              {photos.length}{hasMore ? "+" : ""} result{photos.length !== 1 ? "s" : ""} for &ldquo;{q}&rdquo;
-              {hasActiveFilters && " with active filters"}
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground" data-testid="search-result-count">
+                {photos.length}{hasMore ? "+" : ""} result{photos.length !== 1 ? "s" : ""} for &ldquo;{q}&rdquo;
+                {hasActiveFilters && " with active filters"}
+              </p>
+              {photos.length > 0 && <GridZoomControl zoom={zoom} setZoom={setZoom} />}
+            </div>
 
             {photos.length === 0 ? (
               <div
@@ -596,6 +602,7 @@ export default function SearchPage() {
               <MasonryGrid
                 items={photos}
                 getKey={(photo) => photo.id}
+                columnCountOverride={zoom}
                 data-testid="search-results"
                 renderItem={(photo) => (
                   <button
