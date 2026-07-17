@@ -55,3 +55,5 @@ migrated to issues #6–#13 on 2026-07-14.
 - [x] 2026-07-17 (feat) Smart collection cards with crossfading thumbnails (#86, #87) — collections list carries sampleThumbnailUrls (5 random member photos per request); Smart Collections page + dashboard render cards whose images crossfade every 4s (staggered, reduced-motion safe).
 - [x] 2026-07-17 (feat) Bulk upload from an album page (#85) — album header "Bulk Upload" button links to /bulk-upload?albumId=N, which preselects that album as the destination.
 - [x] 2026-07-17 (bug) Dark mode native controls — color-scheme: dark on the dark root; date-input calendar icon (and scrollbars) now render light instead of black-on-dark.
+- [x] 2026-07-17 (feat) Smart collection view: members + semantic toggle (#94) — the page always shows the collection's own members first (green check), with an "Include semantic results" checkbox (default on) appending the ranked suggestions; unchecking skips the ranking query.
+- [x] 2026-07-17 (feat) Smart collection thumbnails static until hover (#93) — cards load one random static image; the crossfade cycle only plays while hovering and holds on leave; reduced-motion stays static.
