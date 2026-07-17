@@ -57,6 +57,36 @@ export function useBackfillPerceptualHashes() {
   });
 }
 
+const NEAR_DUP_INDEX_STATUS_KEY = ["admin", "photos", "near-duplicate-index-status"] as const;
+
+export function getNearDuplicateIndexStatusQueryKey() {
+  return NEAR_DUP_INDEX_STATUS_KEY;
+}
+
+export function useNearDuplicateIndexStatus() {
+  return useQuery({
+    queryKey: NEAR_DUP_INDEX_STATUS_KEY,
+    queryFn: () =>
+      customFetch<{ pairCount: number; hashedPhotos: number }>(
+        "/api/admin/photos/near-duplicate-index-status",
+      ),
+  });
+}
+
+export function useRebuildNearDuplicateIndex() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      customFetch<{ photos: number; pairs: number }>("/api/admin/photos/near-duplicate-index/rebuild", {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: NEAR_DUP_INDEX_STATUS_KEY });
+      queryClient.invalidateQueries({ queryKey: ["admin", "photos", "near-duplicates"] });
+    },
+  });
+}
+
 export function useNearDuplicatePhotoGroups(params: NearDuplicatePhotoGroupsParams) {
   const search = new URLSearchParams({ threshold: String(params.threshold) });
   if (params.limit != null) search.set("limit", String(params.limit));

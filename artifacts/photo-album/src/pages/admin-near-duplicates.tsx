@@ -4,6 +4,8 @@ import {
   getNearDuplicatePhotoGroupsQueryKey,
   usePerceptualHashBackfillStatus,
   useBackfillPerceptualHashes,
+  useNearDuplicateIndexStatus,
+  useRebuildNearDuplicateIndex,
   useDeletePhoto,
   useBulkDeletePhotos,
   getGetRecentPhotosQueryKey,
@@ -66,6 +68,8 @@ export default function AdminNearDuplicatesPage() {
 
   const { data: statusData, isLoading: isStatusLoading } = usePerceptualHashBackfillStatus();
   const { mutate: backfill, isPending: isBackfilling } = useBackfillPerceptualHashes();
+  const { data: indexStatus } = useNearDuplicateIndexStatus();
+  const { mutate: rebuildIndex, isPending: isRebuilding } = useRebuildNearDuplicateIndex();
   const params = { threshold, limit: pageSize, offset };
   const { data: page, isLoading: pageLoading, isFetching } = useNearDuplicatePhotoGroups(params);
   const { mutate: deletePhoto, isPending: isDeleting } = useDeletePhoto();
@@ -184,6 +188,19 @@ export default function AdminNearDuplicatesPage() {
     });
   }
 
+  function handleRebuildIndex() {
+    rebuildIndex(undefined, {
+      onSuccess: (r) => {
+        toast({ title: `Index rebuilt — ${r.pairs} near-duplicate pair${r.pairs !== 1 ? "s" : ""} from ${r.photos} photos` });
+        resetList();
+      },
+      onError: () => toast({ title: "Failed to rebuild index", variant: "destructive" }),
+    });
+  }
+
+  const pairCount = indexStatus?.pairCount ?? null;
+  const needsIndex = indexStatus != null && indexStatus.pairCount === 0 && indexStatus.hashedPhotos >= 2;
+
   return (
     <AdminSectionShell
       title="Near-Duplicate Photos"
@@ -226,6 +243,41 @@ export default function AdminNearDuplicatesPage() {
         >
           <CopyCheck className="h-4 w-4 mr-2" />
           {isBackfilling ? "Computing hashes…" : "Compute missing hashes"}
+        </Button>
+      </div>
+
+      {/* Stored match index: matches are precomputed and saved so the page
+          reads them instead of rescanning the library on every visit. */}
+      <div className="rounded-lg border border-border bg-background/40 px-4 py-3 space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Near-duplicate matches are stored in the database and kept up to date as photos are added.
+          Rebuild the index once for a library that was hashed before this was added, or to force a full recompute.
+        </p>
+        <div className="text-sm" data-testid="near-dup-index-status">
+          {pairCount === null ? (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking…
+            </span>
+          ) : needsIndex ? (
+            <span className="text-amber-700 dark:text-amber-400 font-medium">
+              Index not built yet — rebuild to detect matches across your existing photos.
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4 shrink-0" /> {pairCount} stored match pair{pairCount !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant={needsIndex ? "default" : "outline"}
+          onClick={handleRebuildIndex}
+          disabled={isRebuilding}
+          data-testid="rebuild-near-dup-index-btn"
+        >
+          {isRebuilding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CopyCheck className="h-4 w-4 mr-2" />}
+          {isRebuilding ? "Rebuilding…" : "Rebuild index"}
         </Button>
       </div>
 
