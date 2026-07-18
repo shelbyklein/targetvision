@@ -600,7 +600,7 @@ export default function AlbumDetail() {
               </TooltipTrigger>
               <TooltipContent>Bulk upload to this album</TooltipContent>
             </Tooltip>
-            <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
+            <AddPhotoDialog albumId={albumId} albumTitle={album?.title} onAdded={invalidate} />
 
             {me?.role === "admin" && (
               <AlertDialog>
@@ -1001,7 +1001,7 @@ export default function AlbumDetail() {
             <p className="text-xs text-muted-foreground mb-4">
               Upload the first photos to this album.
             </p>
-            <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
+            <AddPhotoDialog albumId={albumId} albumTitle={album?.title} onAdded={invalidate} />
           </div>
         )}
       </div>

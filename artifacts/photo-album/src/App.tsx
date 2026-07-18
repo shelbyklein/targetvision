@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { BulkUploadProvider } from "@/contexts/BulkUploadContext";
+import { PhotoUploadProvider } from "@/contexts/PhotoUploadContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -60,6 +61,7 @@ function AppRoutes() {
   return (
     <QueryClientProvider client={queryClient}>
       <BulkUploadProvider>
+      <PhotoUploadProvider>
       <SessionQueryClientCacheInvalidator />
       <Switch>
         <Route path="/">
@@ -287,6 +289,7 @@ function AppRoutes() {
         </Route>
       </Switch>
       <Toaster />
+      </PhotoUploadProvider>
       </BulkUploadProvider>
     </QueryClientProvider>
   );
