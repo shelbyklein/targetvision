@@ -92,6 +92,16 @@ const NearDuplicatePhotoSchema = z.object({
   collectionCount: z.number(),
 });
 
+export const NearDuplicateIndexStatusResponse = z.object({
+  pairCount: z.number(),
+  hashedPhotos: z.number(),
+});
+
+export const RebuildNearDuplicateIndexResponse = z.object({
+  photos: z.number(),
+  pairs: z.number(),
+});
+
 export const NearDuplicatePhotoGroupsResponse = z.object({
   threshold: z.number(),
   totalGroups: z.number(),

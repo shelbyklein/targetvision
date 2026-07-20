@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { GridZoomControl } from "@/components/GridZoomControl";
+import { useGridZoom } from "@/hooks/useGridZoom";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import type { Photo } from "@workspace/api-client-react";
@@ -307,6 +309,7 @@ export default function CollectionDetail() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const { zoom, setZoom } = useGridZoom();
   const [selectedPhoto, setSelectedPhoto] = useState<LightboxPhoto | null>(null);
 
   const { data: collection, isLoading } = useGetCollection(collectionId, {
@@ -461,9 +464,14 @@ export default function CollectionDetail() {
             </p>
           </div>
         ) : (
+          <>
+          <div className="flex items-center justify-end">
+            <GridZoomControl zoom={zoom} setZoom={setZoom} />
+          </div>
           <MasonryGrid
             items={collection.photos}
             getKey={(photo) => photo.id}
+            columnCountOverride={zoom}
             data-testid="collection-photo-grid"
             renderItem={(photo) => {
               const isCover = collection.coverPhotoId === photo.id;
@@ -583,6 +591,7 @@ export default function CollectionDetail() {
               );
             }}
           />
+          </>
         )}
       </div>
 

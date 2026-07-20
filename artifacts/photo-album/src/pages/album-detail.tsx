@@ -31,6 +31,8 @@ import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { AddPhotoDialog } from "@/components/AddPhotoDialog";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { GridZoomControl } from "@/components/GridZoomControl";
+import { useGridZoom } from "@/hooks/useGridZoom";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -148,6 +150,7 @@ export default function AlbumDetail() {
   const [unratedReviewMode, setUnratedReviewMode] = useState(false);
   const prevAllPhotosLengthRef = useRef(0);
   const wasFetchingRef = useRef(false);
+  const { zoom, setZoom } = useGridZoom();
   const { data: album, isLoading: albumLoading } = useGetAlbum(albumId, {
     query: { enabled: !!albumId, queryKey: getGetAlbumQueryKey(albumId) },
   });
@@ -597,7 +600,7 @@ export default function AlbumDetail() {
               </TooltipTrigger>
               <TooltipContent>Bulk upload to this album</TooltipContent>
             </Tooltip>
-            <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
+            <AddPhotoDialog albumId={albumId} albumTitle={album?.title} onAdded={invalidate} />
 
             {me?.role === "admin" && (
               <AlertDialog>
@@ -783,6 +786,7 @@ export default function AlbumDetail() {
                 ? `${allPhotos.length}${hasMore ? "+" : ""} photo${allPhotos.length !== 1 ? "s" : ""} (filtered)`
                 : `${visiblePhotoCount} photo${visiblePhotoCount !== 1 ? "s" : ""}`}
             </span>
+            <GridZoomControl zoom={zoom} setZoom={setZoom} />
           </div>
         )}
 
@@ -797,6 +801,7 @@ export default function AlbumDetail() {
           <MasonryGrid
             items={sortedPhotos}
             getKey={(photo) => photo.id}
+            columnCountOverride={zoom}
             data-testid="photo-grid"
             renderItem={(photo) => {
               const collections = photo.photoCollections ?? [];
@@ -996,7 +1001,7 @@ export default function AlbumDetail() {
             <p className="text-xs text-muted-foreground mb-4">
               Upload the first photos to this album.
             </p>
-            <AddPhotoDialog albumId={albumId} onAdded={invalidate} />
+            <AddPhotoDialog albumId={albumId} albumTitle={album?.title} onAdded={invalidate} />
           </div>
         )}
       </div>

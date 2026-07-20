@@ -1,6 +1,6 @@
 import sharp from "sharp";
-import { and, eq, isNull, isNotNull, inArray, sql, desc } from "drizzle-orm";
-import { db, photosTable, albumsTable, photoCollectionsTable } from "@workspace/db";
+import { and, eq, isNull, isNotNull, inArray, lte, sql } from "drizzle-orm";
+import { db, photosTable, albumsTable, photoCollectionsTable, nearDuplicatePairsTable } from "@workspace/db";
 import { objectStorageClient, parseObjectPath, getPrivateObjectDir } from "./objectStorage";
 import { logger } from "./logger";
 import { createLimiter } from "./concurrencyLimit";
@@ -94,6 +94,9 @@ async function computeAndStorePerceptualHashUnbounded(photoId: number, storageKe
     const hash = await computeDHash(sourceBuffer as Buffer);
 
     await db.update(photosTable).set({ perceptualHash: hash }).where(eq(photosTable.id, photoId));
+    // Keep the stored near-duplicate index up to date: compare this photo
+    // against every other hashed photo once (O(n)) and record close pairs.
+    await insertNearDuplicatePairsForPhoto(photoId, hash);
     logger.info({ photoId }, "Perceptual hash computed and stored");
     return "success";
   } catch (err) {
@@ -170,19 +173,136 @@ export const DEFAULT_NEAR_DUP_THRESHOLD = 6;
 export const MAX_NEAR_DUP_THRESHOLD = 10;
 
 /**
- * Find groups of photos whose dHashes are within `threshold` bits of each other
- * (near-duplicates: re-encoded/resized copies as well as byte-identical ones).
- * Photos are connected transitively via union-find; only components with 2+
- * members are returned. Each photo is annotated with album-cover / collection
- * membership so the UI can warn before deleting a referenced photo.
+ * Record near-duplicate pairs for one photo: compare its dHash against every
+ * other hashed photo and store pairs within MAX_NEAR_DUP_THRESHOLD. O(n) per
+ * call; runs whenever a photo's perceptual hash is (re)computed so the stored
+ * index stays current without a full rescan. (A photo's own existing pairs are
+ * refreshed by first clearing them.)
+ */
+export async function insertNearDuplicatePairsForPhoto(photoId: number, hash: string): Promise<void> {
+  // Drop any stale pairs for this photo (hash may have changed on recompute).
+  await db
+    .delete(nearDuplicatePairsTable)
+    .where(sql`${nearDuplicatePairsTable.photoA} = ${photoId} OR ${nearDuplicatePairsTable.photoB} = ${photoId}`);
+
+  const others = await db
+    .select({ id: photosTable.id, perceptualHash: photosTable.perceptualHash })
+    .from(photosTable)
+    .where(and(isNotNull(photosTable.perceptualHash), sql`${photosTable.id} <> ${photoId}`));
+
+  const values: { photoA: number; photoB: number; distance: number }[] = [];
+  for (const o of others) {
+    const d = hammingDistance(hash, o.perceptualHash as string);
+    if (d <= MAX_NEAR_DUP_THRESHOLD) {
+      const a = Math.min(photoId, o.id);
+      const b = Math.max(photoId, o.id);
+      values.push({ photoA: a, photoB: b, distance: d });
+    }
+  }
+  if (values.length > 0) {
+    await db.insert(nearDuplicatePairsTable).values(values).onConflictDoNothing();
+  }
+}
+
+/**
+ * (Re)build the whole near-duplicate pair index from scratch — the one-time
+ * O(n²) scan, run via an admin action for a library that was hashed before the
+ * index existed. After this, page loads just read the table.
+ */
+export async function rebuildNearDuplicatePairs(): Promise<{ photos: number; pairs: number }> {
+  const rows = await db
+    .select({ id: photosTable.id, hash: photosTable.perceptualHash })
+    .from(photosTable)
+    .where(isNotNull(photosTable.perceptualHash))
+    .orderBy(photosTable.id);
+
+  await db.delete(nearDuplicatePairsTable);
+
+  const n = rows.length;
+  const values: { photoA: number; photoB: number; distance: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const hi = rows[i].hash as string;
+    for (let j = i + 1; j < n; j++) {
+      const d = hammingDistance(hi, rows[j].hash as string);
+      if (d <= MAX_NEAR_DUP_THRESHOLD) {
+        // rows are id-ascending, so rows[i].id < rows[j].id.
+        values.push({ photoA: rows[i].id, photoB: rows[j].id, distance: d });
+      }
+    }
+  }
+  // Insert in chunks to stay well under Postgres' parameter limit.
+  const CHUNK = 5000;
+  for (let k = 0; k < values.length; k += CHUNK) {
+    await db.insert(nearDuplicatePairsTable).values(values.slice(k, k + CHUNK)).onConflictDoNothing();
+  }
+  return { photos: n, pairs: values.length };
+}
+
+export async function getNearDuplicateIndexStatus(): Promise<{ pairCount: number; hashedPhotos: number }> {
+  const [pairRow] = await db.select({ c: sql<number>`count(*)::int` }).from(nearDuplicatePairsTable);
+  const [hashRow] = await db
+    .select({ c: sql<number>`count(*)::int` })
+    .from(photosTable)
+    .where(isNotNull(photosTable.perceptualHash));
+  return { pairCount: pairRow?.c ?? 0, hashedPhotos: hashRow?.c ?? 0 };
+}
+
+/**
+ * Find groups of near-duplicate photos by reading the stored pair index (no
+ * per-request rescan). Pairs within `threshold` bits are unioned transitively;
+ * only components with 2+ members are returned, annotated with album-cover /
+ * collection membership so the UI can warn before deleting a referenced photo.
  */
 export async function listNearDuplicatePhotoGroups(
   threshold: number = DEFAULT_NEAR_DUP_THRESHOLD,
 ): Promise<NearDuplicateGroup[]> {
-  const rows = await db
+  const pairs = await db
+    .select({
+      a: nearDuplicatePairsTable.photoA,
+      b: nearDuplicatePairsTable.photoB,
+      distance: nearDuplicatePairsTable.distance,
+    })
+    .from(nearDuplicatePairsTable)
+    .where(lte(nearDuplicatePairsTable.distance, threshold));
+
+  if (pairs.length === 0) return [];
+
+  // Union-find over photo ids connected by a stored pair.
+  const parent = new Map<number, number>();
+  const find = (x: number): number => {
+    let root = x;
+    while (parent.get(root) !== root && parent.get(root) !== undefined) root = parent.get(root)!;
+    return root;
+  };
+  const ensure = (x: number) => { if (!parent.has(x)) parent.set(x, x); };
+  const union = (a: number, b: number) => {
+    ensure(a); ensure(b);
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  for (const p of pairs) union(p.a, p.b);
+
+  // Bucket ids by component, tracking the largest joining distance per group.
+  const components = new Map<number, number[]>();
+  for (const id of parent.keys()) {
+    const root = find(id);
+    (components.get(root) ?? components.set(root, []).get(root)!).push(id);
+  }
+  const groupMaxDistance = new Map<number, number>();
+  for (const p of pairs) {
+    const root = find(p.a);
+    groupMaxDistance.set(root, Math.max(groupMaxDistance.get(root) ?? 0, p.distance));
+  }
+
+  const groupRoots = [...components.entries()].filter(([, ids]) => ids.length > 1);
+  if (groupRoots.length === 0) return [];
+
+  const groupedIds = groupRoots.flatMap(([, ids]) => ids);
+
+  // Load display details + collection counts for the grouped photos.
+  const detailRows = await db
     .select({
       id: photosTable.id,
-      perceptualHash: photosTable.perceptualHash,
       albumId: photosTable.albumId,
       albumTitle: albumsTable.title,
       coverPhotoId: albumsTable.coverPhotoId,
@@ -193,72 +313,27 @@ export async function listNearDuplicatePhotoGroups(
     })
     .from(photosTable)
     .leftJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-    .where(isNotNull(photosTable.perceptualHash))
-    .orderBy(desc(photosTable.createdAt));
+    .where(inArray(photosTable.id, groupedIds));
+  const detailById = new Map(detailRows.map((r) => [r.id, r]));
 
-  const n = rows.length;
-  if (n < 2) return [];
-
-  // Union-find over photos connected by dHash Hamming distance <= threshold.
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const find = (i: number): number => {
-    while (parent[i] !== i) {
-      parent[i] = parent[parent[i]];
-      i = parent[i];
-    }
-    return i;
-  };
-  const union = (a: number, b: number) => {
-    const ra = find(a);
-    const rb = find(b);
-    if (ra !== rb) parent[ra] = rb;
-  };
-
-  // Track the largest pairwise distance that joined each component, for display.
-  const hashes = rows.map((r) => r.perceptualHash as string);
-  const pairMaxDistance = new Map<number, number>();
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = hammingDistance(hashes[i], hashes[j]);
-      if (d <= threshold) {
-        union(i, j);
-        const root = find(i);
-        pairMaxDistance.set(root, Math.max(pairMaxDistance.get(root) ?? 0, d));
-      }
-    }
-  }
-
-  // Bucket photo indices by component root.
-  const components = new Map<number, number[]>();
-  for (let i = 0; i < n; i++) {
-    const root = find(i);
-    const list = components.get(root) ?? [];
-    list.push(i);
-    components.set(root, list);
-  }
-
-  const groupRoots = [...components.entries()].filter(([, idx]) => idx.length > 1);
-  if (groupRoots.length === 0) return [];
-
-  // Collection counts for only the photos that appear in a near-dup group.
-  const groupedIds = groupRoots.flatMap(([, idx]) => idx.map((i) => rows[i].id));
   const collectionCounts = new Map<number, number>();
-  if (groupedIds.length > 0) {
-    const countRows = await db
-      .select({ photoId: photoCollectionsTable.photoId, cnt: sql<number>`count(*)::int` })
-      .from(photoCollectionsTable)
-      .where(inArray(photoCollectionsTable.photoId, groupedIds))
-      .groupBy(photoCollectionsTable.photoId);
-    for (const c of countRows) collectionCounts.set(c.photoId, c.cnt);
-  }
+  const countRows = await db
+    .select({ photoId: photoCollectionsTable.photoId, cnt: sql<number>`count(*)::int` })
+    .from(photoCollectionsTable)
+    .where(inArray(photoCollectionsTable.photoId, groupedIds))
+    .groupBy(photoCollectionsTable.photoId);
+  for (const c of countRows) collectionCounts.set(c.photoId, c.cnt);
 
-  const groups: NearDuplicateGroup[] = groupRoots.map(([root, idx]) => ({
-    // Newest-first within a group (rows are already sorted that way).
-    key: hashes[idx[0]],
-    distance: pairMaxDistance.get(find(root)) ?? 0,
-    photos: idx.map((i) => {
-      const r = rows[i];
-      return {
+  const groups: NearDuplicateGroup[] = groupRoots.map(([root, ids]) => {
+    // Newest first within a group.
+    const sorted = ids
+      .map((id) => detailById.get(id))
+      .filter((r): r is (typeof detailRows)[number] => r !== undefined)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return {
+      key: `ndp-${root}`,
+      distance: groupMaxDistance.get(root) ?? 0,
+      photos: sorted.map((r) => ({
         id: r.id,
         albumId: r.albumId,
         albumTitle: r.albumTitle ?? null,
@@ -268,9 +343,9 @@ export async function listNearDuplicatePhotoGroups(
         createdAt: r.createdAt,
         isAlbumCover: r.coverPhotoId === r.id,
         collectionCount: collectionCounts.get(r.id) ?? 0,
-      };
-    }),
-  }));
+      })),
+    };
+  }).filter((g) => g.photos.length > 1);
 
   // Largest / most-similar groups first.
   groups.sort((a, b) => b.photos.length - a.photos.length || a.distance - b.distance);

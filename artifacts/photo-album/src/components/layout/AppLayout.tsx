@@ -53,6 +53,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useBulkUploadOptional } from "@/contexts/BulkUploadContext";
+import { usePhotoUploadOptional } from "@/contexts/PhotoUploadContext";
+import { PhotoUploadBanner } from "@/components/PhotoUploadBanner";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -104,7 +106,10 @@ function humanSpeed(bps: number): string {
 function useBannerVisible() {
   const [location] = useLocation();
   const ctx = useBulkUploadOptional();
-  return !!(ctx && (ctx.phase === "uploading" || ctx.phase === "complete") && location !== "/bulk-upload");
+  const photoCtx = usePhotoUploadOptional();
+  const bulk = !!(ctx && (ctx.phase === "uploading" || ctx.phase === "complete") && location !== "/bulk-upload");
+  const photo = !!(photoCtx && photoCtx.phase !== "idle");
+  return bulk || photo;
 }
 
 function BulkUploadBanner() {
@@ -722,6 +727,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </SidebarInset>
 
       <BulkUploadBanner />
+      <PhotoUploadBanner />
     </SidebarProvider>
   );
 }

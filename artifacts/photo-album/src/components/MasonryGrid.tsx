@@ -50,6 +50,12 @@ export interface MasonryGridProps<T> {
   /** Render one item. Should return the existing item markup unchanged. */
   renderItem: (item: T, index: number) => React.ReactNode;
   columns?: MasonryColumns;
+  /**
+   * Fixed column count that overrides the responsive `columns` at every
+   * breakpoint. Used by the per-grid zoom control; the zoom value is stored
+   * per browser (each device keeps its own), so a fixed count is fine.
+   */
+  columnCountOverride?: number;
   className?: string;
   "data-testid"?: string;
 }
@@ -73,10 +79,13 @@ export function MasonryGrid<T>({
   getKey,
   renderItem,
   columns = DEFAULT_COLUMNS,
+  columnCountOverride,
   className,
   "data-testid": testId,
 }: MasonryGridProps<T>) {
-  const columnCount = useColumnCount(columns);
+  const responsiveCount = useColumnCount(columns);
+  const columnCount =
+    columnCountOverride && columnCountOverride > 0 ? columnCountOverride : responsiveCount;
 
   const buckets: { item: T; index: number }[][] = React.useMemo(() => {
     const cols: { item: T; index: number }[][] = Array.from(

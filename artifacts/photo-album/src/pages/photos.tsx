@@ -3,6 +3,8 @@ import { FadeImage } from "@/components/ui/fade-image";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { MasonryGrid } from "@/components/MasonryGrid";
+import { GridZoomControl } from "@/components/GridZoomControl";
+import { useGridZoom } from "@/hooks/useGridZoom";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { useLocation, useSearch, Link } from "wouter";
@@ -151,6 +153,7 @@ export default function PhotosPage() {
   const { data: users } = useListUsers({ query: { enabled: me?.role === "admin", queryKey: getListUsersQueryKey() } });
   const { data: albums } = useListAlbums();
   const { data: attributionTagList } = useListAttributionTags();
+  const { zoom, setZoom } = useGridZoom();
 
   const filters = {
     ...(search && { search }),
@@ -361,6 +364,7 @@ export default function PhotosPage() {
                 </span>
               )}
             </Button>
+            <GridZoomControl zoom={zoom} setZoom={setZoom} />
           </div>
         </div>
 
@@ -613,6 +617,7 @@ export default function PhotosPage() {
             <MasonryGrid
               items={allPhotos}
               getKey={(photo) => photo.id}
+              columnCountOverride={zoom}
               data-testid="photos-grid"
               renderItem={(photo) => {
                 const collections = photo.photoCollections ?? [];

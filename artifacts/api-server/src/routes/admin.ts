@@ -39,6 +39,8 @@ import {
   PerceptualHashBackfillStatusResponse,
   BackfillPerceptualHashesResponse,
   NearDuplicatePhotoGroupsResponse,
+  NearDuplicateIndexStatusResponse,
+  RebuildNearDuplicateIndexResponse,
   ListAiBackfillRunsResponse,
   GetAiAutoBackfillSettingsResponse,
   UpdateAiAutoBackfillSettingsBody,
@@ -74,6 +76,8 @@ import {
   countPhotosWithoutPerceptualHash,
   backfillPerceptualHashes,
   listNearDuplicatePhotoGroups,
+  getNearDuplicateIndexStatus,
+  rebuildNearDuplicatePairs,
   DEFAULT_NEAR_DUP_THRESHOLD,
   MAX_NEAR_DUP_THRESHOLD,
 } from "../lib/perceptualHash";
@@ -605,8 +609,8 @@ router.get("/admin/photos/near-duplicates", requireAdmin, async (req, res): Prom
   const rawOffset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
   const offset = Number.isInteger(rawOffset) && rawOffset > 0 ? rawOffset : 0;
 
-  // Clustering is inherently whole-library (union-find over all hashes); the
-  // page slice just keeps the response payload small.
+  // Reads the stored pair index (no per-request rescan); the page slice keeps
+  // the response payload small.
   const allGroups = await listNearDuplicatePhotoGroups(threshold);
   const page = allGroups.slice(offset, offset + limit);
   res.json(
@@ -630,6 +634,15 @@ router.get("/admin/photos/near-duplicates", requireAdmin, async (req, res): Prom
       })),
     }),
   );
+});
+
+router.get("/admin/photos/near-duplicate-index-status", requireAdmin, async (_req, res): Promise<void> => {
+  res.json(NearDuplicateIndexStatusResponse.parse(await getNearDuplicateIndexStatus()));
+});
+
+router.post("/admin/photos/near-duplicate-index/rebuild", requireAdmin, async (_req, res): Promise<void> => {
+  const result = await rebuildNearDuplicatePairs();
+  res.json(RebuildNearDuplicateIndexResponse.parse(result));
 });
 
 router.get("/admin/ai-analysis/backfill-status", requireAdmin, async (_req, res): Promise<void> => {
