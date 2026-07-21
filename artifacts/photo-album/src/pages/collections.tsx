@@ -5,8 +5,10 @@ import {
   useListCollections,
   useCreateCollection,
   useUpdateCollection,
+  useReorderCollections,
   getListCollectionsQueryKey,
 } from "@workspace/api-client-react";
+import { useCardReorder } from "@/hooks/useCardReorder";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -222,6 +224,18 @@ export default function Collections() {
       )
     : collections;
 
+  const reorderMutation = useReorderCollections();
+  const reorder = useCardReorder({
+    ids: (filtered ?? []).map((c) => c.id),
+    // Reordering a tag-filtered subset is ambiguous — drag only on the full list.
+    disabled: !!activeTag,
+    onCommit: (orderedIds) =>
+      reorderMutation.mutate(
+        { data: { ids: orderedIds } },
+        { onSuccess: () => qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() }) },
+      ),
+  });
+
   function refetch() {
     qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
   }
@@ -276,11 +290,15 @@ export default function Collections() {
           </div>
         ) : filtered && filtered.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="collections-grid">
-            {filtered.map((collection) => {
+            {reorder.arrange(filtered, (c) => c.id).map((collection) => {
               const tags = collection.tags ?? [];
               const canManage = me && (me.id === collection.createdById || me.role === "admin");
               return (
-                <div key={collection.id} className="relative group">
+                <div
+                  key={collection.id}
+                  className={`relative group${reorder.draggingId === collection.id ? " opacity-50" : ""}`}
+                  {...reorder.handlers(collection.id)}
+                >
                   {canManage && (
                     <RenameCollectionDialog
                       collectionId={collection.id}

@@ -47,6 +47,16 @@ export interface UserRoleUpdate {
   role: UserRoleUpdateRole;
 }
 
+export interface ReorderBody {
+  /** Entity ids in the desired display order (position = index). */
+  ids: number[];
+}
+
+export interface ReorderResult {
+  /** Number of rows whose sort position was set. */
+  updated: number;
+}
+
 export interface Album {
   id: number;
   ownerId: number;

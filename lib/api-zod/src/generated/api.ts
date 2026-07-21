@@ -126,6 +126,20 @@ export const CreateAlbumBody = zod.object({
 });
 
 /**
+ * Assigns sort positions from the given id order. Ids omitted from the list keep their relative order after the listed ones.
+ * @summary Set the manual card order of albums
+ */
+export const ReorderAlbumsBody = zod.object({
+  ids: zod
+    .array(zod.number())
+    .describe("Entity ids in the desired display order (position = index)."),
+});
+
+export const ReorderAlbumsResponse = zod.object({
+  updated: zod.number().describe("Number of rows whose sort position was set."),
+});
+
+/**
  * @summary Get a single album by ID
  */
 export const GetAlbumParams = zod.object({
@@ -3012,6 +3026,20 @@ export const CreateCollectionBody = zod.object({
 });
 
 /**
+ * Assigns sort positions from the given id order. Shared by the Collections and Smart Collections pages (same rows).
+ * @summary Set the manual card order of collections
+ */
+export const ReorderCollectionsBody = zod.object({
+  ids: zod
+    .array(zod.number())
+    .describe("Entity ids in the desired display order (position = index)."),
+});
+
+export const ReorderCollectionsResponse = zod.object({
+  updated: zod.number().describe("Number of rows whose sort position was set."),
+});
+
+/**
  * @summary Get a single collection with its photos
  */
 export const GetCollectionParams = zod.object({
@@ -3768,6 +3796,19 @@ export const CreateProjectBody = zod.object({
  */
 export const DownloadProjectPhotosParams = zod.object({
   id: zod.coerce.number(),
+});
+
+/**
+ * @summary Set the manual card order of projects
+ */
+export const ReorderProjectsBody = zod.object({
+  ids: zod
+    .array(zod.number())
+    .describe("Entity ids in the desired display order (position = index)."),
+});
+
+export const ReorderProjectsResponse = zod.object({
+  updated: zod.number().describe("Number of rows whose sort position was set."),
 });
 
 /**

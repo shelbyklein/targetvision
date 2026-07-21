@@ -4,8 +4,10 @@ import { FadeImage } from "@/components/ui/fade-image";
 import {
   useListProjects,
   useCreateProject,
+  useReorderProjects,
   getListProjectsQueryKey,
 } from "@workspace/api-client-react";
+import { useCardReorder } from "@/hooks/useCardReorder";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -109,6 +111,13 @@ export default function Projects() {
     qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
   }
 
+  const reorderMutation = useReorderProjects();
+  const reorder = useCardReorder({
+    ids: (projects ?? []).map((p) => p.id),
+    onCommit: (orderedIds) =>
+      reorderMutation.mutate({ data: { ids: orderedIds } }, { onSuccess: refetch }),
+  });
+
   return (
     <AppLayout>
       <div className="space-y-6" data-testid="projects-page">
@@ -136,8 +145,12 @@ export default function Projects() {
           </div>
         ) : projects && projects.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="projects-grid">
-            {projects.map((project) => (
-              <div key={project.id} className="relative group">
+            {reorder.arrange(projects, (p) => p.id).map((project) => (
+              <div
+                key={project.id}
+                className={`relative group${reorder.draggingId === project.id ? " opacity-50" : ""}`}
+                {...reorder.handlers(project.id)}
+              >
                 <Link href={`/projects/${project.id}`}>
                   <div
                     className="rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:shadow-md transition-shadow"
