@@ -165,6 +165,28 @@ paths:
         "401":
           description: Unauthorized
 
+  /albums/order:
+    put:
+      operationId: reorderAlbums
+      tags: [albums]
+      summary: Set the manual card order of albums
+      description: Assigns sort positions from the given id order. Ids omitted from the list keep their relative order after the listed ones.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderBody"
+      responses:
+        "200":
+          description: Order updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReorderResult"
+        "401":
+          description: Unauthorized
+
   /albums/{id}:
     get:
       operationId: getAlbum
@@ -1516,6 +1538,28 @@ paths:
         "401":
           description: Unauthorized
 
+  /collections/order:
+    put:
+      operationId: reorderCollections
+      tags: [collections]
+      summary: Set the manual card order of collections
+      description: Assigns sort positions from the given id order. Shared by the Collections and Smart Collections pages (same rows).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderBody"
+      responses:
+        "200":
+          description: Order updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReorderResult"
+        "401":
+          description: Unauthorized
+
   /collections/{id}:
     get:
       operationId: getCollection
@@ -1826,6 +1870,27 @@ paths:
           description: Unauthorized
         "404":
           description: Project not found or has no photos
+
+  /projects/order:
+    put:
+      operationId: reorderProjects
+      tags: [projects]
+      summary: Set the manual card order of projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderBody"
+      responses:
+        "200":
+          description: Order updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReorderResult"
+        "401":
+          description: Unauthorized
 
   /projects/{id}:
     get:
@@ -2268,6 +2333,24 @@ components:
         role:
           type: string
           enum: [admin, member]
+
+    ReorderBody:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          description: Entity ids in the desired display order (position = index).
+          items:
+            type: integer
+
+    ReorderResult:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+          description: Number of rows whose sort position was set.
 
     Album:
       type: object

@@ -15,6 +15,9 @@ export const projectsTable = pgTable("projects", {
   createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  // Manual card position on the Projects page (drag-to-reorder). Null = never
+  // placed; lists sort sort_order ASC nulls-last, then updated_at desc.
+  sortOrder: integer("sort_order"),
 });
 
 export const projectPhotosTable = pgTable(

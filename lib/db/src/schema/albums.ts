@@ -11,6 +11,10 @@ export const albumsTable = pgTable("albums", {
   eventDate: text("event_date"),
   coverPhotoId: integer("cover_photo_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Manual card position on the Albums page (drag-to-reorder). Null = never
+  // placed; lists sort sort_order ASC (Postgres puts nulls last), then fall
+  // back to the previous default order, so new albums append at the end.
+  sortOrder: integer("sort_order"),
 });
 
 export const insertAlbumSchema = createInsertSchema(albumsTable).omit({ id: true, createdAt: true });

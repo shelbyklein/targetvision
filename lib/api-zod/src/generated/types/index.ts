@@ -79,6 +79,8 @@ export * from "./projectUpdate";
 export * from "./ratingInput";
 export * from "./registrationSettings";
 export * from "./registrationSettingsUpdate";
+export * from "./reorderBody";
+export * from "./reorderResult";
 export * from "./searchPhotosPagedResponse";
 export * from "./searchPhotosParams";
 export * from "./semanticSearchPhotosParams";

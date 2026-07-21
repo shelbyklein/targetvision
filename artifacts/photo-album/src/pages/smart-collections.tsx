@@ -1,14 +1,33 @@
 import { Link } from "wouter";
-import { useListCollections } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useListCollections,
+  useReorderCollections,
+  getListCollectionsQueryKey,
+} from "@workspace/api-client-react";
+import { useCardReorder } from "@/hooks/useCardReorder";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { CrossfadeThumb } from "@/components/CrossfadeThumb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles } from "lucide-react";
 
 export default function SmartCollections() {
+  const qc = useQueryClient();
   const { data: collections, isLoading } = useListCollections();
 
   const smartCollections = collections ?? [];
+
+  // Shares the collections sort order — this page and Collections render the
+  // same rows, so dragging here rearranges both.
+  const reorderMutation = useReorderCollections();
+  const reorder = useCardReorder({
+    ids: smartCollections.map((c) => c.id),
+    onCommit: (orderedIds) =>
+      reorderMutation.mutate(
+        { data: { ids: orderedIds } },
+        { onSuccess: () => qc.invalidateQueries({ queryKey: getListCollectionsQueryKey() }) },
+      ),
+  });
 
   return (
     <AppLayout>
@@ -38,10 +57,10 @@ export default function SmartCollections() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="smart-collections-list">
-            {smartCollections.map((col) => (
-              <Link key={col.id} href={`/smart-collections/${col.id}`}>
+            {reorder.arrange(smartCollections, (c) => c.id).map((col) => (
+              <Link key={col.id} href={`/smart-collections/${col.id}`} {...reorder.handlers(col.id)}>
                 <div
-                  className="relative rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md hover:border-amber-400/50 transition-all"
+                  className={`relative rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md hover:border-amber-400/50 transition-all${reorder.draggingId === col.id ? " opacity-50" : ""}`}
                   data-testid={`smart-collection-card-${col.id}`}
                 >
                   <CrossfadeThumb

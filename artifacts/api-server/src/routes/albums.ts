@@ -16,6 +16,8 @@ import {
   SetAlbumCoverResponse,
   GetAlbumTopRatedParams,
   GetAlbumTopRatedResponse,
+  ReorderAlbumsBody,
+  ReorderAlbumsResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
@@ -80,6 +82,23 @@ async function buildAlbumResponse(albumId: number) {
   };
 }
 
+// Registered before the /albums/:id routes so "order" isn't captured as an id.
+router.put("/albums/order", requireAuth, async (req, res): Promise<void> => {
+  const { ids } = ReorderAlbumsBody.parse(req.body);
+  let updated = 0;
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < ids.length; i++) {
+      const rows = await tx
+        .update(albumsTable)
+        .set({ sortOrder: i })
+        .where(eq(albumsTable.id, ids[i]))
+        .returning({ id: albumsTable.id });
+      updated += rows.length;
+    }
+  });
+  res.json(ReorderAlbumsResponse.parse({ updated }));
+});
+
 router.get("/albums", requireAuth, async (req, res): Promise<void> => {
   // Fetch album rows and ratedCounts in parallel.
   // ratedCounts uses a single aggregate scan — NOT a correlated subquery per album.
@@ -95,7 +114,9 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
       .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
       .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
       .groupBy(albumsTable.id, usersTable.name)
-      .orderBy(sql`${albumsTable.createdAt} desc`),
+      // Manual card order first (ASC puts nulls last), newest of the
+      // never-placed albums after that.
+      .orderBy(sql`${albumsTable.sortOrder} asc, ${albumsTable.createdAt} desc`),
     db
       .select({
         albumId: photosTable.albumId,

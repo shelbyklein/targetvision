@@ -72,6 +72,8 @@ import type {
   RatingInput,
   RegistrationSettings,
   RegistrationSettingsUpdate,
+  ReorderBody,
+  ReorderResult,
   SearchPhotosPagedResponse,
   SearchPhotosParams,
   SemanticSearchPhotosParams,
@@ -627,6 +629,93 @@ export const useCreateAlbum = <
   TContext
 > => {
   return useMutation(getCreateAlbumMutationOptions(options));
+};
+
+/**
+ * Assigns sort positions from the given id order. Ids omitted from the list keep their relative order after the listed ones.
+ * @summary Set the manual card order of albums
+ */
+export const getReorderAlbumsUrl = () => {
+  return `/api/albums/order`;
+};
+
+export const reorderAlbums = async (
+  reorderBody: ReorderBody,
+  options?: RequestInit,
+): Promise<ReorderResult> => {
+  return customFetch<ReorderResult>(getReorderAlbumsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(reorderBody),
+  });
+};
+
+export const getReorderAlbumsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderAlbums>>,
+    TError,
+    { data: BodyType<ReorderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reorderAlbums>>,
+  TError,
+  { data: BodyType<ReorderBody> },
+  TContext
+> => {
+  const mutationKey = ["reorderAlbums"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reorderAlbums>>,
+    { data: BodyType<ReorderBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reorderAlbums(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReorderAlbumsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reorderAlbums>>
+>;
+export type ReorderAlbumsMutationBody = BodyType<ReorderBody>;
+export type ReorderAlbumsMutationError = ErrorType<void>;
+
+/**
+ * @summary Set the manual card order of albums
+ */
+export const useReorderAlbums = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderAlbums>>,
+    TError,
+    { data: BodyType<ReorderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reorderAlbums>>,
+  TError,
+  { data: BodyType<ReorderBody> },
+  TContext
+> => {
+  return useMutation(getReorderAlbumsMutationOptions(options));
 };
 
 /**
@@ -5264,6 +5353,93 @@ export const useCreateCollection = <
 };
 
 /**
+ * Assigns sort positions from the given id order. Shared by the Collections and Smart Collections pages (same rows).
+ * @summary Set the manual card order of collections
+ */
+export const getReorderCollectionsUrl = () => {
+  return `/api/collections/order`;
+};
+
+export const reorderCollections = async (
+  reorderBody: ReorderBody,
+  options?: RequestInit,
+): Promise<ReorderResult> => {
+  return customFetch<ReorderResult>(getReorderCollectionsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(reorderBody),
+  });
+};
+
+export const getReorderCollectionsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderCollections>>,
+    TError,
+    { data: BodyType<ReorderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reorderCollections>>,
+  TError,
+  { data: BodyType<ReorderBody> },
+  TContext
+> => {
+  const mutationKey = ["reorderCollections"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reorderCollections>>,
+    { data: BodyType<ReorderBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reorderCollections(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReorderCollectionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reorderCollections>>
+>;
+export type ReorderCollectionsMutationBody = BodyType<ReorderBody>;
+export type ReorderCollectionsMutationError = ErrorType<void>;
+
+/**
+ * @summary Set the manual card order of collections
+ */
+export const useReorderCollections = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderCollections>>,
+    TError,
+    { data: BodyType<ReorderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reorderCollections>>,
+  TError,
+  { data: BodyType<ReorderBody> },
+  TContext
+> => {
+  return useMutation(getReorderCollectionsMutationOptions(options));
+};
+
+/**
  * @summary Get a single collection with its photos
  */
 export const getGetCollectionUrl = (id: number) => {
@@ -6418,6 +6594,92 @@ export function useDownloadProjectPhotos<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Set the manual card order of projects
+ */
+export const getReorderProjectsUrl = () => {
+  return `/api/projects/order`;
+};
+
+export const reorderProjects = async (
+  reorderBody: ReorderBody,
+  options?: RequestInit,
+): Promise<ReorderResult> => {
+  return customFetch<ReorderResult>(getReorderProjectsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(reorderBody),
+  });
+};
+
+export const getReorderProjectsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderProjects>>,
+    TError,
+    { data: BodyType<ReorderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reorderProjects>>,
+  TError,
+  { data: BodyType<ReorderBody> },
+  TContext
+> => {
+  const mutationKey = ["reorderProjects"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reorderProjects>>,
+    { data: BodyType<ReorderBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reorderProjects(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReorderProjectsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reorderProjects>>
+>;
+export type ReorderProjectsMutationBody = BodyType<ReorderBody>;
+export type ReorderProjectsMutationError = ErrorType<void>;
+
+/**
+ * @summary Set the manual card order of projects
+ */
+export const useReorderProjects = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderProjects>>,
+    TError,
+    { data: BodyType<ReorderBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reorderProjects>>,
+  TError,
+  { data: BodyType<ReorderBody> },
+  TContext
+> => {
+  return useMutation(getReorderProjectsMutationOptions(options));
+};
 
 /**
  * @summary Get a single project with its photos

@@ -13,6 +13,8 @@ import {
   AddPhotoToProjectParams,
   AddPhotoToProjectBody,
   RemovePhotoFromProjectParams,
+  ReorderProjectsBody,
+  ReorderProjectsResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
@@ -120,6 +122,23 @@ router.get("/projects/:id/download", requireAuth, async (req, res): Promise<void
   await archive.finalize();
 });
 
+// Registered before the /projects/:id routes so "order" isn't captured as an id.
+router.put("/projects/order", requireAuth, async (req, res): Promise<void> => {
+  const { ids } = ReorderProjectsBody.parse(req.body);
+  let updated = 0;
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < ids.length; i++) {
+      const rows = await tx
+        .update(projectsTable)
+        .set({ sortOrder: i })
+        .where(eq(projectsTable.id, ids[i]))
+        .returning({ id: projectsTable.id });
+      updated += rows.length;
+    }
+  });
+  res.json(ReorderProjectsResponse.parse({ updated }));
+});
+
 router.get("/projects", requireAuth, async (req, res): Promise<void> => {
   const rows = await db
     .select({
@@ -129,7 +148,9 @@ router.get("/projects", requireAuth, async (req, res): Promise<void> => {
     .from(projectsTable)
     .leftJoin(projectPhotosTable, eq(projectsTable.id, projectPhotosTable.projectId))
     .groupBy(projectsTable.id)
-    .orderBy(sql`${projectsTable.updatedAt} desc`);
+    // Manual card order first (ASC puts nulls last), recently-touched
+    // never-placed projects after that.
+    .orderBy(sql`${projectsTable.sortOrder} asc, ${projectsTable.updatedAt} desc`);
 
   const projects = await Promise.all(
     rows.map(async (row) => {

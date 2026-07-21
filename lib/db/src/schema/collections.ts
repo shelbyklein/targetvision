@@ -13,6 +13,10 @@ export const collectionsTable = pgTable("collections", {
   // collection as a "smart collection", photos are ranked by embedding
   // similarity to this term (falls back to the title when null).
   smartQuery: text("smart_query"),
+  // Manual card position (drag-to-reorder). Shared by the Collections and
+  // Smart Collections pages — both render rows from this table. Null = never
+  // placed; lists sort sort_order ASC nulls-last, then created_at desc.
+  sortOrder: integer("sort_order"),
 });
 
 export const photoCollectionsTable = pgTable("photo_collections", {

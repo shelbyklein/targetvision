@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { FadeImage } from "@/components/ui/fade-image";
-import { useListAlbums, useCreateAlbum, getListAlbumsQueryKey } from "@workspace/api-client-react";
+import { useListAlbums, useCreateAlbum, useReorderAlbums, getListAlbumsQueryKey } from "@workspace/api-client-react";
+import { useCardReorder } from "@/hooks/useCardReorder";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -131,6 +132,20 @@ export default function Albums() {
     qc.invalidateQueries({ queryKey: getListAlbumsQueryKey() });
   }
 
+  const reorderMutation = useReorderAlbums();
+  const reorder = useCardReorder({
+    ids: visibleAlbums.map((a) => a.id),
+    onCommit: (orderedIds) => {
+      // Albums beyond the rendered window keep their relative order after
+      // the rearranged visible ones.
+      const rest = (albums ?? []).map((a) => a.id).filter((id) => !orderedIds.includes(id));
+      reorderMutation.mutate(
+        { data: { ids: [...orderedIds, ...rest] } },
+        { onSuccess: refetch },
+      );
+    },
+  });
+
   return (
     <AppLayout>
       <div className="space-y-6" data-testid="albums-page">
@@ -165,9 +180,9 @@ export default function Albums() {
         ) : albums && albums.length > 0 ? (
           <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="albums-grid">
-            {visibleAlbums.map((album) => (
-              <Link key={album.id} href={`/albums/${album.id}`}>
-                <div className="rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow" data-testid="album-card">
+            {reorder.arrange(visibleAlbums, (a) => a.id).map((album) => (
+              <Link key={album.id} href={`/albums/${album.id}`} {...reorder.handlers(album.id)}>
+                <div className={`rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow${reorder.draggingId === album.id ? " opacity-50" : ""}`} data-testid="album-card">
                   <div className="aspect-[4/3] bg-muted overflow-hidden">
                     {album.coverPhotoUrl ? (
                       <FadeImage

@@ -22,6 +22,8 @@ import {
   RemoveNegativePhotoFromCollectionParams,
   ListCollectionNegativePhotosParams,
   ListCollectionNegativePhotosResponse,
+  ReorderCollectionsBody,
+  ReorderCollectionsResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
@@ -78,6 +80,23 @@ async function buildCollectionResponse(collectionId: number) {
   };
 }
 
+// Registered before the /collections/:id routes so "order" isn't captured as an id.
+router.put("/collections/order", requireAuth, async (req, res): Promise<void> => {
+  const { ids } = ReorderCollectionsBody.parse(req.body);
+  let updated = 0;
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < ids.length; i++) {
+      const rows = await tx
+        .update(collectionsTable)
+        .set({ sortOrder: i })
+        .where(eq(collectionsTable.id, ids[i]))
+        .returning({ id: collectionsTable.id });
+      updated += rows.length;
+    }
+  });
+  res.json(ReorderCollectionsResponse.parse({ updated }));
+});
+
 router.get("/collections", requireAuth, async (req, res): Promise<void> => {
   const rows = await db
     .select({
@@ -87,7 +106,8 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
     .from(collectionsTable)
     .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
     .groupBy(collectionsTable.id)
-    .orderBy(sql`${collectionsTable.createdAt} desc`);
+    // Manual card order first (ASC puts nulls last), newest never-placed after.
+    .orderBy(sql`${collectionsTable.sortOrder} asc, ${collectionsTable.createdAt} desc`);
 
   // Up to 5 random member photos per collection, resolved to display URLs.
   // Feeds the smart-collection cards' crossfading thumbnails; random per
