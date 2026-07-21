@@ -242,6 +242,34 @@ export async function listUsageRights(): Promise<{ name: string; photoCount: num
   return rows.map((r) => ({ ...r, photoCount: Number(r.photoCount) }));
 }
 
+/**
+ * Load a photo's original bytes for the HTTP gateway's download route —
+ * remote clients can't reach signed URLs on the local storage endpoint.
+ */
+export async function getOriginalFile(
+  id: number,
+): Promise<{ buffer: Buffer; contentType: string; filename: string } | null> {
+  const [row] = await db
+    .select({ storageKey: photosTable.storageKey, filename: photosTable.filename })
+    .from(photosTable)
+    .where(eq(photosTable.id, id));
+  if (!row?.storageKey?.startsWith("/objects/")) return null;
+  try {
+    const { file } = resolveObjectFile(row.storageKey);
+    const [exists] = await file.exists();
+    if (!exists) return null;
+    const [buffer] = await file.download();
+    const [metadata] = await file.getMetadata().catch(() => [{ contentType: undefined }]);
+    return {
+      buffer: buffer as Buffer,
+      contentType: (metadata?.contentType as string) || "application/octet-stream",
+      filename: row.filename || `photo-${id}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function loadThumbnailImage(
   thumbnailKey: string | null,
 ): Promise<{ base64: string; mimeType: string } | null> {

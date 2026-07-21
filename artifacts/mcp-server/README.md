@@ -51,9 +51,32 @@ serve the dev database instead):
 }
 ```
 
-**ChatGPT / remote clients**: not wired yet. Needs the streamable-HTTP
-transport exposed through the cloudflared tunnel plus an auth story (bearer
-token at minimum) before going public — see issue #106. Note that signed
-storage URLs point at the local fake-gcs endpoint, so remote clients could
-see metadata and inline thumbnails but not fetch full-res files until that's
-addressed.
+## Remote access (off-machine clients)
+
+`start:http` runs the same tools over streamable HTTP (port `MCP_HTTP_PORT`,
+default 8086), exposed publicly via the cloudflared tunnel:
+
+```sh
+pnpm run mcp:http   # from the repo root; the prod launcher also starts it
+```
+
+Requires `MCP_AUTH_TOKEN` in `.env` (>= 24 chars; `openssl rand -hex 32`) —
+the server refuses to start without it, since the tunnel makes it public.
+Auth is accepted two ways:
+
+- `Authorization: Bearer <token>` header — e.g. Claude Code on another machine:
+  `claude mcp add --scope user --transport http targetvision
+  https://targetvision-mcp.shelbyklein.com/mcp --header "Authorization: Bearer <token>"`
+- Token as the first URL path segment — for clients whose connector UI only
+  accepts a URL (claude.ai custom connectors):
+  `https://targetvision-mcp.shelbyklein.com/<token>/mcp`.
+  The URL is the secret; treat it like a password.
+
+Signed storage URLs only resolve on the local network, so in HTTP mode
+`get_photo` instead returns download links through the gateway's own
+authenticated `GET /photo/:id/original` route, built from `MCP_PUBLIC_URL`.
+`GET /healthz` is the only unauthenticated route.
+
+Tunnel side: a Cloudflare Zero Trust public hostname must map
+`targetvision-mcp.shelbyklein.com` → `http://<host>:8086` (the tunnel is
+remotely managed, so this lives in the dashboard, not a local config).

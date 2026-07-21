@@ -12,6 +12,7 @@
     "dev:web": "PORT=8083 pnpm --filter @workspace/photo-album run dev",
     "dev:web:dev": "PORT=8085 API_PORT=8084 pnpm --filter @workspace/photo-album run dev",
     "dev:mobile": "pnpm --filter @workspace/mobile run dev",
+    "mcp:http": "pnpm --filter @workspace/mcp-server run start:http",
     "dev:storage": "docker compose up -d",
     "dev": "pnpm run dev:storage && concurrently -n api,web \"pnpm run dev:api\" \"pnpm run dev:web\""
   },

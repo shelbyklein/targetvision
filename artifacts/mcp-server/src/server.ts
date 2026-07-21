@@ -17,7 +17,17 @@ function textBlock(text: string): { type: "text"; text: string } {
   return { type: "text", text };
 }
 
-export async function startServer(): Promise<void> {
+export interface ServerOptions {
+  /**
+   * Base URL of the HTTP gateway (including any auth prefix). When set,
+   * get_photo returns `<base>/photo/<id>/original` download links instead of
+   * signed storage URLs — signed URLs point at the local storage endpoint,
+   * which remote clients can't reach.
+   */
+  externalDownloadBase?: string;
+}
+
+export function createServer(options: ServerOptions = {}): McpServer {
   const server = new McpServer({
     name: "targetvision",
     version: "1.0.0",
@@ -98,7 +108,10 @@ export async function startServer(): Promise<void> {
       if (!detail) {
         return { content: [textBlock(`Photo #${id} not found.`)], isError: true };
       }
-      const { photo, fullResUrl } = detail;
+      const { photo } = detail;
+      const fullResUrl = options.externalDownloadBase
+        ? `${options.externalDownloadBase}/photo/${photo.id}/original`
+        : detail.fullResUrl;
       const lines = [
         `photo #${photo.id}`,
         photo.filename && `file: ${photo.filename}`,
@@ -150,6 +163,10 @@ export async function startServer(): Promise<void> {
     },
   );
 
+  return server;
+}
+
+export async function startServer(): Promise<void> {
   const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await createServer().connect(transport);
 }

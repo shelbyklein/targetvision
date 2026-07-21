@@ -37,3 +37,6 @@ function Start-IfNotListening([int]$port, [string]$script, [string]$log) {
 
 Start-IfNotListening 8080 'dev:api' "$logDir\api.log"
 Start-IfNotListening 8083 'dev:web' "$logDir\web.log"
+# MCP HTTP gateway (remote photo search via the tunnel); exits at boot unless
+# MCP_AUTH_TOKEN is set in .env.
+Start-IfNotListening 8086 'mcp:http' "$logDir\mcp.log"
