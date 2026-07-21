@@ -11,6 +11,8 @@ import {
   ratingsTable,
   attributionTagsTable,
   photoAttributionTagsTable,
+  collectionsTable,
+  photoCollectionsTable,
 } from "@workspace/db";
 import { embedText } from "@workspace/api-server/src/lib/aiEmbedding";
 import { withIterativeVectorScan } from "@workspace/api-server/src/lib/vectorSearch";
@@ -116,6 +118,8 @@ export interface SearchOptions {
   exclude?: string;
   minRating?: number;
   rightsTag?: string;
+  /** Restrict to photos tagged to this person (People page groups). */
+  person?: string;
 }
 
 export async function searchPhotos({
@@ -124,6 +128,7 @@ export async function searchPhotos({
   exclude,
   minRating,
   rightsTag,
+  person,
 }: SearchOptions): Promise<{ results: PhotoSummary[]; note?: string }> {
   const posVec = await embedText(query);
   if (!posVec) {
@@ -167,6 +172,41 @@ export async function searchPhotos({
     }
   }
 
+  // Person filter: restrict the ranking to that person's tagged photos.
+  let personPhotoIds: Set<number> | null = null;
+  if (person?.trim()) {
+    const [match] = await db
+      .select({ id: collectionsTable.id })
+      .from(collectionsTable)
+      .where(and(eq(collectionsTable.kind, "person"), ilike(collectionsTable.title, person.trim())));
+    if (!match) {
+      const people = await listPeople();
+      return {
+        results: [],
+        note: `No person named "${person}". Available: ${people.map((p) => p.name).join(", ") || "(none yet)"}.`,
+      };
+    }
+    const rows = await db
+      .select({ photoId: photoCollectionsTable.photoId })
+      .from(photoCollectionsTable)
+      .where(eq(photoCollectionsTable.collectionId, match.id));
+    personPhotoIds = new Set(rows.map((r) => r.photoId));
+    if (personPhotoIds.size === 0) {
+      return { results: [], note: `"${person}" has no tagged photos yet.` };
+    }
+  }
+
+  // Intersect the id-restricting filters before handing them to the ranking.
+  let restrictIds: Set<number> | null = null;
+  if (rightsPhotoIds && personPhotoIds) {
+    restrictIds = new Set([...personPhotoIds].filter((id) => rightsPhotoIds.has(id)));
+    if (restrictIds.size === 0) {
+      return { results: [], note: `No photos of "${person}" are cleared for "${rightsTag}".` };
+    }
+  } else {
+    restrictIds = rightsPhotoIds ?? personPhotoIds;
+  }
+
   // Post-ranking filters thin the list, so over-fetch when any are active.
   const hasPostFilters = minRating != null || rightsPhotoIds != null;
   const fetchLimit = hasPostFilters ? Math.min(500, wanted * 10) : wanted;
@@ -180,7 +220,7 @@ export async function searchPhotos({
       .where(
         and(
           eq(photosTable.isHidden, false),
-          rightsPhotoIds ? inArray(photoEmbeddingsTable.photoId, [...rightsPhotoIds]) : undefined,
+          restrictIds ? inArray(photoEmbeddingsTable.photoId, [...restrictIds]) : undefined,
         ),
       )
       .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
@@ -229,6 +269,21 @@ export async function listAlbums(): Promise<{ id: number; title: string; photoCo
     .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
     .groupBy(albumsTable.id)
     .orderBy(sql`${albumsTable.sortOrder} asc, ${albumsTable.createdAt} desc`);
+  return rows.map((r) => ({ ...r, photoCount: Number(r.photoCount) }));
+}
+
+export async function listPeople(): Promise<{ name: string; description: string | null; photoCount: number }[]> {
+  const rows = await db
+    .select({
+      name: collectionsTable.title,
+      description: collectionsTable.description,
+      photoCount: count(photoCollectionsTable.photoId),
+    })
+    .from(collectionsTable)
+    .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
+    .where(eq(collectionsTable.kind, "person"))
+    .groupBy(collectionsTable.id)
+    .orderBy(collectionsTable.title);
   return rows.map((r) => ({ ...r, photoCount: Number(r.photoCount) }));
 }
 

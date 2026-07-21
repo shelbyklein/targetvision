@@ -52,6 +52,7 @@ import type {
   HealthStatus,
   ListAlbumPhotosPagedResponse,
   ListAlbumPhotosParams,
+  ListCollectionsParams,
   ListDuplicatePhotoGroupsParams,
   ListDuplicatePhotoGroupsResponse,
   ListPhotosPagedResponse,
@@ -5192,43 +5193,59 @@ export const useRequestUploadUrl = <
 };
 
 /**
- * @summary List all collections
+ * @summary List collections of one kind
  */
-export const getListCollectionsUrl = () => {
-  return `/api/collections`;
+export const getListCollectionsUrl = (params?: ListCollectionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/collections?${stringifiedParams}`
+    : `/api/collections`;
 };
 
 export const listCollections = async (
+  params?: ListCollectionsParams,
   options?: RequestInit,
 ): Promise<CollectionSummary[]> => {
-  return customFetch<CollectionSummary[]>(getListCollectionsUrl(), {
+  return customFetch<CollectionSummary[]>(getListCollectionsUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getListCollectionsQueryKey = () => {
-  return [`/api/collections`] as const;
+export const getListCollectionsQueryKey = (params?: ListCollectionsParams) => {
+  return [`/api/collections`, ...(params ? [params] : [])] as const;
 };
 
 export const getListCollectionsQueryOptions = <
   TData = Awaited<ReturnType<typeof listCollections>>,
   TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listCollections>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: ListCollectionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCollections>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListCollectionsQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListCollectionsQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listCollections>>> = ({
     signal,
-  }) => listCollections({ signal, ...requestOptions });
+  }) => listCollections(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listCollections>>,
@@ -5243,21 +5260,24 @@ export type ListCollectionsQueryResult = NonNullable<
 export type ListCollectionsQueryError = ErrorType<void>;
 
 /**
- * @summary List all collections
+ * @summary List collections of one kind
  */
 
 export function useListCollections<
   TData = Awaited<ReturnType<typeof listCollections>>,
   TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listCollections>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListCollectionsQueryOptions(options);
+>(
+  params?: ListCollectionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCollections>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCollectionsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

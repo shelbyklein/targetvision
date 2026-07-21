@@ -5,9 +5,12 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
+import type { CollectionInputKind } from "./collectionInputKind";
 
 export interface CollectionInput {
   /** @minLength 1 */
   title: string;
   description?: string;
+  /** Defaults to 'collection'. */
+  kind?: CollectionInputKind;
 }

@@ -32,7 +32,7 @@ import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
-import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, ImageIcon, Search, Ban, X } from "lucide-react";
+import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, ImageIcon, Search, Ban, X, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // Page size for ranked suggestions; scrolling keeps fetching deeper pages of
@@ -74,7 +74,10 @@ function sortPhotos(photos: RichPhoto[], sort: SortOption): RichPhoto[] {
   }
 }
 
-export default function SmartCollectionDetail() {
+// Also serves People (collections with kind='person') at /people/:id — same
+// members-first + similarity-suggestions experience, person-flavoured copy.
+export default function SmartCollectionDetail({ variant = "collection" }: { variant?: "collection" | "person" } = {}) {
+  const isPerson = variant === "person";
   const { id } = useParams<{ id: string }>();
   const collectionId = parseInt(id, 10);
   const queryClient = useQueryClient();
@@ -278,14 +281,18 @@ export default function SmartCollectionDetail() {
     <AppLayout>
       <div className="space-y-6" data-testid="smart-collection-detail-page">
         <div className="flex items-start gap-3">
-          <Link href="/dashboard">
+          <Link href={isPerson ? "/people" : "/dashboard"}>
             <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" aria-label="Back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+              {isPerson ? (
+                <Users className="h-4 w-4 text-sky-500 shrink-0" />
+              ) : (
+                <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+              )}
               {collectionLoading ? (
                 <Skeleton className="h-7 w-48" />
               ) : (
@@ -294,7 +301,9 @@ export default function SmartCollectionDetail() {
             </div>
             <p className="text-sm text-muted-foreground">
               {isMemberDriven
-                ? `Photos similar to the ${memberCount} in this collection`
+                ? isPerson
+                  ? `Photos similar to the ${memberCount} tagged to this person`
+                  : `Photos similar to the ${memberCount} in this collection`
                 : "Photos ranked by visual similarity to the search term"}
             </p>
             {collection?.description && (

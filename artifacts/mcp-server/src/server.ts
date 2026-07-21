@@ -5,6 +5,7 @@ import {
   searchPhotos,
   getPhotoDetail,
   listAlbums,
+  listPeople,
   listUsageRights,
   loadThumbnailImage,
 } from "./photoLibrary.js";
@@ -48,11 +49,12 @@ export function createServer(options: ServerOptions = {}): McpServer {
         exclude: z.string().optional().describe("Concept to steer away from (e.g. 'crowds', 'indoor range')"),
         minRating: z.number().min(1).max(5).optional().describe("Only photos with at least this average star rating"),
         rightsTag: z.string().optional().describe("Only photos cleared for this usage-rights tag (see list_usage_rights)"),
+        person: z.string().optional().describe("Only photos tagged to this person (see list_people)"),
         includeImages: z.boolean().default(true).describe("Inline thumbnail images in the response"),
       },
     },
-    async ({ query, count, exclude, minRating, rightsTag, includeImages }) => {
-      const { results, note } = await searchPhotos({ query, count, exclude, minRating, rightsTag });
+    async ({ query, count, exclude, minRating, rightsTag, person, includeImages }) => {
+      const { results, note } = await searchPhotos({ query, count, exclude, minRating, rightsTag, person });
       if (results.length === 0) {
         return { content: [textBlock(note ?? `No photos matched "${query}".`)] };
       }
@@ -144,6 +146,24 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const albums = await listAlbums();
       const lines = albums.map((a) => `#${a.id} ${a.title} — ${a.photoCount} photos`);
       return { content: [textBlock(lines.join("\n") || "No albums.")] };
+    },
+  );
+
+  server.registerTool(
+    "list_people",
+    {
+      title: "List people",
+      description:
+        "List the people (athletes etc.) photos can be tagged to, with tagged-photo counts. Pass a name " +
+        "as search_photos' person to restrict results to that person's photos.",
+      inputSchema: {},
+    },
+    async () => {
+      const people = await listPeople();
+      const lines = people.map(
+        (p) => `${p.name} — ${p.photoCount} photo${p.photoCount !== 1 ? "s" : ""}${p.description ? ` (${p.description})` : ""}`,
+      );
+      return { content: [textBlock(lines.join("\n") || "No people defined yet.")] };
     },
   );
 

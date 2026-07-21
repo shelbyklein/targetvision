@@ -98,6 +98,9 @@ router.put("/collections/order", requireAuth, async (req, res): Promise<void> =>
 });
 
 router.get("/collections", requireAuth, async (req, res): Promise<void> => {
+  // Defaults to plain collections so existing consumers never see people;
+  // the People pages ask for kind=person explicitly.
+  const kind = req.query.kind === "person" ? "person" : "collection";
   const rows = await db
     .select({
       collection: collectionsTable,
@@ -105,6 +108,7 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
     })
     .from(collectionsTable)
     .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
+    .where(eq(collectionsTable.kind, kind))
     .groupBy(collectionsTable.id)
     // Manual card order first (ASC puts nulls last), newest never-placed after.
     .orderBy(sql`${collectionsTable.sortOrder} asc, ${collectionsTable.createdAt} desc`);

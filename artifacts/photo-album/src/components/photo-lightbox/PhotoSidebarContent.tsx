@@ -1,4 +1,4 @@
-import { FolderOpen, FolderKanban, Copyright, Loader2, EyeOff, Eye, Check, Plus, ImageIcon, Sparkles, Trash2 } from "lucide-react";
+import { FolderOpen, FolderKanban, Copyright, Loader2, EyeOff, Eye, Check, Plus, ImageIcon, Sparkles, Trash2, Users } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   useGetPhoto,
@@ -72,6 +72,10 @@ export function PhotoSidebarContent({
     query: { queryKey: getGetPhotoQueryKey(photoId) },
   });
   const { data: allCollections, isLoading: collectionsLoading } = useListCollections();
+  // People are person-kind collections; membership uses the same photo_collections
+  // rows, so fullPhoto.photoCollections covers both and the add/remove mutations
+  // are shared with the Collections pills above.
+  const { data: allPeople } = useListCollections({ kind: "person" });
   const { mutate: addToCollection, isPending: adding } = useAddPhotoToCollection();
   const { mutate: removeFromCollection, isPending: removing } = useRemovePhotoFromCollection();
   const { mutate: updatePhoto, isPending: updatingVisibility } = useUpdatePhoto();
@@ -553,6 +557,45 @@ export function PhotoSidebarContent({
           </div>
         ) : (
           <p className="text-xs text-white/40">No projects yet.</p>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-white/10 pt-3">
+        <div className="flex items-center gap-1.5 text-white/70">
+          <Users className="h-3.5 w-3.5" />
+          <span className="text-xs font-semibold uppercase tracking-wide">People</span>
+        </div>
+
+        {allPeople && allPeople.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5" data-testid="lightbox-people-pills">
+            {allPeople.map((person) => {
+              const isIn = (fullPhoto?.photoCollections ?? []).some((c) => c.id === person.id);
+              return (
+                <button
+                  key={person.id}
+                  type="button"
+                  onClick={() =>
+                    isIn ? handleRemove(person.id, person.title) : handleAdd(String(person.id))
+                  }
+                  disabled={adding || removing}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50",
+                    isIn
+                      ? "bg-white text-gray-900 border border-white hover:bg-white/85"
+                      : "bg-transparent text-white/65 border border-white/30 hover:bg-white/10 hover:text-white hover:border-white/50"
+                  )}
+                  data-testid={`lightbox-person-pill-${person.id}`}
+                  aria-label={isIn ? `Remove from ${person.title}` : `Tag ${person.title}`}
+                  aria-pressed={isIn}
+                >
+                  {isIn ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
+                  {person.title}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-white/40">No people yet — add them on the People page.</p>
         )}
       </div>
 

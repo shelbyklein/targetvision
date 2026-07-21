@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 
 // ── Dashboard layout (order + visibility), persisted per browser ─────────────
-const SECTION_IDS = ["stats", "smart", "collections", "projects", "albums", "favorites", "recent"] as const;
+const SECTION_IDS = ["stats", "smart", "collections", "projects", "people", "albums", "favorites", "recent"] as const;
 type SectionId = (typeof SECTION_IDS)[number];
 
 const SECTION_LABELS: Record<SectionId, string> = {
@@ -50,6 +50,7 @@ const SECTION_LABELS: Record<SectionId, string> = {
   smart: "Smart Collections",
   collections: "Collections",
   projects: "Projects",
+  people: "People",
   albums: "Albums",
   favorites: "Favorites",
   recent: "Recent",
@@ -391,6 +392,7 @@ export default function Dashboard() {
   const { data: recentPhotos, isLoading: recentLoading } = useGetRecentPhotos();
   const { data: topRated, isLoading: topLoading } = useGetTopRatedPhotos();
   const { data: collections, isLoading: collectionsLoading } = useListCollections();
+  const { data: peopleList, isLoading: peopleLoading } = useListCollections({ kind: "person" });
   const { data: albums, isLoading: albumsLoading } = useListAlbums();
   const { data: projects, isLoading: projectsLoading } = useListProjects();
 
@@ -520,6 +522,23 @@ export default function Dashboard() {
               photoCount={project.photoCount}
               coverUrl={project.coverPhotoThumbnailKey ? `/api/storage${project.coverPhotoThumbnailKey}` : project.coverPhotoUrl}
               fallbackIcon={FolderKanban}
+            />
+          ))}
+        </CardGrid>
+      </section>
+    ),
+    people: () => (
+      <section>
+        <SectionHeader title="People" href="/people" />
+        <CardGrid loading={peopleLoading} empty={!peopleList || peopleList.length === 0}>
+          {(peopleList ?? []).map((person) => (
+            <CoverCard
+              key={person.id}
+              href={`/people/${person.id}`}
+              title={person.title}
+              photoCount={person.photoCount}
+              coverUrl={person.coverPhotoUrl}
+              fallbackIcon={Users}
             />
           ))}
         </CardGrid>

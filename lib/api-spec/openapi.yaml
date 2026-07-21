@@ -1506,7 +1506,15 @@ paths:
     get:
       operationId: listCollections
       tags: [collections]
-      summary: List all collections
+      summary: List collections of one kind
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          description: Which kind to list. Defaults to 'collection', so existing consumers never see people.
+          schema:
+            type: string
+            enum: [collection, person]
       responses:
         "200":
           description: List of collections
@@ -2648,6 +2656,10 @@ components:
           type: array
           items:
             type: string
+        kind:
+          type: string
+          enum: [collection, person]
+          description: People are collections with kind 'person'.
         createdAt:
           type: string
           format: date-time
@@ -2672,6 +2684,10 @@ components:
           type: ["string", "null"]
         smartQuery:
           type: ["string", "null"]
+        kind:
+          type: string
+          enum: [collection, person]
+          description: People are collections with kind 'person' — same machinery, listed on their own pages.
         tags:
           type: array
           items:
@@ -2693,6 +2709,10 @@ components:
           minLength: 1
         description:
           type: string
+        kind:
+          type: string
+          enum: [collection, person]
+          description: Defaults to 'collection'.
 
     CollectionUpdate:
       type: object
