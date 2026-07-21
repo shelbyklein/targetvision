@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "targetvision": {
+      "command": "pnpm",
+      "args": [
+        "--silent",
+        "--filter",
+        "@workspace/mcp-server",
+        "run",
+        "start"
+      ]
+    }
+  }
+}
