@@ -110,26 +110,33 @@ function StatCard({
   value,
   icon: Icon,
   loading,
+  href,
 }: {
   label: string;
   value?: number;
   icon: React.ComponentType<{ className?: string }>;
   loading: boolean;
+  href: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5 flex items-start gap-4" data-testid={`stat-${label.toLowerCase().replace(/\s/g, "-")}`}>
-      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <Icon className="h-5 w-5 text-primary" />
+    <Link href={href}>
+      <div
+        className="rounded-xl border border-border bg-card p-5 flex items-start gap-4 cursor-pointer hover:shadow-md hover:border-primary/40 transition-all"
+        data-testid={`stat-${label.toLowerCase().replace(/\s/g, "-")}`}
+      >
+        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground font-medium">{label}</p>
+          {loading ? (
+            <Skeleton className="h-7 w-12 mt-1" />
+          ) : (
+            <p className="text-2xl font-bold text-foreground mt-0.5">{value?.toLocaleString() ?? "0"}</p>
+          )}
+        </div>
       </div>
-      <div>
-        <p className="text-sm text-muted-foreground font-medium">{label}</p>
-        {loading ? (
-          <Skeleton className="h-7 w-12 mt-1" />
-        ) : (
-          <p className="text-2xl font-bold text-foreground mt-0.5">{value?.toLocaleString() ?? "0"}</p>
-        )}
-      </div>
-    </div>
+    </Link>
   );
 }
 
@@ -448,11 +455,13 @@ export default function Dashboard() {
 
   const sectionRenderers: Record<SectionId, () => React.ReactNode> = {
     stats: () => (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="stats-grid">
-        <StatCard label="Albums" value={stats?.totalAlbums} icon={Images} loading={statsLoading} />
-        <StatCard label="Photos" value={stats?.totalPhotos} icon={Camera} loading={statsLoading} />
-        <StatCard label="Team Members" value={stats?.totalUsers} icon={Users} loading={statsLoading} />
-        <StatCard label="Collections" value={stats?.totalCollections} icon={FolderOpen} loading={statsLoading} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" data-testid="stats-grid">
+        <StatCard label="Albums" value={stats?.totalAlbums} icon={Images} loading={statsLoading} href="/albums" />
+        <StatCard label="Photos" value={stats?.totalPhotos} icon={Camera} loading={statsLoading} href="/photos" />
+        <StatCard label="Team Members" value={stats?.totalUsers} icon={Users} loading={statsLoading} href="/admin/team" />
+        <StatCard label="Collections" value={stats?.totalCollections} icon={FolderOpen} loading={statsLoading} href="/collections" />
+        <StatCard label="Projects" value={stats?.totalProjects} icon={FolderKanban} loading={statsLoading} href="/projects" />
+        <StatCard label="People" value={stats?.totalPeople} icon={Users} loading={statsLoading} href="/people" />
       </div>
     ),
     smart: () => (

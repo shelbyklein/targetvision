@@ -12,6 +12,9 @@ export interface DashboardStats {
   totalPhotos: number;
   totalUsers: number;
   totalTags: number;
+  /** Plain collections only (kind='collection') — people are counted separately. */
   totalCollections: number;
+  totalProjects: number;
+  totalPeople: number;
   recentActivity: Photo[];
 }
