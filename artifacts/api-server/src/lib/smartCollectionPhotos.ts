@@ -7,6 +7,7 @@ import {
   photosTable,
 } from "@workspace/db";
 import { embedText } from "./aiEmbedding";
+import { withIterativeVectorScan } from "./vectorSearch";
 
 // How hard the negative examples push the query vector away from their concept.
 const NEGATIVE_LAMBDA = 0.75;
@@ -46,6 +47,7 @@ function normalize(v: number[]): number[] {
 export async function resolveSmartCollectionPhotoIds(
   collection: { id: number; title: string; smartQuery: string | null },
   topK: number,
+  offset = 0,
 ): Promise<SmartCollectionResult> {
   const [memberRows, negativeRows] = await Promise.all([
     db
@@ -92,19 +94,24 @@ export async function resolveSmartCollectionPhotoIds(
 
   const excludeIds = [...memberIds, ...negativeIds];
   const vecLiteral = `[${queryVec.join(",")}]`;
-  const rows = await db
-    .select({ id: photoEmbeddingsTable.photoId })
-    .from(photoEmbeddingsTable)
-    .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
-    .where(
-      and(
-        eq(photosTable.isHidden, false),
-        // Exclude the seed members and the negative examples from suggestions.
-        excludeIds.length ? notInArray(photoEmbeddingsTable.photoId, excludeIds) : undefined,
-      ),
-    )
-    .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
-    .limit(topK);
+  const rows = await withIterativeVectorScan((tx) =>
+    tx
+      .select({ id: photoEmbeddingsTable.photoId })
+      .from(photoEmbeddingsTable)
+      .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
+      .where(
+        and(
+          eq(photosTable.isHidden, false),
+          // Exclude the seed members and the negative examples from suggestions.
+          excludeIds.length ? notInArray(photoEmbeddingsTable.photoId, excludeIds) : undefined,
+        ),
+      )
+      .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
+      // strict_order iterative scanning keeps the ranking deterministic, so
+      // offset paging walks the full ordering consistently.
+      .limit(topK)
+      .offset(offset),
+  );
 
   return { mode, ids: rows.map((r) => r.id) };
 }

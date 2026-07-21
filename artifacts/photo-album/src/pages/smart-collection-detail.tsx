@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import {
   useGetCollection,
-  useGetSmartCollectionPhotos,
+  getSmartCollectionPhotos,
   useAddPhotoToCollection,
   useUpdateCollection,
   useSetCollectionCover,
@@ -30,11 +30,13 @@ import {
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
 import { PhotoGrid } from "@/components/PhotoGrid";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, ImageIcon, Search, Ban, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// How many suggestions to pull for a smart collection (the endpoint caps at 200).
+// Page size for ranked suggestions; scrolling keeps fetching deeper pages of
+// the ranking until it's exhausted (#104).
 const SMART_TOP_K = 100;
 
 type SortOption = "relevance" | "newest" | "oldest" | "top-rated" | "name-az";
@@ -103,14 +105,32 @@ export default function SmartCollectionDetail() {
   // opt-out via the checkbox (and their query doesn't even run when off).
   const [includeSuggestions, setIncludeSuggestions] = useState(true);
 
-  const smartParams = { topK: SMART_TOP_K };
-  const smartPhotosKey = getGetSmartCollectionPhotosQueryKey(collectionId, smartParams);
-  const { data: rawPhotos, isLoading: suggestionsLoading } = useGetSmartCollectionPhotos(
-    collectionId,
-    smartParams,
-    { query: { enabled: !!collectionId && includeSuggestions, queryKey: smartPhotosKey } },
-  );
+  // Ranked suggestions page in SMART_TOP_K chunks via offset; a page shorter
+  // than the chunk size means the ranking is exhausted.
+  const smartPhotosKey = [...getGetSmartCollectionPhotosQueryKey(collectionId), "infinite"];
+  const {
+    data: suggestionPages,
+    isLoading: suggestionsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: smartPhotosKey,
+    enabled: !!collectionId && includeSuggestions,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      getSmartCollectionPhotos(collectionId, { topK: SMART_TOP_K, offset: pageParam as number }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < SMART_TOP_K
+        ? undefined
+        : allPages.reduce((n, page) => n + page.length, 0),
+  });
+  const rawPhotos = useMemo(() => suggestionPages?.pages.flat(), [suggestionPages]);
   const photosLoading = includeSuggestions && suggestionsLoading;
+
+  const sentinelRef = useInfiniteScroll(() => {
+    if (!isFetchingNextPage) void fetchNextPage();
+  }, includeSuggestions && !!hasNextPage);
 
   const negativesKey = getListCollectionNegativePhotosQueryKey(collectionId);
   const { data: negativePhotos } = useListCollectionNegativePhotos(collectionId, {
@@ -494,6 +514,13 @@ export default function SmartCollectionDetail() {
               );
             }}
           />
+        )}
+
+        {/* Sentinel: pulls the next page of ranked suggestions into view. */}
+        {includeSuggestions && hasNextPage && (
+          <div ref={sentinelRef} className="flex justify-center py-4" data-testid="smart-scroll-sentinel">
+            {isFetchingNextPage && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+          </div>
         )}
 
         {negativePhotos && negativePhotos.length > 0 && (

@@ -394,9 +394,11 @@ router.get("/collections/:id/smart-photos", requireAuth, async (req, res): Promi
   }
 
   const topKRaw = req.query.topK ? parseInt(String(req.query.topK), 10) : 100;
-  const topK = Number.isInteger(topKRaw) && topKRaw > 0 ? Math.min(topKRaw, 200) : 100;
+  const topK = Number.isInteger(topKRaw) && topKRaw > 0 ? Math.min(topKRaw, 500) : 100;
+  const offsetRaw = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
+  const offset = Number.isInteger(offsetRaw) && offsetRaw > 0 ? offsetRaw : 0;
 
-  const { ids } = await resolveSmartCollectionPhotoIds(collection, topK);
+  const { ids } = await resolveSmartCollectionPhotoIds(collection, topK, offset);
   const photos = await buildPhotosResponse(ids, req.dbUser?.id);
   res.json(GetSmartCollectionPhotosResponse.parse(photos));
 });
