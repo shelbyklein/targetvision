@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, isNull, isNotNull, and, inArray } from "drizzle-orm";
+import { eq, desc, isNull, isNotNull, and, inArray, sql } from "drizzle-orm";
 import {
   db,
   appSettingsTable,
@@ -35,6 +35,7 @@ import {
   BackfillContentHashesResponse,
   BackfillDimensionsStatusResponse,
   BackfillDimensionsResponse,
+  AdminHubStatusResponse,
   ListDuplicatePhotoGroupsResponse,
   GetDuplicatesSummaryResponse,
   DeleteDuplicateExtrasResponse,
@@ -402,6 +403,33 @@ router.post(
     );
   },
 );
+
+// At-a-glance counts for the admin hub cards — one aggregated call of cheap
+// count-only queries, so the hub itself stays fast (#76). Near-duplicate
+// clustering is deliberately absent: its status is expensive to compute.
+router.get("/admin/hub-status", requireAdmin, async (_req, res): Promise<void> => {
+  const [aiAnalysisPending, embeddingsPending, thumbnailRows, capturedDatesMissing, duplicates] =
+    await Promise.all([
+      countPhotosNeedingAiAnalysis(),
+      countPhotosNeedingEmbedding(),
+      db
+        .select({ n: sql<number>`cast(count(*) as integer)` })
+        .from(photosTable)
+        .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey))),
+      countPhotosWithoutCaptureDate(),
+      getDuplicatesSummary(),
+    ]);
+
+  res.json(
+    AdminHubStatusResponse.parse({
+      aiAnalysisPending,
+      embeddingsPending,
+      thumbnailsMissing: thumbnailRows[0]?.n ?? 0,
+      capturedDatesMissing,
+      duplicateGroups: duplicates.groupCount,
+    }),
+  );
+});
 
 router.get("/admin/thumbnails/backfill-status", requireAdmin, async (_req, res): Promise<void> => {
   const photos = await db
