@@ -68,6 +68,16 @@ export const BackfillContentHashesResponse = z.object({
   failed: z.number(),
 });
 
+// Aggregated at-a-glance counts for the admin hub cards. One cheap endpoint
+// so the hub doesn't regress into per-section loading (#76).
+export const AdminHubStatusResponse = z.object({
+  aiAnalysisPending: z.number(),
+  embeddingsPending: z.number(),
+  thumbnailsMissing: z.number(),
+  capturedDatesMissing: z.number(),
+  duplicateGroups: z.number(),
+});
+
 export const BackfillDimensionsStatusResponse = z.object({
   missingCount: z.number(),
 });
