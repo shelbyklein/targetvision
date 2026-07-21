@@ -30,13 +30,14 @@ interface FileItem {
 export function AddPhotoDialog({ albumId, albumTitle, onAdded }: { albumId: number; albumTitle?: string; onAdded: () => void }) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { start, phase } = usePhotoUpload();
   const isUploading = phase === "uploading";
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(e.target.files ?? []);
+  // Shared by the file picker and desktop drag-and-drop.
+  function addFiles(selected: File[]) {
     if (!selected.length) return;
     const newItems: FileItem[] = selected.map((file) => {
       if (!file.type.startsWith("image/")) {
@@ -48,7 +49,17 @@ export function AddPhotoDialog({ albumId, albumTitle, onAdded }: { albumId: numb
       return { file, status: "pending" };
     });
     setFiles((prev) => [...prev, ...newItems]);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    addFiles(Array.from(e.target.files ?? []));
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    addFiles(Array.from(e.dataTransfer.files ?? []));
   }
 
   function removeFile(index: number) {
@@ -90,11 +101,23 @@ export function AddPhotoDialog({ albumId, albumTitle, onAdded }: { albumId: numb
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors shrink-0"
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            className={`w-full border-2 border-dashed rounded-lg py-6 flex flex-col items-center justify-center gap-2 transition-colors shrink-0 ${
+              isDragOver
+                ? "border-primary bg-primary/5 text-foreground"
+                : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            }`}
             data-testid="file-drop-zone"
           >
             <ImagePlus className="h-7 w-7" />
-            <span className="text-sm font-medium">Click to select photos</span>
+            <span className="text-sm font-medium">
+              {isDragOver ? "Drop photos here" : "Click to select or drag photos here"}
+            </span>
             <span className="text-xs">Multiple files supported · JPG, PNG, GIF, WebP</span>
           </button>
 
