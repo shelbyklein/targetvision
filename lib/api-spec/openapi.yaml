@@ -1795,11 +1795,18 @@ paths:
         - name: topK
           in: query
           required: false
+          description: Page size (max 500, default 100).
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          description: Number of ranked results to skip — enables paging through the full ranking. Default 0.
           schema:
             type: integer
       responses:
         "200":
-          description: Non-member photos ranked by similarity (most similar first)
+          description: Non-member photos ranked by similarity (most similar first). A page shorter than topK means the ranking is exhausted.
           content:
             application/json:
               schema:

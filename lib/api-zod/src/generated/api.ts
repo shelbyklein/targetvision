@@ -3648,7 +3648,16 @@ export const GetSmartCollectionPhotosParams = zod.object({
 });
 
 export const GetSmartCollectionPhotosQueryParams = zod.object({
-  topK: zod.coerce.number().optional(),
+  topK: zod.coerce
+    .number()
+    .optional()
+    .describe("Page size (max 500, default 100)."),
+  offset: zod.coerce
+    .number()
+    .optional()
+    .describe(
+      "Number of ranked results to skip — enables paging through the full ranking. Default 0.",
+    ),
 });
 
 export const GetSmartCollectionPhotosResponseItem = zod.object({

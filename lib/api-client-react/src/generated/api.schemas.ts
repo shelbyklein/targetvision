@@ -752,5 +752,12 @@ export type ListDuplicatePhotoGroupsParams = {
 };
 
 export type GetSmartCollectionPhotosParams = {
+  /**
+   * Page size (max 500, default 100).
+   */
   topK?: number;
+  /**
+   * Number of ranked results to skip — enables paging through the full ranking. Default 0.
+   */
+  offset?: number;
 };

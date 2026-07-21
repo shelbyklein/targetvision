@@ -17,6 +17,7 @@ import { SearchPhotosPagedResponse, SemanticSearchPhotosResponse } from "@worksp
 import { requireAuth } from "../middlewares/requireAuth";
 import { buildPhotosResponse } from "../lib/photoHelpers";
 import { embedText } from "../lib/aiEmbedding";
+import { withIterativeVectorScan } from "../lib/vectorSearch";
 
 const router: IRouter = Router();
 
@@ -350,13 +351,15 @@ router.get("/search/semantic", requireAuth, async (req, res): Promise<void> => {
 
   // Nearest neighbours by cosine distance (matches the HNSW vector_cosine_ops
   // index). Join photos to respect hidden visibility.
-  const rows = await db
-    .select({ id: photoEmbeddingsTable.photoId })
-    .from(photoEmbeddingsTable)
-    .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
-    .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
-    .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
-    .limit(topK);
+  const rows = await withIterativeVectorScan((tx) =>
+    tx
+      .select({ id: photoEmbeddingsTable.photoId })
+      .from(photoEmbeddingsTable)
+      .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
+      .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
+      .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
+      .limit(topK),
+  );
 
   // buildPhotosResponse preserves input id order → results stay ranked.
   const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);

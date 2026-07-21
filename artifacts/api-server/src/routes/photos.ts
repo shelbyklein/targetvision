@@ -3,6 +3,7 @@ import { eq, and, inArray, desc, ne, sql } from "drizzle-orm";
 import { db, photosTable, ratingsTable, albumsTable, collectionsTable, photoCollectionsTable, photoCollectionSuggestionsTable, photoNewCollectionSuggestionsTable, photoEmbeddingsTable } from "@workspace/db";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStorePhotoEmbedding } from "../lib/aiEmbedding";
+import { withIterativeVectorScan } from "../lib/vectorSearch";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { computeAndStoreContentHash } from "../lib/contentHash";
 import { computeAndStorePerceptualHash } from "../lib/perceptualHash";
@@ -783,18 +784,20 @@ router.get("/photos/:id/similar", requireAuth, async (req, res): Promise<void> =
   const vecLiteral = `[${self.embedding.join(",")}]`;
 
   const canSeeHidden = req.dbUser!.role === "admin";
-  const rows = await db
-    .select({ id: photoEmbeddingsTable.photoId })
-    .from(photoEmbeddingsTable)
-    .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
-    .where(
-      and(
-        ne(photoEmbeddingsTable.photoId, id),
-        canSeeHidden ? undefined : eq(photosTable.isHidden, false),
-      ),
-    )
-    .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
-    .limit(topK);
+  const rows = await withIterativeVectorScan((tx) =>
+    tx
+      .select({ id: photoEmbeddingsTable.photoId })
+      .from(photoEmbeddingsTable)
+      .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
+      .where(
+        and(
+          ne(photoEmbeddingsTable.photoId, id),
+          canSeeHidden ? undefined : eq(photosTable.isHidden, false),
+        ),
+      )
+      .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
+      .limit(topK),
+  );
 
   const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);
   res.json(ListSimilarPhotosResponse.parse(photos));
