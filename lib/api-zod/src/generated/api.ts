@@ -259,6 +259,10 @@ export const GetAlbumTopRatedResponseItem = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -428,6 +432,10 @@ export const ListAlbumPhotosResponse = zod.object({
                 "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
               ),
             tags: zod.array(zod.string()).optional(),
+            kind: zod
+              .enum(["collection", "person"])
+              .optional()
+              .describe("People are collections with kind 'person'."),
             createdAt: zod.coerce.date(),
           }),
         )
@@ -586,6 +594,10 @@ export const SearchPhotosResponse = zod.object({
                 "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
               ),
             tags: zod.array(zod.string()).optional(),
+            kind: zod
+              .enum(["collection", "person"])
+              .optional()
+              .describe("People are collections with kind 'person'."),
             createdAt: zod.coerce.date(),
           }),
         )
@@ -720,6 +732,10 @@ export const SemanticSearchPhotosResponseItem = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -846,6 +862,10 @@ export const ListSimilarPhotosResponseItem = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -992,6 +1012,10 @@ export const ListPhotosResponse = zod.object({
                 "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
               ),
             tags: zod.array(zod.string()).optional(),
+            kind: zod
+              .enum(["collection", "person"])
+              .optional()
+              .describe("People are collections with kind 'person'."),
             createdAt: zod.coerce.date(),
           }),
         )
@@ -1252,6 +1276,10 @@ export const GetPhotoResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1377,6 +1405,10 @@ export const UpdatePhotoResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1507,6 +1539,10 @@ export const AddPhotoTagResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1627,6 +1663,10 @@ export const RemovePhotoTagResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1750,6 +1790,10 @@ export const AddPhotoCategoryResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1870,6 +1914,10 @@ export const RemovePhotoCategoryResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -1995,6 +2043,10 @@ export const RatePhotoResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2114,6 +2166,10 @@ export const ClearPhotoRatingResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2654,6 +2710,10 @@ export const GetDashboardStatsResponse = zod.object({
                 "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
               ),
             tags: zod.array(zod.string()).optional(),
+            kind: zod
+              .enum(["collection", "person"])
+              .optional()
+              .describe("People are collections with kind 'person'."),
             createdAt: zod.coerce.date(),
           }),
         )
@@ -2775,6 +2835,10 @@ export const GetRecentPhotosResponseItem = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2891,6 +2955,10 @@ export const GetTopRatedPhotosResponseItem = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -2994,8 +3062,17 @@ export const RequestUploadUrlResponse = zod.object({
 });
 
 /**
- * @summary List all collections
+ * @summary List collections of one kind
  */
+export const ListCollectionsQueryParams = zod.object({
+  kind: zod
+    .enum(["collection", "person"])
+    .optional()
+    .describe(
+      "Which kind to list. Defaults to 'collection', so existing consumers never see people.",
+    ),
+});
+
 export const ListCollectionsResponseItem = zod.object({
   id: zod.number(),
   title: zod.string(),
@@ -3012,6 +3089,10 @@ export const ListCollectionsResponseItem = zod.object({
       "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
     ),
   tags: zod.array(zod.string()).optional(),
+  kind: zod
+    .enum(["collection", "person"])
+    .optional()
+    .describe("People are collections with kind 'person'."),
   createdAt: zod.coerce.date(),
 });
 export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem);
@@ -3023,6 +3104,10 @@ export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem);
 export const CreateCollectionBody = zod.object({
   title: zod.string().min(1),
   description: zod.string().optional(),
+  kind: zod
+    .enum(["collection", "person"])
+    .optional()
+    .describe("Defaults to 'collection'."),
 });
 
 /**
@@ -3055,6 +3140,12 @@ export const GetCollectionResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   smartQuery: zod.string().nullish(),
+  kind: zod
+    .enum(["collection", "person"])
+    .optional()
+    .describe(
+      "People are collections with kind 'person' — same machinery, listed on their own pages.",
+    ),
   tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
@@ -3111,6 +3202,10 @@ export const GetCollectionResponse = zod.object({
                   "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
                 ),
               tags: zod.array(zod.string()).optional(),
+              kind: zod
+                .enum(["collection", "person"])
+                .optional()
+                .describe("People are collections with kind 'person'."),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -3203,6 +3298,12 @@ export const UpdateCollectionResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   smartQuery: zod.string().nullish(),
+  kind: zod
+    .enum(["collection", "person"])
+    .optional()
+    .describe(
+      "People are collections with kind 'person' — same machinery, listed on their own pages.",
+    ),
   tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
@@ -3259,6 +3360,10 @@ export const UpdateCollectionResponse = zod.object({
                   "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
                 ),
               tags: zod.array(zod.string()).optional(),
+              kind: zod
+                .enum(["collection", "person"])
+                .optional()
+                .describe("People are collections with kind 'person'."),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -3413,6 +3518,10 @@ export const ListCollectionNegativePhotosResponseItem = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -3515,6 +3624,12 @@ export const SetCollectionCoverResponse = zod.object({
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   smartQuery: zod.string().nullish(),
+  kind: zod
+    .enum(["collection", "person"])
+    .optional()
+    .describe(
+      "People are collections with kind 'person' — same machinery, listed on their own pages.",
+    ),
   tags: zod.array(zod.string()).optional(),
   createdAt: zod.coerce.date(),
   photos: zod
@@ -3571,6 +3686,10 @@ export const SetCollectionCoverResponse = zod.object({
                   "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
                 ),
               tags: zod.array(zod.string()).optional(),
+              kind: zod
+                .enum(["collection", "person"])
+                .optional()
+                .describe("People are collections with kind 'person'."),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -3712,6 +3831,10 @@ export const GetSmartCollectionPhotosResponseItem = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -3890,6 +4013,10 @@ export const GetProjectResponse = zod.object({
                   "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
                 ),
               tags: zod.array(zod.string()).optional(),
+              kind: zod
+                .enum(["collection", "person"])
+                .optional()
+                .describe("People are collections with kind 'person'."),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -4034,6 +4161,10 @@ export const UpdateProjectResponse = zod.object({
                   "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
                 ),
               tags: zod.array(zod.string()).optional(),
+              kind: zod
+                .enum(["collection", "person"])
+                .optional()
+                .describe("People are collections with kind 'person'."),
               createdAt: zod.coerce.date(),
             }),
           )
@@ -4189,6 +4320,10 @@ export const AcceptPhotoSuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -4309,6 +4444,10 @@ export const DismissPhotoSuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -4429,6 +4568,10 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -4549,6 +4692,10 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -4669,6 +4816,10 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -4789,6 +4940,10 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -4913,6 +5068,10 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )
@@ -5033,6 +5192,10 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
             "Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails.",
           ),
         tags: zod.array(zod.string()).optional(),
+        kind: zod
+          .enum(["collection", "person"])
+          .optional()
+          .describe("People are collections with kind 'person'."),
         createdAt: zod.coerce.date(),
       }),
     )

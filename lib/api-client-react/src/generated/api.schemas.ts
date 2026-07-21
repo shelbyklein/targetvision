@@ -155,6 +155,17 @@ export const PhotoLatestAiStatus = {
   failed: "failed",
 } as const;
 
+/**
+ * People are collections with kind 'person'.
+ */
+export type CollectionSummaryKind =
+  (typeof CollectionSummaryKind)[keyof typeof CollectionSummaryKind];
+
+export const CollectionSummaryKind = {
+  collection: "collection",
+  person: "person",
+} as const;
+
 export interface CollectionSummary {
   id: number;
   title: string;
@@ -171,6 +182,8 @@ export interface CollectionSummary {
   /** Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails. */
   sampleThumbnailUrls?: string[];
   tags?: string[];
+  /** People are collections with kind 'person'. */
+  kind?: CollectionSummaryKind;
   createdAt: string;
 }
 
@@ -273,6 +286,17 @@ export interface SearchPhotosPagedResponse {
   hasMore: boolean;
 }
 
+/**
+ * People are collections with kind 'person' — same machinery, listed on their own pages.
+ */
+export type CollectionKind =
+  (typeof CollectionKind)[keyof typeof CollectionKind];
+
+export const CollectionKind = {
+  collection: "collection",
+  person: "person",
+} as const;
+
 export interface Collection {
   id: number;
   title: string;
@@ -286,15 +310,30 @@ export interface Collection {
   coverPhotoUrl?: string | null;
   /** @nullable */
   smartQuery?: string | null;
+  /** People are collections with kind 'person' — same machinery, listed on their own pages. */
+  kind?: CollectionKind;
   tags?: string[];
   createdAt: string;
   photos?: Photo[];
 }
 
+/**
+ * Defaults to 'collection'.
+ */
+export type CollectionInputKind =
+  (typeof CollectionInputKind)[keyof typeof CollectionInputKind];
+
+export const CollectionInputKind = {
+  collection: "collection",
+  person: "person",
+} as const;
+
 export interface CollectionInput {
   /** @minLength 1 */
   title: string;
   description?: string;
+  /** Defaults to 'collection'. */
+  kind?: CollectionInputKind;
 }
 
 export interface CollectionUpdate {
@@ -750,6 +789,21 @@ export type ListDuplicatePhotoGroupsParams = {
    */
   offset?: number;
 };
+
+export type ListCollectionsParams = {
+  /**
+   * Which kind to list. Defaults to 'collection', so existing consumers never see people.
+   */
+  kind?: ListCollectionsKind;
+};
+
+export type ListCollectionsKind =
+  (typeof ListCollectionsKind)[keyof typeof ListCollectionsKind];
+
+export const ListCollectionsKind = {
+  collection: "collection",
+  person: "person",
+} as const;
 
 export type GetSmartCollectionPhotosParams = {
   /**

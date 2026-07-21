@@ -204,7 +204,9 @@ async function runAndRecordPhotoAnalysisUnbounded(
         description: collectionsTable.description,
       })
       .from(collectionsTable)
-      .where(eq(collectionsTable.createdById, photo.uploaderId));
+      // People are excluded: matching an AI description against a person's
+      // *name* is unreliable — person membership stays manual/similarity-driven.
+      .where(and(eq(collectionsTable.createdById, photo.uploaderId), eq(collectionsTable.kind, "collection")));
 
     const outcome = await analyzePhoto(
       photo.url,

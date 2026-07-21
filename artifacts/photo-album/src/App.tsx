@@ -282,6 +282,30 @@ function AppRoutes() {
             </>
           )}
         </Route>
+        <Route path="/people">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/people")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
+        <Route path="/people/:id">
+          {() => (
+            <>
+              <AuthGate when="signed-in">
+                <LazyPage load={() => import("@/pages/person-detail")} />
+              </AuthGate>
+              <AuthGate when="signed-out">
+                <Redirect to="/sign-in" />
+              </AuthGate>
+            </>
+          )}
+        </Route>
         <Route path="/sign-in" component={SignInPage} />
         <Route path="/sign-up" component={SignUpGuard} />
         <Route>

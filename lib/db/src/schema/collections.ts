@@ -1,6 +1,11 @@
-import { pgTable, text, serial, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, serial, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { photosTable } from "./photos";
+
+// "People" are collections with kind='person': same membership, smart-ranking,
+// suggestion, and negative-example machinery, listed on their own pages. List
+// queries filter by kind so the two types never mix in the UI.
+export const collectionKindEnum = pgEnum("collection_kind", ["collection", "person"]);
 
 export const collectionsTable = pgTable("collections", {
   id: serial("id").primaryKey(),
@@ -17,6 +22,7 @@ export const collectionsTable = pgTable("collections", {
   // Smart Collections pages — both render rows from this table. Null = never
   // placed; lists sort sort_order ASC nulls-last, then created_at desc.
   sortOrder: integer("sort_order"),
+  kind: collectionKindEnum("kind").notNull().default("collection"),
 });
 
 export const photoCollectionsTable = pgTable("photo_collections", {

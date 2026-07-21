@@ -5,6 +5,7 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
+import type { CollectionSummaryKind } from "./collectionSummaryKind";
 
 export interface CollectionSummary {
   id: number;
@@ -22,5 +23,7 @@ export interface CollectionSummary {
   /** Up to 5 random member photo thumbnails (display URLs), re-sampled per request. Feeds crossfading card thumbnails. */
   sampleThumbnailUrls?: string[];
   tags?: string[];
+  /** People are collections with kind 'person'. */
+  kind?: CollectionSummaryKind;
   createdAt: Date;
 }

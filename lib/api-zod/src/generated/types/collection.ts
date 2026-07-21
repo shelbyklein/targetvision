@@ -5,6 +5,7 @@
  * Team Photo Album API
  * OpenAPI spec version: 0.1.0
  */
+import type { CollectionKind } from "./collectionKind";
 import type { Photo } from "./photo";
 
 export interface Collection {
@@ -20,6 +21,8 @@ export interface Collection {
   coverPhotoUrl?: string | null;
   /** @nullable */
   smartQuery?: string | null;
+  /** People are collections with kind 'person' — same machinery, listed on their own pages. */
+  kind?: CollectionKind;
   tags?: string[];
   createdAt: Date;
   photos?: Photo[];
