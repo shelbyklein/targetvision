@@ -14,7 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { formatDate } from "@/lib/format-date";
 import { FadeImage } from "@/components/ui/fade-image";
-import { MasonryGrid } from "@/components/MasonryGrid";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import { GridZoomControl } from "@/components/GridZoomControl";
 import { useGridZoom } from "@/hooks/useGridZoom";
 import { startPhotoDrag } from "@/lib/photoDrag";
@@ -198,9 +198,9 @@ export default function ProjectDetail() {
       <AppLayout>
         <div className="space-y-6">
           <Skeleton className="h-8 w-64" />
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
             ))}
           </div>
         </div>
@@ -332,31 +332,30 @@ export default function ProjectDetail() {
           <div className="flex items-center justify-end">
             <GridZoomControl zoom={zoom} setZoom={setZoom} />
           </div>
-          <MasonryGrid
+          <PhotoGrid
             items={photos}
             getKey={(photo) => photo.id}
-            columnCountOverride={zoom}
+            densityOverride={zoom}
             data-testid="project-photo-grid"
             renderItem={(photo) => (
               <div
                 key={photo.id}
                 draggable
                 onDragStart={(e) => startPhotoDrag(e, photo.id)}
-                className="relative group mb-3 break-inside-avoid rounded-lg overflow-hidden bg-muted"
+                className="relative group h-full rounded-lg overflow-hidden bg-muted"
                 data-testid="project-photo-item"
               >
                 <button
                   type="button"
                   onClick={() => setSelectedPhoto(toLight(photo))}
-                  className="block w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  className="block w-full h-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                   aria-label={`Preview ${photo.filename ?? "photo"}`}
                 >
                   <FadeImage
-                    fit="contain"
                     loading="lazy"
                     src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                     alt={photo.aiDescription ?? "Photo"}
-                    className="w-full h-auto cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                    className="w-full h-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                   />
                 </button>
 

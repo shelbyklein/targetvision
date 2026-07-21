@@ -30,7 +30,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { AddPhotoDialog } from "@/components/AddPhotoDialog";
-import { MasonryGrid } from "@/components/MasonryGrid";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import { GridZoomControl } from "@/components/GridZoomControl";
 import { useGridZoom } from "@/hooks/useGridZoom";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -791,17 +791,17 @@ export default function AlbumDetail() {
         )}
 
         {photosLoading ? (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
             ))}
           </div>
         ) : sortedPhotos.length > 0 ? (
           <>
-          <MasonryGrid
+          <PhotoGrid
             items={sortedPhotos}
             getKey={(photo) => photo.id}
-            columnCountOverride={zoom}
+            densityOverride={zoom}
             data-testid="photo-grid"
             renderItem={(photo) => {
               const collections = photo.photoCollections ?? [];
@@ -811,7 +811,7 @@ export default function AlbumDetail() {
                 key={photo.id}
                 draggable
                 onDragStart={(e) => startPhotoDrag(e, photo.id)}
-                className={`relative group mb-3 break-inside-avoid rounded-lg overflow-hidden bg-muted${isSelected ? " ring-2 ring-primary" : ""}`}
+                className={`relative group h-full rounded-lg overflow-hidden bg-muted${isSelected ? " ring-2 ring-primary" : ""}`}
                 data-testid="photo-grid-item"
               >
                 {isSelectMode && (
@@ -823,7 +823,7 @@ export default function AlbumDetail() {
                 )}
                 <button
                   type="button"
-                  className={`w-full block${photo.isHidden ? " opacity-60" : ""}`}
+                  className={`w-full h-full block${photo.isHidden ? " opacity-60" : ""}`}
                   onClick={() => {
                     if (isSelectMode) {
                       toggleSelection(photo.id);
@@ -842,11 +842,10 @@ export default function AlbumDetail() {
                   data-testid="photo-thumbnail-btn"
                 >
                   <FadeImage
-                    fit="contain"
                     src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                     alt={photo.filename ?? "Photo"}
                     loading="lazy"
-                    className="w-full h-auto cursor-pointer transition-transform duration-200 group-hover:scale-105"
+                    className="w-full h-full object-cover cursor-pointer transition-transform duration-200 group-hover:scale-105"
                   />
                 </button>
 

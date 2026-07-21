@@ -38,6 +38,21 @@ export async function extractExifDate(buffer: Buffer): Promise<Date | null> {
   }
 }
 
+/**
+ * Display dimensions of an image: sharp reports the stored pixel grid, so for
+ * EXIF orientations 5-8 (90°/270° rotations) width and height are swapped to
+ * match how the photo actually renders.
+ */
+export function extractDisplayDimensions(metadata: {
+  width?: number;
+  height?: number;
+  orientation?: number;
+}): { width: number; height: number } | null {
+  const { width, height, orientation } = metadata;
+  if (!width || !height) return null;
+  return (orientation ?? 1) >= 5 ? { width: height, height: width } : { width, height };
+}
+
 export type ThumbnailResult = "success" | "skipped" | "failed";
 
 const inProgressPhotoIds = new Set<number>();
@@ -90,7 +105,14 @@ async function generateAndStoreThumbnailUnbounded(photoId: number, storageKey: s
 
     const [sourceBuffer] = await sourceFile.download();
 
+    const sourceMetadata = await sharp(sourceBuffer).metadata();
+    const dimensions = extractDisplayDimensions(sourceMetadata);
+
     const thumbnailBuffer = await sharp(sourceBuffer)
+      // Bake EXIF orientation into the pixels: sharp strips metadata on output,
+      // so without this a rotated portrait shot renders sideways. Also keeps
+      // the stored width/height consistent with how the thumbnail displays.
+      .rotate()
       .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
       .jpeg({ quality: 80, progressive: true })
       .toBuffer();
@@ -132,7 +154,7 @@ async function generateAndStoreThumbnailUnbounded(photoId: number, storageKey: s
 
     await db
       .update(photosTable)
-      .set({ thumbnailKey })
+      .set({ thumbnailKey, ...(dimensions ?? {}) })
       .where(eq(photosTable.id, photoId));
 
     const exifDate = await extractExifDate(sourceBuffer);

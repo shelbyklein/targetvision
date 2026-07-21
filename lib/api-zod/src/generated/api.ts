@@ -203,6 +203,18 @@ export const GetAlbumTopRatedResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -360,6 +372,18 @@ export const ListAlbumPhotosResponse = zod.object({
       url: zod.string(),
       filename: zod.string().nullish(),
       filesize: zod.number().nullish(),
+      width: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
+      height: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
       contentHash: zod
         .string()
         .nullish()
@@ -506,6 +530,18 @@ export const SearchPhotosResponse = zod.object({
       url: zod.string(),
       filename: zod.string().nullish(),
       filesize: zod.number().nullish(),
+      width: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
+      height: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
       contentHash: zod
         .string()
         .nullish()
@@ -628,6 +664,18 @@ export const SemanticSearchPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -742,6 +790,18 @@ export const ListSimilarPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -876,6 +936,18 @@ export const ListPhotosResponse = zod.object({
       url: zod.string(),
       filename: zod.string().nullish(),
       filesize: zod.number().nullish(),
+      width: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
+      height: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
       contentHash: zod
         .string()
         .nullish()
@@ -1124,6 +1196,18 @@ export const GetPhotoResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -1237,6 +1321,18 @@ export const UpdatePhotoResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -1355,6 +1451,18 @@ export const AddPhotoTagResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -1463,6 +1571,18 @@ export const RemovePhotoTagResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -1574,6 +1694,18 @@ export const AddPhotoCategoryResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -1682,6 +1814,18 @@ export const RemovePhotoCategoryResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -1795,6 +1939,18 @@ export const RatePhotoResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -1902,6 +2058,18 @@ export const ClearPhotoRatingResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -2430,6 +2598,18 @@ export const GetDashboardStatsResponse = zod.object({
       url: zod.string(),
       filename: zod.string().nullish(),
       filesize: zod.number().nullish(),
+      width: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
+      height: zod
+        .number()
+        .nullish()
+        .describe(
+          "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+        ),
       contentHash: zod
         .string()
         .nullish()
@@ -2539,6 +2719,18 @@ export const GetRecentPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -2643,6 +2835,18 @@ export const GetTopRatedPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -2837,6 +3041,18 @@ export const GetCollectionResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        width: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
+        height: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
         contentHash: zod
           .string()
           .nullish()
@@ -2973,6 +3189,18 @@ export const UpdateCollectionResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        width: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
+        height: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
         contentHash: zod
           .string()
           .nullish()
@@ -3115,6 +3343,18 @@ export const ListCollectionNegativePhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -3261,6 +3501,18 @@ export const SetCollectionCoverResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        width: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
+        height: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
         contentHash: zod
           .string()
           .nullish()
@@ -3381,6 +3633,18 @@ export const GetSmartCollectionPhotosResponseItem = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -3534,6 +3798,18 @@ export const GetProjectResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        width: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
+        height: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
         contentHash: zod
           .string()
           .nullish()
@@ -3666,6 +3942,18 @@ export const UpdateProjectResponse = zod.object({
         url: zod.string(),
         filename: zod.string().nullish(),
         filesize: zod.number().nullish(),
+        width: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
+        height: zod
+          .number()
+          .nullish()
+          .describe(
+            "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+          ),
         contentHash: zod
           .string()
           .nullish()
@@ -3809,6 +4097,18 @@ export const AcceptPhotoSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -3917,6 +4217,18 @@ export const DismissPhotoSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -4025,6 +4337,18 @@ export const AcceptPhotoTagSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -4133,6 +4457,18 @@ export const DismissPhotoTagSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -4241,6 +4577,18 @@ export const AcceptPhotoCategorySuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -4349,6 +4697,18 @@ export const DismissPhotoCategorySuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -4461,6 +4821,18 @@ export const AcceptPhotoNewCollectionSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()
@@ -4569,6 +4941,18 @@ export const DismissPhotoNewCollectionSuggestionResponse = zod.object({
   url: zod.string(),
   filename: zod.string().nullish(),
   filesize: zod.number().nullish(),
+  width: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
+  height: zod
+    .number()
+    .nullish()
+    .describe(
+      "Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.",
+    ),
   contentHash: zod
     .string()
     .nullish()

@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
-import { MasonryGrid } from "@/components/MasonryGrid";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { ArrowLeft, Sparkles, Star, ArrowUpDown, Plus, Check, Loader2, ImageIcon, Search, Ban, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -360,9 +360,9 @@ export default function SmartCollectionDetail() {
         </div>
 
         {isLoading ? (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
+              <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
             ))}
           </div>
         ) : photos.length === 0 ? (
@@ -380,7 +380,7 @@ export default function SmartCollectionDetail() {
             </p>
           </div>
         ) : (
-          <MasonryGrid
+          <PhotoGrid
             items={photos}
             getKey={(photo) => photo.id}
             data-testid="smart-collection-photo-grid"
@@ -393,16 +393,15 @@ export default function SmartCollectionDetail() {
                   draggable
                   onDragStart={(e) => startPhotoDrag(e, photo.id)}
                   onClick={() => setSelectedPhoto(toLight(photo))}
-                  className="relative mb-3 break-inside-avoid w-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                  className="relative w-full h-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                   data-testid="smart-photo-item"
                   aria-label={`Preview ${photo.filename ?? "photo"}`}
                 >
                   <FadeImage
-                    fit="contain"
                     loading="lazy"
                     src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                     alt={photo.filename ?? "Photo"}
-                    className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   />
 
                   {/* Members carry an always-visible check so they read apart

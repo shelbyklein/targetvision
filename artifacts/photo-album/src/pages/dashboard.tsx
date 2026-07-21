@@ -36,7 +36,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { PhotoLightbox, type LightboxPhoto } from "@/components/PhotoLightbox";
-import { MasonryGrid } from "@/components/MasonryGrid";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import { startPhotoDrag } from "@/lib/photoDrag";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
@@ -183,9 +183,9 @@ function PhotoStrip({
 }) {
   if (loading) {
     return (
-      <div className="columns-2 sm:columns-3 lg:columns-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-[4/3] rounded-lg mb-3 break-inside-avoid" />
+          <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
         ))}
       </div>
     );
@@ -194,7 +194,7 @@ function PhotoStrip({
     return <p className="text-sm text-muted-foreground py-4">No photos yet.</p>;
   }
   return (
-    <MasonryGrid
+    <PhotoGrid
       items={photos}
       getKey={(photo) => photo.id}
       renderItem={(photo) => (
@@ -203,16 +203,15 @@ function PhotoStrip({
           draggable
           onDragStart={(e) => startPhotoDrag(e, photo.id)}
           onClick={() => onPhotoClick(photo)}
-          className="relative mb-3 break-inside-avoid w-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          className="relative w-full h-full rounded-lg overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           data-testid="photo-strip-item"
           aria-label={`Preview ${photo.name ?? "photo"}`}
         >
           <FadeImage
-            fit="contain"
             loading="lazy"
             src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
             alt={photo.name ?? "Photo"}
-            className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end p-2 opacity-0 group-hover:opacity-100">
             {photo.averageRating != null && (
