@@ -28,6 +28,12 @@ export const photosTable = pgTable(
     // distance — a superset of the byte-identical contentHash match. Nullable:
     // populated on upload and via a background backfill for older rows.
     perceptualHash: text("perceptual_hash"),
+    // Pixel dimensions of the original image (EXIF-orientation corrected, so
+    // width/height match how the photo displays). The justified photo grid
+    // needs aspect ratios before images load. Nullable: populated on upload
+    // and via a background backfill for rows that predate these columns.
+    width: integer("width"),
+    height: integer("height"),
     takenAt: timestamp("taken_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

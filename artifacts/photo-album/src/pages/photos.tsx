@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
-import { MasonryGrid } from "@/components/MasonryGrid";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import { GridZoomControl } from "@/components/GridZoomControl";
 import { useGridZoom } from "@/hooks/useGridZoom";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -607,17 +607,17 @@ export default function PhotosPage() {
         )}
 
         {isInitialLoading ? (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3" data-testid="photos-loading">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="photos-loading">
             {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-lg mb-3 break-inside-avoid" />
+              <Skeleton key={i} className="aspect-square rounded-lg" />
             ))}
           </div>
         ) : allPhotos.length > 0 ? (
           <>
-            <MasonryGrid
+            <PhotoGrid
               items={allPhotos}
               getKey={(photo) => photo.id}
-              columnCountOverride={zoom}
+              densityOverride={zoom}
               data-testid="photos-grid"
               renderItem={(photo) => {
                 const collections = photo.photoCollections ?? [];
@@ -628,7 +628,7 @@ export default function PhotosPage() {
                     draggable
                     onDragStart={(e) => startPhotoDrag(e, photo.id)}
                     className={cn(
-                      "group relative mb-3 break-inside-avoid rounded-lg overflow-hidden border bg-muted",
+                      "group relative h-full rounded-lg overflow-hidden border bg-muted",
                       isSelected ? "border-primary ring-2 ring-primary" : "border-border"
                     )}
                     data-testid="photo-grid-item"
@@ -645,7 +645,7 @@ export default function PhotosPage() {
                     )}
                     <button
                       type="button"
-                      className="block w-full cursor-pointer"
+                      className="block w-full h-full cursor-pointer"
                       onClick={() => {
                         if (isSelectMode) {
                           toggleSelection(photo.id);
@@ -662,11 +662,10 @@ export default function PhotosPage() {
                       }}
                     >
                       <FadeImage
-                        fit="contain"
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
                         className={cn(
-                          "w-full h-auto transition-transform duration-200 group-hover:scale-105",
+                          "w-full h-full object-cover transition-transform duration-200 group-hover:scale-105",
                           photo.isHidden && "opacity-60"
                         )}
                         loading="lazy"

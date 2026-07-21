@@ -68,6 +68,17 @@ export const BackfillContentHashesResponse = z.object({
   failed: z.number(),
 });
 
+export const BackfillDimensionsStatusResponse = z.object({
+  missingCount: z.number(),
+});
+
+export const BackfillDimensionsResponse = z.object({
+  processed: z.number(),
+  updated: z.number(),
+  skipped: z.number(),
+  failed: z.number(),
+});
+
 export const PerceptualHashBackfillStatusResponse = z.object({
   missingCount: z.number(),
 });

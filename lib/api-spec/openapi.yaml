@@ -2427,6 +2427,12 @@ components:
           type: ["string", "null"]
         filesize:
           type: ["integer", "null"]
+        width:
+          type: ["integer", "null"]
+          description: Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.
+        height:
+          type: ["integer", "null"]
+          description: Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.
         contentHash:
           type: ["string", "null"]
           description: SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.

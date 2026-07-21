@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { FadeImage } from "@/components/ui/fade-image";
-import { MasonryGrid } from "@/components/MasonryGrid";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import { GridZoomControl } from "@/components/GridZoomControl";
 import { useGridZoom } from "@/hooks/useGridZoom";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -560,11 +560,11 @@ export default function SearchPage() {
 
         {q && isInitialLoading && (
           <div
-            className="columns-2 sm:columns-3 lg:columns-4 gap-3"
+            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
             data-testid="search-loading"
           >
             {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-lg mb-3 break-inside-avoid" />
+              <Skeleton key={i} className="aspect-square rounded-lg" />
             ))}
           </div>
         )}
@@ -599,10 +599,10 @@ export default function SearchPage() {
               </div>
             ) : (
               <>
-              <MasonryGrid
+              <PhotoGrid
                 items={photos}
                 getKey={(photo) => photo.id}
-                columnCountOverride={zoom}
+                densityOverride={zoom}
                 data-testid="search-results"
                 renderItem={(photo) => (
                   <button
@@ -611,20 +611,19 @@ export default function SearchPage() {
                     draggable
                     onDragStart={(e) => startPhotoDrag(e, photo.id)}
                     onClick={() => setSelectedPhoto(photo)}
-                    className="block w-full text-left"
+                    className="block w-full h-full text-left"
                     data-testid="search-result-item"
                     aria-label="Open photo"
                   >
                     <div className={cn(
-                      "group relative mb-3 break-inside-avoid rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
+                      "group relative h-full rounded-lg overflow-hidden border border-border bg-muted cursor-pointer",
                       photo.isHidden && "opacity-60"
                     )}>
                       <FadeImage
-                        fit="contain"
                         loading="lazy"
                         src={photo.thumbnailKey ? `/api/storage${photo.thumbnailKey}` : photo.url}
                         alt="Photo"
-                        className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5">
                         {photo.albumTitle && (

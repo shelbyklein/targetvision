@@ -208,6 +208,16 @@ export interface Photo {
   /** @nullable */
   filesize?: number | null;
   /**
+   * Display width in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.
+   * @nullable
+   */
+  width?: number | null;
+  /**
+   * Display height in pixels (EXIF-orientation corrected). Null until captured on upload or backfilled.
+   * @nullable
+   */
+  height?: number | null;
+  /**
    * SHA-256 hex digest of the original image bytes, used for exact duplicate detection. Null until computed.
    * @nullable
    */

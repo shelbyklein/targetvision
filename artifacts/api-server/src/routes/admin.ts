@@ -33,6 +33,8 @@ import {
   BackfillAiAnalysisResponse,
   BackfillContentHashesStatusResponse,
   BackfillContentHashesResponse,
+  BackfillDimensionsStatusResponse,
+  BackfillDimensionsResponse,
   ListDuplicatePhotoGroupsResponse,
   GetDuplicatesSummaryResponse,
   DeleteDuplicateExtrasResponse,
@@ -64,6 +66,7 @@ import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDateBackfill";
+import { countPhotosWithoutDimensions, backfillDimensions } from "../lib/dimensionBackfill";
 import {
   countPhotosWithoutContentHash,
   backfillContentHashes,
@@ -449,6 +452,16 @@ router.get("/admin/photos/exif-date-backfill-status", requireAdmin, async (_req,
 router.post("/admin/photos/exif-date-backfill", requireAdmin, async (_req, res): Promise<void> => {
   const result = await backfillExifDates();
   res.json(BackfillExifDatesResponse.parse(result));
+});
+
+router.get("/admin/photos/dimension-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutDimensions();
+  res.json(BackfillDimensionsStatusResponse.parse({ missingCount }));
+});
+
+router.post("/admin/photos/dimension-backfill", requireAdmin, async (_req, res): Promise<void> => {
+  const result = await backfillDimensions();
+  res.json(BackfillDimensionsResponse.parse(result));
 });
 
 router.get("/admin/photos/content-hash-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
