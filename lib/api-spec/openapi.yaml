@@ -3029,7 +3029,7 @@ components:
 
     DashboardStats:
       type: object
-      required: [totalAlbums, totalPhotos, totalUsers, totalTags, totalCollections, recentActivity]
+      required: [totalAlbums, totalPhotos, totalUsers, totalTags, totalCollections, totalProjects, totalPeople, recentActivity]
       properties:
         totalAlbums:
           type: integer
@@ -3040,6 +3040,11 @@ components:
         totalTags:
           type: integer
         totalCollections:
+          type: integer
+          description: Plain collections only (kind='collection') — people are counted separately.
+        totalProjects:
+          type: integer
+        totalPeople:
           type: integer
         recentActivity:
           type: array

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { desc, count, avg, eq } from "drizzle-orm";
-import { db, albumsTable, photosTable, usersTable, ratingsTable, collectionsTable } from "@workspace/db";
+import { db, albumsTable, photosTable, usersTable, ratingsTable, collectionsTable, projectsTable } from "@workspace/db";
 import {
   GetDashboardStatsResponse,
   GetRecentPhotosResponse,
@@ -12,11 +12,14 @@ import { buildPhotosResponse } from "../lib/photoHelpers";
 const router: IRouter = Router();
 
 router.get("/stats/dashboard", requireAuth, async (req, res): Promise<void> => {
-  const [albumCount, photoCount, userCount, collectionCount] = await Promise.all([
+  const [albumCount, photoCount, userCount, collectionCount, projectCount, peopleCount] = await Promise.all([
     db.select({ count: count() }).from(albumsTable),
     db.select({ count: count() }).from(photosTable),
     db.select({ count: count() }).from(usersTable),
-    db.select({ count: count() }).from(collectionsTable),
+    // People are person-kind collections — count the two kinds separately.
+    db.select({ count: count() }).from(collectionsTable).where(eq(collectionsTable.kind, "collection")),
+    db.select({ count: count() }).from(projectsTable),
+    db.select({ count: count() }).from(collectionsTable).where(eq(collectionsTable.kind, "person")),
   ]);
 
   const recentPhotoRows = await db
@@ -34,6 +37,8 @@ router.get("/stats/dashboard", requireAuth, async (req, res): Promise<void> => {
       totalUsers: Number(userCount[0].count),
       totalTags: 0,
       totalCollections: Number(collectionCount[0].count),
+      totalProjects: Number(projectCount[0].count),
+      totalPeople: Number(peopleCount[0].count),
       recentActivity,
     })
   );
