@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { eq } from "drizzle-orm";
-import { db, photosTable, appSettingsTable, APP_SETTINGS_SINGLETON_ID } from "@workspace/db";
+import { db, photosTable, organizationSettingsTable } from "@workspace/db";
 import { objectStorageClient, parseObjectPath, getPrivateObjectDir } from "./objectStorage";
 import { logger } from "./logger";
 import { createLimiter } from "./concurrencyLimit";
@@ -30,12 +30,12 @@ function resolveSourceFile(storageKey: string) {
   return objectStorageClient.bucket(bucketName).file(objectName);
 }
 
-async function isImageOptimizationEnabled(): Promise<boolean> {
+async function isImageOptimizationEnabled(organizationId: number): Promise<boolean> {
   const [s] = await db
-    .select({ enabled: appSettingsTable.imageOptimizationEnabled })
-    .from(appSettingsTable)
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
-  // Default on: if the singleton row is somehow missing, still optimize.
+    .select({ enabled: organizationSettingsTable.imageOptimizationEnabled })
+    .from(organizationSettingsTable)
+    .where(eq(organizationSettingsTable.organizationId, organizationId));
+  // Default on: if the org has no settings row yet, still optimize.
   return s ? Boolean(s.enabled) : true;
 }
 
@@ -60,18 +60,20 @@ export type ImageOptimizationResult = "success" | "skipped" | "failed";
 export function optimizeOriginalImage(
   photoId: number,
   storageKey: string,
+  organizationId: number,
 ): Promise<ImageOptimizationResult> {
-  return optimizeLimiter(() => optimizeOriginalImageUnbounded(photoId, storageKey));
+  return optimizeLimiter(() => optimizeOriginalImageUnbounded(photoId, storageKey, organizationId));
 }
 
 async function optimizeOriginalImageUnbounded(
   photoId: number,
   storageKey: string,
+  organizationId: number,
 ): Promise<ImageOptimizationResult> {
   if (!storageKey.startsWith("/objects/")) {
     return "skipped";
   }
-  if (!(await isImageOptimizationEnabled())) {
+  if (!(await isImageOptimizationEnabled(organizationId))) {
     return "skipped";
   }
 

@@ -2,8 +2,7 @@ import { eq } from "drizzle-orm";
 import { GoogleAuth } from "google-auth-library";
 import {
   db,
-  appSettingsTable,
-  APP_SETTINGS_SINGLETON_ID,
+  organizationSettingsTable,
   photosTable,
   photoEmbeddingsTable,
   EMBEDDING_DIMENSION,
@@ -104,11 +103,11 @@ export async function embedText(query: string): Promise<number[] | null> {
   return callVertexEmbedding({ text: q });
 }
 
-async function isEmbeddingEnabled(): Promise<boolean> {
+async function isEmbeddingEnabled(organizationId: number): Promise<boolean> {
   const [s] = await db
-    .select({ enabled: appSettingsTable.embeddingEnabled })
-    .from(appSettingsTable)
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
+    .select({ enabled: organizationSettingsTable.embeddingEnabled })
+    .from(organizationSettingsTable)
+    .where(eq(organizationSettingsTable.organizationId, organizationId));
   return Boolean(s?.enabled);
 }
 
@@ -118,13 +117,14 @@ async function isEmbeddingEnabled(): Promise<boolean> {
  * configured — so it's safe to fire-and-forget on upload and to run in CI.
  */
 export async function generateAndStorePhotoEmbedding(photoId: number): Promise<boolean> {
-  if (!(await isEmbeddingEnabled())) return false;
-
   const [photo] = await db
     .select({ url: photosTable.url, storageKey: photosTable.storageKey, organizationId: photosTable.organizationId })
     .from(photosTable)
     .where(eq(photosTable.id, photoId));
   if (!photo) return false;
+
+  // Embeddings are toggled per org (#113).
+  if (!(await isEmbeddingEnabled(photo.organizationId))) return false;
 
   const { dataUrl } = await resolveImageForAI(photo.url, photo.storageKey);
   // Vertex needs the raw image bytes; resolveImageForAI only base64-encodes when
@@ -161,11 +161,11 @@ export interface EmbeddingConfigStatus {
   location: string;
 }
 
-/** Config snapshot for the admin UI (no network call). */
-export async function getEmbeddingConfigStatus(): Promise<EmbeddingConfigStatus> {
+/** Config snapshot for the admin UI (no network call). Per-org (#113). */
+export async function getEmbeddingConfigStatus(organizationId: number): Promise<EmbeddingConfigStatus> {
   const { project, location } = vertexConfig();
   return {
-    enabled: await isEmbeddingEnabled(),
+    enabled: await isEmbeddingEnabled(organizationId),
     projectConfigured: Boolean(project),
     credentialsConfigured: Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS),
     model: VERTEX_EMBEDDING_MODEL,

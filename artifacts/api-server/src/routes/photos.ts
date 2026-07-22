@@ -142,7 +142,7 @@ router.post("/albums/:id/photos", requireOrgAuth, async (req, res): Promise<void
     // Optimize the original to WebP first (in place — storageKey stays valid),
     // then derive everything else from the final bytes. runs regardless of
     // whether optimization succeeds/skips/fails.
-    void optimizeOriginalImage(photo.id, storageKey)
+    void optimizeOriginalImage(photo.id, storageKey, photo.organizationId)
       .catch((err) => logger.error({ err, photoId: photo.id }, "Image optimization failed"))
       .finally(() => {
         void generateAndStoreThumbnail(photo.id, storageKey).catch((err) => {

@@ -86,6 +86,9 @@ vi.mock("@workspace/db", () => {
     db,
     appSettingsTable,
     APP_SETTINGS_SINGLETON_ID: 1,
+    // getActiveProvider now loads per-org settings (#113); the generic db mock
+    // above returns dbState.settings regardless of table.
+    organizationSettingsTable: { organizationId: "organization_id" } as unknown,
   };
 });
 
@@ -211,7 +214,7 @@ describe("AI provider routing on photo upload", () => {
       ...adminKey("openai", "sk-admin-openai"),
     });
 
-    const result = await analyzePhoto(IMAGE, [], null);
+    const result = await analyzePhoto(IMAGE, [], null, 1);
 
     expect(result.status).toBe("skipped");
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
@@ -225,7 +228,7 @@ describe("AI provider routing on photo upload", () => {
       ...adminKey("openai", "sk-admin-openai"),
     });
 
-    await analyzePhoto(IMAGE, [], null);
+    await analyzePhoto(IMAGE, [], null, 1);
 
     expect(hoisted.openaiCreate).toHaveBeenCalledTimes(1);
     expect(hoisted.anthropicCreate).not.toHaveBeenCalled();
@@ -241,7 +244,7 @@ describe("AI provider routing on photo upload", () => {
       ...adminKey("anthropic", "sk-admin-anthropic"),
     });
 
-    await analyzePhoto(IMAGE, [], null);
+    await analyzePhoto(IMAGE, [], null, 1);
 
     expect(hoisted.anthropicCreate).toHaveBeenCalledTimes(1);
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
@@ -257,7 +260,7 @@ describe("AI provider routing on photo upload", () => {
       ...adminKey("gemini", "AIza-admin-gemini"),
     });
 
-    await analyzePhoto(IMAGE, [], null);
+    await analyzePhoto(IMAGE, [], null, 1);
 
     expect(hoisted.geminiGenerate).toHaveBeenCalledTimes(1);
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
@@ -270,7 +273,7 @@ describe("AI provider routing on photo upload", () => {
   it("falls back to Replit's built-in OpenAI when no admin key is set", async () => {
     hoisted.dbState.settings = baseSettings({ activeProvider: "openai" });
 
-    await analyzePhoto(IMAGE, [], null);
+    await analyzePhoto(IMAGE, [], null, 1);
 
     expect(hoisted.openaiCreate).toHaveBeenCalledTimes(1);
     expect(hoisted.anthropicCreate).not.toHaveBeenCalled();
@@ -287,7 +290,7 @@ describe("AI provider routing on photo upload", () => {
     delete process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
     hoisted.dbState.settings = baseSettings({ activeProvider: "anthropic" });
 
-    const result = await analyzePhoto(IMAGE, [], null);
+    const result = await analyzePhoto(IMAGE, [], null, 1);
 
     expect(result.status).toBe("skipped");
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
@@ -303,7 +306,7 @@ describe("AI provider routing on photo upload", () => {
       ...adminKey("gemini", "AIza-gemini"),
     });
 
-    await analyzePhoto(IMAGE, [], null);
+    await analyzePhoto(IMAGE, [], null, 1);
 
     expect(hoisted.anthropicCreate).toHaveBeenCalledTimes(1);
     expect(hoisted.openaiCreate).not.toHaveBeenCalled();
@@ -332,7 +335,7 @@ describe("new-collection name suggestions", () => {
       ],
     });
 
-    const outcome = await analyzePhoto(IMAGE, [], null);
+    const outcome = await analyzePhoto(IMAGE, [], null, 1);
 
     expect(outcome.status).toBe("success");
     if (outcome.status !== "success") return;
@@ -360,7 +363,7 @@ describe("new-collection name suggestions", () => {
     });
 
     const collections = [{ id: 42, title: "Events", description: null }];
-    const outcome = await analyzePhoto(IMAGE, collections, null);
+    const outcome = await analyzePhoto(IMAGE, collections, null, 1);
 
     expect(outcome.status).toBe("success");
     if (outcome.status !== "success") return;
@@ -391,7 +394,7 @@ describe("new-collection name suggestions", () => {
       ],
     });
 
-    const outcome = await analyzePhoto(IMAGE, [], null);
+    const outcome = await analyzePhoto(IMAGE, [], null, 1);
 
     expect(outcome.status).toBe("success");
     if (outcome.status !== "success") return;
@@ -416,7 +419,7 @@ describe("new-collection name suggestions", () => {
       ],
     });
 
-    const outcome = await analyzePhoto(IMAGE, [], null);
+    const outcome = await analyzePhoto(IMAGE, [], null, 1);
 
     expect(outcome.status).toBe("success");
     if (outcome.status !== "success") return;

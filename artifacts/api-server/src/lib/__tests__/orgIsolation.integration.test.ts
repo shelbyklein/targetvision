@@ -177,4 +177,26 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     // No auth header → 401.
     expect((await api("/api/albums", { orgId: orgA.id })).status).toBe(401);
   });
+
+  it("AI settings are per-org and gated to org owner/admin (#113 Phase 3)", async () => {
+    const { orgA, orgB, userA, userB } = await seedTwoOrgs();
+    const member = await createUser({ name: "Plain Member" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    // Owner can read (this also lazily creates org A's settings row).
+    expect((await api("/api/admin/ai-settings", { user: userA, orgId: orgA.id })).status).toBe(200);
+    // A plain member is forbidden by requireOrgRole("owner","admin").
+    expect((await api("/api/admin/ai-settings", { user: member, orgId: orgA.id })).status).toBe(403);
+
+    // Change org A's active provider; org B must be unaffected.
+    const patch = await api("/api/admin/ai-settings", {
+      user: userA, orgId: orgA.id, method: "PATCH", body: { activeProvider: "anthropic" },
+    });
+    expect(patch.status).toBe(200);
+
+    const a = (await (await api("/api/admin/ai-settings", { user: userA, orgId: orgA.id })).json()) as { activeProvider: string };
+    const b = (await (await api("/api/admin/ai-settings", { user: userB, orgId: orgB.id })).json()) as { activeProvider: string };
+    expect(a.activeProvider).toBe("anthropic");
+    expect(b.activeProvider).toBe("openai");
+  });
 });

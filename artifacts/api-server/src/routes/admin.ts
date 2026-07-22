@@ -4,6 +4,7 @@ import {
   db,
   appSettingsTable,
   APP_SETTINGS_SINGLETON_ID,
+  organizationSettingsTable,
   aiAnalysisEventsTable,
   photosTable,
   photoEmbeddingsTable,
@@ -60,13 +61,20 @@ import {
   UpdateImageOptimizationSettingsBody,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
+import { requireOrgAuth, requireOrgRole } from "../middlewares/requireOrg";
 import {
   loadAppSettings,
+  loadOrgSettings,
   summarizeSettings,
   PROVIDER_IDS,
   PROVIDER_MODEL_OPTIONS,
   type ProviderId,
 } from "../lib/aiProviders";
+
+// Provider keys, models, embedding + image-optimization toggles are per-org
+// (#113): owner/admin of the active org manage them. registration and the
+// maintenance backfills stay instance-admin (requireAdmin).
+const requireOrgAdmin = [requireOrgAuth, requireOrgRole("owner", "admin")] as const;
 import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
@@ -125,19 +133,19 @@ router.patch("/admin/registration-settings", requireAdmin, async (req, res): Pro
   res.json(UpdateRegistrationSettingsResponse.parse({ registrationEnabled: updated.registrationEnabled }));
 });
 
-router.get("/admin/ai-settings", requireAdmin, async (_req, res): Promise<void> => {
-  const settings = await loadAppSettings();
+router.get("/admin/ai-settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const settings = await loadOrgSettings(req.org!.id);
   res.json(GetAiSettingsResponse.parse(summarizeSettings(settings)));
 });
 
-router.patch("/admin/ai-settings", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/ai-settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateAiSettingsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
 
-  await loadAppSettings();
+  await loadOrgSettings(req.org!.id);
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (typeof body.data.enabled === "boolean") updates.aiEnabled = body.data.enabled;
   if (body.data.activeProvider) updates.activeProvider = body.data.activeProvider;
@@ -163,9 +171,9 @@ router.patch("/admin/ai-settings", requireAdmin, async (req, res): Promise<void>
   }
 
   const [updated] = await db
-    .update(appSettingsTable)
+    .update(organizationSettingsTable)
     .set(updates)
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
+    .where(eq(organizationSettingsTable.organizationId, req.org!.id))
     .returning();
 
   res.json(UpdateAiSettingsResponse.parse(summarizeSettings(updated)));
@@ -198,7 +206,7 @@ function keyColumns(provider: ProviderId) {
 
 router.put(
   "/admin/ai-settings/providers/:provider/key",
-  requireAdmin,
+  ...requireOrgAdmin,
   async (req, res): Promise<void> => {
     const params = SetAiProviderKeyParams.safeParse(req.params);
     if (!params.success) {
@@ -216,12 +224,12 @@ router.put(
       return;
     }
 
-    await loadAppSettings();
+    await loadOrgSettings(req.org!.id);
     const apiKey = body.data.apiKey.trim();
     const enc = encryptSecret(apiKey);
     const cols = keyColumns(provider);
     const [updated] = await db
-      .update(appSettingsTable)
+      .update(organizationSettingsTable)
       .set({
         [cols.ciphertext]: enc.ciphertext,
         [cols.iv]: enc.iv,
@@ -229,7 +237,7 @@ router.put(
         [cols.preview]: maskKey(apiKey),
         updatedAt: new Date(),
       })
-      .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
+      .where(eq(organizationSettingsTable.organizationId, req.org!.id))
       .returning();
 
     res.json(SetAiProviderKeyResponse.parse(summarizeSettings(updated)));
@@ -238,7 +246,7 @@ router.put(
 
 router.delete(
   "/admin/ai-settings/providers/:provider/key",
-  requireAdmin,
+  ...requireOrgAdmin,
   async (req, res): Promise<void> => {
     const params = ClearAiProviderKeyParams.safeParse(req.params);
     if (!params.success) {
@@ -251,10 +259,10 @@ router.delete(
       return;
     }
 
-    await loadAppSettings();
+    await loadOrgSettings(req.org!.id);
     const cols = keyColumns(provider);
     const [updated] = await db
-      .update(appSettingsTable)
+      .update(organizationSettingsTable)
       .set({
         [cols.ciphertext]: null,
         [cols.iv]: null,
@@ -262,7 +270,7 @@ router.delete(
         [cols.preview]: null,
         updatedAt: new Date(),
       })
-      .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
+      .where(eq(organizationSettingsTable.organizationId, req.org!.id))
       .returning();
 
     res.json(ClearAiProviderKeyResponse.parse(summarizeSettings(updated)));
@@ -538,47 +546,51 @@ router.post("/admin/photos/content-hash-backfill", requireAdmin, async (_req, re
   res.json(BackfillContentHashesResponse.parse(result));
 });
 
-async function buildEmbeddingStatus() {
-  const cfg = await getEmbeddingConfigStatus();
-  const missingCount = await countPhotosNeedingEmbedding();
+async function buildEmbeddingStatus(orgId: number) {
+  const cfg = await getEmbeddingConfigStatus(orgId);
+  const missingCount = await countPhotosNeedingEmbedding(orgId);
   const embeddedCount = (
-    await db.select({ id: photoEmbeddingsTable.photoId }).from(photoEmbeddingsTable)
+    await db
+      .select({ id: photoEmbeddingsTable.photoId })
+      .from(photoEmbeddingsTable)
+      .where(eq(photoEmbeddingsTable.organizationId, orgId))
   ).length;
   return { ...cfg, embeddedCount, missingCount };
 }
 
-router.get("/admin/embeddings/status", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus()));
+router.get("/admin/embeddings/status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus(req.org!.id)));
 });
 
-router.patch("/admin/embeddings/settings", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/embeddings/settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateEmbeddingSettingsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
+  await loadOrgSettings(req.org!.id);
   await db
-    .update(appSettingsTable)
+    .update(organizationSettingsTable)
     .set({ embeddingEnabled: body.data.enabled })
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
-  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus()));
+    .where(eq(organizationSettingsTable.organizationId, req.org!.id));
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus(req.org!.id)));
 });
 
-router.post("/admin/embeddings/backfill", requireAdmin, async (req, res): Promise<void> => {
+router.post("/admin/embeddings/backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = BackfillEmbeddingsBody.safeParse(req.body ?? {});
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const result = await backfillEmbeddings(body.data.limit);
+  const result = await backfillEmbeddings(body.data.limit, req.org!.id);
   res.json(BackfillEmbeddingsResponse.parse(result));
 });
 
-async function buildImageOptimizationStatus() {
+async function buildImageOptimizationStatus(orgId: number) {
   const [s] = await db
-    .select({ enabled: appSettingsTable.imageOptimizationEnabled })
-    .from(appSettingsTable)
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
+    .select({ enabled: organizationSettingsTable.imageOptimizationEnabled })
+    .from(organizationSettingsTable)
+    .where(eq(organizationSettingsTable.organizationId, orgId));
   return {
     enabled: s ? Boolean(s.enabled) : true,
     quality: IMAGE_OPTIMIZATION_SETTINGS.quality,
@@ -586,21 +598,22 @@ async function buildImageOptimizationStatus() {
   };
 }
 
-router.get("/admin/image-optimization/status", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus()));
+router.get("/admin/image-optimization/status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus(req.org!.id)));
 });
 
-router.patch("/admin/image-optimization/settings", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/image-optimization/settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateImageOptimizationSettingsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
+  await loadOrgSettings(req.org!.id);
   await db
-    .update(appSettingsTable)
+    .update(organizationSettingsTable)
     .set({ imageOptimizationEnabled: body.data.enabled })
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
-  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus()));
+    .where(eq(organizationSettingsTable.organizationId, req.org!.id));
+  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus(req.org!.id)));
 });
 
 const DUPLICATES_DEFAULT_LIMIT = 20;

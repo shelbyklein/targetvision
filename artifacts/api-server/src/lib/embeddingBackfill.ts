@@ -1,4 +1,4 @@
-import { sql, isNotNull, and } from "drizzle-orm";
+import { sql, isNotNull, and, eq } from "drizzle-orm";
 import { db, photosTable } from "@workspace/db";
 import { generateAndStorePhotoEmbedding } from "./aiEmbedding";
 import { logger } from "./logger";
@@ -9,15 +9,22 @@ const needsEmbedding = and(
   sql`NOT EXISTS (SELECT 1 FROM photo_embeddings pe WHERE pe.photo_id = ${photosTable.id})`,
 );
 
-export async function countPhotosNeedingEmbedding(): Promise<number> {
+// Scope to one org (#113) when an id is given; otherwise instance-wide.
+function needsEmbeddingIn(organizationId?: number) {
+  return organizationId != null
+    ? and(needsEmbedding, eq(photosTable.organizationId, organizationId))
+    : needsEmbedding;
+}
+
+export async function countPhotosNeedingEmbedding(organizationId?: number): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`cast(count(*) as integer)` })
     .from(photosTable)
-    .where(needsEmbedding);
+    .where(needsEmbeddingIn(organizationId));
   return row?.n ?? 0;
 }
 
-export async function backfillEmbeddings(limit?: number): Promise<{
+export async function backfillEmbeddings(limit?: number, organizationId?: number): Promise<{
   processed: number;
   succeeded: number;
   failed: number;
@@ -25,7 +32,7 @@ export async function backfillEmbeddings(limit?: number): Promise<{
   const base = db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(needsEmbedding)
+    .where(needsEmbeddingIn(organizationId))
     .orderBy(photosTable.createdAt);
   const photos = limit != null ? await base.limit(limit) : await base;
 

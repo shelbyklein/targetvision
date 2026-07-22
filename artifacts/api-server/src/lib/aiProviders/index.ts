@@ -103,20 +103,20 @@ function envKeyFallbackFor(id: ProviderId): boolean {
   );
 }
 
-function providerHasKey(settings: AppSettings, id: ProviderId): boolean {
+function providerHasKey(settings: OrganizationSettings, id: ProviderId): boolean {
   if (id === "openai") return Boolean(settings.openaiKeyCiphertext);
   if (id === "anthropic") return Boolean(settings.anthropicKeyCiphertext);
   return Boolean(settings.geminiKeyCiphertext);
 }
 
-function providerPreview(settings: AppSettings, id: ProviderId): string | null {
+function providerPreview(settings: OrganizationSettings, id: ProviderId): string | null {
   if (id === "openai") return settings.openaiKeyPreview;
   if (id === "anthropic") return settings.anthropicKeyPreview;
   return settings.geminiKeyPreview;
 }
 
 function configuredModelFor(
-  settings: AppSettings,
+  settings: OrganizationSettings,
   id: ProviderId,
 ): string | null {
   if (id === "openai") return settings.openaiModel;
@@ -125,7 +125,7 @@ function configuredModelFor(
 }
 
 export function resolveProviderModel(
-  settings: AppSettings,
+  settings: OrganizationSettings,
   id: ProviderId,
 ): string {
   const stored = configuredModelFor(settings, id);
@@ -133,7 +133,7 @@ export function resolveProviderModel(
   return DEFAULT_PROVIDER_MODELS[id];
 }
 
-export function summarizeSettings(settings: AppSettings): ResolvedSettings {
+export function summarizeSettings(settings: OrganizationSettings): ResolvedSettings {
   const providers = {} as Record<ProviderId, ProviderStatus>;
   for (const id of PROVIDER_IDS) {
     const hasKey = providerHasKey(settings, id);
@@ -160,7 +160,7 @@ export function summarizeSettings(settings: AppSettings): ResolvedSettings {
 }
 
 function getStoredKey(
-  settings: AppSettings,
+  settings: OrganizationSettings,
   id: ProviderId,
 ): string | null {
   try {
@@ -207,12 +207,12 @@ function getStoredKey(
   }
 }
 
-export async function getActiveProvider(): Promise<{
+export async function getActiveProvider(organizationId: number): Promise<{
   provider: AnalysisProvider | null;
-  settings: AppSettings;
+  settings: OrganizationSettings;
   reason?: string;
 }> {
-  const settings = await loadAppSettings();
+  const settings = await loadOrgSettings(organizationId);
   if (!settings.aiEnabled) {
     return { provider: null, settings, reason: "AI disabled" };
   }
