@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, mcpTokensTable, usersTable } from "@workspace/db";
 
 // Raw tokens look like `tvmcp_<40 hex>`; the prefix stored for display is the
@@ -24,7 +24,7 @@ export interface McpTokenListItem {
   lastUsedAt: string | null;
 }
 
-export async function listMcpTokens(): Promise<McpTokenListItem[]> {
+export async function listMcpTokens(organizationId: number): Promise<McpTokenListItem[]> {
   const rows = await db
     .select({
       id: mcpTokensTable.id,
@@ -36,6 +36,7 @@ export async function listMcpTokens(): Promise<McpTokenListItem[]> {
     })
     .from(mcpTokensTable)
     .leftJoin(usersTable, eq(mcpTokensTable.createdById, usersTable.id))
+    .where(eq(mcpTokensTable.organizationId, organizationId))
     .orderBy(desc(mcpTokensTable.createdAt));
   return rows.map((r) => ({
     id: r.id,
@@ -47,15 +48,17 @@ export async function listMcpTokens(): Promise<McpTokenListItem[]> {
   }));
 }
 
-/** Create a token, returning the raw value ONCE (never retrievable again). */
+/** Create a token scoped to an org, returning the raw value ONCE. */
 export async function createMcpToken(
   label: string,
+  organizationId: number,
   createdById: number | null,
 ): Promise<{ token: string; item: McpTokenListItem }> {
   const raw = generateRawToken();
   const [row] = await db
     .insert(mcpTokensTable)
     .values({
+      organizationId,
       label,
       tokenHash: hashToken(raw),
       tokenPrefix: raw.slice(0, PREFIX_LEN),
@@ -78,9 +81,12 @@ export async function createMcpToken(
   };
 }
 
-/** Revoke (delete) a token by id; returns whether a row was removed. */
-export async function deleteMcpToken(id: number): Promise<boolean> {
-  const deleted = await db.delete(mcpTokensTable).where(eq(mcpTokensTable.id, id)).returning({ id: mcpTokensTable.id });
+/** Revoke (delete) a token by id, scoped to its org; returns whether removed. */
+export async function deleteMcpToken(id: number, organizationId: number): Promise<boolean> {
+  const deleted = await db
+    .delete(mcpTokensTable)
+    .where(and(eq(mcpTokensTable.id, id), eq(mcpTokensTable.organizationId, organizationId)))
+    .returning({ id: mcpTokensTable.id });
   return deleted.length > 0;
 }
 
@@ -89,15 +95,18 @@ const LAST_USED_WRITE_INTERVAL_MS = 60_000;
 const lastUsedWrites = new Map<number, number>();
 
 /**
- * Verify a candidate token against the DB. Returns the token id on success
- * (null otherwise), and best-effort stamps last_used_at (throttled).
- * `nowMs` is injected so the gateway avoids Date.now() in hot paths having
- * to import it; callers pass Date.now().
+ * Verify a candidate token against the DB. Returns the token's id + the org it
+ * grants access to on success (null otherwise), and best-effort stamps
+ * last_used_at (throttled). `nowMs` is injected so the gateway avoids importing
+ * Date.now() in hot paths; callers pass Date.now().
  */
-export async function verifyMcpToken(raw: string, nowMs: number): Promise<number | null> {
+export async function verifyMcpToken(
+  raw: string,
+  nowMs: number,
+): Promise<{ id: number; organizationId: number } | null> {
   if (!raw) return null;
   const [row] = await db
-    .select({ id: mcpTokensTable.id })
+    .select({ id: mcpTokensTable.id, organizationId: mcpTokensTable.organizationId })
     .from(mcpTokensTable)
     .where(eq(mcpTokensTable.tokenHash, hashToken(raw)))
     .limit(1);
@@ -112,5 +121,5 @@ export async function verifyMcpToken(raw: string, nowMs: number): Promise<number
       .where(eq(mcpTokensTable.id, row.id))
       .catch(() => {});
   }
-  return row.id;
+  return { id: row.id, organizationId: row.organizationId };
 }

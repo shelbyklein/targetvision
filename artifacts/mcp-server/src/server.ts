@@ -27,6 +27,12 @@ export interface ServerOptions {
    * which remote clients can't reach.
    */
   externalDownloadBase?: string;
+  /**
+   * The organization this session is scoped to (issue #113, Phase 5): the HTTP
+   * gateway sets it from the authenticating token so every tool only sees that
+   * org's library. Undefined for the local stdio server (single-tenant, global).
+   */
+  organizationId?: number;
 }
 
 export function createServer(options: ServerOptions = {}): McpServer {
@@ -55,7 +61,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async ({ query, count, exclude, minRating, rightsTag, person, includeImages }) => {
-      const { results, note } = await searchPhotos({ query, count, exclude, minRating, rightsTag, person });
+      const { results, note } = await searchPhotos({ query, count, exclude, minRating, rightsTag, person, organizationId: options.organizationId });
       if (results.length === 0) {
         return { content: [textBlock(note ?? `No photos matched "${query}".`)] };
       }
@@ -107,7 +113,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async ({ id }) => {
-      const detail = await getPhotoDetail(id);
+      const detail = await getPhotoDetail(id, options.organizationId);
       if (!detail) {
         return { content: [textBlock(`Photo #${id} not found.`)], isError: true };
       }
@@ -144,7 +150,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       inputSchema: {},
     },
     async () => {
-      const albums = await listAlbums();
+      const albums = await listAlbums(options.organizationId);
       const lines = albums.map((a) => `#${a.id} ${a.title} — ${a.photoCount} photos`);
       return { content: [textBlock(lines.join("\n") || "No albums.")] };
     },
@@ -160,7 +166,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       inputSchema: {},
     },
     async () => {
-      const people = await listPeople();
+      const people = await listPeople(options.organizationId);
       const lines = people.map(
         (p) => `${p.name} — ${p.photoCount} photo${p.photoCount !== 1 ? "s" : ""}${p.description ? ` (${p.description})` : ""}`,
       );
@@ -178,7 +184,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       inputSchema: {},
     },
     async () => {
-      const tags = await listUsageRights();
+      const tags = await listUsageRights(options.organizationId);
       const lines = tags.map((t) => `${t.name} — ${t.photoCount} photos cleared`);
       return { content: [textBlock(lines.join("\n") || "No usage-rights tags defined.")] };
     },
@@ -213,7 +219,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async ({ kind, project }) => {
-      const { assets, note } = await listAssets({ kind, project });
+      const { assets, note } = await listAssets({ kind, project, organizationId: options.organizationId });
       if (assets.length === 0) {
         return { content: [textBlock(note ?? "The asset library is empty so far.")] };
       }
@@ -235,7 +241,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async ({ id }) => {
-      const detail = await getAssetDetail(id);
+      const detail = await getAssetDetail(id, options.organizationId);
       if (!detail) {
         return { content: [textBlock(`Asset #${id} not found.`)], isError: true };
       }

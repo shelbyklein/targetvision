@@ -120,6 +120,8 @@ export interface SearchOptions {
   rightsTag?: string;
   /** Restrict to photos tagged to this person (People page groups). */
   person?: string;
+  /** When set, restrict the search to a single organization's library. */
+  organizationId?: number;
 }
 
 export async function searchPhotos({
@@ -129,6 +131,7 @@ export async function searchPhotos({
   minRating,
   rightsTag,
   person,
+  organizationId,
 }: SearchOptions): Promise<{ results: PhotoSummary[]; note?: string }> {
   const posVec = await embedText(query);
   if (!posVec) {
@@ -154,9 +157,14 @@ export async function searchPhotos({
     const [tag] = await db
       .select({ id: attributionTagsTable.id })
       .from(attributionTagsTable)
-      .where(ilike(attributionTagsTable.name, rightsTag.trim()));
+      .where(
+        and(
+          ilike(attributionTagsTable.name, rightsTag.trim()),
+          organizationId != null ? eq(attributionTagsTable.organizationId, organizationId) : undefined,
+        ),
+      );
     if (!tag) {
-      const tags = await listUsageRights();
+      const tags = await listUsageRights(organizationId);
       return {
         results: [],
         note: `No usage-rights tag named "${rightsTag}". Available: ${tags.map((t) => t.name).join(", ") || "(none)"}.`,
@@ -178,9 +186,15 @@ export async function searchPhotos({
     const [match] = await db
       .select({ id: collectionsTable.id })
       .from(collectionsTable)
-      .where(and(eq(collectionsTable.kind, "person"), ilike(collectionsTable.title, person.trim())));
+      .where(
+        and(
+          eq(collectionsTable.kind, "person"),
+          ilike(collectionsTable.title, person.trim()),
+          organizationId != null ? eq(collectionsTable.organizationId, organizationId) : undefined,
+        ),
+      );
     if (!match) {
-      const people = await listPeople();
+      const people = await listPeople(organizationId);
       return {
         results: [],
         note: `No person named "${person}". Available: ${people.map((p) => p.name).join(", ") || "(none yet)"}.`,
@@ -221,6 +235,7 @@ export async function searchPhotos({
         and(
           eq(photosTable.isHidden, false),
           restrictIds ? inArray(photoEmbeddingsTable.photoId, [...restrictIds]) : undefined,
+          organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
         ),
       )
       .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
@@ -241,14 +256,21 @@ export async function searchPhotos({
 
 export async function getPhotoDetail(
   id: number,
+  organizationId?: number,
 ): Promise<{ photo: PhotoSummary; fullResUrl: string | null } | null> {
-  const [photo] = await buildSummaries([id]);
-  if (!photo) return null;
-
   const [row] = await db
     .select({ storageKey: photosTable.storageKey })
     .from(photosTable)
-    .where(eq(photosTable.id, id));
+    .where(
+      and(
+        eq(photosTable.id, id),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
+  if (organizationId != null && !row) return null;
+
+  const [photo] = await buildSummaries([id]);
+  if (!photo) return null;
 
   let fullResUrl: string | null = null;
   if (row?.storageKey?.startsWith("/objects/")) {
@@ -262,17 +284,22 @@ export async function getPhotoDetail(
   return { photo, fullResUrl };
 }
 
-export async function listAlbums(): Promise<{ id: number; title: string; photoCount: number }[]> {
+export async function listAlbums(
+  organizationId?: number,
+): Promise<{ id: number; title: string; photoCount: number }[]> {
   const rows = await db
     .select({ id: albumsTable.id, title: albumsTable.title, photoCount: count(photosTable.id) })
     .from(albumsTable)
     .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
+    .where(organizationId != null ? eq(albumsTable.organizationId, organizationId) : undefined)
     .groupBy(albumsTable.id)
     .orderBy(sql`${albumsTable.sortOrder} asc, ${albumsTable.createdAt} desc`);
   return rows.map((r) => ({ ...r, photoCount: Number(r.photoCount) }));
 }
 
-export async function listPeople(): Promise<{ name: string; description: string | null; photoCount: number }[]> {
+export async function listPeople(
+  organizationId?: number,
+): Promise<{ name: string; description: string | null; photoCount: number }[]> {
   const rows = await db
     .select({
       name: collectionsTable.title,
@@ -281,17 +308,25 @@ export async function listPeople(): Promise<{ name: string; description: string 
     })
     .from(collectionsTable)
     .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
-    .where(eq(collectionsTable.kind, "person"))
+    .where(
+      and(
+        eq(collectionsTable.kind, "person"),
+        organizationId != null ? eq(collectionsTable.organizationId, organizationId) : undefined,
+      ),
+    )
     .groupBy(collectionsTable.id)
     .orderBy(collectionsTable.title);
   return rows.map((r) => ({ ...r, photoCount: Number(r.photoCount) }));
 }
 
-export async function listUsageRights(): Promise<{ name: string; photoCount: number }[]> {
+export async function listUsageRights(
+  organizationId?: number,
+): Promise<{ name: string; photoCount: number }[]> {
   const rows = await db
     .select({ name: attributionTagsTable.name, photoCount: count(photoAttributionTagsTable.photoId) })
     .from(attributionTagsTable)
     .leftJoin(photoAttributionTagsTable, eq(attributionTagsTable.id, photoAttributionTagsTable.tagId))
+    .where(organizationId != null ? eq(attributionTagsTable.organizationId, organizationId) : undefined)
     .groupBy(attributionTagsTable.id)
     .orderBy(attributionTagsTable.name);
   return rows.map((r) => ({ ...r, photoCount: Number(r.photoCount) }));
@@ -303,11 +338,17 @@ export async function listUsageRights(): Promise<{ name: string; photoCount: num
  */
 export async function getOriginalFile(
   id: number,
+  organizationId?: number,
 ): Promise<{ buffer: Buffer; contentType: string; filename: string } | null> {
   const [row] = await db
     .select({ storageKey: photosTable.storageKey, filename: photosTable.filename })
     .from(photosTable)
-    .where(eq(photosTable.id, id));
+    .where(
+      and(
+        eq(photosTable.id, id),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
   if (!row?.storageKey?.startsWith("/objects/")) return null;
   try {
     const { file } = resolveObjectFile(row.storageKey);

@@ -433,17 +433,19 @@ router.post(
 
 // --- MCP gateway access tokens (bearer / URL auth for remote clients) ---
 
-router.get("/admin/mcp-tokens", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(ListMcpTokensResponse.parse(await listMcpTokens()));
+router.get("/admin/mcp-tokens", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(ListMcpTokensResponse.parse(await listMcpTokens(req.org!.id)));
 });
 
-router.post("/admin/mcp-tokens", requireAdmin, async (req, res): Promise<void> => {
+router.post("/admin/mcp-tokens", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = CreateMcpTokenBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const created = await createMcpToken(body.data.label, req.dbUser?.id ?? null);
+  // The token is scoped to the active org — the gateway only exposes this org's
+  // library to whoever holds it (#113 Phase 5).
+  const created = await createMcpToken(body.data.label, req.org!.id, req.dbUser?.id ?? null);
   res.status(201).json(
     CreateMcpTokenResponse.parse({
       ...created,
@@ -452,14 +454,14 @@ router.post("/admin/mcp-tokens", requireAdmin, async (req, res): Promise<void> =
   );
 });
 
-router.delete("/admin/mcp-tokens/:id", requireAdmin, async (req, res): Promise<void> => {
+router.delete("/admin/mcp-tokens/:id", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid token id" });
     return;
   }
-  res.json(DeleteMcpTokenResponse.parse({ deleted: await deleteMcpToken(id) }));
+  res.json(DeleteMcpTokenResponse.parse({ deleted: await deleteMcpToken(id, req.org!.id) }));
 });
 
 // At-a-glance counts for the admin hub cards — one aggregated call of cheap
