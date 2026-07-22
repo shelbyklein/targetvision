@@ -24,6 +24,8 @@ tags:
     description: Collection operations
   - name: projects
     description: Project operations (user-curated photo buckets)
+  - name: assets
+    description: Asset library (brand assets and reference works for deliverables)
   - name: ratings
     description: Rating operations
   - name: stats
@@ -2025,6 +2027,106 @@ paths:
         "404":
           description: Not found
 
+  /assets:
+    get:
+      operationId: listAssets
+      tags: [assets]
+      summary: List asset library items (brand assets and reference works)
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [brand, reference]
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Asset"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createAsset
+      tags: [assets]
+      summary: Register an uploaded file as an asset (upload the file via the storage request-url flow first)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetInput"
+      responses:
+        "201":
+          description: Created asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+
+  /assets/{id}:
+    patch:
+      operationId: updateAsset
+      tags: [assets]
+      summary: Update an asset's metadata (owner or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetUpdate"
+      responses:
+        "200":
+          description: Updated asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAsset
+      tags: [assets]
+      summary: Delete an asset (owner or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
   /photos/{id}/suggestions/{collectionId}/accept:
     post:
       operationId: acceptPhotoSuggestion
@@ -2820,6 +2922,84 @@ components:
           type: integer
         name:
           type: string
+
+    Asset:
+      type: object
+      required: [id, kind, name, storageKey, contentType, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [brand, reference]
+        name:
+          type: string
+        variant:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        storageKey:
+          type: string
+        contentType:
+          type: string
+        filename:
+          type: ["string", "null"]
+        fileSize:
+          type: ["integer", "null"]
+        createdById:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AssetInput:
+      type: object
+      required: [kind, name, storageKey, contentType]
+      properties:
+        kind:
+          type: string
+          enum: [brand, reference]
+        name:
+          type: string
+          minLength: 1
+        variant:
+          type: string
+        notes:
+          type: string
+        projectId:
+          type: integer
+        storageKey:
+          type: string
+          description: The objectPath returned by the storage request-url flow (must start with /objects/)
+        contentType:
+          type: string
+        filename:
+          type: string
+        fileSize:
+          type: integer
+
+    AssetUpdate:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [brand, reference]
+        name:
+          type: string
+          minLength: 1
+        variant:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        projectId:
+          type: ["integer", "null"]
 
     AttributionTag:
       type: object

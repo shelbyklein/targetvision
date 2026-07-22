@@ -9,6 +9,7 @@ import {
   listUsageRights,
   loadThumbnailImage,
 } from "./photoLibrary.js";
+import { listAssets, getAssetDetail, loadAssetImage, type AssetSummary } from "./assetLibrary.js";
 
 // Cap on inline thumbnails per search response: base64 images are the bulk of
 // the payload, and a model judging fit rarely needs more than a screenful.
@@ -180,6 +181,80 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const tags = await listUsageRights();
       const lines = tags.map((t) => `${t.name} — ${t.photoCount} photos cleared`);
       return { content: [textBlock(lines.join("\n") || "No usage-rights tags defined.")] };
+    },
+  );
+
+  function describeAsset(a: AssetSummary, index?: number): string {
+    const bits = [
+      `${index != null ? `${index + 1}. ` : ""}asset #${a.id}`,
+      `kind: ${a.kind}`,
+      `name: ${a.name}`,
+      a.variant && `variant: ${a.variant}`,
+      a.projectName ? `project: ${a.projectName}` : "project: (global — applies to all projects)",
+      a.filename && `file: ${a.filename}`,
+      a.contentType,
+    ].filter(Boolean);
+    const notes = a.notes ? `\n   ${a.notes.slice(0, 300)}` : "";
+    return bits.join(" | ") + notes;
+  }
+
+  server.registerTool(
+    "list_assets",
+    {
+      title: "List brand assets and reference works",
+      description:
+        "List the asset library: kind 'brand' is logos/marks to embed in a deliverable (pick the right " +
+        "variant, e.g. primary vs white vs icon-only); kind 'reference' is past works to study so new " +
+        "output matches the established style. Filter by project to get that project's assets plus the " +
+        "global ones. Use get_asset for a preview image and download link.",
+      inputSchema: {
+        kind: z.enum(["brand", "reference"]).optional().describe("Only this kind of asset"),
+        project: z.string().optional().describe("Only assets for this project (by name) plus global assets"),
+      },
+    },
+    async ({ kind, project }) => {
+      const { assets, note } = await listAssets({ kind, project });
+      if (assets.length === 0) {
+        return { content: [textBlock(note ?? "The asset library is empty so far.")] };
+      }
+      const lines = assets.map((a, i) => describeAsset(a, i));
+      return { content: [textBlock(`${assets.length} assets:\n\n${lines.join("\n")}`)] };
+    },
+  );
+
+  server.registerTool(
+    "get_asset",
+    {
+      title: "Get one asset with preview and download link",
+      description:
+        "Fetch a single asset by id: metadata, an inline preview when the file is a raster image, and a " +
+        "download link for the original file (use it to pull a logo into a deliverable at full quality — " +
+        "SVGs and PDFs are download-only, no inline preview).",
+      inputSchema: {
+        id: z.number().int().describe("Asset id (from list_assets results)"),
+      },
+    },
+    async ({ id }) => {
+      const detail = await getAssetDetail(id);
+      if (!detail) {
+        return { content: [textBlock(`Asset #${id} not found.`)], isError: true };
+      }
+      const { asset } = detail;
+      const downloadUrl = options.externalDownloadBase
+        ? `${options.externalDownloadBase}/asset/${asset.id}/original`
+        : detail.fullResUrl;
+      const lines = [
+        describeAsset(asset),
+        asset.fileSize != null && `size: ${asset.fileSize} bytes`,
+        downloadUrl && `original download (valid ~1h): ${downloadUrl}`,
+      ].filter(Boolean) as string[];
+
+      const content: Array<
+        { type: "text"; text: string } | { type: "image"; data: string; mimeType: string }
+      > = [textBlock(lines.join("\n"))];
+      const img = await loadAssetImage(asset);
+      if (img) content.push({ type: "image", data: img.base64, mimeType: img.mimeType });
+      return { content };
     },
   );
 

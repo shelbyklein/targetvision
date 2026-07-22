@@ -397,6 +397,79 @@ export interface ProjectPhotoInput {
   photoId: number;
 }
 
+export type AssetKind = (typeof AssetKind)[keyof typeof AssetKind];
+
+export const AssetKind = {
+  brand: "brand",
+  reference: "reference",
+} as const;
+
+export interface Asset {
+  id: number;
+  kind: AssetKind;
+  name: string;
+  /** @nullable */
+  variant?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  projectName?: string | null;
+  storageKey: string;
+  contentType: string;
+  /** @nullable */
+  filename?: string | null;
+  /** @nullable */
+  fileSize?: number | null;
+  /** @nullable */
+  createdById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AssetInputKind =
+  (typeof AssetInputKind)[keyof typeof AssetInputKind];
+
+export const AssetInputKind = {
+  brand: "brand",
+  reference: "reference",
+} as const;
+
+export interface AssetInput {
+  kind: AssetInputKind;
+  /** @minLength 1 */
+  name: string;
+  variant?: string;
+  notes?: string;
+  projectId?: number;
+  /** The objectPath returned by the storage request-url flow (must start with /objects/) */
+  storageKey: string;
+  contentType: string;
+  filename?: string;
+  fileSize?: number;
+}
+
+export type AssetUpdateKind =
+  (typeof AssetUpdateKind)[keyof typeof AssetUpdateKind];
+
+export const AssetUpdateKind = {
+  brand: "brand",
+  reference: "reference",
+} as const;
+
+export interface AssetUpdate {
+  kind?: AssetUpdateKind;
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  variant?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  projectId?: number | null;
+}
+
 export interface AttributionTagInput {
   name: string;
 }
@@ -818,3 +891,16 @@ export type GetSmartCollectionPhotosParams = {
    */
   offset?: number;
 };
+
+export type ListAssetsParams = {
+  kind?: ListAssetsKind;
+  projectId?: number;
+};
+
+export type ListAssetsKind =
+  (typeof ListAssetsKind)[keyof typeof ListAssetsKind];
+
+export const ListAssetsKind = {
+  brand: "brand",
+  reference: "reference",
+} as const;

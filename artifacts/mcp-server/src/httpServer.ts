@@ -4,6 +4,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "./server.js";
 import { getOriginalFile } from "./photoLibrary.js";
+import { getAssetFile } from "./assetLibrary.js";
 import { verifyMcpToken } from "@workspace/api-server/src/lib/mcpTokens";
 
 function tokenMatches(candidate: string, expected: string): boolean {
@@ -128,6 +129,25 @@ export async function startHttpServer(): Promise<void> {
     const file = await getOriginalFile(id);
     if (!file) {
       res.status(404).json({ error: "Photo not found" });
+      return;
+    }
+    res.setHeader("Content-Type", file.contentType);
+    res.setHeader("Content-Disposition", `inline; filename="${file.filename.replace(/[^\w .-]+/g, "")}"`);
+    res.send(file.buffer);
+  });
+
+  // Authenticated asset download — what get_asset's link points at when
+  // MCP_PUBLIC_URL is set.
+  app.get("/asset/:id/original", async (req: Request, res: Response) => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: "Invalid asset id" });
+      return;
+    }
+    const file = await getAssetFile(id);
+    if (!file) {
+      res.status(404).json({ error: "Asset not found" });
       return;
     }
     res.setHeader("Content-Type", file.contentType);

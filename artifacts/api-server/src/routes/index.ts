@@ -9,6 +9,7 @@ import statsRouter from "./stats";
 import storageRouter from "./storage";
 import collectionsRouter from "./collections";
 import projectsRouter from "./projects";
+import assetsRouter from "./assets";
 import adminRouter from "./admin";
 import bulkUploadBatchesRouter from "./bulkUploadBatches";
 import attributionTagsRouter from "./attributionTags";
@@ -27,6 +28,7 @@ router.use(statsRouter);
 router.use(storageRouter);
 router.use(collectionsRouter);
 router.use(projectsRouter);
+router.use(assetsRouter);
 router.use(adminRouter);
 router.use(bulkUploadBatchesRouter);
 
