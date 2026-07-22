@@ -32,7 +32,7 @@ function normalizeVec(v: number[]): number[] {
   return v.map((x) => x / m);
 }
 
-function resolveObjectFile(key: string) {
+export function resolveObjectFile(key: string) {
   const privateObjectDir = getPrivateObjectDir();
   const entityDirBase = privateObjectDir.endsWith("/") ? privateObjectDir : `${privateObjectDir}/`;
   const entityId = key.slice("/objects/".length);

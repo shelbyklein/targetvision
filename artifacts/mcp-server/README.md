@@ -18,6 +18,8 @@ reads the same root `.env` as the api-server; whichever `DATABASE_URL` /
 | `get_photo(id)` | Full metadata, thumbnail, and a ~1h signed URL for the full-resolution file |
 | `list_albums` | Albums with photo counts |
 | `list_usage_rights` | Attribution / usage-rights tags with cleared-photo counts |
+| `list_assets(kind?, project?)` | Asset library: brand assets (logos to embed) and reference works (past output to match); project filter includes global assets |
+| `get_asset(id)` | One asset's metadata, an inline preview for raster images, and a download link for the original file |
 
 ## Running
 

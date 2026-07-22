@@ -14,3 +14,4 @@ export * from "./bulkUploadBatches";
 export * from "./attributionTags";
 export * from "./nearDuplicatePairs";
 export * from "./mcpTokens";
+export * from "./assets";

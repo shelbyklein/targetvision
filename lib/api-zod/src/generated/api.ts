@@ -4267,6 +4267,91 @@ export const RemovePhotoFromProjectParams = zod.object({
 });
 
 /**
+ * @summary List asset library items (brand assets and reference works)
+ */
+export const ListAssetsQueryParams = zod.object({
+  kind: zod.enum(["brand", "reference"]).optional(),
+  projectId: zod.coerce.number().optional(),
+});
+
+export const ListAssetsResponseItem = zod.object({
+  id: zod.number(),
+  kind: zod.enum(["brand", "reference"]),
+  name: zod.string(),
+  variant: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  projectId: zod.number().nullish(),
+  projectName: zod.string().nullish(),
+  storageKey: zod.string(),
+  contentType: zod.string(),
+  filename: zod.string().nullish(),
+  fileSize: zod.number().nullish(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListAssetsResponse = zod.array(ListAssetsResponseItem);
+
+/**
+ * @summary Register an uploaded file as an asset (upload the file via the storage request-url flow first)
+ */
+
+export const CreateAssetBody = zod.object({
+  kind: zod.enum(["brand", "reference"]),
+  name: zod.string().min(1),
+  variant: zod.string().optional(),
+  notes: zod.string().optional(),
+  projectId: zod.number().optional(),
+  storageKey: zod
+    .string()
+    .describe(
+      "The objectPath returned by the storage request-url flow (must start with \/objects\/)",
+    ),
+  contentType: zod.string(),
+  filename: zod.string().optional(),
+  fileSize: zod.number().optional(),
+});
+
+/**
+ * @summary Update an asset's metadata (owner or admin)
+ */
+export const UpdateAssetParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateAssetBody = zod.object({
+  kind: zod.enum(["brand", "reference"]).optional(),
+  name: zod.string().min(1).optional(),
+  variant: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  projectId: zod.number().nullish(),
+});
+
+export const UpdateAssetResponse = zod.object({
+  id: zod.number(),
+  kind: zod.enum(["brand", "reference"]),
+  name: zod.string(),
+  variant: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  projectId: zod.number().nullish(),
+  projectName: zod.string().nullish(),
+  storageKey: zod.string(),
+  contentType: zod.string(),
+  filename: zod.string().nullish(),
+  fileSize: zod.number().nullish(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an asset (owner or admin)
+ */
+export const DeleteAssetParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Accept a suggested collection for a photo (adds photo to the collection)
  */
 export const AcceptPhotoSuggestionParams = zod.object({
