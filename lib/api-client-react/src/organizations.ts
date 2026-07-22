@@ -49,3 +49,74 @@ export function useSwitchOrganization() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: MY_ORGS_KEY }),
   });
 }
+
+// --- Member + invite management (Phase 4c) ---
+
+export type OrgMember = {
+  userId: number;
+  name: string;
+  email: string;
+  role: string;
+  joinedAt: string;
+};
+export type OrgInvite = { id: number; email: string; role: string; createdAt: string };
+export type OrgRole = "owner" | "admin" | "member";
+
+const MEMBERS_KEY = ["organizations", "members"] as const;
+const INVITES_KEY = ["organizations", "invites"] as const;
+
+export function useOrgMembers() {
+  return useQuery({
+    queryKey: MEMBERS_KEY,
+    queryFn: () => customFetch<OrgMember[]>("/api/organizations/members"),
+  });
+}
+
+export function useOrgInvites() {
+  return useQuery({
+    queryKey: INVITES_KEY,
+    queryFn: () => customFetch<OrgInvite[]>("/api/organizations/invites"),
+  });
+}
+
+export function useCreateOrgInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; role?: OrgRole }) =>
+      customFetch<OrgInvite>("/api/organizations/invites", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: INVITES_KEY }),
+  });
+}
+
+export function useDeleteOrgInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      customFetch<void>(`/api/organizations/invites/${id}`, { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: INVITES_KEY }),
+  });
+}
+
+export function useUpdateOrgMemberRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { userId: number; role: OrgRole }) =>
+      customFetch<void>(`/api/organizations/members/${input.userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ role: input.role }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: MEMBERS_KEY }),
+  });
+}
+
+export function useRemoveOrgMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: number) =>
+      customFetch<void>(`/api/organizations/members/${userId}`, { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: MEMBERS_KEY }),
+  });
+}

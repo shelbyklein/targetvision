@@ -8,7 +8,9 @@ vi.mock("../auth", () => ({
     api: {
       getSession: async ({ headers }: { headers: Headers }) => {
         const id = headers.get("x-test-auth-user");
-        return id ? { user: { id } } : null;
+        // email/name mirror the id so a not-yet-provisioned id (e.g. an email)
+        // is provisioned by requireAuth — exercising invite auto-join.
+        return id ? { user: { id, email: id, name: id } } : null;
       },
     },
     // app.ts mounts toNodeHandler(auth); tests never hit /api/auth, but the
@@ -192,6 +194,53 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect((await api("/api/albums", { user, orgId: org.id })).status).toBe(200);
     const orgs = (await (await api("/api/organizations", { user })).json()) as Array<{ id: number }>;
     expect(orgs.map((o) => o.id)).toEqual([org.id]);
+  });
+
+  it("org admin manages members and invites; member is forbidden (#113 Phase 4c)", async () => {
+    const { orgA, userA } = await seedTwoOrgs();
+    const member = await createUser({ name: "Member" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+    const opts = { user: userA, orgId: orgA.id };
+
+    // A plain member can't invite.
+    expect((await api("/api/organizations/invites", { user: member, orgId: orgA.id, method: "POST", body: { email: "x@y.com" } })).status).toBe(403);
+
+    // Owner invites (email lowercased); listing shows it.
+    const inv = await api("/api/organizations/invites", { ...opts, method: "POST", body: { email: "Teammate@Example.com", role: "member" } });
+    expect(inv.status).toBe(201);
+    const invite = (await inv.json()) as { id: number; email: string };
+    expect(invite.email).toBe("teammate@example.com");
+    const invites = (await (await api("/api/organizations/invites", opts)).json()) as unknown[];
+    expect(invites).toHaveLength(1);
+
+    // Members list has the owner + the member.
+    const members = (await (await api("/api/organizations/members", opts)).json()) as Array<{ userId: number }>;
+    expect(members.map((m) => m.userId).sort()).toEqual([userA.id, member.id].sort());
+
+    // Can't remove the sole owner; can remove the member.
+    expect((await api(`/api/organizations/members/${userA.id}`, { ...opts, method: "DELETE" })).status).toBe(400);
+    expect((await api(`/api/organizations/members/${member.id}`, { ...opts, method: "DELETE" })).status).toBe(204);
+
+    // Revoke the invite.
+    expect((await api(`/api/organizations/invites/${invite.id}`, { ...opts, method: "DELETE" })).status).toBe(204);
+  });
+
+  it("an invited email auto-joins the org on first sign-in (#113 Phase 4c)", async () => {
+    const { orgA, userA, a } = await seedTwoOrgs();
+    expect((await api("/api/organizations/invites", { user: userA, orgId: orgA.id, method: "POST", body: { email: "newbie@test.local", role: "member" } })).status).toBe(201);
+
+    // A brand-new user with that email signs in — requireAuth provisions them and
+    // consumes the invite, enrolling them in org A.
+    const newUser = { authUserId: "newbie@test.local" };
+    const albums = await api("/api/albums", { user: newUser }); // no org header → resolves the sole (invited) org
+    expect(albums.status).toBe(200);
+    expect(((await albums.json()) as Array<{ id: number }>).map((x) => x.id)).toEqual([a.album.id]);
+
+    const orgs = (await (await api("/api/organizations", { user: newUser })).json()) as Array<{ slug: string }>;
+    expect(orgs.map((o) => o.slug)).toEqual([orgA.slug]);
+
+    // Invite consumed.
+    expect((await (await api("/api/organizations/invites", { user: userA, orgId: orgA.id })).json()) as unknown[]).toHaveLength(0);
   });
 
   it("requires authentication and org membership", async () => {

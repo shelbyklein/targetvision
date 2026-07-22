@@ -261,3 +261,31 @@ export const CreateOrganizationBody = z.object({
 });
 
 export const CreateOrganizationResponse = MyOrganization;
+
+// --- Org member + invite management (Phase 4c) ---
+const OrgRole = z.enum(["owner", "admin", "member"]);
+
+export const OrgMember = z.object({
+  userId: z.number(),
+  name: z.string(),
+  email: z.string(),
+  role: z.string(),
+  joinedAt: z.string(),
+});
+export const ListOrgMembersResponse = z.array(OrgMember);
+
+export const UpdateOrgMemberRoleBody = z.object({ role: OrgRole });
+
+export const OrgInvite = z.object({
+  id: z.number(),
+  email: z.string(),
+  role: z.string(),
+  createdAt: z.string(),
+});
+export const ListOrgInvitesResponse = z.array(OrgInvite);
+
+export const CreateOrgInviteBody = z.object({
+  email: z.string().trim().email().max(255),
+  role: OrgRole.optional(),
+});
+export const CreateOrgInviteResponse = OrgInvite;

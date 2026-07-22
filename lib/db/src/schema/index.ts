@@ -2,6 +2,7 @@ export * from "./users";
 export * from "./auth";
 export * from "./organizations";
 export * from "./organizationSettings";
+export * from "./organizationInvites";
 export * from "./albums";
 export * from "./photos";
 export * from "./tags";

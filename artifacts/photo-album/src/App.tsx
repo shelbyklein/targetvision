@@ -175,6 +175,7 @@ function AppRoutes() {
           ["/admin/captured-dates", () => import("@/pages/admin-captured-dates")],
           ["/admin/attribution-tags", () => import("@/pages/admin-attribution-tags")],
           ["/admin/mcp-tokens", () => import("@/pages/admin-mcp-tokens")],
+          ["/admin/members", () => import("@/pages/admin-org-members")],
           ["/admin/team", () => import("@/pages/admin-team")],
         ] as const).map(([path, load]) => (
           <Route key={path} path={path}>

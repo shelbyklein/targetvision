@@ -1,16 +1,47 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq } from "drizzle-orm";
-import { db, organizationsTable, organizationMembersTable, usersTable } from "@workspace/db";
+import { and, asc, eq, ne } from "drizzle-orm";
+import {
+  db,
+  organizationsTable,
+  organizationMembersTable,
+  organizationInvitesTable,
+  usersTable,
+} from "@workspace/db";
 import {
   ListMyOrganizationsResponse,
   SwitchOrganizationBody,
   SwitchOrganizationResponse,
   CreateOrganizationBody,
   CreateOrganizationResponse,
+  ListOrgMembersResponse,
+  UpdateOrgMemberRoleBody,
+  ListOrgInvitesResponse,
+  CreateOrgInviteBody,
+  CreateOrgInviteResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth, requireOrgRole } from "../middlewares/requireOrg";
 
 const router: IRouter = Router();
+
+// Member/invite management is owner/admin-only, scoped to the active org.
+const requireOrgAdmin = [requireOrgAuth, requireOrgRole("owner", "admin")] as const;
+
+// Count remaining owners in an org excluding one user — used to refuse removing
+// or demoting the last owner (which would orphan the org).
+async function otherOwnerCount(organizationId: number, excludeUserId: number): Promise<number> {
+  const rows = await db
+    .select({ userId: organizationMembersTable.userId })
+    .from(organizationMembersTable)
+    .where(
+      and(
+        eq(organizationMembersTable.organizationId, organizationId),
+        eq(organizationMembersTable.role, "owner"),
+        ne(organizationMembersTable.userId, excludeUserId),
+      ),
+    );
+  return rows.length;
+}
 
 // Turn an org name into a URL-safe slug. Uniqueness is resolved by the caller
 // (appends -2, -3, … on collision).
@@ -115,6 +146,152 @@ router.post("/organizations/switch", requireAuth, async (req, res): Promise<void
     .where(eq(usersTable.id, req.dbUser!.id));
 
   res.json(SwitchOrganizationResponse.parse(membership));
+});
+
+// --- Member + invite management for the active org (Phase 4c, org-admin) ---
+
+router.get("/organizations/members", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const rows = await db
+    .select({
+      userId: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      role: organizationMembersTable.role,
+      joinedAt: organizationMembersTable.createdAt,
+    })
+    .from(organizationMembersTable)
+    .innerJoin(usersTable, eq(usersTable.id, organizationMembersTable.userId))
+    .where(eq(organizationMembersTable.organizationId, req.org!.id))
+    .orderBy(asc(organizationMembersTable.createdAt));
+  res.json(ListOrgMembersResponse.parse(rows.map((r) => ({ ...r, joinedAt: r.joinedAt.toISOString() }))));
+});
+
+router.patch("/organizations/members/:userId", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+  const userId = Number.parseInt(raw, 10);
+  if (!Number.isInteger(userId)) {
+    res.status(400).json({ error: "Invalid user id" });
+    return;
+  }
+  const body = UpdateOrgMemberRoleBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ role: organizationMembersTable.role })
+    .from(organizationMembersTable)
+    .where(and(eq(organizationMembersTable.organizationId, req.org!.id), eq(organizationMembersTable.userId, userId)));
+  if (!existing) {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+  // Don't demote the org's last owner.
+  if (existing.role === "owner" && body.data.role !== "owner" && (await otherOwnerCount(req.org!.id, userId)) === 0) {
+    res.status(400).json({ error: "Cannot demote the last owner" });
+    return;
+  }
+
+  await db
+    .update(organizationMembersTable)
+    .set({ role: body.data.role })
+    .where(and(eq(organizationMembersTable.organizationId, req.org!.id), eq(organizationMembersTable.userId, userId)));
+  res.sendStatus(204);
+});
+
+router.delete("/organizations/members/:userId", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+  const userId = Number.parseInt(raw, 10);
+  if (!Number.isInteger(userId)) {
+    res.status(400).json({ error: "Invalid user id" });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ role: organizationMembersTable.role })
+    .from(organizationMembersTable)
+    .where(and(eq(organizationMembersTable.organizationId, req.org!.id), eq(organizationMembersTable.userId, userId)));
+  if (!existing) {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+  if (existing.role === "owner" && (await otherOwnerCount(req.org!.id, userId)) === 0) {
+    res.status(400).json({ error: "Cannot remove the last owner" });
+    return;
+  }
+
+  await db
+    .delete(organizationMembersTable)
+    .where(and(eq(organizationMembersTable.organizationId, req.org!.id), eq(organizationMembersTable.userId, userId)));
+  res.sendStatus(204);
+});
+
+router.get("/organizations/invites", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const rows = await db
+    .select({
+      id: organizationInvitesTable.id,
+      email: organizationInvitesTable.email,
+      role: organizationInvitesTable.role,
+      createdAt: organizationInvitesTable.createdAt,
+    })
+    .from(organizationInvitesTable)
+    .where(eq(organizationInvitesTable.organizationId, req.org!.id))
+    .orderBy(asc(organizationInvitesTable.createdAt));
+  res.json(ListOrgInvitesResponse.parse(rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))));
+});
+
+router.post("/organizations/invites", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const body = CreateOrgInviteBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const email = body.data.email.trim().toLowerCase();
+  const role = body.data.role ?? "member";
+
+  // Already a member? (case-insensitive email match)
+  const [alreadyMember] = await db
+    .select({ id: usersTable.id })
+    .from(organizationMembersTable)
+    .innerJoin(usersTable, eq(usersTable.id, organizationMembersTable.userId))
+    .where(and(eq(organizationMembersTable.organizationId, req.org!.id), eq(usersTable.email, email)));
+  if (alreadyMember) {
+    res.status(409).json({ error: "That email is already a member" });
+    return;
+  }
+
+  // Upsert the pending invite (re-inviting updates the role).
+  const [invite] = await db
+    .insert(organizationInvitesTable)
+    .values({ organizationId: req.org!.id, email, role, invitedById: req.dbUser?.id ?? null })
+    .onConflictDoUpdate({
+      target: [organizationInvitesTable.organizationId, organizationInvitesTable.email],
+      set: { role },
+    })
+    .returning();
+
+  res.status(201).json(
+    CreateOrgInviteResponse.parse({
+      id: invite.id,
+      email: invite.email,
+      role: invite.role,
+      createdAt: invite.createdAt.toISOString(),
+    }),
+  );
+});
+
+router.delete("/organizations/invites/:id", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = Number.parseInt(raw, 10);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid invite id" });
+    return;
+  }
+  await db
+    .delete(organizationInvitesTable)
+    .where(and(eq(organizationInvitesTable.id, id), eq(organizationInvitesTable.organizationId, req.org!.id)));
+  res.sendStatus(204);
 });
 
 export default router;
