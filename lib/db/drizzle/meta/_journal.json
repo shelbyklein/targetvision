@@ -127,6 +127,13 @@
       "when": 1784737224408,
       "tag": "0017_polite_microchip",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784738016256,
+      "tag": "0018_fast_ironclad",
+      "breakpoints": true
     }
   ]
 }

@@ -234,3 +234,22 @@ export const ImageOptimizationStatusResponse = z.object({
 export const UpdateImageOptimizationSettingsBody = z.object({
   enabled: z.boolean(),
 });
+
+// --- Organizations (multi-tenant context, issue #113) ---
+// One org the current user belongs to, with their role in it. The active org is
+// selected via the X-Organization-Id header (see requireOrg); these endpoints
+// let the client discover which orgs it may pick and persist the sticky choice.
+export const MyOrganization = z.object({
+  id: z.number(),
+  name: z.string(),
+  slug: z.string(),
+  role: z.string(), // "owner" | "admin" | "member"
+});
+
+export const ListMyOrganizationsResponse = z.array(MyOrganization);
+
+export const SwitchOrganizationBody = z.object({
+  organizationId: z.number().int(),
+});
+
+export const SwitchOrganizationResponse = MyOrganization;

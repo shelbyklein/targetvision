@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import usersRouter from "./users";
+import organizationsRouter from "./organizations";
 import albumsRouter from "./albums";
 import photosRouter from "./photos";
 import searchRouter from "./search";
@@ -18,6 +19,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(usersRouter);
+router.use(organizationsRouter);
 router.use(albumsRouter);
 // Before photosRouter so its /photos/... routes are never shadowed.
 router.use(attributionTagsRouter);
