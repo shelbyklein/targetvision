@@ -23,7 +23,7 @@ function customerIdOf(sub: Stripe.Subscription): string {
 // Write the org's subscription row from a Stripe.Subscription (absolute state, so
 // re-delivering the same event is idempotent) and keep organizations.plan in
 // sync — but never downgrade an admin-assigned enterprise org.
-async function syncFromSubscription(org: Organization, sub: Stripe.Subscription): Promise<void> {
+export async function syncFromSubscription(org: Organization, sub: Stripe.Subscription): Promise<void> {
   await db
     .update(organizationSubscriptionsTable)
     .set({
