@@ -48,6 +48,8 @@ export async function resolveSmartCollectionPhotoIds(
   collection: { id: number; title: string; smartQuery: string | null },
   topK: number,
   offset = 0,
+  // Tenant scope (#113): rank only within this org's photos.
+  organizationId?: number,
 ): Promise<SmartCollectionResult> {
   const [memberRows, negativeRows] = await Promise.all([
     db
@@ -102,6 +104,7 @@ export async function resolveSmartCollectionPhotoIds(
       .where(
         and(
           eq(photosTable.isHidden, false),
+          organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
           // Exclude the seed members and the negative examples from suggestions.
           excludeIds.length ? notInArray(photoEmbeddingsTable.photoId, excludeIds) : undefined,
         ),

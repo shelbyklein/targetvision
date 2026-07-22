@@ -19,12 +19,15 @@ import {
   ReorderAlbumsBody,
   ReorderAlbumsResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 import { buildPhotosResponse, deletePhotoStorageObjects } from "../lib/photoHelpers";
 
 const router: IRouter = Router();
 
-async function buildAlbumResponse(albumId: number) {
+// Tenant scope (#113): buildAlbumResponse is only ever called with an album the
+// caller has already confirmed is in their org, but it re-asserts the org here
+// so a foreign album id resolves to null (→ 404) as defense-in-depth.
+async function buildAlbumResponse(albumId: number, orgId: number) {
   const [[row], [ratedRow], [unratedRow]] = await Promise.all([
     db
       .select({
@@ -36,7 +39,7 @@ async function buildAlbumResponse(albumId: number) {
       .from(albumsTable)
       .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
       .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
-      .where(eq(albumsTable.id, albumId))
+      .where(and(eq(albumsTable.id, albumId), eq(albumsTable.organizationId, orgId)))
       .groupBy(albumsTable.id, usersTable.name),
     db
       .select({ ratedCount: sql<number>`cast(count(distinct ${ratingsTable.photoId}) as integer)` })
@@ -83,15 +86,16 @@ async function buildAlbumResponse(albumId: number) {
 }
 
 // Registered before the /albums/:id routes so "order" isn't captured as an id.
-router.put("/albums/order", requireAuth, async (req, res): Promise<void> => {
+router.put("/albums/order", requireOrgAuth, async (req, res): Promise<void> => {
   const { ids } = ReorderAlbumsBody.parse(req.body);
+  const orgId = req.org!.id;
   let updated = 0;
   await db.transaction(async (tx) => {
     for (let i = 0; i < ids.length; i++) {
       const rows = await tx
         .update(albumsTable)
         .set({ sortOrder: i })
-        .where(eq(albumsTable.id, ids[i]))
+        .where(and(eq(albumsTable.id, ids[i]), eq(albumsTable.organizationId, orgId)))
         .returning({ id: albumsTable.id });
       updated += rows.length;
     }
@@ -99,9 +103,10 @@ router.put("/albums/order", requireAuth, async (req, res): Promise<void> => {
   res.json(ReorderAlbumsResponse.parse({ updated }));
 });
 
-router.get("/albums", requireAuth, async (req, res): Promise<void> => {
+router.get("/albums", requireOrgAuth, async (req, res): Promise<void> => {
   // Fetch album rows and ratedCounts in parallel.
   // ratedCounts uses a single aggregate scan — NOT a correlated subquery per album.
+  const orgId = req.org!.id;
   const [rows, ratedCountRows] = await Promise.all([
     db
       .select({
@@ -113,6 +118,7 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
       .from(albumsTable)
       .leftJoin(usersTable, eq(albumsTable.ownerId, usersTable.id))
       .leftJoin(photosTable, eq(albumsTable.id, photosTable.albumId))
+      .where(eq(albumsTable.organizationId, orgId))
       .groupBy(albumsTable.id, usersTable.name)
       // Manual card order first (ASC puts nulls last), newest of the
       // never-placed albums after that.
@@ -124,6 +130,7 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
       })
       .from(ratingsTable)
       .innerJoin(photosTable, eq(ratingsTable.photoId, photosTable.id))
+      .where(eq(photosTable.organizationId, orgId))
       .groupBy(photosTable.albumId),
   ]);
 
@@ -158,7 +165,7 @@ router.get("/albums", requireAuth, async (req, res): Promise<void> => {
   res.json(ListAlbumsResponse.parse(albums));
 });
 
-router.post("/albums", requireAuth, async (req, res): Promise<void> => {
+router.post("/albums", requireOrgAuth, async (req, res): Promise<void> => {
   const body = CreateAlbumBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -167,14 +174,14 @@ router.post("/albums", requireAuth, async (req, res): Promise<void> => {
 
   const [album] = await db
     .insert(albumsTable)
-    .values({ ...body.data, ownerId: req.dbUser!.id })
+    .values({ ...body.data, ownerId: req.dbUser!.id, organizationId: req.org!.id })
     .returning();
 
-  const full = await buildAlbumResponse(album.id);
+  const full = await buildAlbumResponse(album.id, req.org!.id);
   res.status(201).json(GetAlbumResponse.parse(full));
 });
 
-router.get("/albums/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/albums/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetAlbumParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -182,7 +189,7 @@ router.get("/albums/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const full = await buildAlbumResponse(params.data.id);
+  const full = await buildAlbumResponse(params.data.id, req.org!.id);
   if (!full) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -191,7 +198,7 @@ router.get("/albums/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(GetAlbumResponse.parse(full));
 });
 
-router.patch("/albums/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/albums/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdateAlbumParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -205,7 +212,7 @@ router.patch("/albums/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [existing] = await db.select().from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  const [existing] = await db.select().from(albumsTable).where(and(eq(albumsTable.id, params.data.id), eq(albumsTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -217,11 +224,11 @@ router.patch("/albums/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   await db.update(albumsTable).set(body.data).where(eq(albumsTable.id, params.data.id));
-  const full = await buildAlbumResponse(params.data.id);
+  const full = await buildAlbumResponse(params.data.id, req.org!.id);
   res.json(UpdateAlbumResponse.parse(full));
 });
 
-router.delete("/albums/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/albums/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteAlbumParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -229,7 +236,7 @@ router.delete("/albums/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [existing] = await db.select().from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  const [existing] = await db.select().from(albumsTable).where(and(eq(albumsTable.id, params.data.id), eq(albumsTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -250,7 +257,7 @@ router.delete("/albums/:id", requireAuth, async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-router.patch("/albums/:id/cover", requireAuth, async (req, res): Promise<void> => {
+router.patch("/albums/:id/cover", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = SetAlbumCoverParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -264,7 +271,7 @@ router.patch("/albums/:id/cover", requireAuth, async (req, res): Promise<void> =
     return;
   }
 
-  const [existing] = await db.select().from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  const [existing] = await db.select().from(albumsTable).where(and(eq(albumsTable.id, params.data.id), eq(albumsTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -289,11 +296,11 @@ router.patch("/albums/:id/cover", requireAuth, async (req, res): Promise<void> =
     .set({ coverPhotoId: body.data.photoId })
     .where(eq(albumsTable.id, params.data.id));
 
-  const full = await buildAlbumResponse(params.data.id);
+  const full = await buildAlbumResponse(params.data.id, req.org!.id);
   res.json(SetAlbumCoverResponse.parse(full));
 });
 
-router.get("/albums/:id/top-rated", requireAuth, async (req, res): Promise<void> => {
+router.get("/albums/:id/top-rated", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetAlbumTopRatedParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -301,7 +308,7 @@ router.get("/albums/:id/top-rated", requireAuth, async (req, res): Promise<void>
     return;
   }
 
-  const [album] = await db.select().from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  const [album] = await db.select().from(albumsTable).where(and(eq(albumsTable.id, params.data.id), eq(albumsTable.organizationId, req.org!.id)));
   if (!album) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -316,7 +323,7 @@ router.get("/albums/:id/top-rated", requireAuth, async (req, res): Promise<void>
     .orderBy(desc(avg(ratingsTable.score)))
     .limit(12);
 
-  const photos = await buildPhotosResponse(rows.map((p) => p.id), req.dbUser?.id);
+  const photos = await buildPhotosResponse(rows.map((p) => p.id), req.org!.id, req.dbUser?.id);
   res.json(GetAlbumTopRatedResponse.parse(photos));
 });
 

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, bulkUploadBatchesTable } from "@workspace/db";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 import {
   CreateBulkUploadBatchBody,
   CreateBulkUploadBatchResponse,
@@ -10,7 +10,7 @@ import {
 
 const router: IRouter = Router();
 
-router.post("/bulk-upload-batches", requireAuth, async (req, res): Promise<void> => {
+router.post("/bulk-upload-batches", requireOrgAuth, async (req, res): Promise<void> => {
   const body = CreateBulkUploadBatchBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -21,6 +21,7 @@ router.post("/bulk-upload-batches", requireAuth, async (req, res): Promise<void>
     .insert(bulkUploadBatchesTable)
     .values({
       userId: req.dbUser!.id,
+      organizationId: req.org!.id,
       groupNames: body.data.groupNames,
       albumIds: body.data.albumIds,
       totalUploaded: body.data.totalUploaded,
@@ -31,11 +32,11 @@ router.post("/bulk-upload-batches", requireAuth, async (req, res): Promise<void>
   res.status(201).json(CreateBulkUploadBatchResponse.parse(batch));
 });
 
-router.get("/bulk-upload-batches", requireAuth, async (req, res): Promise<void> => {
+router.get("/bulk-upload-batches", requireOrgAuth, async (req, res): Promise<void> => {
   const batches = await db
     .select()
     .from(bulkUploadBatchesTable)
-    .where(eq(bulkUploadBatchesTable.userId, req.dbUser!.id))
+    .where(and(eq(bulkUploadBatchesTable.userId, req.dbUser!.id), eq(bulkUploadBatchesTable.organizationId, req.org!.id)))
     .orderBy(desc(bulkUploadBatchesTable.createdAt))
     .limit(50);
 

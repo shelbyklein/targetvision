@@ -1,6 +1,8 @@
 import {
   db,
   usersTable,
+  organizationsTable,
+  organizationMembersTable,
   albumsTable,
   photosTable,
   ratingsTable,
@@ -48,21 +50,46 @@ export async function createUser(opts: { name?: string; role?: "admin" | "member
   return user;
 }
 
-export async function createAlbum(ownerId: number, title = "Test Album") {
-  const [album] = await db.insert(albumsTable).values({ ownerId, title }).returning();
+// Multi-tenant test helpers (issue #113).
+export async function createOrganization(opts: { name?: string; slug?: string } = {}) {
+  const n = nextSeq();
+  const [org] = await db
+    .insert(organizationsTable)
+    .values({ name: opts.name ?? `Org ${n}`, slug: opts.slug ?? `org-${n}` })
+    .returning();
+  return org;
+}
+
+export async function addOrganizationMember(
+  organizationId: number,
+  userId: number,
+  role: "owner" | "admin" | "member" = "member",
+) {
+  await db.insert(organizationMembersTable).values({ organizationId, userId, role });
+}
+
+export async function createAlbum(ownerId: number, title = "Test Album", organizationId?: number) {
+  const [album] = await db.insert(albumsTable).values({ ownerId, title, organizationId }).returning();
   return album;
 }
 
 export async function createPhoto(
   albumId: number,
   uploaderId: number,
-  opts: { url?: string; aiDescription?: string | null; isHidden?: boolean; createdAt?: Date } = {},
+  opts: {
+    url?: string;
+    aiDescription?: string | null;
+    isHidden?: boolean;
+    createdAt?: Date;
+    organizationId?: number;
+  } = {},
 ) {
   const [photo] = await db
     .insert(photosTable)
     .values({
       albumId,
       uploaderId,
+      organizationId: opts.organizationId,
       url: opts.url ?? `/api/storage/objects/uploads/${nextSeq()}`,
       aiDescription: opts.aiDescription ?? null,
       isHidden: opts.isHidden ?? false,
@@ -76,8 +103,11 @@ export async function ratePhoto(photoId: number, userId: number, score: number) 
   await db.insert(ratingsTable).values({ photoId, userId, score });
 }
 
-export async function createCollection(createdById: number, title = "Test Collection") {
-  const [collection] = await db.insert(collectionsTable).values({ createdById, title }).returning();
+export async function createCollection(createdById: number, title = "Test Collection", organizationId?: number) {
+  const [collection] = await db
+    .insert(collectionsTable)
+    .values({ createdById, title, organizationId })
+    .returning();
   return collection;
 }
 
@@ -85,8 +115,11 @@ export async function addPhotoToCollection(collectionId: number, photoId: number
   await db.insert(photoCollectionsTable).values({ collectionId, photoId });
 }
 
-export async function createProject(createdById: number, name = "Test Project") {
-  const [project] = await db.insert(projectsTable).values({ createdById, name }).returning();
+export async function createProject(createdById: number, name = "Test Project", organizationId?: number) {
+  const [project] = await db
+    .insert(projectsTable)
+    .values({ createdById, name, organizationId })
+    .returning();
   return project;
 }
 

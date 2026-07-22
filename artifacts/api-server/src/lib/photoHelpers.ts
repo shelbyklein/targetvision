@@ -8,6 +8,10 @@ const objectStorageService = new ObjectStorageService();
 export type AiStatusFilter = "has_description" | "failed" | "not_analysed";
 
 export interface AlbumPhotoPageOptions {
+  // Tenant scope (issue #113): only photos in this org are returned, even if the
+  // album id somehow belonged to another org. Defense-in-depth over the caller's
+  // own album-org check.
+  organizationId: number;
   canSeeHidden: boolean;
   inCollection?: boolean;
   hasRating?: boolean;
@@ -29,7 +33,10 @@ export async function fetchAlbumPhotoPage(
   albumId: number,
   opts: AlbumPhotoPageOptions,
 ): Promise<{ ids: number[]; hasMore: boolean }> {
-  const conditions: SQL[] = [eq(photosTable.albumId, albumId)];
+  const conditions: SQL[] = [
+    eq(photosTable.albumId, albumId),
+    eq(photosTable.organizationId, opts.organizationId),
+  ];
   if (!opts.canSeeHidden) conditions.push(eq(photosTable.isHidden, false));
 
   if (opts.inCollection === true) {
@@ -105,7 +112,7 @@ export async function deletePhotoStorageObjects(photo: {
   }
 }
 
-export async function buildPhotoResponse(photoId: number, currentUserId?: number) {
+export async function buildPhotoResponse(photoId: number, orgId: number, currentUserId?: number) {
   const [photo] = await db
     .select({
       photo: photosTable,
@@ -113,7 +120,8 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
     })
     .from(photosTable)
     .leftJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-    .where(eq(photosTable.id, photoId));
+    // Tenant scope (#113): a foreign-org photo id resolves to null (→ 404).
+    .where(and(eq(photosTable.id, photoId), eq(photosTable.organizationId, orgId)));
 
   if (!photo) return null;
 
@@ -239,7 +247,7 @@ export async function buildPhotoResponse(photoId: number, currentUserId?: number
  * identical in shape to buildPhotoResponse and preserve the input `photoIds`
  * order; ids with no photo row are dropped (matching the old `.filter(Boolean)`).
  */
-export async function buildPhotosResponse(photoIds: number[], currentUserId?: number) {
+export async function buildPhotosResponse(photoIds: number[], orgId: number, currentUserId?: number) {
   if (photoIds.length === 0) return [];
 
   const [
@@ -258,7 +266,9 @@ export async function buildPhotosResponse(photoIds: number[], currentUserId?: nu
       .select({ photo: photosTable, albumTitle: albumsTable.title })
       .from(photosTable)
       .leftJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-      .where(inArray(photosTable.id, photoIds)),
+      // Tenant scope (#113): foreign-org ids are dropped even if a caller's
+      // upstream query missed them — the defense-in-depth choke point.
+      .where(and(inArray(photosTable.id, photoIds), eq(photosTable.organizationId, orgId))),
     db
       .select({
         photoId: photoCollectionsTable.photoId,

@@ -15,16 +15,24 @@ import {
   SetAlbumAttributionBody,
   SetAlbumAttributionResponse,
 } from "@workspace/api-zod";
-import { requireAuth, requireAdmin } from "../middlewares/requireAuth";
+import { requireOrgAuth, requireOrgRole } from "../middlewares/requireOrg";
 
 const router: IRouter = Router();
 
-router.get("/attribution-tags", requireAuth, async (_req, res): Promise<void> => {
-  const tags = await db.select().from(attributionTagsTable).orderBy(attributionTagsTable.name);
+// Tag management is an org-admin action (owner/admin in the active org), not an
+// instance-superadmin one, now that attribution tags are per-org (#113).
+const requireOrgAdmin = [requireOrgAuth, requireOrgRole("owner", "admin")] as const;
+
+router.get("/attribution-tags", requireOrgAuth, async (req, res): Promise<void> => {
+  const tags = await db
+    .select()
+    .from(attributionTagsTable)
+    .where(eq(attributionTagsTable.organizationId, req.org!.id))
+    .orderBy(attributionTagsTable.name);
   res.json(ListAttributionTagsResponse.parse(tags.map((t) => ({ id: t.id, name: t.name }))));
 });
 
-router.post("/attribution-tags", requireAdmin, async (req, res): Promise<void> => {
+router.post("/attribution-tags", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = CreateAttributionTagBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -35,16 +43,19 @@ router.post("/attribution-tags", requireAdmin, async (req, res): Promise<void> =
     res.status(400).json({ error: "Tag name cannot be empty" });
     return;
   }
-  const [existing] = await db.select().from(attributionTagsTable).where(eq(attributionTagsTable.name, name));
+  const [existing] = await db
+    .select()
+    .from(attributionTagsTable)
+    .where(and(eq(attributionTagsTable.name, name), eq(attributionTagsTable.organizationId, req.org!.id)));
   if (existing) {
     res.status(409).json({ error: "A tag with that name already exists" });
     return;
   }
-  const [tag] = await db.insert(attributionTagsTable).values({ name }).returning();
+  const [tag] = await db.insert(attributionTagsTable).values({ name, organizationId: req.org!.id }).returning();
   res.status(201).json(UpdateAttributionTagResponse.parse({ id: tag.id, name: tag.name }));
 });
 
-router.patch("/attribution-tags/:id", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/attribution-tags/:id", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (!Number.isInteger(id)) {
@@ -64,7 +75,7 @@ router.patch("/attribution-tags/:id", requireAdmin, async (req, res): Promise<vo
   const [tag] = await db
     .update(attributionTagsTable)
     .set({ name })
-    .where(eq(attributionTagsTable.id, id))
+    .where(and(eq(attributionTagsTable.id, id), eq(attributionTagsTable.organizationId, req.org!.id)))
     .returning();
   if (!tag) {
     res.status(404).json({ error: "Tag not found" });
@@ -73,7 +84,7 @@ router.patch("/attribution-tags/:id", requireAdmin, async (req, res): Promise<vo
   res.json(UpdateAttributionTagResponse.parse({ id: tag.id, name: tag.name }));
 });
 
-router.delete("/attribution-tags/:id", requireAdmin, async (req, res): Promise<void> => {
+router.delete("/attribution-tags/:id", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (!Number.isInteger(id)) {
@@ -82,7 +93,7 @@ router.delete("/attribution-tags/:id", requireAdmin, async (req, res): Promise<v
   }
   const deleted = await db
     .delete(attributionTagsTable)
-    .where(eq(attributionTagsTable.id, id))
+    .where(and(eq(attributionTagsTable.id, id), eq(attributionTagsTable.organizationId, req.org!.id)))
     .returning({ id: attributionTagsTable.id });
   if (deleted.length === 0) {
     res.status(404).json({ error: "Tag not found" });
@@ -93,14 +104,14 @@ router.delete("/attribution-tags/:id", requireAdmin, async (req, res): Promise<v
 
 // Album-level coverage: for every attribution tag, how many of this album's
 // photos carry it. Drives the album page's tri-state pills (none/some/all).
-router.get("/albums/:id/attribution-tags", requireAuth, async (req, res): Promise<void> => {
+router.get("/albums/:id/attribution-tags", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const albumId = parseInt(raw, 10);
   if (!Number.isInteger(albumId)) {
     res.status(400).json({ error: "Invalid album id" });
     return;
   }
-  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(eq(albumsTable.id, albumId));
+  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(and(eq(albumsTable.id, albumId), eq(albumsTable.organizationId, req.org!.id)));
   if (!album) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -115,6 +126,7 @@ router.get("/albums/:id/attribution-tags", requireAuth, async (req, res): Promis
     LEFT JOIN photo_attribution_tags pat
       ON pat.tag_id = t.id
       AND pat.photo_id IN (SELECT p.id FROM photos p WHERE p.album_id = ${albumId})
+    WHERE t.organization_id = ${req.org!.id}
     GROUP BY t.id, t.name
     ORDER BY t.name
   `);
@@ -129,7 +141,7 @@ router.get("/albums/:id/attribution-tags", requireAuth, async (req, res): Promis
 
 // The album-level control: attribution is decided per album, so this adds or
 // removes one tag on EVERY photo in the album in a single statement.
-router.post("/albums/:id/attribution-tags", requireAdmin, async (req, res): Promise<void> => {
+router.post("/albums/:id/attribution-tags", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const albumId = parseInt(raw, 10);
   if (!Number.isInteger(albumId)) {
@@ -143,12 +155,12 @@ router.post("/albums/:id/attribution-tags", requireAdmin, async (req, res): Prom
   }
   const { tagId, mode } = body.data;
 
-  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(eq(albumsTable.id, albumId));
+  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(and(eq(albumsTable.id, albumId), eq(albumsTable.organizationId, req.org!.id)));
   if (!album) {
     res.status(404).json({ error: "Album not found" });
     return;
   }
-  const [tag] = await db.select().from(attributionTagsTable).where(eq(attributionTagsTable.id, tagId));
+  const [tag] = await db.select().from(attributionTagsTable).where(and(eq(attributionTagsTable.id, tagId), eq(attributionTagsTable.organizationId, req.org!.id)));
   if (!tag) {
     res.status(404).json({ error: "Tag not found" });
     return;
@@ -174,7 +186,7 @@ router.post("/albums/:id/attribution-tags", requireAdmin, async (req, res): Prom
 // Bulk add/remove a tag on a set of photos (the album select-mode flow).
 // Registered as /photos/attribution-tags/bulk (not /photos/bulk/...) so it can
 // never be shadowed by /photos/:id patterns regardless of mount order.
-router.post("/photos/attribution-tags/bulk", requireAdmin, async (req, res): Promise<void> => {
+router.post("/photos/attribution-tags/bulk", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = BulkSetAttributionTagsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -182,7 +194,7 @@ router.post("/photos/attribution-tags/bulk", requireAdmin, async (req, res): Pro
   }
   const { ids, tagId, mode } = body.data;
 
-  const [tag] = await db.select().from(attributionTagsTable).where(eq(attributionTagsTable.id, tagId));
+  const [tag] = await db.select().from(attributionTagsTable).where(and(eq(attributionTagsTable.id, tagId), eq(attributionTagsTable.organizationId, req.org!.id)));
   if (!tag) {
     res.status(404).json({ error: "Tag not found" });
     return;
@@ -192,7 +204,7 @@ router.post("/photos/attribution-tags/bulk", requireAdmin, async (req, res): Pro
     const existing = await db
       .select({ id: photosTable.id })
       .from(photosTable)
-      .where(inArray(photosTable.id, ids));
+      .where(and(inArray(photosTable.id, ids), eq(photosTable.organizationId, req.org!.id)));
     if (existing.length === 0) {
       res.json(BulkSetAttributionTagsResponse.parse({ updated: 0 }));
       return;
@@ -212,7 +224,7 @@ router.post("/photos/attribution-tags/bulk", requireAdmin, async (req, res): Pro
   }
 });
 
-router.post("/photos/:id/attribution-tags", requireAuth, async (req, res): Promise<void> => {
+router.post("/photos/:id/attribution-tags", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const photoId = parseInt(raw, 10);
   if (!Number.isInteger(photoId)) {
@@ -224,12 +236,12 @@ router.post("/photos/:id/attribution-tags", requireAuth, async (req, res): Promi
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, photoId));
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(and(eq(photosTable.id, photoId), eq(photosTable.organizationId, req.org!.id)));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
   }
-  const [tag] = await db.select().from(attributionTagsTable).where(eq(attributionTagsTable.id, body.data.tagId));
+  const [tag] = await db.select().from(attributionTagsTable).where(and(eq(attributionTagsTable.id, body.data.tagId), eq(attributionTagsTable.organizationId, req.org!.id)));
   if (!tag) {
     res.status(404).json({ error: "Tag not found" });
     return;
@@ -241,13 +253,23 @@ router.post("/photos/:id/attribution-tags", requireAuth, async (req, res): Promi
   res.status(204).send();
 });
 
-router.delete("/photos/:id/attribution-tags/:tagId", requireAuth, async (req, res): Promise<void> => {
+router.delete("/photos/:id/attribution-tags/:tagId", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawTagId = Array.isArray(req.params.tagId) ? req.params.tagId[0] : req.params.tagId;
   const photoId = parseInt(rawId, 10);
   const tagId = parseInt(rawTagId, 10);
   if (!Number.isInteger(photoId) || !Number.isInteger(tagId)) {
     res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  // Only touch a photo in this org — otherwise a foreign (photo, tag) link could
+  // be removed by id alone.
+  const [photo] = await db
+    .select({ id: photosTable.id })
+    .from(photosTable)
+    .where(and(eq(photosTable.id, photoId), eq(photosTable.organizationId, req.org!.id)));
+  if (!photo) {
+    res.status(404).json({ error: "Photo not found" });
     return;
   }
   await db

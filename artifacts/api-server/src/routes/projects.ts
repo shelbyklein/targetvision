@@ -16,7 +16,7 @@ import {
   ReorderProjectsBody,
   ReorderProjectsResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 import { buildPhotosResponse } from "../lib/photoHelpers";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
@@ -31,7 +31,7 @@ function safeZipName(name: string): string {
   return (cleaned || "project") + ".zip";
 }
 
-async function buildProjectResponse(projectId: number) {
+async function buildProjectResponse(projectId: number, orgId: number) {
   const [row] = await db
     .select({
       project: projectsTable,
@@ -39,7 +39,7 @@ async function buildProjectResponse(projectId: number) {
     })
     .from(projectsTable)
     .leftJoin(projectPhotosTable, eq(projectsTable.id, projectPhotosTable.projectId))
-    .where(eq(projectsTable.id, projectId))
+    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.organizationId, orgId)))
     .groupBy(projectsTable.id);
 
   if (!row) return null;
@@ -65,7 +65,7 @@ async function buildProjectResponse(projectId: number) {
 // Streams a zip of every photo in the project (original files, store-level —
 // JPEGs don't recompress). Entries keep their original filenames; collisions
 // get a "-<photoId>" suffix. Missing storage objects are skipped, not fatal.
-router.get("/projects/:id/download", requireAuth, async (req, res): Promise<void> => {
+router.get("/projects/:id/download", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const projectId = parseInt(raw, 10);
   if (!Number.isInteger(projectId)) {
@@ -73,7 +73,7 @@ router.get("/projects/:id/download", requireAuth, async (req, res): Promise<void
     return;
   }
 
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+  const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.organizationId, req.org!.id)));
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -123,7 +123,7 @@ router.get("/projects/:id/download", requireAuth, async (req, res): Promise<void
 });
 
 // Registered before the /projects/:id routes so "order" isn't captured as an id.
-router.put("/projects/order", requireAuth, async (req, res): Promise<void> => {
+router.put("/projects/order", requireOrgAuth, async (req, res): Promise<void> => {
   const { ids } = ReorderProjectsBody.parse(req.body);
   let updated = 0;
   await db.transaction(async (tx) => {
@@ -131,7 +131,7 @@ router.put("/projects/order", requireAuth, async (req, res): Promise<void> => {
       const rows = await tx
         .update(projectsTable)
         .set({ sortOrder: i })
-        .where(eq(projectsTable.id, ids[i]))
+        .where(and(eq(projectsTable.id, ids[i]), eq(projectsTable.organizationId, req.org!.id)))
         .returning({ id: projectsTable.id });
       updated += rows.length;
     }
@@ -139,7 +139,7 @@ router.put("/projects/order", requireAuth, async (req, res): Promise<void> => {
   res.json(ReorderProjectsResponse.parse({ updated }));
 });
 
-router.get("/projects", requireAuth, async (req, res): Promise<void> => {
+router.get("/projects", requireOrgAuth, async (req, res): Promise<void> => {
   const rows = await db
     .select({
       project: projectsTable,
@@ -147,6 +147,7 @@ router.get("/projects", requireAuth, async (req, res): Promise<void> => {
     })
     .from(projectsTable)
     .leftJoin(projectPhotosTable, eq(projectsTable.id, projectPhotosTable.projectId))
+    .where(eq(projectsTable.organizationId, req.org!.id))
     .groupBy(projectsTable.id)
     // Manual card order first (ASC puts nulls last), recently-touched
     // never-placed projects after that.
@@ -176,7 +177,7 @@ router.get("/projects", requireAuth, async (req, res): Promise<void> => {
   res.json(ListProjectsResponse.parse(projects));
 });
 
-router.post("/projects", requireAuth, async (req, res): Promise<void> => {
+router.post("/projects", requireOrgAuth, async (req, res): Promise<void> => {
   const body = CreateProjectBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -185,14 +186,14 @@ router.post("/projects", requireAuth, async (req, res): Promise<void> => {
 
   const [project] = await db
     .insert(projectsTable)
-    .values({ ...body.data, createdById: req.dbUser!.id })
+    .values({ ...body.data, createdById: req.dbUser!.id, organizationId: req.org!.id })
     .returning();
 
-  const full = await buildProjectResponse(project.id);
+  const full = await buildProjectResponse(project.id, req.org!.id);
   res.status(201).json(GetProjectResponse.parse(full));
 });
 
-router.get("/projects/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/projects/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetProjectParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -200,7 +201,7 @@ router.get("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const full = await buildProjectResponse(params.data.id);
+  const full = await buildProjectResponse(params.data.id, req.org!.id);
   if (!full) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -212,12 +213,12 @@ router.get("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     .where(eq(projectPhotosTable.projectId, params.data.id))
     .orderBy(projectPhotosTable.addedAt, projectPhotosTable.photoId);
 
-  const photos = await buildPhotosResponse(photoRows.map((p) => p.id), req.dbUser?.id);
+  const photos = await buildPhotosResponse(photoRows.map((p) => p.id), req.org!.id, req.dbUser?.id);
 
   res.json(GetProjectResponse.parse({ ...full, photos }));
 });
 
-router.patch("/projects/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/projects/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdateProjectParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -231,7 +232,7 @@ router.patch("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, params.data.id));
+  const [existing] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -247,11 +248,11 @@ router.patch("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     .set({ ...body.data, updatedAt: new Date() })
     .where(eq(projectsTable.id, params.data.id));
 
-  const full = await buildProjectResponse(params.data.id);
+  const full = await buildProjectResponse(params.data.id, req.org!.id);
   res.json(UpdateProjectResponse.parse(full));
 });
 
-router.delete("/projects/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/projects/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteProjectParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -259,7 +260,7 @@ router.delete("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, params.data.id));
+  const [existing] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -274,7 +275,7 @@ router.delete("/projects/:id", requireAuth, async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-router.post("/projects/:id/photos", requireAuth, async (req, res): Promise<void> => {
+router.post("/projects/:id/photos", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = AddPhotoToProjectParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -288,7 +289,7 @@ router.post("/projects/:id/photos", requireAuth, async (req, res): Promise<void>
     return;
   }
 
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, params.data.id));
+  const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.organizationId, req.org!.id)));
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;
@@ -299,7 +300,11 @@ router.post("/projects/:id/photos", requireAuth, async (req, res): Promise<void>
     return;
   }
 
-  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, body.data.photoId));
+  // Only a photo in this org can be added — blocks cross-tenant photo ids.
+  const [photo] = await db
+    .select({ id: photosTable.id })
+    .from(photosTable)
+    .where(and(eq(photosTable.id, body.data.photoId), eq(photosTable.organizationId, req.org!.id)));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -315,7 +320,7 @@ router.post("/projects/:id/photos", requireAuth, async (req, res): Promise<void>
   res.sendStatus(204);
 });
 
-router.delete("/projects/:id/photos/:photoId", requireAuth, async (req, res): Promise<void> => {
+router.delete("/projects/:id/photos/:photoId", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawPhotoId = Array.isArray(req.params.photoId) ? req.params.photoId[0] : req.params.photoId;
   const params = RemovePhotoFromProjectParams.safeParse({
@@ -327,7 +332,7 @@ router.delete("/projects/:id/photos/:photoId", requireAuth, async (req, res): Pr
     return;
   }
 
-  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, params.data.id));
+  const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.organizationId, req.org!.id)));
   if (!project) {
     res.status(404).json({ error: "Project not found" });
     return;

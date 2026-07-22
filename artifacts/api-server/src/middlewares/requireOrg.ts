@@ -85,8 +85,14 @@ export const requireOrg = async (req: Request, res: Response, next: NextFunction
 };
 
 // Auth + org context for tenant routes: `router.get(path, requireOrgAuth, handler)`.
-// Express flattens the array, running requireAuth then requireOrg before the handler.
-export const requireOrgAuth: RequestHandler[] = [requireAuth, requireOrg];
+// A single composed handler (not an array) so Express infers the route handler's
+// req/res types. Runs requireAuth first; requireOrg only runs on auth success
+// (requireAuth sends its own 401/500 and doesn't call next on failure).
+export const requireOrgAuth: RequestHandler = (req: Request, res: Response, next: NextFunction): void => {
+  void requireAuth(req, res, () => {
+    void requireOrg(req, res, next);
+  });
+};
 
 // Guards an org-scoped action to callers holding one of `roles` in req.org
 // (e.g. requireOrgRole("owner", "admin") for member management). Runs after
