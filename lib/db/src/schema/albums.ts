@@ -8,7 +8,7 @@ export const albumsTable = pgTable("albums", {
   id: serial("id").primaryKey(),
   // Multi-tenant owner (issue #113). Nullable in Phase 1 (backfilled to the
   // default org); the API sets it on insert and it flips NOT NULL in Phase 2.
-  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
+  organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
   ownerId: integer("owner_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),

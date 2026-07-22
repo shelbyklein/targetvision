@@ -12,7 +12,7 @@ export const photosTable = pgTable(
     id: serial("id").primaryKey(),
     // Denormalized tenant owner (issue #113) — global listing/search/stats scan
     // photos directly. Nullable in Phase 1 (backfilled), NOT NULL in Phase 2.
-    organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
+    organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
     albumId: integer("album_id").notNull().references(() => albumsTable.id, { onDelete: "cascade" }),
     uploaderId: integer("uploader_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
     storageKey: text("storage_key"),

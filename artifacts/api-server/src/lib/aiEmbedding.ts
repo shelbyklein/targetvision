@@ -121,7 +121,7 @@ export async function generateAndStorePhotoEmbedding(photoId: number): Promise<b
   if (!(await isEmbeddingEnabled())) return false;
 
   const [photo] = await db
-    .select({ url: photosTable.url, storageKey: photosTable.storageKey })
+    .select({ url: photosTable.url, storageKey: photosTable.storageKey, organizationId: photosTable.organizationId })
     .from(photosTable)
     .where(eq(photosTable.id, photoId));
   if (!photo) return false;
@@ -143,10 +143,12 @@ export async function generateAndStorePhotoEmbedding(photoId: number): Promise<b
 
   await db
     .insert(photoEmbeddingsTable)
-    .values({ photoId, embedding: vec, model: EMBEDDING_MODEL_TAG })
+    // organizationId denormalized from the photo (#113) so vector search can
+    // stay within a tenant without a join when needed.
+    .values({ photoId, organizationId: photo.organizationId, embedding: vec, model: EMBEDDING_MODEL_TAG })
     .onConflictDoUpdate({
       target: photoEmbeddingsTable.photoId,
-      set: { embedding: vec, model: EMBEDDING_MODEL_TAG, createdAt: new Date() },
+      set: { embedding: vec, model: EMBEDDING_MODEL_TAG, createdAt: new Date(), organizationId: photo.organizationId },
     });
   return true;
 }

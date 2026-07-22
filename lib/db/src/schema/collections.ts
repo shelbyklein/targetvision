@@ -11,7 +11,7 @@ export const collectionKindEnum = pgEnum("collection_kind", ["collection", "pers
 export const collectionsTable = pgTable("collections", {
   id: serial("id").primaryKey(),
   // Tenant owner (issue #113). Nullable in Phase 1 (backfilled), NOT NULL in P2.
-  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
+  organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),

@@ -9,7 +9,7 @@ export const attributionTagsTable = pgTable("attribution_tags", {
   id: serial("id").primaryKey(),
   // Tenant owner (issue #113). Nullable in Phase 1 (backfilled), NOT NULL in P2.
   // The global-unique `name` becomes per-org unique in Phase 2.
-  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
+  organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

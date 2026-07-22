@@ -32,7 +32,7 @@ export const photoEmbeddingsTable = pgTable("photo_embeddings", {
     .references(() => photosTable.id, { onDelete: "cascade" }),
   // Denormalized tenant owner (issue #113) — vector search scans embeddings
   // directly, so it needs the org here too. Nullable in Phase 1, NOT NULL in P2.
-  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
+  organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
   embedding: vector("embedding").notNull(),
   // e.g. "vertex/multimodalembedding@001" — tracks which model produced the
   // vector, so a model change can be detected for re-embedding.

@@ -10,7 +10,7 @@ import { organizationsTable } from "./organizations";
 export const nearDuplicatePairsTable = pgTable("near_duplicate_pairs", {
   // Tenant owner (issue #113) — near-duplicate detection is per-org. Nullable in
   // Phase 1 (backfilled, both photos share one org), NOT NULL in P2.
-  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
+  organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
   photoA: integer("photo_a").notNull().references(() => photosTable.id, { onDelete: "cascade" }),
   photoB: integer("photo_b").notNull().references(() => photosTable.id, { onDelete: "cascade" }),
   distance: integer("distance").notNull(),

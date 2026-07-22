@@ -28,12 +28,26 @@ export async function resetDb(): Promise<void> {
   await db.execute(
     sql`TRUNCATE TABLE near_duplicate_pairs, photo_embeddings, ai_analysis_events, photo_collections, collection_negative_photos, project_photos, projects, collections, ratings, photo_attribution_tags, attribution_tags, photos, albums, organization_members, organizations, "user", session, account, verification, users RESTART IDENTITY CASCADE`,
   );
+  cachedOrgId = null;
 }
 
 let seq = 0;
 function nextSeq(): number {
   seq += 1;
   return seq;
+}
+
+// A lazily-created default org so factories that don't care about tenancy still
+// satisfy the now-required organization_id. Reset per resetDb().
+let cachedOrgId: number | null = null;
+async function ensureDefaultOrg(): Promise<number> {
+  if (cachedOrgId != null) return cachedOrgId;
+  const [org] = await db
+    .insert(organizationsTable)
+    .values({ name: "Default Test Org", slug: `default-test-org-${nextSeq()}` })
+    .returning();
+  cachedOrgId = org.id;
+  return cachedOrgId;
 }
 
 export async function createUser(opts: { name?: string; role?: "admin" | "member" } = {}) {
@@ -69,7 +83,8 @@ export async function addOrganizationMember(
 }
 
 export async function createAlbum(ownerId: number, title = "Test Album", organizationId?: number) {
-  const [album] = await db.insert(albumsTable).values({ ownerId, title, organizationId }).returning();
+  const orgId = organizationId ?? (await ensureDefaultOrg());
+  const [album] = await db.insert(albumsTable).values({ ownerId, title, organizationId: orgId }).returning();
   return album;
 }
 
@@ -89,7 +104,7 @@ export async function createPhoto(
     .values({
       albumId,
       uploaderId,
-      organizationId: opts.organizationId,
+      organizationId: opts.organizationId ?? (await ensureDefaultOrg()),
       url: opts.url ?? `/api/storage/objects/uploads/${nextSeq()}`,
       aiDescription: opts.aiDescription ?? null,
       isHidden: opts.isHidden ?? false,
@@ -104,9 +119,10 @@ export async function ratePhoto(photoId: number, userId: number, score: number) 
 }
 
 export async function createCollection(createdById: number, title = "Test Collection", organizationId?: number) {
+  const orgId = organizationId ?? (await ensureDefaultOrg());
   const [collection] = await db
     .insert(collectionsTable)
-    .values({ createdById, title, organizationId })
+    .values({ createdById, title, organizationId: orgId })
     .returning();
   return collection;
 }
@@ -116,9 +132,10 @@ export async function addPhotoToCollection(collectionId: number, photoId: number
 }
 
 export async function createProject(createdById: number, name = "Test Project", organizationId?: number) {
+  const orgId = organizationId ?? (await ensureDefaultOrg());
   const [project] = await db
     .insert(projectsTable)
-    .values({ createdById, name, organizationId })
+    .values({ createdById, name, organizationId: orgId })
     .returning();
   return project;
 }
