@@ -1,7 +1,7 @@
 export * from "./generated/api";
 export * from "./generated/api.schemas";
-export { setBaseUrl, setAuthTokenGetter } from "./custom-fetch";
-export type { AuthTokenGetter } from "./custom-fetch";
+export { setBaseUrl, setAuthTokenGetter, setActiveOrgIdGetter } from "./custom-fetch";
+export type { AuthTokenGetter, ActiveOrgIdGetter } from "./custom-fetch";
 export * from "./collectionTags";
 export * from "./thumbnails";
 export * from "./adminHubStatus";
@@ -13,3 +13,4 @@ export * from "./embeddings";
 export * from "./imageOptimization";
 export * from "./bulkUploadBatches";
 export * from "./mcpTokens";
+export * from "./organizations";

@@ -15,8 +15,11 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 // Module-level configuration
 // ---------------------------------------------------------------------------
 
+export type ActiveOrgIdGetter = () => string | number | null;
+
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _activeOrgIdGetter: ActiveOrgIdGetter | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -42,6 +45,17 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Register a getter that supplies the active organization id (issue #113). When
+ * it returns a non-null value, an `X-Organization-Id` header is attached to
+ * every request (unless one is already set). The web app wires this to its
+ * OrgProvider so all tenant-scoped API calls target the chosen org. Pass `null`
+ * to clear it.
+ */
+export function setActiveOrgIdGetter(getter: ActiveOrgIdGetter | null): void {
+  _activeOrgIdGetter = getter;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -355,6 +369,16 @@ export async function customFetch<T = unknown>(
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    }
+  }
+
+  // Attach the active organization id (issue #113) so tenant-scoped routes act
+  // within the user's chosen org. Absent header → the API falls back to the
+  // user's sticky/last-active org, so this is safe before the org is resolved.
+  if (_activeOrgIdGetter && !headers.has("x-organization-id")) {
+    const orgId = _activeOrgIdGetter();
+    if (orgId != null) {
+      headers.set("x-organization-id", String(orgId));
     }
   }
 
