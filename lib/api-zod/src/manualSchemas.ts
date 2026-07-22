@@ -68,6 +68,27 @@ export const BackfillContentHashesResponse = z.object({
   failed: z.number(),
 });
 
+// Admin-managed MCP gateway tokens. The raw token is only present in the
+// create response; list/get never expose it.
+export const McpTokenListItem = z.object({
+  id: z.number(),
+  label: z.string(),
+  tokenPrefix: z.string(),
+  createdByName: z.string().nullable(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+});
+export const ListMcpTokensResponse = z.array(McpTokenListItem);
+export const CreateMcpTokenBody = z.object({ label: z.string().trim().min(1).max(80) });
+export const CreateMcpTokenResponse = z.object({
+  token: z.string(),
+  item: McpTokenListItem,
+  // Public MCP gateway base URL (from MCP_PUBLIC_URL) so the one-time reveal
+  // can show a ready-to-paste connector URL; null if the gateway isn't public.
+  publicBaseUrl: z.string().nullable(),
+});
+export const DeleteMcpTokenResponse = z.object({ deleted: z.boolean() });
+
 // Aggregated at-a-glance counts for the admin hub cards. One cheap endpoint
 // so the hub doesn't regress into per-section loading (#76).
 export const AdminHubStatusResponse = z.object({

@@ -36,6 +36,10 @@ import {
   BackfillDimensionsStatusResponse,
   BackfillDimensionsResponse,
   AdminHubStatusResponse,
+  ListMcpTokensResponse,
+  CreateMcpTokenBody,
+  CreateMcpTokenResponse,
+  DeleteMcpTokenResponse,
   ListDuplicatePhotoGroupsResponse,
   GetDuplicatesSummaryResponse,
   DeleteDuplicateExtrasResponse,
@@ -67,6 +71,7 @@ import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
 import { countPhotosWithoutCaptureDate, backfillExifDates } from "../lib/exifDateBackfill";
+import { listMcpTokens, createMcpToken, deleteMcpToken } from "../lib/mcpTokens";
 import { countPhotosWithoutDimensions, backfillDimensions } from "../lib/dimensionBackfill";
 import {
   countPhotosWithoutContentHash,
@@ -403,6 +408,37 @@ router.post(
     );
   },
 );
+
+// --- MCP gateway access tokens (bearer / URL auth for remote clients) ---
+
+router.get("/admin/mcp-tokens", requireAdmin, async (_req, res): Promise<void> => {
+  res.json(ListMcpTokensResponse.parse(await listMcpTokens()));
+});
+
+router.post("/admin/mcp-tokens", requireAdmin, async (req, res): Promise<void> => {
+  const body = CreateMcpTokenBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const created = await createMcpToken(body.data.label, req.dbUser?.id ?? null);
+  res.status(201).json(
+    CreateMcpTokenResponse.parse({
+      ...created,
+      publicBaseUrl: process.env.MCP_PUBLIC_URL?.replace(/\/$/, "") ?? null,
+    }),
+  );
+});
+
+router.delete("/admin/mcp-tokens/:id", requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid token id" });
+    return;
+  }
+  res.json(DeleteMcpTokenResponse.parse({ deleted: await deleteMcpToken(id) }));
+});
 
 // At-a-glance counts for the admin hub cards — one aggregated call of cheap
 // count-only queries, so the hub itself stays fast (#76). Near-duplicate

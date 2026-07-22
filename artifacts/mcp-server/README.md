@@ -71,6 +71,11 @@ Auth is accepted two ways:
   accepts a URL (claude.ai custom connectors):
   `https://targetvisionmcp.shelbyklein.com/<token>/mcp`.
   The URL is the secret; treat it like a password.
+- ChatGPT / OpenAI: same token-in-URL form — in ChatGPT go to Settings →
+  Apps & Connectors → Create, paste
+  `https://targetvisionmcp.shelbyklein.com/<token>/mcp` as the MCP server URL,
+  and pick authentication "None" (the token rides in the URL; ChatGPT's
+  connector UI has no custom-header option).
 
 Signed storage URLs only resolve on the local network, so in HTTP mode
 `get_photo` instead returns download links through the gateway's own
