@@ -1,5 +1,6 @@
 import { pgTable, integer, text, timestamp, customType } from "drizzle-orm/pg-core";
 import { photosTable } from "./photos";
+import { organizationsTable } from "./organizations";
 
 // Fixed by the embedding model. Google Vertex AI multimodalembedding@001 outputs
 // 1408-dim vectors (image + text share this space). Changing the model to a
@@ -29,6 +30,9 @@ export const photoEmbeddingsTable = pgTable("photo_embeddings", {
   photoId: integer("photo_id")
     .primaryKey()
     .references(() => photosTable.id, { onDelete: "cascade" }),
+  // Denormalized tenant owner (issue #113) — vector search scans embeddings
+  // directly, so it needs the org here too. Nullable in Phase 1, NOT NULL in P2.
+  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
   embedding: vector("embedding").notNull(),
   // e.g. "vertex/multimodalembedding@001" — tracks which model produced the
   // vector, so a model change can be detected for re-embedding.

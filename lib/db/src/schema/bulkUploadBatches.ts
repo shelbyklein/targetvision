@@ -1,8 +1,11 @@
 import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
+import { organizationsTable } from "./organizations";
 
 export const bulkUploadBatchesTable = pgTable("bulk_upload_batches", {
   id: serial("id").primaryKey(),
+  // Tenant owner (issue #113). Nullable in Phase 1 (backfilled), NOT NULL in P2.
+  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
   userId: integer("user_id")
     .notNull()
     .references(() => usersTable.id, { onDelete: "cascade" }),

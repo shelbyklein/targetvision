@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { photosTable } from "./photos";
+import { organizationsTable } from "./organizations";
 
 // A Project is a user-curated bucket of photos gathered for use in an actual
 // deliverable — distinct from Albums (storage/ownership) and Smart Collections
@@ -10,6 +11,8 @@ import { photosTable } from "./photos";
 // regardless of its album.
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
+  // Tenant owner (issue #113). Nullable in Phase 1 (backfilled), NOT NULL in P2.
+  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),

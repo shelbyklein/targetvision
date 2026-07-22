@@ -4,11 +4,15 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { albumsTable } from "./albums";
 import { collectionsTable } from "./collections";
+import { organizationsTable } from "./organizations";
 
 export const photosTable = pgTable(
   "photos",
   {
     id: serial("id").primaryKey(),
+    // Denormalized tenant owner (issue #113) — global listing/search/stats scan
+    // photos directly. Nullable in Phase 1 (backfilled), NOT NULL in Phase 2.
+    organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
     albumId: integer("album_id").notNull().references(() => albumsTable.id, { onDelete: "cascade" }),
     uploaderId: integer("uploader_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
     storageKey: text("storage_key"),

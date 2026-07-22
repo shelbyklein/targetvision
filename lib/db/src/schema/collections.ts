@@ -1,6 +1,7 @@
 import { pgTable, pgEnum, text, serial, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { photosTable } from "./photos";
+import { organizationsTable } from "./organizations";
 
 // "People" are collections with kind='person': same membership, smart-ranking,
 // suggestion, and negative-example machinery, listed on their own pages. List
@@ -9,6 +10,8 @@ export const collectionKindEnum = pgEnum("collection_kind", ["collection", "pers
 
 export const collectionsTable = pgTable("collections", {
   id: serial("id").primaryKey(),
+  // Tenant owner (issue #113). Nullable in Phase 1 (backfilled), NOT NULL in P2.
+  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   createdById: integer("created_by").notNull().references(() => usersTable.id, { onDelete: "cascade" }),

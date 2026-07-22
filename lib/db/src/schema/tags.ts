@@ -1,8 +1,12 @@
 import { pgTable, serial, text, integer, primaryKey } from "drizzle-orm/pg-core";
 import { collectionsTable } from "./collections";
+import { organizationsTable } from "./organizations";
 
 export const tagsTable = pgTable("tags", {
   id: serial("id").primaryKey(),
+  // Tenant owner (issue #113). Nullable in Phase 1 (backfilled), NOT NULL in P2.
+  // The global-unique `name` becomes per-org unique in Phase 2.
+  organizationId: integer("organization_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull().unique(),
 });
 
