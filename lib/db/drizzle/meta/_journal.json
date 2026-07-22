@@ -169,6 +169,13 @@
       "when": 1784754752946,
       "tag": "0023_safe_blizzard",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784762356435,
+      "tag": "0024_magenta_forgotten_one",
+      "breakpoints": true
     }
   ]
 }

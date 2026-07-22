@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./organizations";
 export * from "./organizationSettings";
 export * from "./organizationInvites";
+export * from "./organizationSubscriptions";
 export * from "./albums";
 export * from "./photos";
 export * from "./tags";
