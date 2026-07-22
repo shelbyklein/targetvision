@@ -25,7 +25,7 @@ import {
   ReorderCollectionsBody,
   ReorderCollectionsResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 import { buildPhotosResponse } from "../lib/photoHelpers";
 import { resolveSmartCollectionPhotoIds } from "../lib/smartCollectionPhotos";
 
@@ -41,7 +41,7 @@ async function getCollectionTags(collectionId: number): Promise<string[]> {
   return rows.map((r) => r.name);
 }
 
-async function buildCollectionResponse(collectionId: number) {
+async function buildCollectionResponse(collectionId: number, orgId: number) {
   const [row] = await db
     .select({
       collection: collectionsTable,
@@ -49,7 +49,7 @@ async function buildCollectionResponse(collectionId: number) {
     })
     .from(collectionsTable)
     .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
-    .where(eq(collectionsTable.id, collectionId))
+    .where(and(eq(collectionsTable.id, collectionId), eq(collectionsTable.organizationId, orgId)))
     .groupBy(collectionsTable.id);
 
   if (!row) return null;
@@ -81,7 +81,7 @@ async function buildCollectionResponse(collectionId: number) {
 }
 
 // Registered before the /collections/:id routes so "order" isn't captured as an id.
-router.put("/collections/order", requireAuth, async (req, res): Promise<void> => {
+router.put("/collections/order", requireOrgAuth, async (req, res): Promise<void> => {
   const { ids } = ReorderCollectionsBody.parse(req.body);
   let updated = 0;
   await db.transaction(async (tx) => {
@@ -89,7 +89,7 @@ router.put("/collections/order", requireAuth, async (req, res): Promise<void> =>
       const rows = await tx
         .update(collectionsTable)
         .set({ sortOrder: i })
-        .where(eq(collectionsTable.id, ids[i]))
+        .where(and(eq(collectionsTable.id, ids[i]), eq(collectionsTable.organizationId, req.org!.id)))
         .returning({ id: collectionsTable.id });
       updated += rows.length;
     }
@@ -97,7 +97,7 @@ router.put("/collections/order", requireAuth, async (req, res): Promise<void> =>
   res.json(ReorderCollectionsResponse.parse({ updated }));
 });
 
-router.get("/collections", requireAuth, async (req, res): Promise<void> => {
+router.get("/collections", requireOrgAuth, async (req, res): Promise<void> => {
   // Defaults to plain collections so existing consumers never see people;
   // the People pages ask for kind=person explicitly.
   const kind = req.query.kind === "person" ? "person" : "collection";
@@ -108,7 +108,7 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
     })
     .from(collectionsTable)
     .leftJoin(photoCollectionsTable, eq(collectionsTable.id, photoCollectionsTable.collectionId))
-    .where(eq(collectionsTable.kind, kind))
+    .where(and(eq(collectionsTable.organizationId, req.org!.id), eq(collectionsTable.kind, kind)))
     .groupBy(collectionsTable.id)
     // Manual card order first (ASC puts nulls last), newest never-placed after.
     .orderBy(sql`${collectionsTable.sortOrder} asc, ${collectionsTable.createdAt} desc`);
@@ -122,7 +122,7 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
              row_number() OVER (PARTITION BY pc.collection_id ORDER BY random()) AS rn
       FROM photo_collections pc
       JOIN photos p ON p.id = pc.photo_id
-      WHERE p.is_hidden = false
+      WHERE p.is_hidden = false AND p.organization_id = ${req.org!.id}
     ) s WHERE rn <= 5
   `);
   const samplesByCollection = new Map<number, string[]>();
@@ -167,7 +167,7 @@ router.get("/collections", requireAuth, async (req, res): Promise<void> => {
   res.json(ListCollectionsResponse.parse(collections));
 });
 
-router.post("/collections", requireAuth, async (req, res): Promise<void> => {
+router.post("/collections", requireOrgAuth, async (req, res): Promise<void> => {
   const body = CreateCollectionBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -176,14 +176,14 @@ router.post("/collections", requireAuth, async (req, res): Promise<void> => {
 
   const [collection] = await db
     .insert(collectionsTable)
-    .values({ ...body.data, createdById: req.dbUser!.id })
+    .values({ ...body.data, createdById: req.dbUser!.id, organizationId: req.org!.id })
     .returning();
 
-  const full = await buildCollectionResponse(collection.id);
+  const full = await buildCollectionResponse(collection.id, req.org!.id);
   res.status(201).json(GetCollectionResponse.parse(full));
 });
 
-router.get("/collections/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/collections/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetCollectionParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -191,7 +191,7 @@ router.get("/collections/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const full = await buildCollectionResponse(params.data.id);
+  const full = await buildCollectionResponse(params.data.id, req.org!.id);
   if (!full) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -203,12 +203,12 @@ router.get("/collections/:id", requireAuth, async (req, res): Promise<void> => {
     .where(eq(photoCollectionsTable.collectionId, params.data.id))
     .orderBy(photoCollectionsTable.photoId);
 
-  const photos = await buildPhotosResponse(photoRows.map((p) => p.id), req.dbUser?.id);
+  const photos = await buildPhotosResponse(photoRows.map((p) => p.id), req.org!.id, req.dbUser?.id);
 
   res.json(GetCollectionResponse.parse({ ...full, photos }));
 });
 
-router.patch("/collections/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/collections/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdateCollectionParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -222,7 +222,7 @@ router.patch("/collections/:id", requireAuth, async (req, res): Promise<void> =>
     return;
   }
 
-  const [existing] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [existing] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -234,11 +234,11 @@ router.patch("/collections/:id", requireAuth, async (req, res): Promise<void> =>
   }
 
   await db.update(collectionsTable).set(body.data).where(eq(collectionsTable.id, params.data.id));
-  const full = await buildCollectionResponse(params.data.id);
+  const full = await buildCollectionResponse(params.data.id, req.org!.id);
   res.json(UpdateCollectionResponse.parse(full));
 });
 
-router.delete("/collections/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/collections/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteCollectionParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -246,7 +246,7 @@ router.delete("/collections/:id", requireAuth, async (req, res): Promise<void> =
     return;
   }
 
-  const [existing] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [existing] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -261,7 +261,7 @@ router.delete("/collections/:id", requireAuth, async (req, res): Promise<void> =
   res.sendStatus(204);
 });
 
-router.post("/collections/:id/photos", requireAuth, async (req, res): Promise<void> => {
+router.post("/collections/:id/photos", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = AddPhotoToCollectionParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -275,7 +275,7 @@ router.post("/collections/:id/photos", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [collection] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -286,7 +286,7 @@ router.post("/collections/:id/photos", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, body.data.photoId));
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(and(eq(photosTable.id, body.data.photoId), eq(photosTable.organizationId, req.org!.id)));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -304,7 +304,7 @@ router.post("/collections/:id/photos", requireAuth, async (req, res): Promise<vo
   res.sendStatus(204);
 });
 
-router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res): Promise<void> => {
+router.delete("/collections/:id/photos/:photoId", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawPhotoId = Array.isArray(req.params.photoId) ? req.params.photoId[0] : req.params.photoId;
   const params = RemovePhotoFromCollectionParams.safeParse({
@@ -316,7 +316,7 @@ router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res):
     return;
   }
 
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [collection] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -346,7 +346,7 @@ router.delete("/collections/:id/photos/:photoId", requireAuth, async (req, res):
   res.sendStatus(204);
 });
 
-router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<void> => {
+router.patch("/collections/:id/cover", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = SetCollectionCoverParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
@@ -360,7 +360,7 @@ router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [collection] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -371,7 +371,7 @@ router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, body.data.photoId));
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(and(eq(photosTable.id, body.data.photoId), eq(photosTable.organizationId, req.org!.id)));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -379,11 +379,11 @@ router.patch("/collections/:id/cover", requireAuth, async (req, res): Promise<vo
 
   await db.update(collectionsTable).set({ coverPhotoId: body.data.photoId }).where(eq(collectionsTable.id, params.data.id));
 
-  const full = await buildCollectionResponse(params.data.id);
+  const full = await buildCollectionResponse(params.data.id, req.org!.id);
   res.json(SetCollectionCoverResponse.parse(full));
 });
 
-router.get("/collections/:id/smart-photos", requireAuth, async (req, res): Promise<void> => {
+router.get("/collections/:id/smart-photos", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (!Number.isInteger(id)) {
@@ -391,7 +391,7 @@ router.get("/collections/:id/smart-photos", requireAuth, async (req, res): Promi
     return;
   }
 
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, id));
+  const [collection] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -402,19 +402,19 @@ router.get("/collections/:id/smart-photos", requireAuth, async (req, res): Promi
   const offsetRaw = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
   const offset = Number.isInteger(offsetRaw) && offsetRaw > 0 ? offsetRaw : 0;
 
-  const { ids } = await resolveSmartCollectionPhotoIds(collection, topK, offset);
-  const photos = await buildPhotosResponse(ids, req.dbUser?.id);
+  const { ids } = await resolveSmartCollectionPhotoIds(collection, topK, offset, req.org!.id);
+  const photos = await buildPhotosResponse(ids, req.org!.id, req.dbUser?.id);
   res.json(GetSmartCollectionPhotosResponse.parse(photos));
 });
 
-router.get("/collections/:id/negative-photos", requireAuth, async (req, res): Promise<void> => {
+router.get("/collections/:id/negative-photos", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = ListCollectionNegativePhotosParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [collection] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -424,11 +424,11 @@ router.get("/collections/:id/negative-photos", requireAuth, async (req, res): Pr
     .from(collectionNegativePhotosTable)
     .where(eq(collectionNegativePhotosTable.collectionId, params.data.id))
     .orderBy(collectionNegativePhotosTable.photoId);
-  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);
+  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.org!.id, req.dbUser?.id);
   res.json(ListCollectionNegativePhotosResponse.parse(photos));
 });
 
-router.post("/collections/:id/negative-photos", requireAuth, async (req, res): Promise<void> => {
+router.post("/collections/:id/negative-photos", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = AddNegativePhotoToCollectionParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -440,7 +440,7 @@ router.post("/collections/:id/negative-photos", requireAuth, async (req, res): P
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [collection] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -449,7 +449,7 @@ router.post("/collections/:id/negative-photos", requireAuth, async (req, res): P
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, body.data.photoId));
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(and(eq(photosTable.id, body.data.photoId), eq(photosTable.organizationId, req.org!.id)));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -465,7 +465,7 @@ router.post("/collections/:id/negative-photos", requireAuth, async (req, res): P
   res.sendStatus(204);
 });
 
-router.delete("/collections/:id/negative-photos/:photoId", requireAuth, async (req, res): Promise<void> => {
+router.delete("/collections/:id/negative-photos/:photoId", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawPhoto = Array.isArray(req.params.photoId) ? req.params.photoId[0] : req.params.photoId;
   const params = RemoveNegativePhotoFromCollectionParams.safeParse({ id: parseInt(rawId, 10), photoId: parseInt(rawPhoto, 10) });
@@ -473,7 +473,7 @@ router.delete("/collections/:id/negative-photos/:photoId", requireAuth, async (r
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [collection] = await db.select().from(collectionsTable).where(eq(collectionsTable.id, params.data.id));
+  const [collection] = await db.select().from(collectionsTable).where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;

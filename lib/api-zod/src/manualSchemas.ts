@@ -234,3 +234,74 @@ export const ImageOptimizationStatusResponse = z.object({
 export const UpdateImageOptimizationSettingsBody = z.object({
   enabled: z.boolean(),
 });
+
+// --- Organizations (multi-tenant context, issue #113) ---
+// One org the current user belongs to, with their role in it. The active org is
+// selected via the X-Organization-Id header (see requireOrg); these endpoints
+// let the client discover which orgs it may pick and persist the sticky choice.
+export const MyOrganization = z.object({
+  id: z.number(),
+  name: z.string(),
+  slug: z.string(),
+  role: z.string(), // "owner" | "admin" | "member"
+});
+
+export const ListMyOrganizationsResponse = z.array(MyOrganization);
+
+export const SwitchOrganizationBody = z.object({
+  organizationId: z.number().int(),
+});
+
+export const SwitchOrganizationResponse = MyOrganization;
+
+// Create a new organization; the caller becomes its owner. Slug is derived
+// server-side from the name (uniqueness handled there).
+export const CreateOrganizationBody = z.object({
+  name: z.string().trim().min(1).max(80),
+});
+
+export const CreateOrganizationResponse = MyOrganization;
+
+// --- Org member + invite management (Phase 4c) ---
+const OrgRole = z.enum(["owner", "admin", "member"]);
+
+export const OrgMember = z.object({
+  userId: z.number(),
+  name: z.string(),
+  email: z.string(),
+  role: z.string(),
+  joinedAt: z.string(),
+});
+export const ListOrgMembersResponse = z.array(OrgMember);
+
+export const UpdateOrgMemberRoleBody = z.object({ role: OrgRole });
+
+export const OrgInvite = z.object({
+  id: z.number(),
+  email: z.string(),
+  role: z.string(),
+  createdAt: z.string(),
+});
+export const ListOrgInvitesResponse = z.array(OrgInvite);
+
+export const CreateOrgInviteBody = z.object({
+  email: z.string().trim().email().max(255),
+  role: OrgRole.optional(),
+});
+export const CreateOrgInviteResponse = OrgInvite;
+
+// --- Org settings / info (Phase 4d) ---
+export const OrgDetailsResponse = z.object({
+  id: z.number(),
+  name: z.string(),
+  slug: z.string(),
+  description: z.string().nullable(),
+  createdAt: z.string(),
+  role: z.string(), // the caller's role in this org
+  memberCount: z.number(),
+});
+
+export const UpdateOrgBody = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+});

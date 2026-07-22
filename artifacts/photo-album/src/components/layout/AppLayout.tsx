@@ -16,9 +16,10 @@ import {
   getGetPhotoQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, FolderKanban, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon, ChevronRight, Users, Palette } from "lucide-react";
+import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, FolderKanban, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon, ChevronRight, Users, Palette, Building2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useOrg } from "@/contexts/OrgContext";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { isPhotoDrag, getDraggedPhotoId, PHOTO_DND_MIME } from "@/lib/photoDrag";
@@ -515,6 +516,49 @@ function CollectionsNav({ location, dragProps }: { location: string; dragProps?:
   );
 }
 
+// Org switcher (issue #113): shows the active organization and lets the user
+// switch between the orgs they belong to. Hidden entirely when the user has a
+// single org (nothing to switch), so single-tenant deployments see no change.
+function OrgSwitcher() {
+  const { orgs, activeOrg, switchOrg } = useOrg();
+  if (orgs.length <= 1) return null;
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton tooltip={activeOrg?.name ?? "Organization"} data-testid="org-switcher">
+              <Building2 />
+              <div className="grid flex-1 text-left leading-tight min-w-0">
+                <span className="truncate font-medium">{activeOrg?.name ?? "Select organization"}</span>
+                {activeOrg?.role && <span className="truncate text-xs text-muted-foreground">{activeOrg.role}</span>}
+              </div>
+              <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="w-56">
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">Organizations</div>
+            <DropdownMenuSeparator />
+            {orgs.map((o) => (
+              <DropdownMenuItem
+                key={o.id}
+                onSelect={() => switchOrg(o.id)}
+                className="cursor-pointer gap-2"
+                data-testid={`org-option-${o.id}`}
+              >
+                <Check className={cn("h-4 w-4 shrink-0", o.id === activeOrg?.id ? "opacity-100" : "opacity-0")} />
+                <span className="truncate flex-1">{o.name}</span>
+                <span className="text-xs text-muted-foreground">{o.role}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
 function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean }) {
   const { data: session } = useSession();
   const user = session?.user;
@@ -589,6 +633,7 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <OrgSwitcher />
       </SidebarHeader>
 
       <SidebarContent>

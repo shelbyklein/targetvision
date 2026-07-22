@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq } from "drizzle-orm";
 import { db, collectionsTable, tagsTable, collectionTagsTable } from "@workspace/db";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -10,7 +10,7 @@ const CollectionTagParams = z.object({ id: z.coerce.number() });
 const AddCollectionTagBody = z.object({ tagName: z.string().min(1).max(50) });
 const RemoveCollectionTagParams = z.object({ id: z.coerce.number(), tagName: z.string().min(1) });
 
-router.get("/collections/:id/tags", requireAuth, async (req, res): Promise<void> => {
+router.get("/collections/:id/tags", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = CollectionTagParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -21,7 +21,7 @@ router.get("/collections/:id/tags", requireAuth, async (req, res): Promise<void>
   const [collection] = await db
     .select({ id: collectionsTable.id })
     .from(collectionsTable)
-    .where(eq(collectionsTable.id, params.data.id));
+    .where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -37,7 +37,7 @@ router.get("/collections/:id/tags", requireAuth, async (req, res): Promise<void>
   res.json(rows.map((r) => r.name));
 });
 
-router.post("/collections/:id/tags", requireAuth, async (req, res): Promise<void> => {
+router.post("/collections/:id/tags", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = CollectionTagParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -54,7 +54,7 @@ router.post("/collections/:id/tags", requireAuth, async (req, res): Promise<void
   const [collection] = await db
     .select({ id: collectionsTable.id, createdById: collectionsTable.createdById })
     .from(collectionsTable)
-    .where(eq(collectionsTable.id, params.data.id));
+    .where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -92,7 +92,7 @@ router.post("/collections/:id/tags", requireAuth, async (req, res): Promise<void
   res.sendStatus(204);
 });
 
-router.delete("/collections/:id/tags/:tagName", requireAuth, async (req, res): Promise<void> => {
+router.delete("/collections/:id/tags/:tagName", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawTagName = Array.isArray(req.params.tagName) ? req.params.tagName[0] : req.params.tagName;
 
@@ -108,7 +108,7 @@ router.delete("/collections/:id/tags/:tagName", requireAuth, async (req, res): P
   const [collection] = await db
     .select({ id: collectionsTable.id, createdById: collectionsTable.createdById })
     .from(collectionsTable)
-    .where(eq(collectionsTable.id, params.data.id));
+    .where(and(eq(collectionsTable.id, params.data.id), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;

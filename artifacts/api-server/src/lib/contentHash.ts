@@ -56,15 +56,21 @@ async function computeAndStoreContentHashUnbounded(photoId: number, storageKey: 
   }
 }
 
-export async function countPhotosWithoutContentHash(): Promise<number> {
+export async function countPhotosWithoutContentHash(organizationId?: number): Promise<number> {
   const rows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(and(isNull(photosTable.contentHash), isNotNull(photosTable.storageKey)));
+    .where(
+      and(
+        isNull(photosTable.contentHash),
+        isNotNull(photosTable.storageKey),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
   return rows.length;
 }
 
-export async function backfillContentHashes(): Promise<{
+export async function backfillContentHashes(organizationId?: number): Promise<{
   processed: number;
   updated: number;
   skipped: number;
@@ -73,7 +79,13 @@ export async function backfillContentHashes(): Promise<{
   const photos = await db
     .select({ id: photosTable.id, storageKey: photosTable.storageKey })
     .from(photosTable)
-    .where(and(isNull(photosTable.contentHash), isNotNull(photosTable.storageKey)))
+    .where(
+      and(
+        isNull(photosTable.contentHash),
+        isNotNull(photosTable.storageKey),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    )
     .orderBy(photosTable.createdAt);
 
   let updated = 0;
@@ -125,11 +137,18 @@ export interface DuplicatePhotoGroup {
 export async function listDuplicatePhotoGroups(opts?: {
   limit?: number;
   offset?: number;
+  organizationId?: number;
 }): Promise<DuplicatePhotoGroup[]> {
+  const organizationId = opts?.organizationId;
   let dupHashesQuery = db
     .select({ contentHash: photosTable.contentHash })
     .from(photosTable)
-    .where(isNotNull(photosTable.contentHash))
+    .where(
+      and(
+        isNotNull(photosTable.contentHash),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    )
     .groupBy(photosTable.contentHash)
     .having(sql`count(*) > 1`)
     .orderBy(photosTable.contentHash)
@@ -155,7 +174,12 @@ export async function listDuplicatePhotoGroups(opts?: {
     })
     .from(photosTable)
     .leftJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-    .where(inArray(photosTable.contentHash, hashes))
+    .where(
+      and(
+        inArray(photosTable.contentHash, hashes),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    )
     .orderBy(photosTable.contentHash, desc(photosTable.createdAt));
 
   const photoIds = rows.map((r) => r.id);
@@ -198,7 +222,8 @@ export async function listDuplicatePhotoGroups(opts?: {
  * how many "extra" copies could be deleted (keeping album covers when a group
  * has any, otherwise one photo per group) — without fetching any group rows.
  */
-export async function getDuplicatesSummary(): Promise<{ groupCount: number; extraCount: number }> {
+export async function getDuplicatesSummary(organizationId?: number): Promise<{ groupCount: number; extraCount: number }> {
+  const orgFilter = organizationId != null ? sql`AND p.organization_id = ${organizationId}` : sql``;
   const result = await db.execute<{ group_count: number; extra_count: number }>(sql`
     SELECT
       count(*)::int AS group_count,
@@ -210,6 +235,7 @@ export async function getDuplicatesSummary(): Promise<{ groupCount: number; extr
       FROM photos p
       LEFT JOIN albums a ON p.album_id = a.id
       WHERE p.content_hash IS NOT NULL
+      ${orgFilter}
       GROUP BY p.content_hash
       HAVING count(*) > 1
     ) t
@@ -223,8 +249,8 @@ export async function getDuplicatesSummary(): Promise<{ groupCount: number; extr
  * the album covers when there are any (covers can't be deleted), otherwise the
  * first (newest) photo, and mark the rest for deletion.
  */
-export async function computeDuplicateExtraIds(): Promise<number[]> {
-  const groups = await listDuplicatePhotoGroups();
+export async function computeDuplicateExtraIds(organizationId?: number): Promise<number[]> {
+  const groups = await listDuplicatePhotoGroups({ organizationId });
   return groups.flatMap((group) => {
     const hasCover = group.photos.some((p) => p.isAlbumCover);
     const deletable = hasCover

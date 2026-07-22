@@ -48,14 +48,14 @@ import {
   BulkDeletePhotosBody,
   BulkDeletePhotosResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 import { buildPhotoResponse, buildPhotosResponse, fetchAlbumPhotoPage, deletePhotoStorageObjects } from "../lib/photoHelpers";
 import { applyFiltersAndFetchIds } from "./search";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
-router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> => {
+router.post("/albums/:id/photos", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UploadPhotoParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -113,7 +113,7 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
     return;
   }
 
-  const [album] = await db.select().from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  const [album] = await db.select().from(albumsTable).where(and(eq(albumsTable.id, params.data.id), eq(albumsTable.organizationId, req.org!.id)));
   if (!album) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -123,6 +123,7 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
     .insert(photosTable)
     .values({
       albumId: params.data.id,
+      organizationId: req.org!.id,
       uploaderId: req.dbUser!.id,
       url: body.data.url,
       storageKey: body.data.storageKey,
@@ -141,7 +142,7 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
     // Optimize the original to WebP first (in place — storageKey stays valid),
     // then derive everything else from the final bytes. runs regardless of
     // whether optimization succeeds/skips/fails.
-    void optimizeOriginalImage(photo.id, storageKey)
+    void optimizeOriginalImage(photo.id, storageKey, photo.organizationId)
       .catch((err) => logger.error({ err, photoId: photo.id }, "Image optimization failed"))
       .finally(() => {
         void generateAndStoreThumbnail(photo.id, storageKey).catch((err) => {
@@ -160,11 +161,11 @@ router.post("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =
       });
   }
 
-  const full = await buildPhotoResponse(photo.id, req.dbUser?.id);
+  const full = await buildPhotoResponse(photo.id, req.org!.id, req.dbUser?.id);
   res.status(201).json(GetPhotoResponse.parse(full));
 });
 
-router.post("/albums/:id/photos/check-duplicates", requireAuth, async (req, res): Promise<void> => {
+router.post("/albums/:id/photos/check-duplicates", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UploadPhotoParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -178,7 +179,7 @@ router.post("/albums/:id/photos/check-duplicates", requireAuth, async (req, res)
     return;
   }
 
-  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(eq(albumsTable.id, params.data.id));
+  const [album] = await db.select({ id: albumsTable.id }).from(albumsTable).where(and(eq(albumsTable.id, params.data.id), eq(albumsTable.organizationId, req.org!.id)));
   if (!album) {
     res.status(404).json({ error: "Album not found" });
     return;
@@ -201,7 +202,7 @@ router.post("/albums/:id/photos/check-duplicates", requireAuth, async (req, res)
   res.json(CheckDuplicatesResponse.parse({ duplicates }));
 });
 
-router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> => {
+router.get("/albums/:id/photos", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = ListAlbumPhotosParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -239,6 +240,7 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
   // Filter and paginate entirely in SQL: only the requested page of photo IDs
   // leaves the database, and only that page is expanded into full responses.
   const { ids: pageIds, hasMore } = await fetchAlbumPhotoPage(params.data.id, {
+    organizationId: req.org!.id,
     canSeeHidden,
     inCollection,
     hasRating,
@@ -249,11 +251,11 @@ router.get("/albums/:id/photos", requireAuth, async (req, res): Promise<void> =>
     offset,
   });
 
-  const photoList = await buildPhotosResponse(pageIds, req.dbUser?.id);
+  const photoList = await buildPhotosResponse(pageIds, req.org!.id, req.dbUser?.id);
   res.json(ListAlbumPhotosPagedResponse.parse({ photos: photoList, hasMore }));
 });
 
-router.get("/photos", requireAuth, async (req, res): Promise<void> => {
+router.get("/photos", requireOrgAuth, async (req, res): Promise<void> => {
   const query = ListPhotosQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
@@ -266,7 +268,12 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
   const allPhotos = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
+    .where(
+      and(
+        eq(photosTable.organizationId, req.org!.id),
+        canSeeHidden ? undefined : eq(photosTable.isHidden, false),
+      ),
+    )
     // createdAt DESC, id DESC for a stable order across pages (ties on createdAt).
     .orderBy(desc(photosTable.createdAt), desc(photosTable.id));
 
@@ -291,18 +298,18 @@ router.get("/photos", requireAuth, async (req, res): Promise<void> => {
     aiStatus,
     attributionTagId,
     hasAttribution,
-  });
+  }, req.org!.id);
 
   const limit = Math.min(Math.max(query.data.limit ?? 48, 1), 200);
   const offset = Math.max(query.data.offset ?? 0, 0);
   const pageIds = filteredIds.slice(offset, offset + limit);
   const hasMore = filteredIds.length > offset + limit;
 
-  const photos = await buildPhotosResponse(pageIds, req.dbUser?.id);
+  const photos = await buildPhotosResponse(pageIds, req.org!.id, req.dbUser?.id);
   res.json(ListPhotosPagedResponse.parse({ photos, hasMore }));
 });
 
-router.patch("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
+router.patch("/photos/bulk", requireOrgAuth, async (req, res): Promise<void> => {
   if (req.dbUser!.role !== "admin") {
     res.status(403).json({ error: "Forbidden" });
     return;
@@ -319,13 +326,13 @@ router.patch("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
   const updated = await db
     .update(photosTable)
     .set({ isHidden })
-    .where(inArray(photosTable.id, ids))
+    .where(and(inArray(photosTable.id, ids), eq(photosTable.organizationId, req.org!.id)))
     .returning({ id: photosTable.id });
 
   res.json(BulkUpdatePhotosResponse.parse({ updated: updated.length }));
 });
 
-router.delete("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
+router.delete("/photos/bulk", requireOrgAuth, async (req, res): Promise<void> => {
   if (req.dbUser!.role !== "admin") {
     res.status(403).json({ error: "Forbidden" });
     return;
@@ -342,11 +349,11 @@ router.delete("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
   const toDelete = await db
     .select({ id: photosTable.id, storageKey: photosTable.storageKey, thumbnailKey: photosTable.thumbnailKey })
     .from(photosTable)
-    .where(inArray(photosTable.id, ids));
+    .where(and(inArray(photosTable.id, ids), eq(photosTable.organizationId, req.org!.id)));
 
   const deleted = await db
     .delete(photosTable)
-    .where(inArray(photosTable.id, ids))
+    .where(and(inArray(photosTable.id, ids), eq(photosTable.organizationId, req.org!.id)))
     .returning({ id: photosTable.id });
 
   await Promise.all(toDelete.map((photo) => deletePhotoStorageObjects(photo)));
@@ -354,7 +361,7 @@ router.delete("/photos/bulk", requireAuth, async (req, res): Promise<void> => {
   res.json(BulkDeletePhotosResponse.parse({ deleted: deleted.length }));
 });
 
-router.get("/photos/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/photos/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = GetPhotoParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -362,7 +369,7 @@ router.get("/photos/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const photo = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const photo = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -371,7 +378,7 @@ router.get("/photos/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(GetPhotoResponse.parse(photo));
 });
 
-router.patch("/photos/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/photos/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdatePhotoParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -385,7 +392,7 @@ router.patch("/photos/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [existing] = await db.select().from(photosTable).where(eq(photosTable.id, params.data.id));
+  const [existing] = await db.select().from(photosTable).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -402,14 +409,14 @@ router.patch("/photos/:id", requireAuth, async (req, res): Promise<void> => {
   if (body.data.isHidden !== undefined) updateData.isHidden = body.data.isHidden;
 
   if (Object.keys(updateData).length > 0) {
-    await db.update(photosTable).set(updateData).where(eq(photosTable.id, params.data.id));
+    await db.update(photosTable).set(updateData).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   }
 
-  const photo = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const photo = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   res.json(UpdatePhotoResponse.parse(photo));
 });
 
-router.delete("/photos/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/photos/:id", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeletePhotoParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -417,7 +424,7 @@ router.delete("/photos/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [existing] = await db.select().from(photosTable).where(eq(photosTable.id, params.data.id));
+  const [existing] = await db.select().from(photosTable).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -428,12 +435,12 @@ router.delete("/photos/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  await db.delete(photosTable).where(eq(photosTable.id, params.data.id));
+  await db.delete(photosTable).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   await deletePhotoStorageObjects(existing);
   res.sendStatus(204);
 });
 
-router.post("/photos/:id/rating", requireAuth, async (req, res): Promise<void> => {
+router.post("/photos/:id/rating", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = RatePhotoParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -447,7 +454,7 @@ router.post("/photos/:id/rating", requireAuth, async (req, res): Promise<void> =
     return;
   }
 
-  const [photo] = await db.select().from(photosTable).where(eq(photosTable.id, params.data.id));
+  const [photo] = await db.select().from(photosTable).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -461,11 +468,11 @@ router.post("/photos/:id/rating", requireAuth, async (req, res): Promise<void> =
       set: { score: body.data.score },
     });
 
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const full = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   res.json(RatePhotoResponse.parse(full));
 });
 
-router.delete("/photos/:id/rating", requireAuth, async (req, res): Promise<void> => {
+router.delete("/photos/:id/rating", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = ClearPhotoRatingParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -473,7 +480,7 @@ router.delete("/photos/:id/rating", requireAuth, async (req, res): Promise<void>
     return;
   }
 
-  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!photo) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -483,11 +490,11 @@ router.delete("/photos/:id/rating", requireAuth, async (req, res): Promise<void>
     .delete(ratingsTable)
     .where(and(eq(ratingsTable.photoId, params.data.id), eq(ratingsTable.userId, req.dbUser!.id)));
 
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const full = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   res.json(ClearPhotoRatingResponse.parse(full));
 });
 
-router.post("/photos/:id/suggestions/:collectionId/accept", requireAuth, async (req, res): Promise<void> => {
+router.post("/photos/:id/suggestions/:collectionId/accept", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawCol = Array.isArray(req.params.collectionId) ? req.params.collectionId[0] : req.params.collectionId;
   const params = AcceptPhotoSuggestionParams.safeParse({
@@ -499,13 +506,13 @@ router.post("/photos/:id/suggestions/:collectionId/accept", requireAuth, async (
     return;
   }
 
-  const [photoExists] = await db.select({ id: photosTable.id, uploaderId: photosTable.uploaderId }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  const [photoExists] = await db.select({ id: photosTable.id, uploaderId: photosTable.uploaderId }).from(photosTable).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!photoExists) {
     res.status(404).json({ error: "Photo not found" });
     return;
   }
 
-  const [collection] = await db.select({ id: collectionsTable.id, createdById: collectionsTable.createdById }).from(collectionsTable).where(eq(collectionsTable.id, params.data.collectionId));
+  const [collection] = await db.select({ id: collectionsTable.id, createdById: collectionsTable.createdById }).from(collectionsTable).where(and(eq(collectionsTable.id, params.data.collectionId), eq(collectionsTable.organizationId, req.org!.id)));
   if (!collection) {
     res.status(404).json({ error: "Collection not found" });
     return;
@@ -547,11 +554,11 @@ router.post("/photos/:id/suggestions/:collectionId/accept", requireAuth, async (
       ),
     );
 
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const full = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   res.json(AcceptPhotoSuggestionResponse.parse(full));
 });
 
-router.post("/photos/:id/suggestions/:collectionId/dismiss", requireAuth, async (req, res): Promise<void> => {
+router.post("/photos/:id/suggestions/:collectionId/dismiss", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawCol = Array.isArray(req.params.collectionId) ? req.params.collectionId[0] : req.params.collectionId;
   const params = DismissPhotoSuggestionParams.safeParse({
@@ -563,13 +570,13 @@ router.post("/photos/:id/suggestions/:collectionId/dismiss", requireAuth, async 
     return;
   }
 
-  const [photoExists] = await db.select({ id: photosTable.id, uploaderId: photosTable.uploaderId }).from(photosTable).where(eq(photosTable.id, params.data.id));
+  const [photoExists] = await db.select({ id: photosTable.id, uploaderId: photosTable.uploaderId }).from(photosTable).where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!photoExists) {
     res.status(404).json({ error: "Photo not found" });
     return;
   }
 
-  const [collection] = await db.select({ createdById: collectionsTable.createdById }).from(collectionsTable).where(eq(collectionsTable.id, params.data.collectionId));
+  const [collection] = await db.select({ createdById: collectionsTable.createdById }).from(collectionsTable).where(and(eq(collectionsTable.id, params.data.collectionId), eq(collectionsTable.organizationId, req.org!.id)));
   const isAdmin = req.dbUser!.role === "admin";
   const isOwner = photoExists.uploaderId === req.dbUser!.id || (collection && collection.createdById === req.dbUser!.id);
   if (!isAdmin && !isOwner) {
@@ -601,11 +608,11 @@ router.post("/photos/:id/suggestions/:collectionId/dismiss", requireAuth, async 
       ),
     );
 
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const full = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   res.json(DismissPhotoSuggestionResponse.parse(full));
 });
 
-router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requireAuth, async (req, res): Promise<void> => {
+router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawSid = Array.isArray(req.params.suggestionId) ? req.params.suggestionId[0] : req.params.suggestionId;
   const params = AcceptPhotoNewCollectionSuggestionParams.safeParse({
@@ -620,7 +627,7 @@ router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requi
   const [photoExists] = await db
     .select({ id: photosTable.id, uploaderId: photosTable.uploaderId })
     .from(photosTable)
-    .where(eq(photosTable.id, params.data.id));
+    .where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!photoExists) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -660,6 +667,7 @@ router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requi
     .values({
       title: collectionTitle,
       createdById: photoExists.uploaderId,
+      organizationId: req.org!.id,
     })
     .returning();
 
@@ -673,11 +681,11 @@ router.post("/photos/:id/new-collection-suggestions/:suggestionId/accept", requi
     .set({ status: "accepted" })
     .where(eq(photoNewCollectionSuggestionsTable.id, params.data.suggestionId));
 
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const full = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   res.json(AcceptPhotoNewCollectionSuggestionResponse.parse(full));
 });
 
-router.post("/photos/:id/new-collection-suggestions/:suggestionId/dismiss", requireAuth, async (req, res): Promise<void> => {
+router.post("/photos/:id/new-collection-suggestions/:suggestionId/dismiss", requireOrgAuth, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const rawSid = Array.isArray(req.params.suggestionId) ? req.params.suggestionId[0] : req.params.suggestionId;
   const params = DismissPhotoNewCollectionSuggestionParams.safeParse({
@@ -692,7 +700,7 @@ router.post("/photos/:id/new-collection-suggestions/:suggestionId/dismiss", requ
   const [photoExists] = await db
     .select({ id: photosTable.id, uploaderId: photosTable.uploaderId })
     .from(photosTable)
-    .where(eq(photosTable.id, params.data.id));
+    .where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!photoExists) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -725,11 +733,11 @@ router.post("/photos/:id/new-collection-suggestions/:suggestionId/dismiss", requ
     .set({ status: "dismissed" })
     .where(eq(photoNewCollectionSuggestionsTable.id, params.data.suggestionId));
 
-  const full = await buildPhotoResponse(params.data.id, req.dbUser?.id);
+  const full = await buildPhotoResponse(params.data.id, req.org!.id, req.dbUser?.id);
   res.json(DismissPhotoNewCollectionSuggestionResponse.parse(full));
 });
 
-router.post("/photos/:id/rerun-analysis", requireAuth, async (req, res): Promise<void> => {
+router.post("/photos/:id/rerun-analysis", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = RerunPhotoAnalysisParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -740,7 +748,7 @@ router.post("/photos/:id/rerun-analysis", requireAuth, async (req, res): Promise
   const [existing] = await db
     .select({ id: photosTable.id, uploaderId: photosTable.uploaderId })
     .from(photosTable)
-    .where(eq(photosTable.id, params.data.id));
+    .where(and(eq(photosTable.id, params.data.id), eq(photosTable.organizationId, req.org!.id)));
   if (!existing) {
     res.status(404).json({ error: "Photo not found" });
     return;
@@ -762,7 +770,7 @@ router.post("/photos/:id/rerun-analysis", requireAuth, async (req, res): Promise
   res.json(RerunPhotoAnalysisResponse.parse(event));
 });
 
-router.get("/photos/:id/similar", requireAuth, async (req, res): Promise<void> => {
+router.get("/photos/:id/similar", requireOrgAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (!Number.isInteger(id)) {
@@ -773,10 +781,14 @@ router.get("/photos/:id/similar", requireAuth, async (req, res): Promise<void> =
   const topK = Number.isInteger(topKRaw) && topKRaw > 0 ? Math.min(topKRaw, 50) : 12;
 
   // This photo's own embedding — empty result if it hasn't been embedded yet.
+  // Scope via the photo's org (always populated), not the embedding's org column
+  // (denormalized, still backfilled by a later phase), so a foreign photo id
+  // never seeds a cross-tenant search but freshly-embedded photos still resolve.
   const [self] = await db
     .select({ embedding: photoEmbeddingsTable.embedding })
     .from(photoEmbeddingsTable)
-    .where(eq(photoEmbeddingsTable.photoId, id));
+    .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
+    .where(and(eq(photoEmbeddingsTable.photoId, id), eq(photosTable.organizationId, req.org!.id)));
   if (!self) {
     res.json(ListSimilarPhotosResponse.parse([]));
     return;
@@ -792,6 +804,7 @@ router.get("/photos/:id/similar", requireAuth, async (req, res): Promise<void> =
       .where(
         and(
           ne(photoEmbeddingsTable.photoId, id),
+          eq(photosTable.organizationId, req.org!.id),
           canSeeHidden ? undefined : eq(photosTable.isHidden, false),
         ),
       )
@@ -799,7 +812,7 @@ router.get("/photos/:id/similar", requireAuth, async (req, res): Promise<void> =
       .limit(topK),
   );
 
-  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);
+  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.org!.id, req.dbUser?.id);
   res.json(ListSimilarPhotosResponse.parse(photos));
 });
 

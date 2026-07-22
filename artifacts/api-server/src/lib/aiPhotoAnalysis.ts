@@ -95,8 +95,9 @@ export async function analyzePhoto(
   imageUrl: string,
   collections: CollectionForSuggestion[],
   storageKey: string | null,
+  organizationId: number,
 ): Promise<AnalyzePhotoOutcome> {
-  const { provider, reason } = await getActiveProvider();
+  const { provider, reason } = await getActiveProvider(organizationId);
   if (!provider) {
     logger.info({ reason }, "Skipping AI photo analysis");
     return { status: "skipped", provider: null, reason: reason ?? "No active provider" };
@@ -204,14 +205,16 @@ async function runAndRecordPhotoAnalysisUnbounded(
         description: collectionsTable.description,
       })
       .from(collectionsTable)
-      // People are excluded: matching an AI description against a person's
-      // *name* is unreliable — person membership stays manual/similarity-driven.
-      .where(and(eq(collectionsTable.createdById, photo.uploaderId), eq(collectionsTable.kind, "collection")));
+      // Suggest from the photo's org (#113). People are excluded: matching an AI
+      // description against a person's *name* is unreliable — person membership
+      // stays manual/similarity-driven.
+      .where(and(eq(collectionsTable.organizationId, photo.organizationId), eq(collectionsTable.kind, "collection")));
 
     const outcome = await analyzePhoto(
       photo.url,
       collections,
       photo.storageKey,
+      photo.organizationId,
     );
 
     if (outcome.status === "skipped") {

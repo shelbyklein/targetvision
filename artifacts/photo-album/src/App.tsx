@@ -6,6 +6,8 @@ import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { queryClient } from "@/lib/queryClient";
+import "@/lib/active-org"; // registers the X-Organization-Id getter with the API client
+import { OrgProvider } from "@/contexts/OrgContext";
 import { useSession } from "@/lib/auth-client";
 import { AuthGate } from "@/components/auth/AuthGate";
 import SignInPage from "@/pages/sign-in";
@@ -60,6 +62,7 @@ function LazyPage({ load }: { load: () => Promise<{ default: React.ComponentType
 function AppRoutes() {
   return (
     <QueryClientProvider client={queryClient}>
+      <OrgProvider>
       <BulkUploadProvider>
       <PhotoUploadProvider>
       <SessionQueryClientCacheInvalidator />
@@ -172,6 +175,8 @@ function AppRoutes() {
           ["/admin/captured-dates", () => import("@/pages/admin-captured-dates")],
           ["/admin/attribution-tags", () => import("@/pages/admin-attribution-tags")],
           ["/admin/mcp-tokens", () => import("@/pages/admin-mcp-tokens")],
+          ["/admin/organization", () => import("@/pages/admin-organization")],
+          ["/admin/members", () => import("@/pages/admin-org-members")],
           ["/admin/team", () => import("@/pages/admin-team")],
         ] as const).map(([path, load]) => (
           <Route key={path} path={path}>
@@ -328,6 +333,7 @@ function AppRoutes() {
       <Toaster />
       </PhotoUploadProvider>
       </BulkUploadProvider>
+      </OrgProvider>
     </QueryClientProvider>
   );
 }

@@ -31,17 +31,23 @@ async function eligibleForAnalysis() {
     : isNull(photosTable.aiDescription);
 }
 
-export async function countPhotosNeedingAiAnalysis(): Promise<number> {
+export async function countPhotosNeedingAiAnalysis(organizationId?: number): Promise<number> {
   const rows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(await eligibleForAnalysis());
+    .where(
+      and(
+        await eligibleForAnalysis(),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
   return rows.length;
 }
 
 export async function backfillAiAnalysis(
   limit?: number,
   trigger: BackfillTrigger = "manual",
+  organizationId?: number,
 ): Promise<{
   processed: number;
   succeeded: number;
@@ -51,7 +57,12 @@ export async function backfillAiAnalysis(
   const baseQuery = db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(await eligibleForAnalysis())
+    .where(
+      and(
+        await eligibleForAnalysis(),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    )
     .orderBy(photosTable.createdAt);
   const photos = limit != null ? await baseQuery.limit(limit) : await baseQuery;
 
@@ -76,16 +87,18 @@ export async function backfillAiAnalysis(
   await db.insert(aiBackfillRunsTable).values({
     trigger,
     requestedLimit: limit ?? null,
+    organizationId: organizationId ?? null,
     ...result,
   });
 
   return result;
 }
 
-export async function listAiBackfillRuns(limit = 20): Promise<AiBackfillRun[]> {
+export async function listAiBackfillRuns(limit = 20, organizationId?: number): Promise<AiBackfillRun[]> {
   return db
     .select()
     .from(aiBackfillRunsTable)
+    .where(organizationId != null ? eq(aiBackfillRunsTable.organizationId, organizationId) : undefined)
     .orderBy(desc(aiBackfillRunsTable.createdAt))
     .limit(limit);
 }

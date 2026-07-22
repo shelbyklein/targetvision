@@ -37,8 +37,9 @@ function toSummary(row: { asset: typeof assetsTable.$inferSelect; projectName: s
 export async function listAssets(options: {
   kind?: "brand" | "reference";
   project?: string;
+  organizationId?: number;
 }): Promise<{ assets: AssetSummary[]; note?: string }> {
-  const { kind, project } = options;
+  const { kind, project, organizationId } = options;
 
   // Project filter includes global assets (projectId null): an org-wide logo
   // is "the right one" for any project without its own.
@@ -71,6 +72,7 @@ export async function listAssets(options: {
         projectId != null
           ? or(eq(assetsTable.projectId, projectId), isNull(assetsTable.projectId))
           : undefined,
+        organizationId != null ? eq(assetsTable.organizationId, organizationId) : undefined,
       ),
     )
     .orderBy(asc(assetsTable.kind), asc(assetsTable.name));
@@ -80,12 +82,18 @@ export async function listAssets(options: {
 
 export async function getAssetDetail(
   id: number,
+  organizationId?: number,
 ): Promise<{ asset: AssetSummary; fullResUrl: string | null } | null> {
   const [row] = await db
     .select({ asset: assetsTable, projectName: projectsTable.name })
     .from(assetsTable)
     .leftJoin(projectsTable, eq(assetsTable.projectId, projectsTable.id))
-    .where(eq(assetsTable.id, id));
+    .where(
+      and(
+        eq(assetsTable.id, id),
+        organizationId != null ? eq(assetsTable.organizationId, organizationId) : undefined,
+      ),
+    );
   if (!row) return null;
 
   let fullResUrl: string | null = null;
@@ -103,11 +111,17 @@ export async function getAssetDetail(
 /** Load an asset's original bytes for the HTTP gateway's download route. */
 export async function getAssetFile(
   id: number,
+  organizationId?: number,
 ): Promise<{ buffer: Buffer; contentType: string; filename: string } | null> {
   const [row] = await db
     .select({ storageKey: assetsTable.storageKey, contentType: assetsTable.contentType, filename: assetsTable.filename, name: assetsTable.name })
     .from(assetsTable)
-    .where(eq(assetsTable.id, id));
+    .where(
+      and(
+        eq(assetsTable.id, id),
+        organizationId != null ? eq(assetsTable.organizationId, organizationId) : undefined,
+      ),
+    );
   if (!row?.storageKey?.startsWith("/objects/")) return null;
   try {
     const { file } = resolveObjectFile(row.storageKey);

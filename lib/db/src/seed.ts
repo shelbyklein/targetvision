@@ -3,6 +3,8 @@ import pg from "pg";
 import { eq } from "drizzle-orm";
 import {
   usersTable,
+  organizationsTable,
+  organizationMembersTable,
   albumsTable,
   photosTable,
   ratingsTable,
@@ -50,6 +52,21 @@ async function seed() {
     .onConflictDoNothing()
     .returning();
 
+  // All demo data lives in one organization (issue #113); both seed users are
+  // members (the admin owns it).
+  const [org] = await db
+    .insert(organizationsTable)
+    .values({ name: "Demo Org", slug: "demo-org" })
+    .onConflictDoNothing()
+    .returning();
+  await db
+    .insert(organizationMembersTable)
+    .values([
+      { organizationId: org.id, userId: seedUser.id, role: "owner" },
+      { organizationId: org.id, userId: secondUser!.id, role: "member" },
+    ])
+    .onConflictDoNothing();
+
   const albumData = [
     {
       ownerId: seedUser.id,
@@ -77,7 +94,10 @@ async function seed() {
     },
   ];
 
-  const albums = await db.insert(albumsTable).values(albumData).returning();
+  const albums = await db
+    .insert(albumsTable)
+    .values(albumData.map((a) => ({ ...a, organizationId: org.id })))
+    .returning();
   console.log(`  ${albums.length} albums seeded`);
 
   const photoData = [
@@ -143,7 +163,10 @@ async function seed() {
     },
   ];
 
-  const photos = await db.insert(photosTable).values(photoData).returning();
+  const photos = await db
+    .insert(photosTable)
+    .values(photoData.map((p) => ({ ...p, organizationId: org.id })))
+    .returning();
   console.log(`  ${photos.length} photos seeded`);
 
   const ratingData = [

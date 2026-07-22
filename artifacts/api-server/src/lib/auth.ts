@@ -1,7 +1,8 @@
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, user, session, account, verification } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { db, user, session, account, verification, organizationInvitesTable } from "@workspace/db";
 import { loadAppSettings } from "./aiProviders";
 
 export const auth = betterAuth({
@@ -26,9 +27,20 @@ export const auth = betterAuth({
         before: async (user) => {
           const settings = await loadAppSettings();
           if (!settings.registrationEnabled) {
-            throw new APIError("FORBIDDEN", {
-              message: "Registration is currently disabled",
-            });
+            // An email with a pending org invite may still sign up even when
+            // instance registration is off (#113 Phase 4c).
+            const email = (user.email ?? "").toLowerCase();
+            const [invite] = email
+              ? await db
+                  .select({ id: organizationInvitesTable.id })
+                  .from(organizationInvitesTable)
+                  .where(eq(organizationInvitesTable.email, email))
+              : [];
+            if (!invite) {
+              throw new APIError("FORBIDDEN", {
+                message: "Registration is currently disabled",
+              });
+            }
           }
           return { data: user };
         },

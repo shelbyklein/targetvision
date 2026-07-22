@@ -3,6 +3,7 @@ import {
   db,
   pool,
   usersTable,
+  organizationsTable,
   albumsTable,
   photosTable,
   collectionsTable,
@@ -26,8 +27,22 @@ const nextSeq = () => (seq += 1);
 
 async function resetDb(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE TABLE photo_collections, collections, photos, albums, users RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE photo_collections, collections, photos, albums, organization_members, organizations, users RESTART IDENTITY CASCADE`,
   );
+  cachedOrgId = null;
+}
+
+// All entities in this suite belong to one org (issue #113 made organization_id
+// required); these tests aren't about tenancy, so a single cached org suffices.
+let cachedOrgId: number | null = null;
+async function ensureOrg(): Promise<number> {
+  if (cachedOrgId != null) return cachedOrgId;
+  const [org] = await db
+    .insert(organizationsTable)
+    .values({ name: "Org", slug: `ch-org-${nextSeq()}` })
+    .returning();
+  cachedOrgId = org.id;
+  return cachedOrgId;
 }
 
 async function createUser() {
@@ -40,7 +55,7 @@ async function createUser() {
 }
 
 async function createAlbum(ownerId: number) {
-  const [album] = await db.insert(albumsTable).values({ ownerId, title: "Album" }).returning();
+  const [album] = await db.insert(albumsTable).values({ ownerId, title: "Album", organizationId: await ensureOrg() }).returning();
   return album;
 }
 
@@ -51,6 +66,7 @@ async function createPhoto(albumId: number, uploaderId: number, contentHash: str
     .values({
       albumId,
       uploaderId,
+      organizationId: await ensureOrg(),
       url: `/api/storage/objects/uploads/${n}`,
       storageKey: `/objects/uploads/${n}`,
       filename: `photo-${n}.jpg`,
@@ -104,8 +120,9 @@ describe("listDuplicatePhotoGroups", () => {
     await db.update(albumsTable).set({ coverPhotoId: cover.id }).where(eq(albumsTable.id, album.id));
 
     // Put `other` into two collections.
-    const [c1] = await db.insert(collectionsTable).values({ createdById: user.id, title: "C1" }).returning();
-    const [c2] = await db.insert(collectionsTable).values({ createdById: user.id, title: "C2" }).returning();
+    const orgId = await ensureOrg();
+    const [c1] = await db.insert(collectionsTable).values({ createdById: user.id, title: "C1", organizationId: orgId }).returning();
+    const [c2] = await db.insert(collectionsTable).values({ createdById: user.id, title: "C2", organizationId: orgId }).returning();
     await db.insert(photoCollectionsTable).values({ collectionId: c1.id, photoId: other.id });
     await db.insert(photoCollectionsTable).values({ collectionId: c2.id, photoId: other.id });
 

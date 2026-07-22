@@ -14,7 +14,7 @@ import {
   photoAttributionTagsTable,
 } from "@workspace/db";
 import { SearchPhotosPagedResponse, SemanticSearchPhotosResponse } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 import { buildPhotosResponse } from "../lib/photoHelpers";
 import { embedText } from "../lib/aiEmbedding";
 import { withIterativeVectorScan } from "../lib/vectorSearch";
@@ -55,6 +55,10 @@ interface PhotoFilterOptions {
 async function applyFiltersAndFetchIds(
   baseIds: number[],
   filters: PhotoFilterOptions,
+  // Tenant scope (#113). This function only ever *intersects* baseIds, so an
+  // org-scoped baseIds already guarantees isolation; org-scoping the internal
+  // scans keeps pagination counts accurate and adds defense-in-depth.
+  organizationId: number,
 ): Promise<number[]> {
   let ids = baseIds;
 
@@ -62,19 +66,20 @@ async function applyFiltersAndFetchIds(
   if (trimmedSearch) {
     const pattern = `%${trimmedSearch}%`;
     const words = trimmedSearch.split(/\s+/).filter(Boolean);
+    const orgScope = eq(photosTable.organizationId, organizationId);
     const [byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
       db
         .select({ id: photosTable.id })
         .from(photosTable)
         .innerJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-        .where(ilike(albumsTable.title, pattern)),
+        .where(and(ilike(albumsTable.title, pattern), orgScope)),
       db
         .select({ id: photosTable.id })
         .from(photosTable)
         .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
-        .where(ilike(usersTable.name, pattern)),
+        .where(and(ilike(usersTable.name, pattern), orgScope)),
       db.select({ id: photosTable.id }).from(photosTable).where(
-        or(...words.map((word) => ilike(photosTable.aiDescription, `%${word}%`)))
+        and(or(...words.map((word) => ilike(photosTable.aiDescription, `%${word}%`))), orgScope)
       ),
     ]);
     const searchIds = new Set([
@@ -227,7 +232,7 @@ async function applyFiltersAndFetchIds(
   return ids;
 }
 
-router.get("/search", requireAuth, async (req, res): Promise<void> => {
+router.get("/search", requireOrgAuth, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!q) {
     res.json(SearchPhotosPagedResponse.parse({ photos: [], hasMore: false }));
@@ -249,6 +254,7 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
 
   const pattern = `%${q}%`;
 
+  const orgScope = eq(photosTable.organizationId, req.org!.id);
   const hiddenCondition = canSeeHidden ? undefined : eq(photosTable.isHidden, false);
 
   const [byAlbumTitle, byUploader, byAiDescription] = await Promise.all([
@@ -256,16 +262,16 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
       .select({ id: photosTable.id })
       .from(photosTable)
       .innerJoin(albumsTable, eq(photosTable.albumId, albumsTable.id))
-      .where(hiddenCondition ? and(ilike(albumsTable.title, pattern), hiddenCondition) : ilike(albumsTable.title, pattern)),
+      .where(and(ilike(albumsTable.title, pattern), orgScope, hiddenCondition)),
     db
       .select({ id: photosTable.id })
       .from(photosTable)
       .innerJoin(usersTable, eq(photosTable.uploaderId, usersTable.id))
-      .where(hiddenCondition ? and(ilike(usersTable.name, pattern), hiddenCondition) : ilike(usersTable.name, pattern)),
+      .where(and(ilike(usersTable.name, pattern), orgScope, hiddenCondition)),
     db
       .select({ id: photosTable.id })
       .from(photosTable)
-      .where(hiddenCondition ? and(ilike(photosTable.aiDescription, pattern), hiddenCondition) : ilike(photosTable.aiDescription, pattern)),
+      .where(and(ilike(photosTable.aiDescription, pattern), orgScope, hiddenCondition)),
   ]);
 
   const uniqueIds = [
@@ -307,16 +313,16 @@ router.get("/search", requireAuth, async (req, res): Promise<void> => {
     dateFrom,
     dateTo,
     uploaderId,
-  });
+  }, req.org!.id);
 
   const pageIds = filtered.slice(offset, offset + limit);
   const hasMore = filtered.length > offset + limit;
 
-  const photos = await buildPhotosResponse(pageIds, req.dbUser?.id);
+  const photos = await buildPhotosResponse(pageIds, req.org!.id, req.dbUser?.id);
   res.json(SearchPhotosPagedResponse.parse({ photos, hasMore }));
 });
 
-router.get("/search/semantic", requireAuth, async (req, res): Promise<void> => {
+router.get("/search/semantic", requireOrgAuth, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!q) {
     res.json(SemanticSearchPhotosResponse.parse([]));
@@ -356,13 +362,18 @@ router.get("/search/semantic", requireAuth, async (req, res): Promise<void> => {
       .select({ id: photoEmbeddingsTable.photoId })
       .from(photoEmbeddingsTable)
       .innerJoin(photosTable, eq(photosTable.id, photoEmbeddingsTable.photoId))
-      .where(canSeeHidden ? undefined : eq(photosTable.isHidden, false))
+      .where(
+        and(
+          eq(photosTable.organizationId, req.org!.id),
+          canSeeHidden ? undefined : eq(photosTable.isHidden, false),
+        ),
+      )
       .orderBy(sql`${photoEmbeddingsTable.embedding} <=> ${vecLiteral}::vector`)
       .limit(topK),
   );
 
   // buildPhotosResponse preserves input id order → results stay ranked.
-  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.dbUser?.id);
+  const photos = await buildPhotosResponse(rows.map((r) => r.id), req.org!.id, req.dbUser?.id);
   res.json(SemanticSearchPhotosResponse.parse(photos));
 });
 

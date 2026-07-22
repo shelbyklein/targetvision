@@ -4,6 +4,7 @@ import {
   db,
   appSettingsTable,
   APP_SETTINGS_SINGLETON_ID,
+  organizationSettingsTable,
   aiAnalysisEventsTable,
   photosTable,
   photoEmbeddingsTable,
@@ -60,13 +61,20 @@ import {
   UpdateImageOptimizationSettingsBody,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
+import { requireOrgAuth, requireOrgRole } from "../middlewares/requireOrg";
 import {
   loadAppSettings,
+  loadOrgSettings,
   summarizeSettings,
   PROVIDER_IDS,
   PROVIDER_MODEL_OPTIONS,
   type ProviderId,
 } from "../lib/aiProviders";
+
+// Provider keys, models, embedding + image-optimization toggles are per-org
+// (#113): owner/admin of the active org manage them. registration and the
+// maintenance backfills stay instance-admin (requireAdmin).
+const requireOrgAdmin = [requireOrgAuth, requireOrgRole("owner", "admin")] as const;
 import { encryptSecret, maskKey } from "../lib/secretCrypto";
 import { runAndRecordPhotoAnalysis } from "../lib/aiPhotoAnalysis";
 import { generateAndStoreThumbnail } from "../lib/thumbnailGeneration";
@@ -125,19 +133,19 @@ router.patch("/admin/registration-settings", requireAdmin, async (req, res): Pro
   res.json(UpdateRegistrationSettingsResponse.parse({ registrationEnabled: updated.registrationEnabled }));
 });
 
-router.get("/admin/ai-settings", requireAdmin, async (_req, res): Promise<void> => {
-  const settings = await loadAppSettings();
+router.get("/admin/ai-settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const settings = await loadOrgSettings(req.org!.id);
   res.json(GetAiSettingsResponse.parse(summarizeSettings(settings)));
 });
 
-router.patch("/admin/ai-settings", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/ai-settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateAiSettingsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
 
-  await loadAppSettings();
+  await loadOrgSettings(req.org!.id);
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (typeof body.data.enabled === "boolean") updates.aiEnabled = body.data.enabled;
   if (body.data.activeProvider) updates.activeProvider = body.data.activeProvider;
@@ -163,9 +171,9 @@ router.patch("/admin/ai-settings", requireAdmin, async (req, res): Promise<void>
   }
 
   const [updated] = await db
-    .update(appSettingsTable)
+    .update(organizationSettingsTable)
     .set(updates)
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
+    .where(eq(organizationSettingsTable.organizationId, req.org!.id))
     .returning();
 
   res.json(UpdateAiSettingsResponse.parse(summarizeSettings(updated)));
@@ -198,7 +206,7 @@ function keyColumns(provider: ProviderId) {
 
 router.put(
   "/admin/ai-settings/providers/:provider/key",
-  requireAdmin,
+  ...requireOrgAdmin,
   async (req, res): Promise<void> => {
     const params = SetAiProviderKeyParams.safeParse(req.params);
     if (!params.success) {
@@ -216,12 +224,12 @@ router.put(
       return;
     }
 
-    await loadAppSettings();
+    await loadOrgSettings(req.org!.id);
     const apiKey = body.data.apiKey.trim();
     const enc = encryptSecret(apiKey);
     const cols = keyColumns(provider);
     const [updated] = await db
-      .update(appSettingsTable)
+      .update(organizationSettingsTable)
       .set({
         [cols.ciphertext]: enc.ciphertext,
         [cols.iv]: enc.iv,
@@ -229,7 +237,7 @@ router.put(
         [cols.preview]: maskKey(apiKey),
         updatedAt: new Date(),
       })
-      .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
+      .where(eq(organizationSettingsTable.organizationId, req.org!.id))
       .returning();
 
     res.json(SetAiProviderKeyResponse.parse(summarizeSettings(updated)));
@@ -238,7 +246,7 @@ router.put(
 
 router.delete(
   "/admin/ai-settings/providers/:provider/key",
-  requireAdmin,
+  ...requireOrgAdmin,
   async (req, res): Promise<void> => {
     const params = ClearAiProviderKeyParams.safeParse(req.params);
     if (!params.success) {
@@ -251,10 +259,10 @@ router.delete(
       return;
     }
 
-    await loadAppSettings();
+    await loadOrgSettings(req.org!.id);
     const cols = keyColumns(provider);
     const [updated] = await db
-      .update(appSettingsTable)
+      .update(organizationSettingsTable)
       .set({
         [cols.ciphertext]: null,
         [cols.iv]: null,
@@ -262,14 +270,14 @@ router.delete(
         [cols.preview]: null,
         updatedAt: new Date(),
       })
-      .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
+      .where(eq(organizationSettingsTable.organizationId, req.org!.id))
       .returning();
 
     res.json(ClearAiProviderKeyResponse.parse(summarizeSettings(updated)));
   },
 );
 
-router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise<void> => {
+router.get("/admin/ai-analysis-events", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const rows = await db
     .select({
       id: aiAnalysisEventsTable.id,
@@ -282,7 +290,8 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
       thumbnailKey: photosTable.thumbnailKey,
     })
     .from(aiAnalysisEventsTable)
-    .leftJoin(photosTable, eq(photosTable.id, aiAnalysisEventsTable.photoId))
+    .innerJoin(photosTable, eq(photosTable.id, aiAnalysisEventsTable.photoId))
+    .where(eq(photosTable.organizationId, req.org!.id))
     .orderBy(desc(aiAnalysisEventsTable.createdAt))
     .limit(20);
 
@@ -304,8 +313,8 @@ router.get("/admin/ai-analysis-events", requireAdmin, async (_req, res): Promise
 
 router.post(
   "/admin/ai-analysis-events/retry-all",
-  requireAdmin,
-  async (_req, res): Promise<void> => {
+  ...requireOrgAdmin,
+  async (req, res): Promise<void> => {
     const recentEvents = await db
       .select({
         id: aiAnalysisEventsTable.id,
@@ -313,6 +322,8 @@ router.post(
         status: aiAnalysisEventsTable.status,
       })
       .from(aiAnalysisEventsTable)
+      .innerJoin(photosTable, eq(photosTable.id, aiAnalysisEventsTable.photoId))
+      .where(eq(photosTable.organizationId, req.org!.id))
       .orderBy(desc(aiAnalysisEventsTable.createdAt))
       .limit(20);
 
@@ -345,7 +356,7 @@ router.post(
 
 router.post(
   "/admin/ai-analysis-events/:id/retry",
-  requireAdmin,
+  ...requireOrgAdmin,
   async (req, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const params = RetryAiAnalysisEventParams.safeParse({
@@ -370,6 +381,17 @@ router.post(
     }
     if (event.photoId == null) {
       res.status(404).json({ error: "Photo no longer exists" });
+      return;
+    }
+
+    // The event's photo must belong to the active org (#113) — otherwise a
+    // foreign event id could trigger analysis on another tenant's photo.
+    const [photoInOrg] = await db
+      .select({ id: photosTable.id })
+      .from(photosTable)
+      .where(and(eq(photosTable.id, event.photoId), eq(photosTable.organizationId, req.org!.id)));
+    if (!photoInOrg) {
+      res.status(404).json({ error: "Event not found" });
       return;
     }
 
@@ -411,17 +433,19 @@ router.post(
 
 // --- MCP gateway access tokens (bearer / URL auth for remote clients) ---
 
-router.get("/admin/mcp-tokens", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(ListMcpTokensResponse.parse(await listMcpTokens()));
+router.get("/admin/mcp-tokens", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(ListMcpTokensResponse.parse(await listMcpTokens(req.org!.id)));
 });
 
-router.post("/admin/mcp-tokens", requireAdmin, async (req, res): Promise<void> => {
+router.post("/admin/mcp-tokens", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = CreateMcpTokenBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const created = await createMcpToken(body.data.label, req.dbUser?.id ?? null);
+  // The token is scoped to the active org — the gateway only exposes this org's
+  // library to whoever holds it (#113 Phase 5).
+  const created = await createMcpToken(body.data.label, req.org!.id, req.dbUser?.id ?? null);
   res.status(201).json(
     CreateMcpTokenResponse.parse({
       ...created,
@@ -430,30 +454,31 @@ router.post("/admin/mcp-tokens", requireAdmin, async (req, res): Promise<void> =
   );
 });
 
-router.delete("/admin/mcp-tokens/:id", requireAdmin, async (req, res): Promise<void> => {
+router.delete("/admin/mcp-tokens/:id", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid token id" });
     return;
   }
-  res.json(DeleteMcpTokenResponse.parse({ deleted: await deleteMcpToken(id) }));
+  res.json(DeleteMcpTokenResponse.parse({ deleted: await deleteMcpToken(id, req.org!.id) }));
 });
 
 // At-a-glance counts for the admin hub cards — one aggregated call of cheap
 // count-only queries, so the hub itself stays fast (#76). Near-duplicate
 // clustering is deliberately absent: its status is expensive to compute.
-router.get("/admin/hub-status", requireAdmin, async (_req, res): Promise<void> => {
+router.get("/admin/hub-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const orgId = req.org!.id;
   const [aiAnalysisPending, embeddingsPending, thumbnailRows, capturedDatesMissing, duplicates] =
     await Promise.all([
-      countPhotosNeedingAiAnalysis(),
-      countPhotosNeedingEmbedding(),
+      countPhotosNeedingAiAnalysis(orgId),
+      countPhotosNeedingEmbedding(orgId),
       db
         .select({ n: sql<number>`cast(count(*) as integer)` })
         .from(photosTable)
-        .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey))),
-      countPhotosWithoutCaptureDate(),
-      getDuplicatesSummary(),
+        .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey), eq(photosTable.organizationId, orgId))),
+      countPhotosWithoutCaptureDate(orgId),
+      getDuplicatesSummary(orgId),
     ]);
 
   res.json(
@@ -467,26 +492,27 @@ router.get("/admin/hub-status", requireAdmin, async (_req, res): Promise<void> =
   );
 });
 
-router.get("/admin/thumbnails/backfill-status", requireAdmin, async (_req, res): Promise<void> => {
+router.get("/admin/thumbnails/backfill-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const photos = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey)));
+    .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey), eq(photosTable.organizationId, req.org!.id)));
 
   res.json(BackfillThumbnailsStatusResponse.parse({ missingCount: photos.length }));
 });
 
-router.post("/admin/thumbnails/backfill", requireAdmin, async (_req, res): Promise<void> => {
+router.post("/admin/thumbnails/backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const orgId = req.org!.id;
   // Reset any photos stuck with thumbnailGenerating=true from a previous interrupted process.
   await db
     .update(photosTable)
     .set({ thumbnailGenerating: false })
-    .where(and(isNull(photosTable.thumbnailKey), eq(photosTable.thumbnailGenerating, true)));
+    .where(and(isNull(photosTable.thumbnailKey), eq(photosTable.thumbnailGenerating, true), eq(photosTable.organizationId, orgId)));
 
   const photos = await db
     .select({ id: photosTable.id, storageKey: photosTable.storageKey })
     .from(photosTable)
-    .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey)));
+    .where(and(isNull(photosTable.thumbnailKey), isNotNull(photosTable.storageKey), eq(photosTable.organizationId, orgId)));
 
   let succeeded = 0;
   let skipped = 0;
@@ -508,77 +534,81 @@ router.post("/admin/thumbnails/backfill", requireAdmin, async (_req, res): Promi
   res.json(BackfillThumbnailsResponse.parse({ processed: photos.length, succeeded, skipped, failed }));
 });
 
-router.get("/admin/photos/exif-date-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
-  const missingCount = await countPhotosWithoutCaptureDate();
+router.get("/admin/photos/exif-date-backfill-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutCaptureDate(req.org!.id);
   res.json(BackfillExifDatesStatusResponse.parse({ missingCount }));
 });
 
-router.post("/admin/photos/exif-date-backfill", requireAdmin, async (_req, res): Promise<void> => {
-  const result = await backfillExifDates();
+router.post("/admin/photos/exif-date-backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const result = await backfillExifDates(req.org!.id);
   res.json(BackfillExifDatesResponse.parse(result));
 });
 
-router.get("/admin/photos/dimension-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
-  const missingCount = await countPhotosWithoutDimensions();
+router.get("/admin/photos/dimension-backfill-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutDimensions(req.org!.id);
   res.json(BackfillDimensionsStatusResponse.parse({ missingCount }));
 });
 
-router.post("/admin/photos/dimension-backfill", requireAdmin, async (_req, res): Promise<void> => {
-  const result = await backfillDimensions();
+router.post("/admin/photos/dimension-backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const result = await backfillDimensions(req.org!.id);
   res.json(BackfillDimensionsResponse.parse(result));
 });
 
-router.get("/admin/photos/content-hash-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
-  const missingCount = await countPhotosWithoutContentHash();
+router.get("/admin/photos/content-hash-backfill-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutContentHash(req.org!.id);
   res.json(BackfillContentHashesStatusResponse.parse({ missingCount }));
 });
 
-router.post("/admin/photos/content-hash-backfill", requireAdmin, async (_req, res): Promise<void> => {
-  const result = await backfillContentHashes();
+router.post("/admin/photos/content-hash-backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const result = await backfillContentHashes(req.org!.id);
   res.json(BackfillContentHashesResponse.parse(result));
 });
 
-async function buildEmbeddingStatus() {
-  const cfg = await getEmbeddingConfigStatus();
-  const missingCount = await countPhotosNeedingEmbedding();
+async function buildEmbeddingStatus(orgId: number) {
+  const cfg = await getEmbeddingConfigStatus(orgId);
+  const missingCount = await countPhotosNeedingEmbedding(orgId);
   const embeddedCount = (
-    await db.select({ id: photoEmbeddingsTable.photoId }).from(photoEmbeddingsTable)
+    await db
+      .select({ id: photoEmbeddingsTable.photoId })
+      .from(photoEmbeddingsTable)
+      .where(eq(photoEmbeddingsTable.organizationId, orgId))
   ).length;
   return { ...cfg, embeddedCount, missingCount };
 }
 
-router.get("/admin/embeddings/status", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus()));
+router.get("/admin/embeddings/status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus(req.org!.id)));
 });
 
-router.patch("/admin/embeddings/settings", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/embeddings/settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateEmbeddingSettingsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
+  await loadOrgSettings(req.org!.id);
   await db
-    .update(appSettingsTable)
+    .update(organizationSettingsTable)
     .set({ embeddingEnabled: body.data.enabled })
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
-  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus()));
+    .where(eq(organizationSettingsTable.organizationId, req.org!.id));
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus(req.org!.id)));
 });
 
-router.post("/admin/embeddings/backfill", requireAdmin, async (req, res): Promise<void> => {
+router.post("/admin/embeddings/backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = BackfillEmbeddingsBody.safeParse(req.body ?? {});
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const result = await backfillEmbeddings(body.data.limit);
+  const result = await backfillEmbeddings(body.data.limit, req.org!.id);
   res.json(BackfillEmbeddingsResponse.parse(result));
 });
 
-async function buildImageOptimizationStatus() {
+async function buildImageOptimizationStatus(orgId: number) {
   const [s] = await db
-    .select({ enabled: appSettingsTable.imageOptimizationEnabled })
-    .from(appSettingsTable)
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
+    .select({ enabled: organizationSettingsTable.imageOptimizationEnabled })
+    .from(organizationSettingsTable)
+    .where(eq(organizationSettingsTable.organizationId, orgId));
   return {
     enabled: s ? Boolean(s.enabled) : true,
     quality: IMAGE_OPTIMIZATION_SETTINGS.quality,
@@ -586,34 +616,35 @@ async function buildImageOptimizationStatus() {
   };
 }
 
-router.get("/admin/image-optimization/status", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus()));
+router.get("/admin/image-optimization/status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus(req.org!.id)));
 });
 
-router.patch("/admin/image-optimization/settings", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/image-optimization/settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateImageOptimizationSettingsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
+  await loadOrgSettings(req.org!.id);
   await db
-    .update(appSettingsTable)
+    .update(organizationSettingsTable)
     .set({ imageOptimizationEnabled: body.data.enabled })
-    .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID));
-  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus()));
+    .where(eq(organizationSettingsTable.organizationId, req.org!.id));
+  res.json(ImageOptimizationStatusResponse.parse(await buildImageOptimizationStatus(req.org!.id)));
 });
 
 const DUPLICATES_DEFAULT_LIMIT = 20;
 const DUPLICATES_MAX_LIMIT = 100;
 
-router.get("/admin/photos/duplicates", requireAdmin, async (req, res): Promise<void> => {
+router.get("/admin/photos/duplicates", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const rawLimit = req.query.limit ? parseInt(String(req.query.limit), 10) : DUPLICATES_DEFAULT_LIMIT;
   const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, DUPLICATES_MAX_LIMIT) : DUPLICATES_DEFAULT_LIMIT;
   const rawOffset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
   const offset = Number.isInteger(rawOffset) && rawOffset > 0 ? rawOffset : 0;
 
   // Fetch one extra group to know whether another page exists.
-  const groups = await listDuplicatePhotoGroups({ limit: limit + 1, offset });
+  const groups = await listDuplicatePhotoGroups({ limit: limit + 1, offset, organizationId: req.org!.id });
   const hasMore = groups.length > limit;
   const page = hasMore ? groups.slice(0, limit) : groups;
 
@@ -637,28 +668,31 @@ router.get("/admin/photos/duplicates", requireAdmin, async (req, res): Promise<v
   );
 });
 
-router.get("/admin/photos/duplicates/summary", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(GetDuplicatesSummaryResponse.parse(await getDuplicatesSummary()));
+router.get("/admin/photos/duplicates/summary", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(GetDuplicatesSummaryResponse.parse(await getDuplicatesSummary(req.org!.id)));
 });
 
 // Server-side "delete all extras": computes the deletable copies (keeping album
 // covers, else one per group) and removes them in one shot, so the admin
 // summary never has to download every group to bulk-delete.
-router.post("/admin/photos/duplicates/delete-extras", requireAdmin, async (_req, res): Promise<void> => {
-  const extraIds = await computeDuplicateExtraIds();
+router.post("/admin/photos/duplicates/delete-extras", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const orgId = req.org!.id;
+  const extraIds = await computeDuplicateExtraIds(orgId);
   if (extraIds.length === 0) {
     res.json(DeleteDuplicateExtrasResponse.parse({ deleted: 0 }));
     return;
   }
 
+  // extraIds are already org-scoped, but re-assert org on the delete as
+  // defense-in-depth so no foreign id can ever be removed.
   const toDelete = await db
     .select({ id: photosTable.id, storageKey: photosTable.storageKey, thumbnailKey: photosTable.thumbnailKey })
     .from(photosTable)
-    .where(inArray(photosTable.id, extraIds));
+    .where(and(inArray(photosTable.id, extraIds), eq(photosTable.organizationId, orgId)));
 
   const deleted = await db
     .delete(photosTable)
-    .where(inArray(photosTable.id, extraIds))
+    .where(and(inArray(photosTable.id, extraIds), eq(photosTable.organizationId, orgId)))
     .returning({ id: photosTable.id });
 
   await Promise.all(toDelete.map((photo) => deletePhotoStorageObjects(photo)));
@@ -666,19 +700,19 @@ router.post("/admin/photos/duplicates/delete-extras", requireAdmin, async (_req,
   res.json(DeleteDuplicateExtrasResponse.parse({ deleted: deleted.length }));
 });
 
-router.get("/admin/photos/perceptual-hash-backfill-status", requireAdmin, async (_req, res): Promise<void> => {
-  const missingCount = await countPhotosWithoutPerceptualHash();
+router.get("/admin/photos/perceptual-hash-backfill-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const missingCount = await countPhotosWithoutPerceptualHash(req.org!.id);
   res.json(PerceptualHashBackfillStatusResponse.parse({ missingCount }));
 });
 
-router.post("/admin/photos/perceptual-hash-backfill", requireAdmin, async (req, res): Promise<void> => {
+router.post("/admin/photos/perceptual-hash-backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const rawLimit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
   const limit = rawLimit && Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
-  const result = await backfillPerceptualHashes(limit);
+  const result = await backfillPerceptualHashes(limit, req.org!.id);
   res.json(BackfillPerceptualHashesResponse.parse(result));
 });
 
-router.get("/admin/photos/near-duplicates", requireAdmin, async (req, res): Promise<void> => {
+router.get("/admin/photos/near-duplicates", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const raw = req.query.threshold ? parseInt(String(req.query.threshold), 10) : DEFAULT_NEAR_DUP_THRESHOLD;
   const threshold = Number.isInteger(raw) ? Math.min(Math.max(raw, 0), MAX_NEAR_DUP_THRESHOLD) : DEFAULT_NEAR_DUP_THRESHOLD;
   const rawLimit = req.query.limit ? parseInt(String(req.query.limit), 10) : DUPLICATES_DEFAULT_LIMIT;
@@ -688,7 +722,7 @@ router.get("/admin/photos/near-duplicates", requireAdmin, async (req, res): Prom
 
   // Reads the stored pair index (no per-request rescan); the page slice keeps
   // the response payload small.
-  const allGroups = await listNearDuplicatePhotoGroups(threshold);
+  const allGroups = await listNearDuplicatePhotoGroups(threshold, req.org!.id);
   const page = allGroups.slice(offset, offset + limit);
   res.json(
     NearDuplicatePhotoGroupsResponse.parse({
@@ -713,32 +747,32 @@ router.get("/admin/photos/near-duplicates", requireAdmin, async (req, res): Prom
   );
 });
 
-router.get("/admin/photos/near-duplicate-index-status", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(NearDuplicateIndexStatusResponse.parse(await getNearDuplicateIndexStatus()));
+router.get("/admin/photos/near-duplicate-index-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(NearDuplicateIndexStatusResponse.parse(await getNearDuplicateIndexStatus(req.org!.id)));
 });
 
-router.post("/admin/photos/near-duplicate-index/rebuild", requireAdmin, async (_req, res): Promise<void> => {
-  const result = await rebuildNearDuplicatePairs();
+router.post("/admin/photos/near-duplicate-index/rebuild", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const result = await rebuildNearDuplicatePairs(req.org!.id);
   res.json(RebuildNearDuplicateIndexResponse.parse(result));
 });
 
-router.get("/admin/ai-analysis/backfill-status", requireAdmin, async (_req, res): Promise<void> => {
-  const missingCount = await countPhotosNeedingAiAnalysis();
+router.get("/admin/ai-analysis/backfill-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const missingCount = await countPhotosNeedingAiAnalysis(req.org!.id);
   res.json(BackfillAiAnalysisStatusResponse.parse({ missingCount }));
 });
 
-router.post("/admin/ai-analysis/backfill", requireAdmin, async (req, res): Promise<void> => {
+router.post("/admin/ai-analysis/backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = BackfillAiAnalysisBody.safeParse(req.body ?? {});
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const result = await backfillAiAnalysis(body.data.limit, "manual");
+  const result = await backfillAiAnalysis(body.data.limit, "manual", req.org!.id);
   res.json(BackfillAiAnalysisResponse.parse(result));
 });
 
-router.get("/admin/ai-analysis/backfill-runs", requireAdmin, async (_req, res): Promise<void> => {
-  const runs = await listAiBackfillRuns();
+router.get("/admin/ai-analysis/backfill-runs", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const runs = await listAiBackfillRuns(undefined, req.org!.id);
   res.json(
     ListAiBackfillRunsResponse.parse(
       runs.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })),
@@ -746,18 +780,18 @@ router.get("/admin/ai-analysis/backfill-runs", requireAdmin, async (_req, res): 
   );
 });
 
-router.get("/admin/ai-analysis/auto-backfill-settings", requireAdmin, async (_req, res): Promise<void> => {
-  const settings = await getAiAutoBackfillSettings();
+router.get("/admin/ai-analysis/auto-backfill-settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const settings = await getAiAutoBackfillSettings(req.org!.id);
   res.json(GetAiAutoBackfillSettingsResponse.parse(settings));
 });
 
-router.patch("/admin/ai-analysis/auto-backfill-settings", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/ai-analysis/auto-backfill-settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateAiAutoBackfillSettingsBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const settings = await updateAiAutoBackfillSettings(body.data);
+  const settings = await updateAiAutoBackfillSettings(req.org!.id, body.data);
   res.json(UpdateAiAutoBackfillSettingsResponse.parse(settings));
 });
 

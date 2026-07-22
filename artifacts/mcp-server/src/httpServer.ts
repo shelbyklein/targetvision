@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { timingSafeEqual } from "node:crypto";
 import express, { type Request, type Response, type NextFunction } from "express";
+import { asc } from "drizzle-orm";
+import { db, organizationsTable } from "@workspace/db";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "./server.js";
 import { getOriginalFile } from "./photoLibrary.js";
@@ -20,10 +22,19 @@ export async function startHttpServer(): Promise<void> {
     ? process.env.MCP_AUTH_TOKEN
     : null;
 
-  // Accept a candidate if it matches the env token or any admin-created token.
-  async function isValidToken(candidate: string): Promise<boolean> {
-    if (envToken && tokenMatches(candidate, envToken)) return true;
-    return (await verifyMcpToken(candidate, Date.now())) != null;
+  // The break-glass env token isn't tied to an org; scope it to the default
+  // (lowest-id) org so it still only exposes one tenant's library.
+  async function defaultOrgId(): Promise<number | null> {
+    const [org] = await db.select({ id: organizationsTable.id }).from(organizationsTable).orderBy(asc(organizationsTable.id)).limit(1);
+    return org?.id ?? null;
+  }
+
+  // Resolve a candidate token to the org it grants access to (#113 Phase 5), or
+  // null when the token is invalid.
+  async function resolveTokenOrg(candidate: string): Promise<number | null> {
+    if (envToken && tokenMatches(candidate, envToken)) return defaultOrgId();
+    const verified = await verifyMcpToken(candidate, Date.now());
+    return verified ? verified.organizationId : null;
   }
 
   const port = Number(process.env.MCP_HTTP_PORT) || 8086;
@@ -43,13 +54,15 @@ export async function startHttpServer(): Promise<void> {
   // path segment (`/<token>/mcp`). The URL form exists because claude.ai's
   // custom-connector UI only accepts a URL — no header field. Over HTTPS the
   // path is encrypted in transit; treat the URL itself as a secret.
-  app.use((req: Request & { mcpToken?: string }, res: Response, next: NextFunction) => {
+  app.use((req: Request & { mcpToken?: string; mcpOrgId?: number }, res: Response, next: NextFunction) => {
     void (async () => {
       const header = req.headers.authorization;
       if (header?.startsWith("Bearer ")) {
         const candidate = header.slice("Bearer ".length);
-        if (await isValidToken(candidate)) {
+        const orgId = await resolveTokenOrg(candidate);
+        if (orgId != null) {
           req.mcpToken = candidate;
+          req.mcpOrgId = orgId;
           next();
           return;
         }
@@ -57,10 +70,12 @@ export async function startHttpServer(): Promise<void> {
       const segments = req.path.split("/").filter(Boolean);
       if (segments.length > 0) {
         const candidate = decodeURIComponent(segments[0]);
-        if (await isValidToken(candidate)) {
+        const orgId = await resolveTokenOrg(candidate);
+        if (orgId != null) {
           // Strip the token segment from the path the router sees; keep the
           // raw token so get_photo download links can embed it (openable URLs).
           req.mcpToken = candidate;
+          req.mcpOrgId = orgId;
           req.url = req.url.replace(`/${segments[0]}`, "") || "/";
           next();
           return;
@@ -73,11 +88,12 @@ export async function startHttpServer(): Promise<void> {
   // Stateless streamable HTTP: a fresh server+transport pair per request.
   // Tools-only usage needs no session affinity, and statelessness survives
   // process restarts without breaking connected clients.
-  app.post("/mcp", async (req: Request & { mcpToken?: string }, res: Response) => {
+  app.post("/mcp", async (req: Request & { mcpToken?: string; mcpOrgId?: number }, res: Response) => {
     // Download links carry the same token that authenticated this request, so
     // they're openable by the caller (the storage-signed URLs are local-only).
     const externalDownloadBase = publicUrl && req.mcpToken ? `${publicUrl}/${req.mcpToken}` : undefined;
-    const server = createServer({ externalDownloadBase });
+    // Every tool is scoped to the token's org (#113 Phase 5).
+    const server = createServer({ externalDownloadBase, organizationId: req.mcpOrgId });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -119,14 +135,14 @@ export async function startHttpServer(): Promise<void> {
 
   // Authenticated full-resolution download — what get_photo's link points at
   // when MCP_PUBLIC_URL is set.
-  app.get("/photo/:id/original", async (req: Request, res: Response) => {
+  app.get("/photo/:id/original", async (req: Request & { mcpOrgId?: number }, res: Response) => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
     if (!Number.isInteger(id)) {
       res.status(400).json({ error: "Invalid photo id" });
       return;
     }
-    const file = await getOriginalFile(id);
+    const file = await getOriginalFile(id, req.mcpOrgId);
     if (!file) {
       res.status(404).json({ error: "Photo not found" });
       return;
@@ -138,14 +154,14 @@ export async function startHttpServer(): Promise<void> {
 
   // Authenticated asset download — what get_asset's link points at when
   // MCP_PUBLIC_URL is set.
-  app.get("/asset/:id/original", async (req: Request, res: Response) => {
+  app.get("/asset/:id/original", async (req: Request & { mcpOrgId?: number }, res: Response) => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
     if (!Number.isInteger(id)) {
       res.status(400).json({ error: "Invalid asset id" });
       return;
     }
-    const file = await getAssetFile(id);
+    const file = await getAssetFile(id, req.mcpOrgId);
     if (!file) {
       res.status(404).json({ error: "Asset not found" });
       return;

@@ -1,6 +1,7 @@
 import { pgTable, pgEnum, text, serial, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { projectsTable } from "./projects";
+import { organizationsTable } from "./organizations";
 
 // The asset library holds non-photo files agents and humans pull into
 // deliverables: kind='brand' is logos/marks (the thing you embed in the
@@ -13,6 +14,8 @@ export const assetsTable = pgTable(
   "assets",
   {
     id: serial("id").primaryKey(),
+    // Tenant owner (issue #113). Nullable in Phase 1 (backfilled), NOT NULL in P2.
+    organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
     kind: assetKindEnum("kind").notNull(),
     name: text("name").notNull(),
     // Distinguishes versions of the same mark: "primary", "white", "icon-only"

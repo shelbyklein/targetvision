@@ -3,7 +3,9 @@ import {
   db,
   appSettingsTable,
   APP_SETTINGS_SINGLETON_ID,
+  organizationSettingsTable,
   type AppSettings,
+  type OrganizationSettings,
 } from "@workspace/db";
 import { decryptSecret } from "../secretCrypto";
 import { OpenAIProvider } from "./openai";
@@ -62,6 +64,23 @@ export async function loadAppSettings(): Promise<AppSettings> {
   return created;
 }
 
+// Per-org AI/embedding/image settings (issue #113, Phase 3). Creates a defaults
+// row on first access. organization_settings carries the same AI columns as
+// app_settings, so the shared summarize/getStoredKey/getActiveProvider helpers
+// operate on it structurally — only registration stays instance-level.
+export async function loadOrgSettings(organizationId: number): Promise<OrganizationSettings> {
+  const [existing] = await db
+    .select()
+    .from(organizationSettingsTable)
+    .where(eq(organizationSettingsTable.organizationId, organizationId));
+  if (existing) return existing;
+  const [created] = await db
+    .insert(organizationSettingsTable)
+    .values({ organizationId })
+    .returning();
+  return created;
+}
+
 // True when the AI_INTEGRATIONS_* env vars supply a base URL + API key for this
 // provider, i.e. a server-configured fallback used when no admin key is set in
 // the UI. (Formerly Replit's built-in AI gateway; now a generic env fallback.)
@@ -84,20 +103,20 @@ function envKeyFallbackFor(id: ProviderId): boolean {
   );
 }
 
-function providerHasKey(settings: AppSettings, id: ProviderId): boolean {
+function providerHasKey(settings: OrganizationSettings, id: ProviderId): boolean {
   if (id === "openai") return Boolean(settings.openaiKeyCiphertext);
   if (id === "anthropic") return Boolean(settings.anthropicKeyCiphertext);
   return Boolean(settings.geminiKeyCiphertext);
 }
 
-function providerPreview(settings: AppSettings, id: ProviderId): string | null {
+function providerPreview(settings: OrganizationSettings, id: ProviderId): string | null {
   if (id === "openai") return settings.openaiKeyPreview;
   if (id === "anthropic") return settings.anthropicKeyPreview;
   return settings.geminiKeyPreview;
 }
 
 function configuredModelFor(
-  settings: AppSettings,
+  settings: OrganizationSettings,
   id: ProviderId,
 ): string | null {
   if (id === "openai") return settings.openaiModel;
@@ -106,7 +125,7 @@ function configuredModelFor(
 }
 
 export function resolveProviderModel(
-  settings: AppSettings,
+  settings: OrganizationSettings,
   id: ProviderId,
 ): string {
   const stored = configuredModelFor(settings, id);
@@ -114,7 +133,7 @@ export function resolveProviderModel(
   return DEFAULT_PROVIDER_MODELS[id];
 }
 
-export function summarizeSettings(settings: AppSettings): ResolvedSettings {
+export function summarizeSettings(settings: OrganizationSettings): ResolvedSettings {
   const providers = {} as Record<ProviderId, ProviderStatus>;
   for (const id of PROVIDER_IDS) {
     const hasKey = providerHasKey(settings, id);
@@ -141,7 +160,7 @@ export function summarizeSettings(settings: AppSettings): ResolvedSettings {
 }
 
 function getStoredKey(
-  settings: AppSettings,
+  settings: OrganizationSettings,
   id: ProviderId,
 ): string | null {
   try {
@@ -188,12 +207,12 @@ function getStoredKey(
   }
 }
 
-export async function getActiveProvider(): Promise<{
+export async function getActiveProvider(organizationId: number): Promise<{
   provider: AnalysisProvider | null;
-  settings: AppSettings;
+  settings: OrganizationSettings;
   reason?: string;
 }> {
-  const settings = await loadAppSettings();
+  const settings = await loadOrgSettings(organizationId);
   if (!settings.aiEnabled) {
     return { provider: null, settings, reason: "AI disabled" };
   }
