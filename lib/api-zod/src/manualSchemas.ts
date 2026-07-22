@@ -289,3 +289,19 @@ export const CreateOrgInviteBody = z.object({
   role: OrgRole.optional(),
 });
 export const CreateOrgInviteResponse = OrgInvite;
+
+// --- Org settings / info (Phase 4d) ---
+export const OrgDetailsResponse = z.object({
+  id: z.number(),
+  name: z.string(),
+  slug: z.string(),
+  description: z.string().nullable(),
+  createdAt: z.string(),
+  role: z.string(), // the caller's role in this org
+  memberCount: z.number(),
+});
+
+export const UpdateOrgBody = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+});

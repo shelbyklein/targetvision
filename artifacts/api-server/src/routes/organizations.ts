@@ -7,6 +7,7 @@ import {
   organizationInvitesTable,
   usersTable,
 } from "@workspace/db";
+import { count as sqlCount } from "drizzle-orm";
 import {
   ListMyOrganizationsResponse,
   SwitchOrganizationBody,
@@ -18,6 +19,8 @@ import {
   ListOrgInvitesResponse,
   CreateOrgInviteBody,
   CreateOrgInviteResponse,
+  OrgDetailsResponse,
+  UpdateOrgBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireOrgAuth, requireOrgRole } from "../middlewares/requireOrg";
@@ -146,6 +149,62 @@ router.post("/organizations/switch", requireAuth, async (req, res): Promise<void
     .where(eq(usersTable.id, req.dbUser!.id));
 
   res.json(SwitchOrganizationResponse.parse(membership));
+});
+
+// --- Active org details / settings (Phase 4d) ---
+
+// GET /organizations/current — details of the active org. Any member may view.
+router.get("/organizations/current", requireOrgAuth, async (req, res): Promise<void> => {
+  const org = req.org!;
+  const [{ n }] = await db
+    .select({ n: sqlCount() })
+    .from(organizationMembersTable)
+    .where(eq(organizationMembersTable.organizationId, org.id));
+  res.json(
+    OrgDetailsResponse.parse({
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      description: org.description,
+      createdAt: org.createdAt.toISOString(),
+      role: req.orgRole ?? "member",
+      memberCount: Number(n),
+    }),
+  );
+});
+
+// PATCH /organizations/current — rename / re-describe the active org. Slug is
+// immutable (baked into token/handle semantics). Owner/admin only.
+router.patch("/organizations/current", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const body = UpdateOrgBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const updates: { name?: string; description?: string | null } = {};
+  if (body.data.name !== undefined) updates.name = body.data.name;
+  if (body.data.description !== undefined) updates.description = body.data.description === "" ? null : body.data.description;
+
+  const [org] = Object.keys(updates).length
+    ? await db.update(organizationsTable).set(updates).where(eq(organizationsTable.id, req.org!.id)).returning()
+    : [req.org!];
+
+  const [{ n }] = await db
+    .select({ n: sqlCount() })
+    .from(organizationMembersTable)
+    .where(eq(organizationMembersTable.organizationId, org.id));
+
+  res.json(
+    OrgDetailsResponse.parse({
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      description: org.description,
+      createdAt: org.createdAt.toISOString(),
+      role: req.orgRole ?? "member",
+      memberCount: Number(n),
+    }),
+  );
 });
 
 // --- Member + invite management for the active org (Phase 4c, org-admin) ---

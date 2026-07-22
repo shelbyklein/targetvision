@@ -13,6 +13,8 @@ export const organizationsTable = pgTable("organizations", {
   name: text("name").notNull(),
   // URL/handle-safe unique identifier (e.g. "usa-archery").
   slug: text("slug").notNull().unique(),
+  // Optional free-text description shown on the org settings page.
+  description: text("description"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

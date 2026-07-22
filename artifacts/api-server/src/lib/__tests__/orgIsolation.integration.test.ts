@@ -243,6 +243,37 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect((await (await api("/api/organizations/invites", { user: userA, orgId: orgA.id })).json()) as unknown[]).toHaveLength(0);
   });
 
+  it("org details are viewable by members and editable by admins (#113 Phase 4d)", async () => {
+    const { orgA, userA } = await seedTwoOrgs();
+    const member = await createUser({ name: "Member" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    // Any member can view details.
+    const view = await api("/api/organizations/current", { user: member, orgId: orgA.id });
+    expect(view.status).toBe(200);
+    const details = (await view.json()) as { name: string; memberCount: number; role: string; description: string | null };
+    expect(details.name).toBe("Org A");
+    expect(details.memberCount).toBe(2);
+    expect(details.role).toBe("member");
+    expect(details.description).toBeNull();
+
+    // A plain member cannot edit.
+    expect((await api("/api/organizations/current", { user: member, orgId: orgA.id, method: "PATCH", body: { name: "Hacked" } })).status).toBe(403);
+
+    // Owner renames + describes.
+    const upd = await api("/api/organizations/current", { user: userA, orgId: orgA.id, method: "PATCH", body: { name: "Org A Renamed", description: "Our shared library" } });
+    expect(upd.status).toBe(200);
+    const updated = (await upd.json()) as { name: string; description: string | null };
+    expect(updated.name).toBe("Org A Renamed");
+    expect(updated.description).toBe("Our shared library");
+
+    // Persisted, and the switcher list reflects the new name.
+    const after = (await (await api("/api/organizations/current", { user: userA, orgId: orgA.id })).json()) as { name: string };
+    expect(after.name).toBe("Org A Renamed");
+    const myOrgs = (await (await api("/api/organizations", { user: userA })).json()) as Array<{ name: string }>;
+    expect(myOrgs[0].name).toBe("Org A Renamed");
+  });
+
   it("requires authentication and org membership", async () => {
     const { orgA } = await seedTwoOrgs();
     // No auth header → 401.

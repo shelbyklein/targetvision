@@ -18,6 +18,7 @@ import {
   CircleCheck,
   CircleAlert,
   KeyRound,
+  Building2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
@@ -61,6 +62,7 @@ const SECTIONS: {
   { href: "/admin/near-duplicates", title: "Near-Duplicates", description: "Visually similar photos — select and delete.", icon: CopyCheck },
   { href: "/admin/attribution-tags", title: "Attribution Tags", description: "Usage-rights tags photos can be cleared for.", icon: Copyright },
   { href: "/admin/mcp-tokens", title: "MCP Access Tokens", description: "Tokens for external AI clients to reach the photo library.", icon: KeyRound },
+  { href: "/admin/organization", title: "Organization", description: "Name, description, and details of your current organization.", icon: Building2 },
   { href: "/admin/members", title: "Organization Members", description: "Invite teammates and manage roles in this organization.", icon: Users },
   { href: "/admin/team", title: "Team Members", description: "Instance-wide member roles.", icon: Users },
 ];

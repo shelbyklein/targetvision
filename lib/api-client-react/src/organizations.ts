@@ -50,6 +50,43 @@ export function useSwitchOrganization() {
   });
 }
 
+// --- Active org details / settings (Phase 4d) ---
+
+export type OrgDetails = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  createdAt: string;
+  role: string;
+  memberCount: number;
+};
+
+const CURRENT_ORG_KEY = ["organizations", "current"] as const;
+
+export function useOrgDetails() {
+  return useQuery({
+    queryKey: CURRENT_ORG_KEY,
+    queryFn: () => customFetch<OrgDetails>("/api/organizations/current"),
+  });
+}
+
+export function useUpdateOrg() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name?: string; description?: string | null }) =>
+      customFetch<OrgDetails>("/api/organizations/current", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      // Refresh the details view and the switcher's org list (name may change).
+      queryClient.invalidateQueries({ queryKey: CURRENT_ORG_KEY });
+      queryClient.invalidateQueries({ queryKey: MY_ORGS_KEY });
+    },
+  });
+}
+
 // --- Member + invite management (Phase 4c) ---
 
 export type OrgMember = {
