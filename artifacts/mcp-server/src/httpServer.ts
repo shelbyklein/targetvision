@@ -4,6 +4,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "./server.js";
 import { getOriginalFile } from "./photoLibrary.js";
+import { verifyMcpToken } from "@workspace/api-server/src/lib/mcpTokens";
 
 function tokenMatches(candidate: string, expected: string): boolean {
   const a = Buffer.from(candidate);
@@ -12,12 +13,18 @@ function tokenMatches(candidate: string, expected: string): boolean {
 }
 
 export async function startHttpServer(): Promise<void> {
-  const token = process.env.MCP_AUTH_TOKEN;
-  if (!token || token.length < 24) {
-    throw new Error(
-      "MCP_AUTH_TOKEN must be set (>= 24 chars) to run the HTTP transport — it is exposed publicly via the tunnel.",
-    );
+  // Admin-managed DB tokens are the primary auth; MCP_AUTH_TOKEN is an
+  // optional break-glass/bootstrap token (e.g. before any DB token exists).
+  const envToken = process.env.MCP_AUTH_TOKEN && process.env.MCP_AUTH_TOKEN.length >= 24
+    ? process.env.MCP_AUTH_TOKEN
+    : null;
+
+  // Accept a candidate if it matches the env token or any admin-created token.
+  async function isValidToken(candidate: string): Promise<boolean> {
+    if (envToken && tokenMatches(candidate, envToken)) return true;
+    return (await verifyMcpToken(candidate, Date.now())) != null;
   }
+
   const port = Number(process.env.MCP_HTTP_PORT) || 8086;
   // Public base for download links returned by get_photo, e.g.
   // https://targetvision-mcp.shelbyklein.com — token prefix is appended here.
@@ -35,27 +42,40 @@ export async function startHttpServer(): Promise<void> {
   // path segment (`/<token>/mcp`). The URL form exists because claude.ai's
   // custom-connector UI only accepts a URL — no header field. Over HTTPS the
   // path is encrypted in transit; treat the URL itself as a secret.
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const header = req.headers.authorization;
-    if (header?.startsWith("Bearer ") && tokenMatches(header.slice("Bearer ".length), token)) {
-      next();
-      return;
-    }
-    const segments = req.path.split("/").filter(Boolean);
-    if (segments.length > 0 && tokenMatches(decodeURIComponent(segments[0]), token)) {
-      req.url = req.url.replace(`/${segments[0]}`, "") || "/";
-      next();
-      return;
-    }
-    res.status(401).json({ error: "Unauthorized" });
+  app.use((req: Request & { mcpToken?: string }, res: Response, next: NextFunction) => {
+    void (async () => {
+      const header = req.headers.authorization;
+      if (header?.startsWith("Bearer ")) {
+        const candidate = header.slice("Bearer ".length);
+        if (await isValidToken(candidate)) {
+          req.mcpToken = candidate;
+          next();
+          return;
+        }
+      }
+      const segments = req.path.split("/").filter(Boolean);
+      if (segments.length > 0) {
+        const candidate = decodeURIComponent(segments[0]);
+        if (await isValidToken(candidate)) {
+          // Strip the token segment from the path the router sees; keep the
+          // raw token so get_photo download links can embed it (openable URLs).
+          req.mcpToken = candidate;
+          req.url = req.url.replace(`/${segments[0]}`, "") || "/";
+          next();
+          return;
+        }
+      }
+      res.status(401).json({ error: "Unauthorized" });
+    })();
   });
-
-  const externalDownloadBase = publicUrl ? `${publicUrl}/${token}` : undefined;
 
   // Stateless streamable HTTP: a fresh server+transport pair per request.
   // Tools-only usage needs no session affinity, and statelessness survives
   // process restarts without breaking connected clients.
-  app.post("/mcp", async (req: Request, res: Response) => {
+  app.post("/mcp", async (req: Request & { mcpToken?: string }, res: Response) => {
+    // Download links carry the same token that authenticated this request, so
+    // they're openable by the caller (the storage-signed URLs are local-only).
+    const externalDownloadBase = publicUrl && req.mcpToken ? `${publicUrl}/${req.mcpToken}` : undefined;
     const server = createServer({ externalDownloadBase });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
