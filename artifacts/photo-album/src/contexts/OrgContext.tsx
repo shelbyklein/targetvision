@@ -5,6 +5,8 @@ import {
   useSwitchOrganization,
   type MyOrganization,
 } from "@workspace/api-client-react";
+import { useSession } from "@/lib/auth-client";
+import { CreateOrgScreen } from "@/components/auth/CreateOrgScreen";
 import { getActiveOrgId, setActiveOrgId } from "@/lib/active-org";
 
 type OrgContextValue = {
@@ -17,7 +19,10 @@ type OrgContextValue = {
 const OrgContext = createContext<OrgContextValue | null>(null);
 
 export function OrgProvider({ children }: { children: React.ReactNode }) {
-  const { data: orgs = [], isLoading } = useMyOrganizations();
+  const { data: session } = useSession();
+  const orgsQuery = useMyOrganizations();
+  const orgs = orgsQuery.data ?? [];
+  const isLoading = orgsQuery.isLoading;
   const { mutate: persistSwitch } = useSwitchOrganization();
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(() => getActiveOrgId());
@@ -53,6 +58,12 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
     setActiveId(id);
     persistSwitch(id);
     void queryClient.invalidateQueries();
+  }
+
+  // A signed-in user who belongs to no org yet (e.g. a fresh sign-up) must create
+  // one before the app is usable — every tenant route would otherwise 403.
+  if (session?.user && orgsQuery.isSuccess && orgs.length === 0) {
+    return <CreateOrgScreen />;
   }
 
   return (

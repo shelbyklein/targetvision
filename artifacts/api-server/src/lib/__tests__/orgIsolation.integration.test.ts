@@ -173,6 +173,27 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect((await api("/api/organizations/switch", { user: userA, method: "POST", body: { organizationId: orgA.id } })).status).toBe(200);
   });
 
+  it("a user with no org can create one and is enrolled as owner (#113 Phase 4b)", async () => {
+    const user = await createUser({ name: "New Signup" });
+
+    // No membership → tenant routes 403 and the org list is empty.
+    expect((await api("/api/albums", { user })).status).toBe(403);
+    expect(await (await api("/api/organizations", { user })).json()).toEqual([]);
+
+    // Create an org — becomes owner, slug derived from the name.
+    const res = await api("/api/organizations", { user, method: "POST", body: { name: "Acme Photos" } });
+    expect(res.status).toBe(201);
+    const org = (await res.json()) as { id: number; name: string; slug: string; role: string };
+    expect(org.name).toBe("Acme Photos");
+    expect(org.slug).toBe("acme-photos");
+    expect(org.role).toBe("owner");
+
+    // Now a member → tenant routes work and the org list shows it.
+    expect((await api("/api/albums", { user, orgId: org.id })).status).toBe(200);
+    const orgs = (await (await api("/api/organizations", { user })).json()) as Array<{ id: number }>;
+    expect(orgs.map((o) => o.id)).toEqual([org.id]);
+  });
+
   it("requires authentication and org membership", async () => {
     const { orgA } = await seedTwoOrgs();
     // No auth header → 401.

@@ -22,6 +22,19 @@ export function useMyOrganizations() {
   });
 }
 
+// Create a new org (the caller becomes owner). Used by the "no org yet" screen.
+export function useCreateOrganization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      customFetch<MyOrganization>("/api/organizations", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: MY_ORGS_KEY }),
+  });
+}
+
 // Persist the user's sticky active org server-side. The header the client sends
 // is the source of truth per-request; this makes the choice survive a fresh
 // session with no stored preference.

@@ -253,3 +253,11 @@ export const SwitchOrganizationBody = z.object({
 });
 
 export const SwitchOrganizationResponse = MyOrganization;
+
+// Create a new organization; the caller becomes its owner. Slug is derived
+// server-side from the name (uniqueness handled there).
+export const CreateOrganizationBody = z.object({
+  name: z.string().trim().min(1).max(80),
+});
+
+export const CreateOrganizationResponse = MyOrganization;
