@@ -280,12 +280,19 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect((await api("/api/albums", { orgId: orgA.id })).status).toBe(401);
   });
 
-  it("storage ACL: org-prefixed object keys require membership (#113 Phase 3c)", async () => {
-    const { orgA, orgB, userA } = await seedTwoOrgs();
-    // Own org → allowed; other org → denied; legacy (unprefixed) key → allowed.
+  it("storage ACL: every object key requires membership of its org (#113 Phase 3c/4)", async () => {
+    // orgA is created first, so it's the default (lowest-id) org that legacy
+    // (unprefixed) keys belong to. userA is in orgA, userB only in orgB.
+    const { orgA, orgB, userA, userB } = await seedTwoOrgs();
+
+    // Own org → allowed; other org → denied.
     expect(await mayAccessObjectPath(userA.id, `orgs/${orgA.id}/uploads/x`)).toBe(true);
     expect(await mayAccessObjectPath(userA.id, `orgs/${orgB.id}/uploads/x`)).toBe(false);
+
+    // Legacy keys are gated to the default org: userA (default-org member) may
+    // read; userB (only in orgB) may not — no more "any member" pass.
     expect(await mayAccessObjectPath(userA.id, "uploads/legacy-key")).toBe(true);
+    expect(await mayAccessObjectPath(userB.id, "uploads/legacy-key")).toBe(false);
   });
 
   it("admin maintenance (hub-status) is org-admin-gated and per-org (#113 Phase 3d)", async () => {

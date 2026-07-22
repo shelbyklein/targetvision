@@ -4,29 +4,43 @@ import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
-import { and, eq } from "drizzle-orm";
-import { db, organizationMembersTable } from "@workspace/db";
+import { and, asc, eq } from "drizzle-orm";
+import { db, organizationMembersTable, organizationsTable } from "@workspace/db";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireOrgAuth } from "../middlewares/requireOrg";
 
-// All private object routes require an authenticated user. Org-prefixed keys
-// (orgs/<id>/…, minted since #113) additionally require membership of that org;
-// legacy keys predate tenanting and stay readable by any signed-in member.
+// All private object routes require an authenticated user, and additionally
+// membership of the org that owns the object (#113). Org-prefixed keys
+// (orgs/<id>/…) name their org directly; legacy (unprefixed) keys predate
+// org-prefixing and all belong to the default org, so they're gated the same way
+// — no object is readable by a non-member of its org.
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
-// If the object path is tenant-scoped (orgs/<id>/…), the caller must belong to
-// that org. Returns true when access is allowed. Legacy (unprefixed) keys pass.
-export async function mayAccessObjectPath(userId: number, wildcardPath: string): Promise<boolean> {
+// Resolve which org an object path belongs to: the prefix's org for
+// orgs/<id>/… keys, else the default (lowest-id) org for legacy keys.
+async function objectOrgId(wildcardPath: string): Promise<number | null> {
   const m = wildcardPath.match(/^orgs\/(\d+)\//);
-  if (!m) return true;
-  const objOrgId = Number.parseInt(m[1], 10);
+  if (m) return Number.parseInt(m[1], 10);
+  const [defaultOrg] = await db
+    .select({ id: organizationsTable.id })
+    .from(organizationsTable)
+    .orderBy(asc(organizationsTable.id))
+    .limit(1);
+  return defaultOrg?.id ?? null;
+}
+
+// The caller must belong to the org that owns the object. Returns true when
+// access is allowed.
+export async function mayAccessObjectPath(userId: number, wildcardPath: string): Promise<boolean> {
+  const orgId = await objectOrgId(wildcardPath);
+  if (orgId == null) return false;
   const [membership] = await db
     .select({ userId: organizationMembersTable.userId })
     .from(organizationMembersTable)
-    .where(and(eq(organizationMembersTable.organizationId, objOrgId), eq(organizationMembersTable.userId, userId)));
+    .where(and(eq(organizationMembersTable.organizationId, orgId), eq(organizationMembersTable.userId, userId)));
   return Boolean(membership);
 }
 
