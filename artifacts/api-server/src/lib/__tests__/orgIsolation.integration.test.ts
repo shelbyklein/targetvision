@@ -329,6 +329,41 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(ent.capBytes).toBeNull();
   });
 
+  it("instance-admin set-plan overrides a plan; non-admins are refused (#118)", async () => {
+    const { orgA, userA } = await seedTwoOrgs(); // orgA on the free plan; userA is its owner (not an instance admin)
+    const instanceAdmin = await createUser({ name: "Root", role: "admin" });
+
+    // An org owner who is not an instance admin cannot use the override.
+    const forbidden = await api("/api/billing/admin/set-plan", {
+      user: userA,
+      method: "POST",
+      body: { organizationId: orgA.id, plan: "enterprise" },
+    });
+    expect(forbidden.status).toBe(403);
+    expect((await orgRow(orgA.id)).plan).toBe("free");
+
+    // The instance admin flips it to Enterprise → unlimited.
+    const granted = await api("/api/billing/admin/set-plan", {
+      user: instanceAdmin,
+      method: "POST",
+      body: { organizationId: orgA.id, plan: "enterprise" },
+    });
+    expect(granted.status).toBe(200);
+    const body = (await granted.json()) as { plan: string; capBytes: number | null };
+    expect(body.plan).toBe("enterprise");
+    expect(body.capBytes).toBeNull();
+    expect((await orgRow(orgA.id)).plan).toBe("enterprise");
+    expect((await assertUploadAllowed(await orgRow(orgA.id), 999 * GB)).allowed).toBe(true);
+
+    // ...and back down to Free re-imposes the cap.
+    await api("/api/billing/admin/set-plan", {
+      user: instanceAdmin,
+      method: "POST",
+      body: { organizationId: orgA.id, plan: "free" },
+    });
+    expect((await orgRow(orgA.id)).plan).toBe("free");
+  });
+
   it("requires authentication and org membership", async () => {
     const { orgA } = await seedTwoOrgs();
     // No auth header → 401.
