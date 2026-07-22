@@ -19,6 +19,7 @@ vi.mock("../auth", () => ({
 
 import type { Server } from "node:http";
 import app from "../../app";
+import { mayAccessObjectPath } from "../../routes/storage";
 import { db, pool, assetsTable, attributionTagsTable } from "@workspace/db";
 import {
   resetDb,
@@ -176,6 +177,14 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     const { orgA } = await seedTwoOrgs();
     // No auth header → 401.
     expect((await api("/api/albums", { orgId: orgA.id })).status).toBe(401);
+  });
+
+  it("storage ACL: org-prefixed object keys require membership (#113 Phase 3c)", async () => {
+    const { orgA, orgB, userA } = await seedTwoOrgs();
+    // Own org → allowed; other org → denied; legacy (unprefixed) key → allowed.
+    expect(await mayAccessObjectPath(userA.id, `orgs/${orgA.id}/uploads/x`)).toBe(true);
+    expect(await mayAccessObjectPath(userA.id, `orgs/${orgB.id}/uploads/x`)).toBe(false);
+    expect(await mayAccessObjectPath(userA.id, "uploads/legacy-key")).toBe(true);
   });
 
   it("AI settings are per-org and gated to org owner/admin (#113 Phase 3)", async () => {

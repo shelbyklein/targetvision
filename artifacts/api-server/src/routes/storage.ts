@@ -4,14 +4,31 @@ import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
+import { and, eq } from "drizzle-orm";
+import { db, organizationMembersTable } from "@workspace/db";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requireOrgAuth } from "../middlewares/requireOrg";
 
-// All private object routes require an authenticated user.
-// Photos are internal-team content — any member who can sign in may read them.
+// All private object routes require an authenticated user. Org-prefixed keys
+// (orgs/<id>/…, minted since #113) additionally require membership of that org;
+// legacy keys predate tenanting and stay readable by any signed-in member.
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+
+// If the object path is tenant-scoped (orgs/<id>/…), the caller must belong to
+// that org. Returns true when access is allowed. Legacy (unprefixed) keys pass.
+export async function mayAccessObjectPath(userId: number, wildcardPath: string): Promise<boolean> {
+  const m = wildcardPath.match(/^orgs\/(\d+)\//);
+  if (!m) return true;
+  const objOrgId = Number.parseInt(m[1], 10);
+  const [membership] = await db
+    .select({ userId: organizationMembersTable.userId })
+    .from(organizationMembersTable)
+    .where(and(eq(organizationMembersTable.organizationId, objOrgId), eq(organizationMembersTable.userId, userId)));
+  return Boolean(membership);
+}
 
 /**
  * POST /storage/uploads/request-url
@@ -21,7 +38,7 @@ const objectStorageService = new ObjectStorageService();
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
  */
-router.post("/storage/uploads/request-url", requireAuth, async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireOrgAuth, async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
@@ -36,7 +53,8 @@ router.post("/storage/uploads/request-url", requireAuth, async (req: Request, re
       return;
     }
 
-    let uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    // Key the upload under the caller's active org (#113).
+    let uploadURL = await objectStorageService.getObjectEntityUploadURL(req.org!.id);
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
     // In local dev the browser can't PUT cross-origin to fake-gcs-server, so
@@ -107,6 +125,14 @@ router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Resp
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
+
+    // Tenant ACL (#113): an org-prefixed object is only served to a member of
+    // that org. 404 (not 403) so a non-member can't probe which keys exist.
+    if (!(await mayAccessObjectPath(req.dbUser!.id, wildcardPath))) {
+      res.status(404).json({ error: "Object not found" });
+      return;
+    }
+
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 

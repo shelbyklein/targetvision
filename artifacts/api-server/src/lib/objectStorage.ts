@@ -109,7 +109,11 @@ export class ObjectStorageService {
     return new Response(webStream, { headers });
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  // organizationId prefixes the key as orgs/<id>/uploads/<uuid> (#113) so the
+  // object path itself carries its tenant, letting the download route enforce
+  // membership. Retrieval is transparent — getObjectEntityFile keeps the whole
+  // suffix after /objects/ as the entity id.
+  async getObjectEntityUploadURL(organizationId: number): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -119,7 +123,7 @@ export class ObjectStorageService {
     }
 
     const objectId = randomUUID();
-    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    const fullPath = `${privateObjectDir}/orgs/${organizationId}/uploads/${objectId}`;
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
