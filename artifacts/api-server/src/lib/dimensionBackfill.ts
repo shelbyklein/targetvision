@@ -14,11 +14,16 @@ import { logger } from "./logger";
  * own pixel grid IS the aspect ratio the grid actually renders. Falls back to
  * the original (orientation-corrected) when a photo has no thumbnail.
  */
-export async function countPhotosWithoutDimensions(): Promise<number> {
+export async function countPhotosWithoutDimensions(organizationId?: number): Promise<number> {
   const rows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(isNull(photosTable.width));
+    .where(
+      and(
+        isNull(photosTable.width),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
   return rows.length;
 }
 
@@ -30,7 +35,7 @@ function resolveObjectFile(key: string) {
   return objectStorageClient.bucket(bucketName).file(objectName);
 }
 
-export async function backfillDimensions(): Promise<{
+export async function backfillDimensions(organizationId?: number): Promise<{
   processed: number;
   updated: number;
   skipped: number;
@@ -43,7 +48,12 @@ export async function backfillDimensions(): Promise<{
       thumbnailKey: photosTable.thumbnailKey,
     })
     .from(photosTable)
-    .where(and(isNull(photosTable.width)));
+    .where(
+      and(
+        isNull(photosTable.width),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
 
   let updated = 0;
   let skipped = 0;

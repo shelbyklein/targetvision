@@ -105,15 +105,21 @@ async function computeAndStorePerceptualHashUnbounded(photoId: number, storageKe
   }
 }
 
-export async function countPhotosWithoutPerceptualHash(): Promise<number> {
+export async function countPhotosWithoutPerceptualHash(organizationId?: number): Promise<number> {
   const rows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(and(isNull(photosTable.perceptualHash), isNotNull(photosTable.storageKey)));
+    .where(
+      and(
+        isNull(photosTable.perceptualHash),
+        isNotNull(photosTable.storageKey),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
   return rows.length;
 }
 
-export async function backfillPerceptualHashes(limit?: number): Promise<{
+export async function backfillPerceptualHashes(limit?: number, organizationId?: number): Promise<{
   processed: number;
   updated: number;
   skipped: number;
@@ -122,7 +128,13 @@ export async function backfillPerceptualHashes(limit?: number): Promise<{
   const base = db
     .select({ id: photosTable.id, storageKey: photosTable.storageKey })
     .from(photosTable)
-    .where(and(isNull(photosTable.perceptualHash), isNotNull(photosTable.storageKey)))
+    .where(
+      and(
+        isNull(photosTable.perceptualHash),
+        isNotNull(photosTable.storageKey),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    )
     .orderBy(photosTable.createdAt);
   const photos = limit && limit > 0 ? await base.limit(limit) : await base;
 
@@ -224,14 +236,24 @@ export async function insertNearDuplicatePairsForPhoto(photoId: number, hash: st
  * O(n²) scan, run via an admin action for a library that was hashed before the
  * index existed. After this, page loads just read the table.
  */
-export async function rebuildNearDuplicatePairs(): Promise<{ photos: number; pairs: number }> {
+export async function rebuildNearDuplicatePairs(organizationId?: number): Promise<{ photos: number; pairs: number }> {
   const rows = await db
     .select({ id: photosTable.id, hash: photosTable.perceptualHash, organizationId: photosTable.organizationId })
     .from(photosTable)
-    .where(isNotNull(photosTable.perceptualHash))
+    .where(
+      and(
+        isNotNull(photosTable.perceptualHash),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    )
     .orderBy(photosTable.id);
 
-  await db.delete(nearDuplicatePairsTable);
+  // When scoped to an org, only clear that org's pairs; otherwise a full rebuild.
+  if (organizationId != null) {
+    await db.delete(nearDuplicatePairsTable).where(eq(nearDuplicatePairsTable.organizationId, organizationId));
+  } else {
+    await db.delete(nearDuplicatePairsTable);
+  }
 
   const n = rows.length;
   const values: { photoA: number; photoB: number; distance: number; organizationId: number }[] = [];
@@ -255,12 +277,20 @@ export async function rebuildNearDuplicatePairs(): Promise<{ photos: number; pai
   return { photos: n, pairs: values.length };
 }
 
-export async function getNearDuplicateIndexStatus(): Promise<{ pairCount: number; hashedPhotos: number }> {
-  const [pairRow] = await db.select({ c: sql<number>`count(*)::int` }).from(nearDuplicatePairsTable);
+export async function getNearDuplicateIndexStatus(organizationId?: number): Promise<{ pairCount: number; hashedPhotos: number }> {
+  const [pairRow] = await db
+    .select({ c: sql<number>`count(*)::int` })
+    .from(nearDuplicatePairsTable)
+    .where(organizationId != null ? eq(nearDuplicatePairsTable.organizationId, organizationId) : undefined);
   const [hashRow] = await db
     .select({ c: sql<number>`count(*)::int` })
     .from(photosTable)
-    .where(isNotNull(photosTable.perceptualHash));
+    .where(
+      and(
+        isNotNull(photosTable.perceptualHash),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
   return { pairCount: pairRow?.c ?? 0, hashedPhotos: hashRow?.c ?? 0 };
 }
 
@@ -272,6 +302,7 @@ export async function getNearDuplicateIndexStatus(): Promise<{ pairCount: number
  */
 export async function listNearDuplicatePhotoGroups(
   threshold: number = DEFAULT_NEAR_DUP_THRESHOLD,
+  organizationId?: number,
 ): Promise<NearDuplicateGroup[]> {
   const pairs = await db
     .select({
@@ -280,7 +311,12 @@ export async function listNearDuplicatePhotoGroups(
       distance: nearDuplicatePairsTable.distance,
     })
     .from(nearDuplicatePairsTable)
-    .where(lte(nearDuplicatePairsTable.distance, threshold));
+    .where(
+      and(
+        lte(nearDuplicatePairsTable.distance, threshold),
+        organizationId != null ? eq(nearDuplicatePairsTable.organizationId, organizationId) : undefined,
+      ),
+    );
 
   if (pairs.length === 0) return [];
 

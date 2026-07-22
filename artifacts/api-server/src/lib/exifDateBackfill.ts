@@ -26,15 +26,21 @@ function getPrivateObjectDir(): string {
   return dir;
 }
 
-export async function countPhotosWithoutCaptureDate(): Promise<number> {
+export async function countPhotosWithoutCaptureDate(organizationId?: number): Promise<number> {
   const rows = await db
     .select({ id: photosTable.id })
     .from(photosTable)
-    .where(and(isNull(photosTable.takenAt), isNotNull(photosTable.storageKey)));
+    .where(
+      and(
+        isNull(photosTable.takenAt),
+        isNotNull(photosTable.storageKey),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
   return rows.length;
 }
 
-export async function backfillExifDates(): Promise<{
+export async function backfillExifDates(organizationId?: number): Promise<{
   processed: number;
   updated: number;
   skipped: number;
@@ -43,7 +49,13 @@ export async function backfillExifDates(): Promise<{
   const photos = await db
     .select({ id: photosTable.id, storageKey: photosTable.storageKey })
     .from(photosTable)
-    .where(and(isNull(photosTable.takenAt), isNotNull(photosTable.storageKey)));
+    .where(
+      and(
+        isNull(photosTable.takenAt),
+        isNotNull(photosTable.storageKey),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
 
   let updated = 0;
   let skipped = 0;

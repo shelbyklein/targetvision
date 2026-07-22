@@ -187,6 +187,21 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(await mayAccessObjectPath(userA.id, "uploads/legacy-key")).toBe(true);
   });
 
+  it("admin maintenance (hub-status) is org-admin-gated and per-org (#113 Phase 3d)", async () => {
+    const { orgA, userA } = await seedTwoOrgs();
+    const member = await createUser({ name: "Plain Member 2" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    // Owner gets a per-org status payload; a plain member is forbidden.
+    const owner = await api("/api/admin/hub-status", { user: userA, orgId: orgA.id });
+    expect(owner.status).toBe(200);
+    const body = (await owner.json()) as { aiAnalysisPending: number; duplicateGroups: number };
+    expect(typeof body.aiAnalysisPending).toBe("number");
+    expect(typeof body.duplicateGroups).toBe("number");
+
+    expect((await api("/api/admin/hub-status", { user: member, orgId: orgA.id })).status).toBe(403);
+  });
+
   it("AI settings are per-org and gated to org owner/admin (#113 Phase 3)", async () => {
     const { orgA, orgB, userA, userB } = await seedTwoOrgs();
     const member = await createUser({ name: "Plain Member" });
