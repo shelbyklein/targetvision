@@ -3,7 +3,9 @@ import {
   db,
   appSettingsTable,
   APP_SETTINGS_SINGLETON_ID,
+  organizationSettingsTable,
   type AppSettings,
+  type OrganizationSettings,
 } from "@workspace/db";
 import { decryptSecret } from "../secretCrypto";
 import { OpenAIProvider } from "./openai";
@@ -58,6 +60,23 @@ export async function loadAppSettings(): Promise<AppSettings> {
   const [created] = await db
     .insert(appSettingsTable)
     .values({ id: APP_SETTINGS_SINGLETON_ID })
+    .returning();
+  return created;
+}
+
+// Per-org AI/embedding/image settings (issue #113, Phase 3). Creates a defaults
+// row on first access. organization_settings carries the same AI columns as
+// app_settings, so the shared summarize/getStoredKey/getActiveProvider helpers
+// operate on it structurally — only registration stays instance-level.
+export async function loadOrgSettings(organizationId: number): Promise<OrganizationSettings> {
+  const [existing] = await db
+    .select()
+    .from(organizationSettingsTable)
+    .where(eq(organizationSettingsTable.organizationId, organizationId));
+  if (existing) return existing;
+  const [created] = await db
+    .insert(organizationSettingsTable)
+    .values({ organizationId })
     .returning();
   return created;
 }

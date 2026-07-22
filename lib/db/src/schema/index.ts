@@ -1,6 +1,7 @@
 export * from "./users";
 export * from "./auth";
 export * from "./organizations";
+export * from "./organizationSettings";
 export * from "./albums";
 export * from "./photos";
 export * from "./tags";
