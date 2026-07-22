@@ -305,3 +305,28 @@ export const UpdateOrgBody = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   description: z.string().trim().max(500).nullable().optional(),
 });
+
+// --- Billing / subscription (issue #118) ---
+export const BillingStatusResponse = z.object({
+  plan: z.string(),
+  planLabel: z.string(),
+  capBytes: z.number().nullable(), // null = unlimited
+  usageBytes: z.number(),
+  ratio: z.number(),
+  nearLimit: z.boolean(),
+  overLimit: z.boolean(),
+  status: z.string(),
+  currentPeriodEnd: z.string().nullable(),
+  cancelAtPeriodEnd: z.boolean(),
+  hasStripeCustomer: z.boolean(),
+  canManage: z.boolean(),
+});
+
+export const CheckoutSessionResponse = z.object({ url: z.string() });
+export const PortalSessionResponse = z.object({ url: z.string() });
+
+// Instance-admin override to set an org's plan directly (Enterprise / manual).
+export const SetOrgPlanBody = z.object({
+  organizationId: z.number().int(),
+  plan: z.enum(["free", "pro", "enterprise"]),
+});

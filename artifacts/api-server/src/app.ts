@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth";
 import router from "./routes";
+import { billingWebhookHandler } from "./lib/billing/webhook";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -59,6 +60,11 @@ app.use(
 // Better Auth must be mounted before express.json(): its handler reads the
 // raw request body, which hangs if the JSON middleware has already consumed it.
 app.all("/api/auth/*splat", toNodeHandler(auth));
+
+// The Stripe webhook (#118) also needs the raw body for signature verification,
+// so it too is mounted before express.json() — with express.raw so req.body is
+// the exact bytes Stripe signed. It authenticates via the signature, not a session.
+app.post("/api/billing/webhook", express.raw({ type: "application/json" }), billingWebhookHandler);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

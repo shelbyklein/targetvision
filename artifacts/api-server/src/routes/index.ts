@@ -14,6 +14,7 @@ import assetsRouter from "./assets";
 import adminRouter from "./admin";
 import bulkUploadBatchesRouter from "./bulkUploadBatches";
 import attributionTagsRouter from "./attributionTags";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
@@ -33,5 +34,6 @@ router.use(projectsRouter);
 router.use(assetsRouter);
 router.use(adminRouter);
 router.use(bulkUploadBatchesRouter);
+router.use(billingRouter);
 
 export default router;

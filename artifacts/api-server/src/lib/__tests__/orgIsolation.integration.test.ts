@@ -22,7 +22,9 @@ vi.mock("../auth", () => ({
 import type { Server } from "node:http";
 import app from "../../app";
 import { mayAccessObjectPath } from "../../routes/storage";
-import { db, pool, assetsTable, attributionTagsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { db, pool, assetsTable, attributionTagsTable, organizationsTable } from "@workspace/db";
+import { assertUploadAllowed } from "../billing/subscriptions";
 import {
   resetDb,
   createUser,
@@ -33,6 +35,12 @@ import {
   createCollection,
   createProject,
 } from "./testDb";
+
+const GB = 1024 * 1024 * 1024;
+async function orgRow(id: number) {
+  const [row] = await db.select().from(organizationsTable).where(eq(organizationsTable.id, id));
+  return row;
+}
 
 let server: Server;
 let baseUrl: string;
@@ -272,6 +280,42 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(after.name).toBe("Org A Renamed");
     const myOrgs = (await (await api("/api/organizations", { user: userA })).json()) as Array<{ name: string }>;
     expect(myOrgs[0].name).toBe("Org A Renamed");
+  });
+
+  it("billing status is per-org; gate enforces the plan cap; enterprise is unlimited (#118)", async () => {
+    const { orgA, userA, a } = await seedTwoOrgs(); // orgA defaults to the free plan (2 GB)
+    const member = await createUser({ name: "Viewer" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    // One 1 GB photo → under the 2 GB free cap.
+    await createPhoto(a.album.id, userA.id, { organizationId: orgA.id, filesize: 1 * GB });
+
+    // Status: owner sees plan/usage/cap and canManage; a plain member cannot manage.
+    const owner = (await (await api("/api/billing/status", { user: userA, orgId: orgA.id })).json()) as {
+      plan: string; usageBytes: number; capBytes: number; overLimit: boolean; canManage: boolean;
+    };
+    expect(owner.plan).toBe("free");
+    expect(owner.usageBytes).toBe(1 * GB);
+    expect(owner.capBytes).toBe(2 * GB);
+    expect(owner.overLimit).toBe(false);
+    expect(owner.canManage).toBe(true);
+    const viewer = (await (await api("/api/billing/status", { user: member, orgId: orgA.id })).json()) as { canManage: boolean };
+    expect(viewer.canManage).toBe(false);
+
+    // Checkout is unavailable until Stripe is configured (no keys in tests).
+    expect((await api("/api/billing/create-checkout-session", { user: userA, orgId: orgA.id, method: "POST", body: {} })).status).toBe(503);
+
+    // Push usage to the 2 GB cap → the upload gate refuses more.
+    await createPhoto(a.album.id, userA.id, { organizationId: orgA.id, filesize: 1 * GB });
+    const atCap = await assertUploadAllowed(await orgRow(orgA.id), 1);
+    expect(atCap.allowed).toBe(false);
+    expect(atCap.capBytes).toBe(2 * GB);
+
+    // Enterprise = unlimited → always allowed, regardless of usage.
+    await db.update(organizationsTable).set({ plan: "enterprise" }).where(eq(organizationsTable.id, orgA.id));
+    const ent = await assertUploadAllowed(await orgRow(orgA.id), 999 * GB);
+    expect(ent.allowed).toBe(true);
+    expect(ent.capBytes).toBeNull();
   });
 
   it("requires authentication and org membership", async () => {

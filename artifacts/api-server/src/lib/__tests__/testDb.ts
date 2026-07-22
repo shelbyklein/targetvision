@@ -97,6 +97,7 @@ export async function createPhoto(
     isHidden?: boolean;
     createdAt?: Date;
     organizationId?: number;
+    filesize?: number;
   } = {},
 ) {
   const [photo] = await db
@@ -108,6 +109,7 @@ export async function createPhoto(
       url: opts.url ?? `/api/storage/objects/uploads/${nextSeq()}`,
       aiDescription: opts.aiDescription ?? null,
       isHidden: opts.isHidden ?? false,
+      filesize: opts.filesize ?? null,
       ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
     })
     .returning();
