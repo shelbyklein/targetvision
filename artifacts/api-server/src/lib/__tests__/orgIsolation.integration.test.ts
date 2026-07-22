@@ -311,6 +311,17 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(atCap.allowed).toBe(false);
     expect(atCap.capBytes).toBe(2 * GB);
 
+    // ...and the presign route refuses to mint an upload URL with a 402 (#118),
+    // so over-cap bytes never reach storage.
+    const preflight = await api("/api/storage/uploads/request-url", {
+      user: userA,
+      orgId: orgA.id,
+      method: "POST",
+      body: { name: "next.jpg", size: 1024, contentType: "image/jpeg" },
+    });
+    expect(preflight.status).toBe(402);
+    expect(((await preflight.json()) as { code: string }).code).toBe("storage_limit_exceeded");
+
     // Enterprise = unlimited → always allowed, regardless of usage.
     await db.update(organizationsTable).set({ plan: "enterprise" }).where(eq(organizationsTable.id, orgA.id));
     const ent = await assertUploadAllowed(await orgRow(orgA.id), 999 * GB);
