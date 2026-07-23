@@ -59,7 +59,6 @@ import {
   EmbeddingStatusResponse,
   UpdateEmbeddingSettingsBody,
   BackfillEmbeddingsBody,
-  BackfillEmbeddingsResponse,
   ImageOptimizationStatusResponse,
   UpdateImageOptimizationSettingsBody,
 } from "@workspace/api-zod";
@@ -107,7 +106,7 @@ import { countPhotosNeedingAiAnalysis, backfillAiAnalysis, listAiBackfillRuns } 
 import { getAiAutoBackfillSettings, updateAiAutoBackfillSettings } from "../lib/aiAutoBackfillScheduler";
 import { getEmbeddingConfigStatus } from "../lib/aiEmbedding";
 import { IMAGE_OPTIMIZATION_SETTINGS } from "../lib/imageOptimization";
-import { countPhotosNeedingEmbedding, backfillEmbeddings } from "../lib/embeddingBackfill";
+import { countPhotosNeedingEmbedding, startEmbeddingBackfill, stopEmbeddingBackfill, getEmbeddingJob } from "../lib/embeddingBackfill";
 import { logger } from "../lib/logger";
 import { sendEmail, isEmailConfigured } from "../lib/email";
 import { testEmail } from "../lib/email/templates";
@@ -591,7 +590,7 @@ async function buildEmbeddingStatus(orgId: number) {
       .from(photoEmbeddingsTable)
       .where(eq(photoEmbeddingsTable.organizationId, orgId))
   ).length;
-  return { ...cfg, embeddedCount, missingCount };
+  return { ...cfg, embeddedCount, missingCount, job: getEmbeddingJob(orgId) };
 }
 
 router.get("/admin/embeddings/status", ...requireOrgAdmin, async (req, res): Promise<void> => {
@@ -612,14 +611,22 @@ router.patch("/admin/embeddings/settings", ...requireOrgAdmin, async (req, res):
   res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus(req.org!.id)));
 });
 
+// Kick off the backfill as a cancellable background job (#31) and return the
+// status immediately (with the live job); the client polls the status endpoint.
 router.post("/admin/embeddings/backfill", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = BackfillEmbeddingsBody.safeParse(req.body ?? {});
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const result = await backfillEmbeddings(body.data.limit, req.org!.id);
-  res.json(BackfillEmbeddingsResponse.parse(result));
+  startEmbeddingBackfill(req.org!.id, body.data.limit);
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus(req.org!.id)));
+});
+
+// Request a clean halt of the running backfill; already-embedded photos are kept.
+router.post("/admin/embeddings/backfill/stop", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  stopEmbeddingBackfill(req.org!.id);
+  res.json(EmbeddingStatusResponse.parse(await buildEmbeddingStatus(req.org!.id)));
 });
 
 async function buildImageOptimizationStatus(orgId: number) {

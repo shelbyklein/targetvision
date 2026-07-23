@@ -3,25 +3,29 @@ import {
   useEmbeddingStatus,
   useUpdateEmbeddingSettings,
   useBackfillEmbeddings,
+  useStopEmbeddingBackfill,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Boxes, CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Boxes, CheckCircle2, XCircle, Loader2, AlertTriangle, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-type BackfillResult = { processed: number; succeeded: number; failed: number };
 
 export function EmbeddingsSection() {
   const { toast } = useToast();
-  const { data: status, isLoading } = useEmbeddingStatus();
+  // pollWhileRunning: the status query auto-refetches every 1.5s while a
+  // backfill job is running, so the progress count updates live (#31).
+  const { data: status, isLoading } = useEmbeddingStatus({ pollWhileRunning: true });
   const { mutate: updateSettings, isPending: updating } = useUpdateEmbeddingSettings();
-  const { mutate: backfill, isPending: backfilling } = useBackfillEmbeddings();
+  const { mutate: backfill, isPending: starting } = useBackfillEmbeddings();
+  const { mutate: stopBackfill, isPending: stopping } = useStopEmbeddingBackfill();
   const [limitInput, setLimitInput] = useState("");
-  const [lastResult, setLastResult] = useState<BackfillResult | null>(null);
 
   const configured = Boolean(status?.projectConfigured && status?.credentialsConfigured);
+  const job = status?.job ?? null;
+  const running = job?.running ?? false;
 
   function handleToggle(enabled: boolean) {
     updateSettings(
@@ -41,23 +45,15 @@ export function EmbeddingsSection() {
       toast({ title: "Batch size must be a positive whole number", variant: "destructive" });
       return;
     }
-    setLastResult(null);
     backfill(limit != null ? { limit } : undefined, {
-      onSuccess: (result) => {
-        setLastResult(result);
-        if (result.processed === 0) {
-          toast({ title: "All photos already have embeddings" });
-        } else if (result.failed === 0) {
-          toast({ title: `Embedded ${result.succeeded} photo${result.succeeded !== 1 ? "s" : ""}` });
-        } else {
-          toast({
-            title: "Embedding backfill completed with some errors",
-            description: `${result.succeeded} succeeded, ${result.failed} failed`,
-            variant: "destructive",
-          });
-        }
-      },
-      onError: () => toast({ title: "Embedding backfill failed", variant: "destructive" }),
+      onError: () => toast({ title: "Couldn't start embedding backfill", variant: "destructive" }),
+    });
+  }
+
+  function handleStop() {
+    stopBackfill(undefined, {
+      onSuccess: () => toast({ title: "Stopping — finishing the current photo" }),
+      onError: () => toast({ title: "Couldn't stop the backfill", variant: "destructive" }),
     });
   }
 
@@ -133,27 +129,58 @@ export function EmbeddingsSection() {
           ) : null}
         </div>
 
-        {lastResult && (
+        {/* Live job progress (#31) — shown while running, and as a summary once
+            a batch finishes (or is stopped) until the next one starts. */}
+        {job && (
           <div
-            className="rounded-lg border border-border bg-background/50 px-4 py-3 text-sm space-y-1"
-            data-testid="embeddings-backfill-result"
+            className="rounded-lg border border-border bg-background/50 px-4 py-3 text-sm space-y-2"
+            data-testid="embeddings-job"
           >
-            <div className="flex items-center gap-2 font-medium text-foreground">
-              {lastResult.failed === 0 ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              ) : (
-                <XCircle className="h-4 w-4 text-destructive shrink-0" />
-              )}
-              {lastResult.processed === 0
-                ? "No photos needed embedding"
-                : `Processed ${lastResult.processed} photo${lastResult.processed !== 1 ? "s" : ""}`}
-            </div>
-            {lastResult.processed > 0 && (
-              <div className="flex gap-4 text-xs text-muted-foreground pl-6">
-                <span className="text-emerald-700 dark:text-emerald-400">{lastResult.succeeded} succeeded</span>
-                {lastResult.failed > 0 && (
-                  <span className="text-destructive">{lastResult.failed} failed</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 font-medium text-foreground">
+                {running ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                    Embedding photos… {job.processed} / {job.total || "…"}
+                  </>
+                ) : job.stopped ? (
+                  <>
+                    <XCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    Stopped — {job.processed} of {job.total} processed
+                  </>
+                ) : job.total === 0 ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    No photos needed embedding
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    Done — {job.processed} of {job.total} processed
+                  </>
                 )}
+              </div>
+              {running && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleStop}
+                  disabled={stopping}
+                  data-testid="stop-embeddings-btn"
+                >
+                  <Square className="h-3.5 w-3.5 mr-1.5 fill-current" />
+                  {stopping ? "Stopping…" : "Stop"}
+                </Button>
+              )}
+            </div>
+            {job.total > 0 && (
+              <Progress value={(job.processed / job.total) * 100} className="h-1.5" />
+            )}
+            {job.processed > 0 && (
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                <span className="text-emerald-700 dark:text-emerald-400">{job.succeeded} succeeded</span>
+                {job.failed > 0 && <span className="text-destructive">{job.failed} failed</span>}
               </div>
             )}
           </div>
@@ -172,6 +199,7 @@ export function EmbeddingsSection() {
               className="w-28 h-9"
               value={limitInput}
               onChange={(e) => setLimitInput(e.target.value)}
+              disabled={running}
               data-testid="embeddings-batch-size-input"
             />
           </div>
@@ -180,12 +208,12 @@ export function EmbeddingsSection() {
             size="sm"
             variant="outline"
             onClick={handleBackfill}
-            disabled={backfilling || !status?.enabled}
+            disabled={starting || running || !status?.enabled}
             data-testid="backfill-embeddings-btn"
             title={!status?.enabled ? "Enable embeddings first" : undefined}
           >
             <Boxes className="h-4 w-4 mr-2" />
-            {backfilling ? "Embedding photos…" : "Embed photos missing vectors"}
+            {running ? "Embedding photos…" : starting ? "Starting…" : "Embed photos missing vectors"}
           </Button>
         </div>
       </div>
