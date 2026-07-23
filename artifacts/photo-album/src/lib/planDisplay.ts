@@ -13,4 +13,4 @@ export const PLAN_CARDS: Record<PlanCardId, { label: string; priceDisplay: strin
 
 export const PLAN_ORDER: PlanCardId[] = ["free", "pro", "enterprise"];
 
-export const ENTERPRISE_CONTACT = "mailto:hello@vispix.dev?subject=Vispix%20Enterprise";
+export const ENTERPRISE_CONTACT = "/contact";

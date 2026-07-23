@@ -24,6 +24,9 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireOrgAuth, requireOrgRole } from "../middlewares/requireOrg";
+import { sendEmail, appUrl, adminAlertEmail } from "../lib/email";
+import { orgInviteEmail, adminNewOrgEmail } from "../lib/email/templates";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -122,6 +125,15 @@ router.post("/organizations", requireAuth, async (req, res): Promise<void> => {
     await tx.update(usersTable).set({ lastActiveOrgId: org.id }).where(eq(usersTable.id, req.dbUser!.id));
     return org;
   });
+
+  // Best-effort operator alert; never blocks org creation.
+  const alertTo = adminAlertEmail();
+  if (alertTo) {
+    const { subject, html, text } = adminNewOrgEmail(created.name, req.dbUser!.email);
+    sendEmail({ to: alertTo, subject, html, text }).catch((err) =>
+      logger.error({ err }, "Failed to send new-org admin alert"),
+    );
+  }
 
   res.status(201).json(
     CreateOrganizationResponse.parse({ id: created.id, name: created.name, slug: created.slug, role: "owner", logoUrl: null }),
@@ -348,6 +360,14 @@ router.post("/organizations/invites", ...requireOrgAdmin, async (req, res): Prom
       set: { role },
     })
     .returning();
+
+  // Email the invitee a join link. Signing up with this exact address
+  // auto-consumes the invite (see requireAuth provisioning). Best-effort.
+  const signUpUrl = appUrl(`/sign-up?email=${encodeURIComponent(email)}`);
+  const inviteMail = orgInviteEmail(req.org!.name, signUpUrl);
+  sendEmail({ to: email, subject: inviteMail.subject, html: inviteMail.html, text: inviteMail.text }).catch((err) =>
+    logger.error({ err }, "Failed to send org invite email"),
+  );
 
   res.status(201).json(
     CreateOrgInviteResponse.parse({

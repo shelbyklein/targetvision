@@ -197,7 +197,7 @@ export default function Home() {
       <footer className="border-t border-border py-8 text-sm text-muted-foreground">
         <div className="max-w-5xl mx-auto px-6 flex items-center justify-between">
           <span>© {new Date().getFullYear()} Vispix</span>
-          <a href={ENTERPRISE_CONTACT} className="hover:text-foreground">hello@vispix.dev</a>
+          <a href={ENTERPRISE_CONTACT} className="hover:text-foreground">Contact us</a>
         </div>
       </footer>
     </div>
