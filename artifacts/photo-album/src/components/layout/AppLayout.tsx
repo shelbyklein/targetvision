@@ -591,18 +591,14 @@ function AppSidebar({
   const [localNavOrder, setLocalNavOrder] = useState<string[] | null>(null);
 
   const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
-  // Admin (org-scoped) and Superadmin (platform, amber shield) are pinned last
-  // and not reorderable. For platform admins, the Admin link carries ?org=1 so
-  // it opens the org panel instead of bouncing off the /admin → /superadmin
-  // default redirect; `to` is the link target, `href` stays the match path.
+  // Superadmin (platform, amber shield) is pinned FIRST for platform admins
+  // (#135); the org Admin entry lives in the sidebar FOOTER (rendered below).
+  // Neither is reorderable.
   const items: { href: string; to?: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
-    ...orderedNav,
-    ...(isAdmin
-      ? [{ href: "/admin", to: isPlatformAdmin ? "/admin?org=1" : "/admin", label: "Admin", icon: Shield }]
-      : []),
     ...(isPlatformAdmin
       ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
       : []),
+    ...orderedNav,
   ];
 
   function navDragProps(href: string): React.LiHTMLAttributes<HTMLLIElement> {
@@ -652,7 +648,7 @@ function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip="Vispix">
-              <Link href="/dashboard" data-testid="sidebar-brand">
+              <Link href={isPlatformAdmin ? "/superadmin" : "/dashboard"} data-testid="sidebar-brand">
                 <img src="/vispix.png" alt="Vispix" className="size-6 shrink-0 rounded" />
                 <span className="font-semibold tracking-tight">Vispix</span>
               </Link>
@@ -694,6 +690,23 @@ function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
+          {/* Org Admin lives at the very bottom of the sidebar, above the
+              theme/user controls. ?org=1 (platform admins) suppresses the
+              /admin → /superadmin default redirect. */}
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={location === "/admin" || location.startsWith("/admin/")}
+                tooltip="Admin"
+              >
+                <Link href={isPlatformAdmin ? "/admin?org=1" : "/admin"} data-testid="nav-admin">
+                  <Shield />
+                  <span>Admin</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <ThemeMenuButton />
           </SidebarMenuItem>
@@ -778,7 +791,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset className="min-h-svh">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 sm:gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1" data-testid="sidebar-toggle" />
-          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Vispix">
+          <Link href={isPlatformAdmin ? "/superadmin" : "/dashboard"} className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Vispix">
             <img src="/vispix.png" alt="Vispix" className="h-7 w-7 rounded" />
           </Link>
           <GlobalSearchBar />

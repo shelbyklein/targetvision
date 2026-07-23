@@ -12,7 +12,7 @@ import { useSession } from "@/lib/auth-client";
 import { AuthGate } from "@/components/auth/AuthGate";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
-import { useGetRegistrationSettings } from "@workspace/api-client-react";
+import { useGetRegistrationSettings, useGetMe } from "@workspace/api-client-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -59,6 +59,21 @@ function LazyPage({ load }: { load: () => Promise<{ default: React.ComponentType
   return <Component />;
 }
 
+// Signed-in landing surface (#135): platform admins land on the superadmin
+// panel, everyone else on the dashboard. Sign-in/sign-up redirect to "/" so
+// this one component owns the decision.
+function LandingRedirect() {
+  const { data: me, isLoading } = useGetMe();
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+  return <Redirect to={me?.role === "admin" ? "/superadmin" : "/dashboard"} />;
+}
+
 function AppRoutes() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -71,7 +86,7 @@ function AppRoutes() {
           {() => (
             <>
               <AuthGate when="signed-in">
-                <Redirect to="/dashboard" />
+                <LandingRedirect />
               </AuthGate>
               <AuthGate when="signed-out">
                 <LazyPage load={() => import("@/pages/home")} />

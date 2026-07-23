@@ -9,6 +9,7 @@ import { AdminSectionShell } from "@/components/admin/AdminSectionShell";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Loader2, Sparkles, Mail, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PLAN_CARDS, ENTERPRISE_CONTACT } from "@/lib/planDisplay";
 
 // Bytes → a compact human size for the usage readout (GB with one decimal once
 // we're past 1 GB, MB below that).
@@ -18,18 +19,6 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${bytes} B`;
 }
-
-// Contact address for Enterprise enquiries.
-const ENTERPRISE_CONTACT = "mailto:hello@vispix.dev?subject=Vispix%20Enterprise";
-
-// Display copy for the plan-comparison cards. This is marketing text only —
-// the enforced caps are the backend's source of truth (PLAN_LIMITS in
-// @workspace/api-zod), surfaced per-org via capBytes in the billing status.
-const PLAN_CARDS: Record<"free" | "pro" | "enterprise", { label: string; priceDisplay: string; blurb: string }> = {
-  free: { label: "Free", priceDisplay: "Free", blurb: "Get started — up to 2 GB of photos." },
-  pro: { label: "Pro", priceDisplay: "$19.99/mo", blurb: "For active teams — 50 GB of photos." },
-  enterprise: { label: "Enterprise", priceDisplay: "Contact us", blurb: "Unlimited storage and priority support." },
-};
 
 export default function AdminBillingPage() {
   const { toast } = useToast();

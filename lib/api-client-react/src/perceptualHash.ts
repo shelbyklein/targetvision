@@ -102,7 +102,7 @@ export function useNearDuplicatePhotoGroups(params: NearDuplicatePhotoGroupsPara
 
 // The cleanup modal (issues #123/#125) needs full-res image URLs on top of the
 // DuplicatePhoto card shape; the near-duplicates route provides imageUrl.
-export type NearDuplicateModalPhoto = DuplicatePhoto & { imageUrl: string };
+export type NearDuplicateModalPhoto = DuplicatePhoto & { imageUrl: string; perceptualHash: string | null };
 
 // Dismiss a comparison as not-duplicates (issue #124): every pair among the
 // given photos is persisted as ignored and the group stops resurfacing.

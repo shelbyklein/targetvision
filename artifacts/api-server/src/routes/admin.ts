@@ -744,6 +744,7 @@ router.get("/admin/photos/near-duplicates", ...requireOrgAdmin, async (req, res)
           filename: p.filename,
           thumbnailUrl: resolvePhotoThumbnailUrl({ url: p.url, thumbnailKey: p.thumbnailKey }),
           imageUrl: p.url,
+          perceptualHash: p.perceptualHash,
           createdAt: p.createdAt.toISOString(),
           isAlbumCover: p.isAlbumCover,
           collectionCount: p.collectionCount,
