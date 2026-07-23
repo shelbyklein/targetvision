@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Images, CalendarDays, Camera, EyeOff, FolderInput, Star } from "lucide-react";
+import { Plus, Images, CalendarDays, Camera, EyeOff, Upload, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe } from "@workspace/api-client-react";
 import { formatDate } from "@/lib/format-date";
@@ -158,8 +158,8 @@ export default function Albums() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" className="gap-2" onClick={() => navigate("/bulk-upload")} data-testid="bulk-upload-btn">
-              <FolderInput className="h-4 w-4" />
-              Bulk Upload
+              <Upload className="h-4 w-4" />
+              Upload
             </Button>
             <CreateAlbumDialog onCreated={refetch} />
           </div>

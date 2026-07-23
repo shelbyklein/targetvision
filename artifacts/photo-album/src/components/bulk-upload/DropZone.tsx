@@ -1,28 +1,27 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, FolderInput, FileArchive, Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DropZoneProps {
   isDragOver: boolean;
   setIsDragOver: Dispatch<SetStateAction<boolean>>;
   isProcessingDrop: boolean;
-  folderInputRef: RefObject<HTMLInputElement | null>;
-  zipInputRef: RefObject<HTMLInputElement | null>;
+  photoInputRef: RefObject<HTMLInputElement | null>;
   onDrop: (e: React.DragEvent) => void;
-  onFolderInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onZipInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onPhotoInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
+// Photo-first drop zone: pick or drop image files. Dropping a folder of photos
+// also works (the page harvests its images); zip support was removed — photos
+// only, to keep the upload UX simple.
 export function DropZone({
   isDragOver,
   setIsDragOver,
   isProcessingDrop,
-  folderInputRef,
-  zipInputRef,
+  photoInputRef,
   onDrop,
-  onFolderInput,
-  onZipInput,
+  onPhotoInput,
 }: DropZoneProps) {
   return (
     <div
@@ -41,37 +40,23 @@ export function DropZone({
         </>
       ) : (
         <>
-          <FolderInput className="h-9 w-9 text-muted-foreground" />
+          <Upload className="h-9 w-9 text-muted-foreground" />
           <div className="text-center">
-            <p className="text-sm font-medium text-foreground">Drop folders or a .zip here</p>
-            <p className="text-xs text-muted-foreground mt-1">Drag and drop one or more folders, or a .zip of folders</p>
+            <p className="text-sm font-medium text-foreground">Drop photos here</p>
+            <p className="text-xs text-muted-foreground mt-1">Drag and drop photos (or a folder of photos)</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => folderInputRef.current?.click()}>
-              <FolderOpen className="h-4 w-4" />
-              Pick Folder
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => zipInputRef.current?.click()} data-testid="pick-zip-btn">
-              <FileArchive className="h-4 w-4" />
-              Upload .zip
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => photoInputRef.current?.click()} data-testid="pick-photos-btn">
+            <ImagePlus className="h-4 w-4" />
+            Pick Photos
+          </Button>
           <input
-            ref={folderInputRef}
+            ref={photoInputRef}
             type="file"
-            // @ts-ignore
-            webkitdirectory=""
+            accept="image/*"
             multiple
             className="hidden"
-            onChange={onFolderInput}
-          />
-          <input
-            ref={zipInputRef}
-            type="file"
-            accept=".zip,application/zip,application/x-zip-compressed"
-            className="hidden"
-            onChange={onZipInput}
-            data-testid="zip-input"
+            onChange={onPhotoInput}
+            data-testid="photo-input"
           />
         </>
       )}

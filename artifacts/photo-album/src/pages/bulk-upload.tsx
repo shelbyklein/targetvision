@@ -28,16 +28,20 @@ import { DuplicateCheckPhase } from "@/components/bulk-upload/DuplicateCheckPhas
 import { DropZone } from "@/components/bulk-upload/DropZone";
 import { FolderList } from "@/components/bulk-upload/FolderList";
 import { DestinationPanel } from "@/components/bulk-upload/DestinationPanel";
-import { extractImagesFromZip } from "@/lib/extractImagesFromZip";
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 type LocalPhase = "staging" | "duplicate-check";
 
+// Loose photos (picked or dropped as files, not folders) are grouped under
+// this pseudo-folder name; it's excluded from album-name auto-suggestion.
+const LOOSE_PHOTOS_GROUP = "Photos";
+
 function deriveName(folders: FolderEntry[]): string {
-  if (folders.length === 0) return "";
-  if (folders.length === 1) return folders[0].name;
-  const names = folders.map((f) => f.name);
+  const named = folders.filter((f) => f.name !== LOOSE_PHOTOS_GROUP);
+  if (named.length === 0) return "";
+  if (named.length === 1) return named[0].name;
+  const names = named.map((f) => f.name);
   const prefix = names.reduce((acc, name) => {
     let i = 0;
     while (i < acc.length && i < name.length && acc[i] === name[i]) i++;
@@ -106,8 +110,7 @@ export default function BulkUpload() {
 
   const { data: batchHistory, isLoading: batchHistoryLoading } = useListBulkUploadBatches();
 
-  const folderInputRef = useRef<HTMLInputElement>(null);
-  const zipInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-suggest album name from folder names (only if name is empty)
   useEffect(() => {
@@ -135,31 +138,21 @@ export default function BulkUpload() {
     setIsProcessingDrop(false);
   }
 
-  async function addFoldersFromZip(zip: File) {
-    setIsProcessingDrop(true);
-    try {
-      const newFolders = await extractImagesFromZip(zip);
-      if (newFolders.length === 0) {
-        toast({ title: "No images found in that .zip", variant: "destructive" });
-        return;
+  // Merge loose image files into the single "Photos" pseudo-group (so picking
+  // photos twice doesn't create two groups).
+  function addLoosePhotos(files: File[]) {
+    const images = files.filter((f) => f.type.startsWith("image/") && f.size <= MAX_FILE_SIZE);
+    if (images.length === 0) return false;
+    setFolders((prev) => {
+      const existing = prev.find((f) => f.name === LOOSE_PHOTOS_GROUP);
+      if (existing) {
+        return prev.map((f) =>
+          f.id === existing.id ? { ...f, files: [...f.files, ...images] } : f,
+        );
       }
-      await addFolders(newFolders);
-    } catch (err) {
-      console.error("ZIP extraction failed", err);
-      toast({
-        title: "Couldn't read that .zip file",
-        description: err instanceof Error ? err.message : undefined,
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessingDrop(false);
-    }
-  }
-
-  async function handleZipInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) await addFoldersFromZip(file);
-    if (zipInputRef.current) zipInputRef.current.value = "";
+      return [...prev, { id: genId(), name: LOOSE_PHOTOS_GROUP, files: images }];
+    });
+    return true;
   }
 
   async function handleDrop(e: React.DragEvent) {
@@ -167,49 +160,24 @@ export default function BulkUpload() {
     setIsDragOver(false);
     const items = Array.from(e.dataTransfer.items);
     const dtFiles = Array.from(e.dataTransfer.files); // capture before any await
+    // Dropped folders still work — their images are harvested — but the
+    // primary path is plain photo files. Zip support was removed (too fiddly).
     const dirEntries: FileSystemDirectoryEntry[] = [];
-    const zipEntries: FileSystemFileEntry[] = [];
     for (const item of items) {
       const entry = item.webkitGetAsEntry?.();
       if (entry?.isDirectory) dirEntries.push(entry as FileSystemDirectoryEntry);
-      else if (entry?.isFile && /\.zip$/i.test(entry.name)) zipEntries.push(entry as FileSystemFileEntry);
     }
 
-    const zipFiles: File[] = [];
-    for (const ze of zipEntries) {
-      zipFiles.push(await new Promise<File>((resolve, reject) => ze.file(resolve, reject)));
-    }
-    if (dirEntries.length === 0 && zipFiles.length === 0) {
-      for (const f of dtFiles) if (/\.zip$/i.test(f.name)) zipFiles.push(f);
-    }
-
-    if (dirEntries.length === 0 && zipFiles.length === 0) {
-      toast({ title: "Drop folders or a .zip file", variant: "destructive" });
-      return;
-    }
+    const addedPhotos = addLoosePhotos(dtFiles);
     if (dirEntries.length > 0) await addFoldersFromEntries(dirEntries);
-    for (const zip of zipFiles) await addFoldersFromZip(zip);
+    if (!addedPhotos && dirEntries.length === 0) {
+      toast({ title: "Drop photos here", description: "Image files (or a folder of them).", variant: "destructive" });
+    }
   }
 
-  async function handleFolderInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-
-    const byFolder = new Map<string, File[]>();
-    for (const file of files) {
-      if (!file.type.startsWith("image/") || file.size > MAX_FILE_SIZE) continue;
-      const parts = (file.webkitRelativePath || file.name).split("/");
-      const folderName = parts.length > 1 ? parts[0] : "(root)";
-      if (!byFolder.has(folderName)) byFolder.set(folderName, []);
-      byFolder.get(folderName)!.push(file);
-    }
-
-    const newFolders: FolderEntry[] = [];
-    for (const [name, fls] of byFolder.entries()) {
-      newFolders.push({ id: genId(), name, files: fls });
-    }
-    if (newFolders.length > 0) await addFolders(newFolders);
-    if (folderInputRef.current) folderInputRef.current.value = "";
+  function handlePhotoInput(e: React.ChangeEvent<HTMLInputElement>) {
+    addLoosePhotos(Array.from(e.target.files ?? []));
+    if (photoInputRef.current) photoInputRef.current.value = "";
   }
 
   function removeFolder(folderId: string) {
@@ -395,9 +363,9 @@ export default function BulkUpload() {
             Albums
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Bulk Upload</h1>
+            <h1 className="text-xl font-bold text-foreground">Upload</h1>
             <p className="text-sm text-muted-foreground">
-              Drop folders and choose where to upload them.
+              Drop photos and choose where to upload them.
             </p>
           </div>
         </div>
@@ -441,11 +409,9 @@ export default function BulkUpload() {
               isDragOver={isDragOver}
               setIsDragOver={setIsDragOver}
               isProcessingDrop={isProcessingDrop}
-              folderInputRef={folderInputRef}
-              zipInputRef={zipInputRef}
+              photoInputRef={photoInputRef}
               onDrop={handleDrop}
-              onFolderInput={handleFolderInput}
-              onZipInput={handleZipInput}
+              onPhotoInput={handlePhotoInput}
             />
 
             {/* Folder list */}
