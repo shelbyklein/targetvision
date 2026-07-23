@@ -5,7 +5,7 @@ import { asc } from "drizzle-orm";
 import { db, organizationsTable } from "@workspace/db";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "./server.js";
-import { getOriginalFile } from "./photoLibrary.js";
+import { getOriginalFile, getThumbnailFile } from "./photoLibrary.js";
 import { getAssetFile } from "./assetLibrary.js";
 import { verifyMcpToken } from "@workspace/api-server/src/lib/mcpTokens";
 
@@ -145,6 +145,26 @@ export async function startHttpServer(): Promise<void> {
     const file = await getOriginalFile(id, req.mcpOrgId);
     if (!file) {
       res.status(404).json({ error: "Photo not found" });
+      return;
+    }
+    res.setHeader("Content-Type", file.contentType);
+    res.setHeader("Content-Disposition", `inline; filename="${file.filename.replace(/[^\w .-]+/g, "")}"`);
+    res.send(file.buffer);
+  });
+
+  // Authenticated thumbnail — the lightweight preview linked from
+  // search_photos / get_photo results, so clients can embed or display a
+  // small image without downloading the full-resolution original.
+  app.get("/photo/:id/thumbnail", async (req: Request & { mcpOrgId?: number }, res: Response) => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: "Invalid photo id" });
+      return;
+    }
+    const file = await getThumbnailFile(id, req.mcpOrgId);
+    if (!file) {
+      res.status(404).json({ error: "Thumbnail not found" });
       return;
     }
     res.setHeader("Content-Type", file.contentType);

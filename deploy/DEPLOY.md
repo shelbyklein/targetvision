@@ -55,6 +55,14 @@ gsutil iam ch \
   serviceAccount:vispix-storage@targetvision-502503.iam.gserviceaccount.com:roles/storage.objectAdmin \
   gs://vispix-prod
 
+# Vertex AI access — the same key is the app's ADC for embeddings
+# (semantic search + photo-upload embedding generation). Without this the
+# Vertex :predict call 403s and MCP search_photos reports
+# "embedding service not configured or unreachable".
+gcloud projects add-iam-policy-binding targetvision-502503 \
+  --member serviceAccount:vispix-storage@targetvision-502503.iam.gserviceaccount.com \
+  --role roles/aiplatform.user
+
 # Key file — this is what the container mounts. Keep it secret.
 gcloud iam service-accounts keys create ./gcp-sa.json \
   --iam-account vispix-storage@targetvision-502503.iam.gserviceaccount.com

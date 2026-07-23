@@ -366,6 +366,40 @@ export async function getOriginalFile(
   }
 }
 
+/**
+ * Load a photo's stored thumbnail bytes for the HTTP gateway's thumbnail
+ * route — lets remote clients embed a preview without pulling the original.
+ */
+export async function getThumbnailFile(
+  id: number,
+  organizationId?: number,
+): Promise<{ buffer: Buffer; contentType: string; filename: string } | null> {
+  const [row] = await db
+    .select({ thumbnailKey: photosTable.thumbnailKey, filename: photosTable.filename })
+    .from(photosTable)
+    .where(
+      and(
+        eq(photosTable.id, id),
+        organizationId != null ? eq(photosTable.organizationId, organizationId) : undefined,
+      ),
+    );
+  if (!row?.thumbnailKey?.startsWith("/objects/")) return null;
+  try {
+    const { file } = resolveObjectFile(row.thumbnailKey);
+    const [exists] = await file.exists();
+    if (!exists) return null;
+    const [buffer] = await file.download();
+    const [metadata] = await file.getMetadata().catch(() => [{ contentType: undefined }]);
+    return {
+      buffer: buffer as Buffer,
+      contentType: (metadata?.contentType as string) || "image/jpeg",
+      filename: row.filename ? `thumb-${row.filename}` : `photo-${id}-thumb`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function loadThumbnailImage(
   thumbnailKey: string | null,
 ): Promise<{ base64: string; mimeType: string } | null> {

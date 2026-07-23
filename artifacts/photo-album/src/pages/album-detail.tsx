@@ -29,7 +29,6 @@ import type { Photo } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
-import { AddPhotoDialog } from "@/components/AddPhotoDialog";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { GridZoomControl } from "@/components/GridZoomControl";
 import { useGridZoom } from "@/hooks/useGridZoom";
@@ -591,16 +590,15 @@ export default function AlbumDetail() {
             )}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button asChild variant="outline" size="sm" className="gap-1.5" data-testid="album-bulk-upload-btn">
-                  <Link href={`/bulk-upload?albumId=${albumId}`} aria-label="Bulk upload to this album">
+                <Button asChild size="sm" className="gap-1.5" data-testid="album-bulk-upload-btn">
+                  <Link href={`/bulk-upload?albumId=${albumId}`} aria-label="Upload to this album">
                     <Upload className="h-4 w-4" />
-                    <span className="hidden sm:inline">Bulk Upload</span>
+                    <span className="hidden sm:inline">Upload</span>
                   </Link>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Bulk upload to this album</TooltipContent>
+              <TooltipContent>Upload to this album</TooltipContent>
             </Tooltip>
-            <AddPhotoDialog albumId={albumId} albumTitle={album?.title} onAdded={invalidate} />
 
             {me?.role === "admin" && (
               <AlertDialog>
@@ -1000,7 +998,12 @@ export default function AlbumDetail() {
             <p className="text-xs text-muted-foreground mb-4">
               Upload the first photos to this album.
             </p>
-            <AddPhotoDialog albumId={albumId} albumTitle={album?.title} onAdded={invalidate} />
+            <Button asChild size="sm" className="gap-1.5" data-testid="empty-upload-btn">
+              <Link href={`/bulk-upload?albumId=${albumId}`}>
+                <Upload className="h-4 w-4" />
+                Upload Photos
+              </Link>
+            </Button>
           </div>
         )}
       </div>

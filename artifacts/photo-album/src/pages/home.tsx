@@ -11,7 +11,7 @@ import { PLAN_CARDS, PLAN_ORDER, ENTERPRISE_CONTACT } from "@/lib/planDisplay";
 // billing). Copy stays honest to the current feature set.
 
 const STEPS = [
-  { icon: Upload, title: "Upload", text: "Drag in photos or whole ZIPs — thousands at a time." },
+  { icon: Upload, title: "Upload", text: "Drag in photos — thousands at a time." },
   { icon: Sparkles, title: "AI does the triage", text: "Every photo gets a description; duplicates and near-duplicates get flagged." },
   { icon: Star, title: "Rate together", text: "Your whole team scores candidates, so the best shots rise." },
   { icon: FolderOpen, title: "Ship collections", text: "Shortlist into collections and hand off to design." },

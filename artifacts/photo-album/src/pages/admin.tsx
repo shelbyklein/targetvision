@@ -1,4 +1,4 @@
-import { useGetMe, useAdminHubStatus, useOrgServiceStatus, type AdminHubStatus } from "@workspace/api-client-react";
+import { useGetMe, useAdminHubStatus, useOrgServiceStatus, useBillingStatus, type AdminHubStatus } from "@workspace/api-client-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ServiceReadinessCard, type ActionItem } from "@/components/admin/ServiceReadinessCard";
@@ -119,9 +119,19 @@ function CardStatus({
   );
 }
 
+// Bytes → compact human size for the org card's storage readout (mirrors the
+// billing page): GB with one decimal past 1 GB, MB/KB below that.
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
 export default function Admin() {
   const { data: me, isLoading: meLoading } = useGetMe();
   const { activeOrg, isLoading: orgLoading } = useOrg();
+  const { data: billing } = useBillingStatus();
   const search = useSearch();
 
   // Org owners/admins manage their organization; platform admins see everything
@@ -246,6 +256,30 @@ export default function Admin() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{section.description}</p>
+                        {billing && (
+                          <div className="space-y-1" data-testid="admin-org-card-storage">
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                                {billing.planLabel}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {formatBytes(billing.usageBytes)}
+                                {billing.capBytes == null ? " · Unlimited" : ` of ${formatBytes(billing.capBytes)}`}
+                              </span>
+                            </div>
+                            {billing.capBytes != null && (
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all",
+                                    billing.overLimit ? "bg-red-500" : billing.nearLimit ? "bg-amber-500" : "bg-primary",
+                                  )}
+                                  style={{ width: `${Math.min(100, Math.round(billing.ratio * 100))}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <span className="text-xs font-medium text-primary">Open organization settings →</span>
                     </div>
