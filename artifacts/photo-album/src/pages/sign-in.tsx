@@ -70,6 +70,11 @@ export default function SignInPage() {
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="text-right">
+              <Link href="/forgot-password" className="text-sm font-medium text-primary hover:text-primary/80">
+                Forgot password?
+              </Link>
+            </div>
             <Button type="submit" disabled={submitting}>
               {submitting ? "Signing in…" : "Sign in"}
             </Button>

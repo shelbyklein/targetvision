@@ -4,6 +4,9 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { eq } from "drizzle-orm";
 import { db, user, session, account, verification, organizationInvitesTable } from "@workspace/db";
 import { loadAppSettings } from "./aiProviders";
+import { sendEmail, appUrl, adminAlertEmail } from "./email";
+import { passwordResetEmail, adminNewSignupEmail } from "./email/templates";
+import { logger } from "./logger";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -15,6 +18,14 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   emailAndPassword: {
     enabled: true,
+    // Send the reset link to our own frontend page (which calls the Better Auth
+    // client's resetPassword with the token), not Better Auth's default handler
+    // URL. Best-effort: if SMTP is unconfigured, sendEmail logs and no-ops.
+    sendResetPassword: async ({ user, token }) => {
+      const url = appUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+      const { subject, html, text } = passwordResetEmail(url);
+      await sendEmail({ to: user.email, subject, html, text });
+    },
   },
   trustedOrigins: [
     "http://localhost:8081",
@@ -43,6 +54,18 @@ export const auth = betterAuth({
             }
           }
           return { data: user };
+        },
+        // Notify the operator when someone new signs up. Best-effort and never
+        // blocks or fails the signup — a bad/missing SMTP config just logs.
+        after: async (user) => {
+          const to = adminAlertEmail();
+          if (!to) return;
+          try {
+            const { subject, html, text } = adminNewSignupEmail(user.email, user.name ?? null);
+            await sendEmail({ to, subject, html, text });
+          } catch (err) {
+            logger.error({ err }, "Failed to send new-signup admin alert");
+          }
         },
       },
     },

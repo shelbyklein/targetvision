@@ -12,6 +12,8 @@ import { useSession } from "@/lib/auth-client";
 import { AuthGate } from "@/components/auth/AuthGate";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 import { useGetRegistrationSettings, useGetMe } from "@workspace/api-client-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -344,6 +346,8 @@ function AppRoutes() {
         </Route>
         <Route path="/sign-in" component={SignInPage} />
         <Route path="/sign-up" component={SignUpGuard} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <Route>
           <LazyPage load={() => import("@/pages/not-found")} />
         </Route>

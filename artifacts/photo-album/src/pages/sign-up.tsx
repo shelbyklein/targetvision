@@ -10,8 +10,11 @@ import { AuthCardLogo } from "@/pages/sign-in";
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function SignUpPage() {
+  // Invite links carry the invited address as ?email= so the invitee signs up
+  // with the exact address that auto-consumes their org invite.
+  const invitedEmail = new URLSearchParams(window.location.search).get("email") ?? "";
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invitedEmail);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
