@@ -51,10 +51,16 @@ export async function sendEmail(input: SendEmailInput): Promise<boolean> {
   if (!transport) {
     // Dev fallback: with no SMTP configured, log the full text body (including
     // any reset/verify links) so local flows are testable without a provider.
-    // In production SMTP is always configured, so this branch never runs.
+    // NEVER log the body in production — gate on NODE_ENV as well as config, so
+    // a prod deploy that's somehow missing SMTP can't spill tokens into logs.
+    const isProd = process.env.NODE_ENV === "production";
     logger.warn(
-      { to: input.to, subject: input.subject, body: input.text },
-      "Email not sent: SMTP not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS) — logging body for local dev",
+      isProd
+        ? { to: input.to, subject: input.subject }
+        : { to: input.to, subject: input.subject, body: input.text },
+      isProd
+        ? "Email not sent: SMTP not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS)"
+        : "Email not sent: SMTP not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS) — logging body for local dev",
     );
     return false;
   }

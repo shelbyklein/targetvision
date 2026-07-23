@@ -25,6 +25,14 @@ const hits = new Map<string, number[]>();
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
+  // Opportunistic sweep so the Map can't grow unbounded once req.ip is a real
+  // per-client value (trust proxy is set in app.ts): drop buckets whose every
+  // hit has aged out of the window.
+  if (hits.size > 5000) {
+    for (const [key, times] of hits) {
+      if (times.every((t) => now - t >= WINDOW_MS)) hits.delete(key);
+    }
+  }
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   recent.push(now);
   hits.set(ip, recent);

@@ -9,6 +9,11 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Behind the Cloudflare tunnel / nginx, the socket peer is a fixed proxy hop —
+// trust one proxy hop so req.ip reflects the real client (X-Forwarded-For).
+// Without this the per-IP contact rate limiter collapses to one global bucket.
+app.set("trust proxy", 1);
+
 class CorsOriginError extends Error {
   constructor() {
     super("Not allowed by CORS");
