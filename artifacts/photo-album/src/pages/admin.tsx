@@ -210,16 +210,17 @@ export default function Admin() {
                 href={section.href}
                 className={cn(
                   "group rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/50",
-                  featured ? "sm:col-span-2 sm:row-span-2 flex gap-4" : "flex items-start gap-3",
+                  featured ? "sm:col-span-2 sm:row-span-2 flex flex-col sm:flex-row gap-4" : "flex items-start gap-3",
                 )}
                 data-testid={`admin-card-${section.href.split("/").pop()}`}
               >
                 {featured ? (
                   <>
-                    {/* Logo square matches the card height (2 grid rows) — the
-                        image is absolutely positioned so its intrinsic size
+                    {/* Logo: a fixed square on mobile (the card stacks), and a
+                        full-height side column on sm+ (the 2x2 featured card).
+                        The image is absolutely positioned so its intrinsic size
                         can't inflate the card or the grid's row tracks. */}
-                    <div className="relative self-stretch aspect-square shrink-0 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-primary/10 flex items-center justify-center sm:h-auto sm:w-auto sm:self-stretch sm:aspect-square">
                       {activeOrg?.logoUrl ? (
                         <img
                           src={activeOrg.logoUrl}
