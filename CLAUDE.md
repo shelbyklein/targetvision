@@ -4,8 +4,8 @@ A pnpm-workspace monorepo photo album app: Express API + React web frontend + Ex
 
 ## Branch workflow (dev → main releases)
 
-- **All day-to-day work happens on the `dev` branch**, checked out in the dev worktree at `C:\Vibes\Targetvision\targetvision-dev` (served live at vispixdev.shelbyklein.com, web 8085 / API 8084). Edit and commit there — not in the prod checkout.
-- The prod checkout (`C:\Vibes\Targetvision\Targetvision`) stays on `main` and is the live site (vispix.shelbyklein.com, web 8083 / API 8080). Don't switch its branch or leave its tree dirty.
+- **All day-to-day work happens on the `dev` branch**, checked out in the dev worktree at `C:\Vibes\Targetvision\targetvision-dev` (served live at dev.vispix.dev, web 8085 / API 8084). Edit and commit there — not in the prod checkout.
+- The prod checkout (`C:\Vibes\Targetvision\Targetvision`) stays on `main` and is the live site (vispix.dev, web 8083 / API 8080). Don't switch its branch or leave its tree dirty.
 - **Release** (only when the user says so): open a PR `dev` → `main`, merge with a **merge commit** (not squash — keeps the long-lived `dev` history connected), then `git pull` in the prod checkout and restart the prod API if api-server code changed (the API is a prebuilt bundle, no watch; the web is Vite HMR and updates itself).
 - The web dev server picks up `dev` commits via HMR; **API changes need a dev API restart** (kill port 8084, re-run `pnpm run dev:api` in the worktree or `scripts/start-vispix-dev.ps1`).
 - Dev has its **own database** (`vispix_dev`, cloned from prod via `scripts/clone-dev-db.ps1`) — schema changes, migrations, and destructive testing on dev are safe. **At release, run `pnpm --filter @workspace/db run migrate` in the prod checkout** to apply any new migrations to the prod DB.

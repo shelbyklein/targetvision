@@ -1,4 +1,4 @@
-# Dev preview environment (`vispixdev.shelbyklein.com`)
+# Dev preview environment (`dev.vispix.dev`)
 
 A second copy of the app runs on this PC so you can preview any branch **without
 touching the live site**. Prod stays on `main`; dev tracks whatever branch you
@@ -11,7 +11,7 @@ check out in a separate git worktree.
 | API | 8080 | **8084** |
 | Database | `vispix` @ 5433 | **`vispix_dev` @ 5433** (cloned from prod) |
 | Object storage | fake-gcs @ 4443 | same bucket (deletes disabled — see below) |
-| Public URL | vispix.shelbyklein.com | **vispixdev.shelbyklein.com** |
+| Public URL | vispix.dev | **dev.vispix.dev** |
 
 Both stacks share the Postgres + fake-gcs containers (started by the prod
 `scripts/start-vispix.ps1`) and the same secrets. Dev has its **own
@@ -66,8 +66,8 @@ Then edit `.env` in the worktree so these lines read:
 PORT=8084
 DATABASE_URL=postgres://postgres:postgres@localhost:5433/vispix_dev
 BETTER_AUTH_URL=http://localhost:8084/api/auth
-CORS_ORIGINS=http://localhost:8085,https://vispixdev.shelbyklein.com
-TRUSTED_ORIGINS=http://localhost:8085,https://vispixdev.shelbyklein.com
+CORS_ORIGINS=http://localhost:8085,https://dev.vispix.dev
+TRUSTED_ORIGINS=http://localhost:8085,https://dev.vispix.dev
 PHOTO_STORAGE_DELETE_DISABLED=true
 ```
 
@@ -80,7 +80,7 @@ The tunnel is dashboard-managed, so add the subdomain there (I can't change your
 DNS/account):
 
 1. Cloudflare **Zero Trust** → **Networks** → **Tunnels** → your tunnel → **Public Hostname** → **Add a public hostname**.
-2. Subdomain `vispixdev`, domain `shelbyklein.com`.
+2. Subdomain `dev`, domain `vispix.dev`.
 3. Service: **HTTP** → `host.docker.internal:8085`.
    The `cloudflared` for this tunnel runs **inside a Docker container**
    (`homechart-cloudflared-1`, token-managed), so from its perspective the host's
@@ -126,9 +126,9 @@ or run `scripts/start-vispix-dev.ps1` (starts both if the ports are free;
 does **not** touch Docker or the DB).
 
 Then open `http://localhost:8085` locally, or
-`https://vispixdev.shelbyklein.com` once the hostname is added. Sign in
+`https://dev.vispix.dev` once the hostname is added. Sign in
 again on the dev origin (same account, separate cookie host). Prod at
-`vispix.shelbyklein.com` is unaffected.
+`vispix.dev` is unaffected.
 
 **Stop the dev stack:** kill the two `node`/`vite` processes on 8084/8085 (e.g.
 close their windows, or `Get-NetTCPConnection -LocalPort 8085,8084 -State Listen`

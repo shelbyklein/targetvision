@@ -39,7 +39,7 @@ export async function startHttpServer(): Promise<void> {
 
   const port = Number(process.env.MCP_HTTP_PORT) || 8086;
   // Public base for download links returned by get_photo, e.g.
-  // https://vispixmcp.shelbyklein.com — token prefix is appended here.
+  // https://mcp.vispix.dev — token prefix is appended here.
   const publicUrl = process.env.MCP_PUBLIC_URL?.replace(/\/$/, "");
 
   const app = express();

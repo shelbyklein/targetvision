@@ -68,14 +68,14 @@ Auth is accepted two ways:
 
 - `Authorization: Bearer <token>` header — e.g. Claude Code on another machine:
   `claude mcp add --scope user --transport http vispix
-  https://vispixmcp.shelbyklein.com/mcp --header "Authorization: Bearer <token>"`
+  https://mcp.vispix.dev/mcp --header "Authorization: Bearer <token>"`
 - Token as the first URL path segment — for clients whose connector UI only
   accepts a URL (claude.ai custom connectors):
-  `https://vispixmcp.shelbyklein.com/<token>/mcp`.
+  `https://mcp.vispix.dev/<token>/mcp`.
   The URL is the secret; treat it like a password.
 - ChatGPT / OpenAI: same token-in-URL form — in ChatGPT go to Settings →
   Apps & Connectors → Create, paste
-  `https://vispixmcp.shelbyklein.com/<token>/mcp` as the MCP server URL,
+  `https://mcp.vispix.dev/<token>/mcp` as the MCP server URL,
   and pick authentication "None" (the token rides in the URL; ChatGPT's
   connector UI has no custom-header option).
 
@@ -85,5 +85,5 @@ authenticated `GET /photo/:id/original` route, built from `MCP_PUBLIC_URL`.
 `GET /healthz` is the only unauthenticated route.
 
 Tunnel side: a Cloudflare Zero Trust public hostname must map
-`vispixmcp.shelbyklein.com` → `http://<host>:8086` (the tunnel is
+`mcp.vispix.dev` → `http://<host>:8086` (the tunnel is
 remotely managed, so this lives in the dashboard, not a local config).
