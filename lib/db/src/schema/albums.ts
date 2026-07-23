@@ -13,6 +13,10 @@ export const albumsTable = pgTable("albums", {
   title: text("title").notNull(),
   description: text("description"),
   eventDate: text("event_date"),
+  // Optional organizational label grouping albums on the Albums page — e.g.
+  // "2026" for a season (#149, light first cut). Free text; folders exist
+  // implicitly as the distinct values; null = ungrouped.
+  folder: text("folder"),
   coverPhotoId: integer("cover_photo_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   // Manual card position on the Albums page (drag-to-reorder). Null = never

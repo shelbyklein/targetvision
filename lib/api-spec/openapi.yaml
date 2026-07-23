@@ -2485,6 +2485,8 @@ components:
           type: ["string", "null"]
         eventDate:
           type: ["string", "null"]
+        folder:
+          type: ["string", "null"]
         coverPhotoId:
           type: ["integer", "null"]
         coverPhotoUrl:
@@ -2514,6 +2516,8 @@ components:
           type: string
         eventDate:
           type: string
+        folder:
+          type: string
 
     AlbumUpdate:
       type: object
@@ -2524,6 +2528,8 @@ components:
         description:
           type: string
         eventDate:
+          type: ["string", "null"]
+        folder:
           type: ["string", "null"]
 
     AlbumCoverUpdate:

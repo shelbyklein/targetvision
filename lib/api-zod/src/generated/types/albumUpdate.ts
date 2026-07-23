@@ -12,4 +12,6 @@ export interface AlbumUpdate {
   description?: string;
   /** @nullable */
   eventDate?: string | null;
+  /** @nullable */
+  folder?: string | null;
 }

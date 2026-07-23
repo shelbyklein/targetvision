@@ -104,6 +104,7 @@ export const ListAlbumsResponseItem = zod.object({
   title: zod.string(),
   description: zod.string().nullish(),
   eventDate: zod.string().nullish(),
+  folder: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   coverPhotoThumbnailKey: zod.string().nullish(),
@@ -123,6 +124,7 @@ export const CreateAlbumBody = zod.object({
   title: zod.string().min(1),
   description: zod.string().optional(),
   eventDate: zod.string().optional(),
+  folder: zod.string().optional(),
 });
 
 /**
@@ -153,6 +155,7 @@ export const GetAlbumResponse = zod.object({
   title: zod.string(),
   description: zod.string().nullish(),
   eventDate: zod.string().nullish(),
+  folder: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   coverPhotoThumbnailKey: zod.string().nullish(),
@@ -174,6 +177,7 @@ export const UpdateAlbumBody = zod.object({
   title: zod.string().min(1).optional(),
   description: zod.string().optional(),
   eventDate: zod.string().nullish(),
+  folder: zod.string().nullish(),
 });
 
 export const UpdateAlbumResponse = zod.object({
@@ -183,6 +187,7 @@ export const UpdateAlbumResponse = zod.object({
   title: zod.string(),
   description: zod.string().nullish(),
   eventDate: zod.string().nullish(),
+  folder: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   coverPhotoThumbnailKey: zod.string().nullish(),
@@ -342,6 +347,7 @@ export const SetAlbumCoverResponse = zod.object({
   title: zod.string(),
   description: zod.string().nullish(),
   eventDate: zod.string().nullish(),
+  folder: zod.string().nullish(),
   coverPhotoId: zod.number().nullish(),
   coverPhotoUrl: zod.string().nullish(),
   coverPhotoThumbnailKey: zod.string().nullish(),

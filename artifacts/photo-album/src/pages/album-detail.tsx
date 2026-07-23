@@ -28,6 +28,7 @@ import {
 import type { Photo } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
+import { EditAlbumDialog } from "@/components/EditAlbumDialog";
 import type { LightboxPhoto } from "@/components/PhotoLightbox";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { GridZoomControl } from "@/components/GridZoomControl";
@@ -503,12 +504,25 @@ export default function AlbumDetail() {
               </Button>
             </Link>
             <div>
-              <h1
-                className="text-lg sm:text-2xl font-bold text-foreground"
-                data-testid="album-title"
-              >
-                {album.title}
-              </h1>
+              <div className="flex items-center gap-1.5">
+                <h1
+                  className="text-lg sm:text-2xl font-bold text-foreground"
+                  data-testid="album-title"
+                >
+                  {album.title}
+                </h1>
+                {/* PATCH /albums/:id allows the owner or a platform admin. */}
+                {(me?.role === "admin" || album.ownerId === me?.id) && (
+                  <EditAlbumDialog
+                    albumId={albumId}
+                    title={album.title}
+                    description={album.description}
+                    eventDate={album.eventDate}
+                    folder={album.folder}
+                    onSaved={invalidate}
+                  />
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
                 {album.eventDate && (
                   <span className="flex items-center gap-1 whitespace-nowrap">
