@@ -378,8 +378,13 @@ export default function AdminNearDuplicatesPage() {
                 <span className="text-xs font-medium text-foreground">
                   {group.photos.length} similar photo{group.photos.length !== 1 ? "s" : ""}
                 </span>
-                <span className="text-[10px] text-muted-foreground" title="Largest bit-distance within this group (0 = identical)">
-                  {group.distance === 0 ? "identical" : `≤ ${group.distance} bits apart`}
+                <span
+                  className="text-[10px] text-muted-foreground"
+                  title="Similarity from the perceptual hash: 64 bits total; the fewer that differ, the more alike (0 differing = visually identical)"
+                >
+                  {group.distance === 0
+                    ? "visually identical"
+                    : `≈${Math.round(((64 - group.distance) / 64) * 100)}% similar · ≤ ${group.distance} bits apart`}
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">

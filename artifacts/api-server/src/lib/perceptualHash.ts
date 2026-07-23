@@ -167,6 +167,7 @@ export interface NearDuplicatePhoto {
   filename: string | null;
   url: string;
   thumbnailKey: string | null;
+  perceptualHash: string | null;
   createdAt: Date;
   isAlbumCover: boolean;
   collectionCount: number;
@@ -373,6 +374,7 @@ export async function listNearDuplicatePhotoGroups(
       filename: photosTable.filename,
       url: photosTable.url,
       thumbnailKey: photosTable.thumbnailKey,
+      perceptualHash: photosTable.perceptualHash,
       createdAt: photosTable.createdAt,
     })
     .from(photosTable)
@@ -404,6 +406,7 @@ export async function listNearDuplicatePhotoGroups(
         filename: r.filename ?? null,
         url: r.url,
         thumbnailKey: r.thumbnailKey ?? null,
+        perceptualHash: r.perceptualHash ?? null,
         createdAt: r.createdAt,
         isAlbumCover: r.coverPhotoId === r.id,
         collectionCount: collectionCounts.get(r.id) ?? 0,

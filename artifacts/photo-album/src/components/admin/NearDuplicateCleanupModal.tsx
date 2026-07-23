@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { Loader2, Trash2, EyeOff, Layers, ArrowLeft, ArrowRight, CheckCircle2, X, Star, FolderOpen } from "lucide-react";
 import { formatDate } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
+import { HashDiffGrid, hammingDistance } from "@/components/admin/HashDiffGrid";
 
 // Interactive near-duplicates cleanup (issues #123/#124/#125): steps through
 // each comparison with the images side by side; per-photo delete, per-
@@ -50,6 +51,14 @@ export function NearDuplicateCleanupModal({
   const done = groups.length === 0;
   const photos = (group?.photos ?? []) as NearDuplicateModalPhoto[];
   const isPair = photos.length === 2;
+
+  // Hash similarity for pairs (#129): the exact bit distance between the two
+  // dHashes, rendered as a percentage plus a bit-grid visualization.
+  const pairDistance =
+    isPair && photos[0].perceptualHash && photos[1].perceptualHash
+      ? hammingDistance(photos[0].perceptualHash, photos[1].perceptualHash)
+      : null;
+  const similarity = pairDistance != null ? Math.round(((64 - pairDistance) / 64) * 100) : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,7 +115,23 @@ export function NearDuplicateCleanupModal({
             </div>
           </div>
         ) : (
-          /* Side-by-side review (#123). */
+          <>
+          {similarity != null && photos[0].perceptualHash && photos[1].perceptualHash && (
+            /* Hash similarity readout (#129): percentage + which of the 64
+               perceptual-hash bits actually differ. */
+            <div className="rounded-lg border border-border bg-muted/40 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3" data-testid="hash-similarity">
+              <span className="text-sm">
+                <span className={cn("font-semibold", similarity >= 95 ? "text-red-600 dark:text-red-500" : "text-foreground")}>
+                  ≈{similarity}% similar
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  — {pairDistance} of 64 perceptual-hash bits differ{pairDistance === 0 ? " (visually identical)" : ""}
+                </span>
+              </span>
+              <HashDiffGrid hashA={photos[0].perceptualHash} hashB={photos[1].perceptualHash} />
+            </div>
+          )}
+          {/* Side-by-side review (#123). */}
           <div
             className={cn("grid gap-3", photos.length <= 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3")}
             data-testid="cleanup-compare"
@@ -153,6 +178,7 @@ export function NearDuplicateCleanupModal({
               </div>
             ))}
           </div>
+          </>
         )}
 
         {!done && (

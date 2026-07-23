@@ -132,6 +132,8 @@ const NearDuplicatePhotoSchema = z.object({
   // Full-size image URL — the cleanup modal's side-by-side and diff overlay
   // (issues #123/#125) need more resolution than the grid thumbnails.
   imageUrl: z.string(),
+  // 16-hex-char dHash for the hash-difference visualization (#129).
+  perceptualHash: z.string().nullable(),
   createdAt: z.string(),
   isAlbumCover: z.boolean(),
   collectionCount: z.number(),
