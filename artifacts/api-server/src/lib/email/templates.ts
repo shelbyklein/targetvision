@@ -87,6 +87,17 @@ export function adminNewSignupEmail(userEmail: string, userName: string | null):
   };
 }
 
+export function testEmail(): EmailContent {
+  return {
+    subject: "Vispix test email",
+    html: layout(
+      `<p style="margin:0 0 12px;">This is a test email from Vispix. 🎉</p>
+       <p style="margin:0;color:#71717a;font-size:13px;">If you received it, your SMTP configuration is working.</p>`,
+    ),
+    text: "This is a test email from Vispix. If you received it, your SMTP configuration is working.",
+  };
+}
+
 export function adminNewOrgEmail(orgName: string, creatorEmail: string): EmailContent {
   return {
     subject: `New Vispix organization: ${orgName}`,

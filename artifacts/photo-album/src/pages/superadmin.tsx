@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ServiceReadinessCard } from "@/components/admin/ServiceReadinessCard";
+import { SendTestEmailCard } from "@/components/admin/SendTestEmailCard";
 
 // Superadmin hub (issue #120): the platform operator's cross-organization
 // tools, split out from the org-scoped /admin area. Platform admins only.
@@ -56,6 +57,8 @@ export default function Superadmin() {
         </div>
 
         <ServiceReadinessCard variant="platform" enabled={me.role === "admin"} />
+
+        <SendTestEmailCard />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="superadmin-grid">
           {SECTIONS.map((section) => {
