@@ -329,6 +329,50 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(ent.capBytes).toBeNull();
   });
 
+  it("platform admin sees all orgs and can join one on demand; non-admins refused (#120)", async () => {
+    const { orgA, orgB, userA, a } = await seedTwoOrgs();
+    const platformAdmin = await createUser({ name: "Operator", role: "admin" });
+    await createPhoto(a.album.id, userA.id, { organizationId: orgA.id, filesize: 1024 });
+
+    // A regular org owner is NOT a platform admin → 403 on the overview.
+    expect((await api("/api/admin/organizations", { user: userA })).status).toBe(403);
+
+    // The platform admin sees every org with stats, without being a member.
+    const listRes = await api("/api/admin/organizations", { user: platformAdmin });
+    expect(listRes.status).toBe(200);
+    const list = (await listRes.json()) as {
+      id: number; plan: string; memberCount: number; photoCount: number; usageBytes: number; myRole: string | null;
+    }[];
+    const a1 = list.find((o) => o.id === orgA.id)!;
+    const b1 = list.find((o) => o.id === orgB.id)!;
+    expect(a1.photoCount).toBe(2); // seedTwoOrgs' photo (null filesize) + the 1024-byte one
+    expect(a1.usageBytes).toBe(1024);
+    expect(a1.myRole).toBeNull();
+    expect(b1.photoCount).toBe(1);
+
+    // Membership is still required to act inside the org (the tenancy wall holds).
+    expect((await api("/api/albums", { user: platformAdmin, orgId: orgA.id })).status).toBe(403);
+
+    // Join-on-demand: becomes an org-admin member, visible in the roster.
+    const join = await api(`/api/admin/organizations/${orgA.id}/join`, { user: platformAdmin, method: "POST", body: {} });
+    expect(join.status).toBe(200);
+    expect(((await join.json()) as { role: string }).role).toBe("admin");
+    expect((await api("/api/albums", { user: platformAdmin, orgId: orgA.id })).status).toBe(200);
+
+    // Idempotent — rejoining reports the existing membership, role unchanged.
+    const again = (await (
+      await api(`/api/admin/organizations/${orgA.id}/join`, { user: platformAdmin, method: "POST", body: {} })
+    ).json()) as { role: string; alreadyMember: boolean };
+    expect(again.role).toBe("admin");
+    expect(again.alreadyMember).toBe(true);
+
+    // The overview now reflects the membership.
+    const after = (await (await api("/api/admin/organizations", { user: platformAdmin })).json()) as {
+      id: number; myRole: string | null; memberCount: number;
+    }[];
+    expect(after.find((o) => o.id === orgA.id)!.myRole).toBe("admin");
+  });
+
   it("instance-admin set-plan overrides a plan; non-admins are refused (#118)", async () => {
     const { orgA, userA } = await seedTwoOrgs(); // orgA on the free plan; userA is its owner (not an instance admin)
     const instanceAdmin = await createUser({ name: "Root", role: "admin" });

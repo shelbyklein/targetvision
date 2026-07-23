@@ -15,3 +15,4 @@ export * from "./bulkUploadBatches";
 export * from "./mcpTokens";
 export * from "./organizations";
 export * from "./billing";
+export * from "./adminOrganizations";
