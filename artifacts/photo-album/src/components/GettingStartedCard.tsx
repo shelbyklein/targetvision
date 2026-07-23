@@ -4,13 +4,21 @@ import { useOrg } from "@/contexts/OrgContext";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { CircleCheck, Circle, X, ChevronRight, Rocket } from "lucide-react";
-import { cn } from "@/lib/utils";
 
-type Step = { key: string; label: string; href: string; done: boolean; managerOnly?: boolean };
+type Step = {
+  key: string;
+  label: string;
+  blurb: string;
+  href: string;
+  done: boolean;
+  managerOnly?: boolean;
+};
 
-// Dismissible "Getting started" checklist on the dashboard (#148). Steps are
+// Dismissible "Getting started" tour on the dashboard (#148) — one step per
+// major thing the app can do, in the order a new org would use them. Steps are
 // derived from real data server-side, so they complete themselves as the user
-// acts. Auto-hides when dismissed or when every visible step is done.
+// acts. Done steps collapse to a strikethrough; open ones show a short blurb
+// about what the feature is. Auto-hides when dismissed or fully complete.
 export function GettingStartedCard() {
   const { data: status } = useOnboardingStatus();
   const { data: me } = useGetMe();
@@ -23,12 +31,94 @@ export function GettingStartedCard() {
     me?.role === "admin" || activeOrg?.role === "owner" || activeOrg?.role === "admin";
 
   const steps: Step[] = [
-    { key: "org", label: "Create your organization", href: "/admin/organization", done: true },
-    { key: "photos", label: "Upload your first photos", href: "/bulk-upload", done: status.hasPhotos },
-    { key: "album", label: "Create an album", href: "/albums", done: status.hasAlbums },
-    { key: "collection", label: "Add photos to a collection", href: "/collections", done: status.hasCollectionPhotos },
-    { key: "ai", label: "Configure an AI provider", href: "/admin/ai-services", done: status.aiConfigured, managerOnly: true },
-    { key: "invite", label: "Invite a teammate", href: "/admin/members", done: status.invitedTeammate, managerOnly: true },
+    {
+      key: "org",
+      label: "Create your organization",
+      blurb: "Your team's private photo workspace.",
+      href: "/admin/organization",
+      done: true,
+    },
+    {
+      key: "ai",
+      label: "Add an AI provider",
+      blurb: "Connect OpenAI, Anthropic, or Gemini so photos get auto-described and searchable.",
+      href: "/admin/ai-services",
+      done: status.aiConfigured,
+      managerOnly: true,
+    },
+    {
+      key: "photos",
+      label: "Upload photos",
+      blurb: "Bring in your event photos — uploads land in albums.",
+      href: "/bulk-upload",
+      done: status.hasPhotos,
+    },
+    {
+      key: "collection",
+      label: "Curate a collection",
+      blurb: "Collections are hand-picked sets of your best photos — e.g. for a campaign or channel.",
+      href: "/collections",
+      done: status.hasCollectionPhotos,
+    },
+    {
+      key: "analysis",
+      label: "Verify AI processing",
+      blurb: "Check AI Analysis until every photo has a description — that's what powers search.",
+      href: "/admin/ai-analysis",
+      done: status.aiAnalysisComplete,
+      managerOnly: true,
+    },
+    {
+      key: "smart",
+      label: "Try a smart collection",
+      blurb: "Give a collection a search phrase and it ranks photos by AI similarity — a self-updating gallery.",
+      href: "/smart-collections",
+      done: status.hasSmartCollection,
+    },
+    {
+      key: "project",
+      label: "Start a project",
+      blurb: "Projects gather photos for one deliverable, like a brochure or social push.",
+      href: "/projects",
+      done: status.hasProject,
+    },
+    {
+      key: "tags",
+      label: "Categorize with tags",
+      blurb: "Tag collections so they're easy to filter and find.",
+      href: "/collections",
+      done: status.hasCollectionTag,
+    },
+    {
+      key: "person",
+      label: "Tag a person",
+      blurb: "People group one athlete's photos under their name, with AI suggestions.",
+      href: "/people",
+      done: status.hasTaggedPerson,
+    },
+    {
+      key: "attribution",
+      label: "Mark attribution",
+      blurb: "Attribution tags record what a photo is cleared for — web, print, social.",
+      href: "/photos",
+      done: status.hasAttribution,
+    },
+    {
+      key: "invite",
+      label: "Invite a teammate",
+      blurb: "Bring in the rest of the team to rate and pick photos together.",
+      href: "/admin/members",
+      done: status.invitedTeammate,
+      managerOnly: true,
+    },
+    {
+      key: "mcp",
+      label: "Connect MCP",
+      blurb: "Create an MCP token to search your library from Claude and other AI tools.",
+      href: "/admin/mcp-tokens",
+      done: status.hasMcpToken,
+      managerOnly: true,
+    },
   ].filter((s) => isManager || !s.managerOnly);
 
   const doneCount = steps.filter((s) => s.done).length;
@@ -44,7 +134,7 @@ export function GettingStartedCard() {
           <div>
             <h2 className="text-sm font-semibold text-foreground">Getting started</h2>
             <p className="text-xs text-muted-foreground">
-              {doneCount} of {steps.length} done — set up your photo library
+              {doneCount} of {steps.length} done — a quick tour of everything Vispix can do
             </p>
           </div>
         </div>
@@ -75,15 +165,17 @@ export function GettingStartedCard() {
             ) : (
               <Link
                 href={step.href}
-                className={cn(
-                  "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground",
-                  "hover:bg-accent/60 transition-colors",
-                )}
+                className="group flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-accent/60 transition-colors"
                 data-testid={`getting-started-${step.key}`}
               >
-                <Circle className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-                {step.label}
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+                <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/50" />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1 text-sm text-foreground">
+                    {step.label}
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+                  </span>
+                  <span className="block text-xs text-muted-foreground">{step.blurb}</span>
+                </span>
               </Link>
             )}
           </li>

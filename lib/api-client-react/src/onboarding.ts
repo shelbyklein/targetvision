@@ -7,7 +7,14 @@ export type OnboardingStatus = {
   hasPhotos: boolean;
   hasAlbums: boolean;
   hasCollectionPhotos: boolean;
+  hasSmartCollection: boolean;
+  hasProject: boolean;
+  hasCollectionTag: boolean;
+  hasTaggedPerson: boolean;
+  hasAttribution: boolean;
+  hasMcpToken: boolean;
   aiConfigured: boolean;
+  aiAnalysisComplete: boolean;
   memberCount: number;
   invitedTeammate: boolean;
   dismissed: boolean;
