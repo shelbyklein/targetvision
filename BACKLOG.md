@@ -1,6 +1,6 @@
 # Vispix backlog
 
-Open work is tracked in **GitHub Issues** → https://github.com/shelbyklein/targetvision/issues
+Open work is tracked in **GitHub Issues** → https://github.com/shelbyklein/vispix/issues
 
 To add new work, open an issue (templates live in `.github/ISSUE_TEMPLATE/`).
 This file keeps the **Done** changelog below as a local, in-repo history.
@@ -19,7 +19,7 @@ issue auto-closes on merge), and add a line to the **Done** changelog below.
 
 ## Open
 
-Open items now live in **GitHub Issues** → https://github.com/shelbyklein/targetvision/issues
+Open items now live in **GitHub Issues** → https://github.com/shelbyklein/vispix/issues
 (`gh issue list` from the CLI). The eight items previously listed here were
 migrated to issues #6–#13 on 2026-07-14.
 
