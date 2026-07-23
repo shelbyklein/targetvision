@@ -68,6 +68,8 @@ export interface Album {
   /** @nullable */
   eventDate?: string | null;
   /** @nullable */
+  folder?: string | null;
+  /** @nullable */
   coverPhotoId?: number | null;
   /** @nullable */
   coverPhotoUrl?: string | null;
@@ -85,6 +87,7 @@ export interface AlbumInput {
   title: string;
   description?: string;
   eventDate?: string;
+  folder?: string;
 }
 
 export interface AlbumUpdate {
@@ -93,6 +96,8 @@ export interface AlbumUpdate {
   description?: string;
   /** @nullable */
   eventDate?: string | null;
+  /** @nullable */
+  folder?: string | null;
 }
 
 export interface AlbumCoverUpdate {

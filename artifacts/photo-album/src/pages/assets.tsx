@@ -112,7 +112,7 @@ function AssetFieldInputs({
           id={`${idPrefix}-name`}
           value={fields.name}
           onChange={(e) => setFields({ ...fields, name: e.target.value })}
-          placeholder="USA Archery logo"
+          placeholder="Primary logo"
           required
           data-testid={`${idPrefix}-name`}
         />

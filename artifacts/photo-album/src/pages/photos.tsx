@@ -45,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Eye, Bot, Check, AlertCircle, FolderOpen, Loader2, Trash2, CheckSquare } from "lucide-react";
+import { Camera, Search, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight, Sparkles, EyeOff, Eye, Bot, Check, AlertCircle, FolderOpen, Loader2, Trash2, CheckSquare, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -786,10 +786,23 @@ export default function PhotosPage() {
                 ? "Try adjusting or clearing your filters to see more results."
                 : "Photos will appear here once they've been added to albums."}
             </p>
-            {hasActiveFilters && (
+            {hasActiveFilters ? (
               <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>
                 Clear filters
               </Button>
+            ) : (
+              // First-run CTAs (#148 Phase A): don't dead-end an empty library.
+              <div className="mt-4 flex items-center gap-2">
+                <Button asChild size="sm" className="gap-1.5">
+                  <Link href="/bulk-upload" data-testid="photos-empty-upload">
+                    <Upload className="h-4 w-4" />
+                    Upload photos
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/albums" data-testid="photos-empty-albums">Create an album</Link>
+                </Button>
+              </div>
             )}
           </div>
         )}

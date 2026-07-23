@@ -19,6 +19,9 @@ export const usersTable = pgTable("users", {
   lastActiveOrgId: integer("last_active_org_id").references(() => organizationsTable.id, {
     onDelete: "set null",
   }),
+  // When the user dismissed the "Getting started" onboarding checklist (#148).
+  // Null = never dismissed; the card also auto-hides once every step is done.
+  onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });

@@ -11,4 +11,5 @@ export interface AlbumInput {
   title: string;
   description?: string;
   eventDate?: string;
+  folder?: string;
 }

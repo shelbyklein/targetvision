@@ -27,7 +27,7 @@ function layout(bodyHtml: string): string {
         <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:16px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
           <tr><td style="padding-bottom:16px;font-size:20px;font-weight:700;color:#7c3aed;">Vispix</td></tr>
           <tr><td style="font-size:15px;line-height:1.6;">${bodyHtml}</td></tr>
-          <tr><td style="padding-top:24px;font-size:12px;color:#a1a1aa;">Vispix &middot; photo management for archery organizations</td></tr>
+          <tr><td style="padding-top:24px;font-size:12px;color:#a1a1aa;">Vispix &middot; photo management for teams</td></tr>
         </table>
       </td></tr>
     </table>
@@ -69,11 +69,11 @@ export function orgInviteEmail(orgName: string, signUpUrl: string): EmailContent
   return {
     subject: `You've been invited to ${orgName} on Vispix`,
     html: layout(
-      `<p style="margin:0 0 16px;">You've been invited to join <strong>${org}</strong> on Vispix, a photo library for archery organizations.</p>
+      `<p style="margin:0 0 16px;">You've been invited to join <strong>${org}</strong> on Vispix, your team's shared photo library.</p>
        <p style="margin:0 0 24px;">${button(signUpUrl, "Accept invitation")}</p>
        <p style="margin:0;color:#71717a;font-size:13px;">Sign up with this email address and you'll be added to ${org} automatically.</p>`,
     ),
-    text: `You've been invited to ${orgName} on Vispix\n\nJoin ${orgName} on Vispix, a photo library for archery organizations. Sign up with this email address and you'll be added automatically:\n\n${signUpUrl}`,
+    text: `You've been invited to ${orgName} on Vispix\n\nJoin ${orgName} on Vispix, your team's shared photo library. Sign up with this email address and you'll be added automatically:\n\n${signUpUrl}`,
   };
 }
 

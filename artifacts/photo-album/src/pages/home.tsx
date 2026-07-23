@@ -41,7 +41,7 @@ const FEATURES = [
   {
     icon: Users,
     title: "People tagging",
-    text: "Tag the people in your photos and pull up every shot of an athlete or speaker in one click.",
+    text: "Tag the people in your photos and pull up every shot of someone in one click.",
   },
   {
     icon: Bot,
