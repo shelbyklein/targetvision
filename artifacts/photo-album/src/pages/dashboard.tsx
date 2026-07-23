@@ -458,7 +458,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" data-testid="stats-grid">
         <StatCard label="Albums" value={stats?.totalAlbums} icon={Images} loading={statsLoading} href="/albums" />
         <StatCard label="Photos" value={stats?.totalPhotos} icon={Camera} loading={statsLoading} href="/photos" />
-        <StatCard label="Team Members" value={stats?.totalUsers} icon={Users} loading={statsLoading} href="/admin/team" />
+        <StatCard label="Members" value={stats?.totalUsers} icon={Users} loading={statsLoading} href="/admin/members" />
         <StatCard label="Collections" value={stats?.totalCollections} icon={FolderOpen} loading={statsLoading} href="/collections" />
         <StatCard label="Projects" value={stats?.totalProjects} icon={FolderKanban} loading={statsLoading} href="/projects" />
         <StatCard label="People" value={stats?.totalPeople} icon={Users} loading={statsLoading} href="/people" />

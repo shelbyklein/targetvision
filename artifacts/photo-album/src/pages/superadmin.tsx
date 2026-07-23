@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 // Superadmin hub (issue #120): the platform operator's cross-organization
 // tools, split out from the org-scoped /admin area. Platform admins only.
 const SECTIONS: { href: string; title: string; description: string; icon: LucideIcon }[] = [
-  { href: "/admin/organizations", title: "Organizations", description: "All organizations — plans, usage, and support access.", icon: Building2 },
-  { href: "/admin/team", title: "Users", description: "Every registered account, platform roles, and org memberships.", icon: Users },
-  { href: "/admin/registration", title: "Registration", description: "Allow or pause new account sign-ups.", icon: UserPlus },
+  { href: "/superadmin/organizations", title: "Organizations", description: "All organizations — plans, usage, and support access.", icon: Building2 },
+  { href: "/superadmin/users", title: "Users", description: "Every registered account, platform roles, and org memberships.", icon: Users },
+  { href: "/superadmin/registration", title: "Registration", description: "Allow or pause new account sign-ups.", icon: UserPlus },
 ];
 
 export default function Superadmin() {
