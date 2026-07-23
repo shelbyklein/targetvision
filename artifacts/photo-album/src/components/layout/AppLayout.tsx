@@ -57,7 +57,6 @@ import { useBulkUploadOptional } from "@/contexts/BulkUploadContext";
 import { usePhotoUploadOptional } from "@/contexts/PhotoUploadContext";
 import { PhotoUploadBanner } from "@/components/PhotoUploadBanner";
 
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 
@@ -761,13 +760,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {!bannerVisible && (
           <footer className="hidden sm:block border-t border-border py-6 text-sm text-muted-foreground">
-            <div className="px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span>Copyright</span>
-                <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-                <span>{new Date().getFullYear()}</span>
-              </div>
-              <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+            <div className="px-4 sm:px-6 lg:px-8">
+              <span>© {new Date().getFullYear()} Vispix</span>
             </div>
           </footer>
         )}

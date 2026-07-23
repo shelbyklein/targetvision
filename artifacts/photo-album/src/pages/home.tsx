@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useGetRegistrationSettings } from "@workspace/api-client-react";
 
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function Home() {
   const { data: regSettings } = useGetRegistrationSettings();
@@ -20,11 +19,11 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <Link href="/sign-in">
-            <Button data-testid="sign-in-btn" className="bg-[#1a2f53] hover:bg-[#152541] text-white border-[#1a2f53] hover:border-[#152541] focus-visible:ring-[#1a2f53]">Sign In</Button>
+            <Button variant="outline" data-testid="sign-in-btn">Sign In</Button>
           </Link>
           {registrationEnabled && (
             <Link href="/sign-up">
-              <Button data-testid="sign-up-btn" className="bg-[#aa1f2e] hover:bg-[#8e1a26] text-white border-[#aa1f2e] hover:border-[#8e1a26] focus-visible:ring-[#aa1f2e]">Sign Up</Button>
+              <Button data-testid="sign-up-btn">Sign Up</Button>
             </Link>
           )}
         </div>
@@ -37,20 +36,20 @@ export default function Home() {
         </h1>
 
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          Vispix is USA Archery's internal workspace for staff to collaborate on choosing
+          Vispix is a collaborative workspace for teams to choose
           photos for marketing. Browse event albums, rate candidates, and shortlist the shots
           that belong on the next campaign — together, in one place.
         </p>
 
         <div className="flex items-center justify-center gap-4">
           <Link href="/sign-in">
-            <Button size="lg" data-testid="home-sign-in-btn" className="px-8 bg-[#1a2f53] hover:bg-[#152541] text-white border-[#1a2f53] hover:border-[#152541] focus-visible:ring-[#1a2f53]">
+            <Button size="lg" variant="outline" data-testid="home-sign-in-btn" className="px-8">
               Sign In
             </Button>
           </Link>
           {registrationEnabled ? (
             <Link href="/sign-up">
-              <Button size="lg" data-testid="home-sign-up-btn" className="px-8 bg-[#aa1f2e] hover:bg-[#8e1a26] text-white border-[#aa1f2e] hover:border-[#8e1a26] focus-visible:ring-[#aa1f2e]">
+              <Button size="lg" data-testid="home-sign-up-btn" className="px-8">
                 Sign Up
               </Button>
             </Link>
@@ -96,13 +95,8 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-border py-8 text-sm text-muted-foreground">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span>Copyright</span>
-            <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-            <span>{new Date().getFullYear()}</span>
-          </div>
-          <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+        <div className="max-w-5xl mx-auto px-6">
+          <span>© {new Date().getFullYear()} Vispix</span>
         </div>
       </footer>
     </div>
