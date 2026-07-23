@@ -18,6 +18,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, FolderKanban, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon, ChevronRight, Users, Palette, Building2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { LucideIcon } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useToast } from "@/hooks/use-toast";
@@ -57,7 +58,6 @@ import { useBulkUploadOptional } from "@/contexts/BulkUploadContext";
 import { usePhotoUploadOptional } from "@/contexts/PhotoUploadContext";
 import { PhotoUploadBanner } from "@/components/PhotoUploadBanner";
 
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 
@@ -74,7 +74,7 @@ const navItems = [
 
 // Drag type for reordering the top-level nav; distinct from PHOTO_DND_MIME so
 // nav reordering and photo-onto-collection drags never interfere.
-const NAV_DND_MIME = "application/x-targetvision-nav";
+const NAV_DND_MIME = "application/x-vispix-nav";
 
 // Apply the user's saved order (array of hrefs) to navItems. Hrefs that no
 // longer exist are dropped; nav items missing from the saved order (added
@@ -559,7 +559,15 @@ function OrgSwitcher() {
   );
 }
 
-function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean }) {
+function AppSidebar({
+  location,
+  isAdmin,
+  isPlatformAdmin,
+}: {
+  location: string;
+  isAdmin: boolean;
+  isPlatformAdmin: boolean;
+}) {
   const { data: session } = useSession();
   const user = session?.user;
   const firstName = user?.name?.split(" ")[0];
@@ -573,10 +581,14 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
   const [localNavOrder, setLocalNavOrder] = useState<string[] | null>(null);
 
   const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
-  const items = [
+  // Admin (org-scoped) and Superadmin (platform, amber shield) are pinned last
+  // and not reorderable.
+  const items: { href: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
     ...orderedNav,
-    // Admin is pinned last and not reorderable.
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
+    ...(isPlatformAdmin
+      ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
+      : []),
   ];
 
   function navDragProps(href: string): React.LiHTMLAttributes<HTMLLIElement> {
@@ -625,10 +637,10 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="Target Vision">
+            <SidebarMenuButton size="lg" asChild tooltip="Vispix">
               <Link href="/dashboard" data-testid="sidebar-brand">
-                <img src="/target-vision.svg" alt="Target Vision" className="size-6 shrink-0" />
-                <span className="font-semibold tracking-tight">Target Vision</span>
+                <img src="/vispix.png" alt="Vispix" className="size-6 shrink-0 rounded" />
+                <span className="font-semibold tracking-tight">Vispix</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -641,7 +653,8 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarMenu data-testid="main-nav">
             {items.map((item) => {
-              const dragProps = item.href === "/admin" ? undefined : navDragProps(item.href);
+              const dragProps =
+                item.href === "/admin" || item.href === "/superadmin" ? undefined : navDragProps(item.href);
               if (item.href === "/collections") {
                 return <CollectionsNav key={item.href} location={location} dragProps={dragProps} />;
               }
@@ -654,7 +667,7 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
                 <SidebarMenuItem key={item.href} {...dragProps}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
                     <Link href={item.href} data-testid={`nav-${item.label.toLowerCase()}`}>
-                      <Icon />
+                      <Icon className={item.iconClass} />
                       <span>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -736,18 +749,23 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: me } = useGetMe();
+  const { activeOrg } = useOrg();
   const bannerVisible = useBannerVisible();
-  const isAdmin = me?.role === "admin";
+  // Admin = the active org's own owners/admins (plus platform admins);
+  // Superadmin = platform admins only (issue #120).
+  const isPlatformAdmin = me?.role === "admin";
+  const isAdmin =
+    isPlatformAdmin || activeOrg?.role === "owner" || activeOrg?.role === "admin";
 
   return (
     <SidebarProvider defaultOpen={getInitialSidebarOpen()} data-testid="app-layout">
-      <AppSidebar location={location} isAdmin={isAdmin} />
+      <AppSidebar location={location} isAdmin={isAdmin} isPlatformAdmin={isPlatformAdmin} />
 
       <SidebarInset className="min-h-svh">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 sm:gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1" data-testid="sidebar-toggle" />
-          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Target Vision">
-            <img src="/target-vision.svg" alt="Target Vision" className="h-7 w-7" />
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Vispix">
+            <img src="/vispix.png" alt="Vispix" className="h-7 w-7 rounded" />
           </Link>
           <GlobalSearchBar />
         </header>
@@ -761,13 +779,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {!bannerVisible && (
           <footer className="hidden sm:block border-t border-border py-6 text-sm text-muted-foreground">
-            <div className="px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span>Copyright</span>
-                <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-                <span>{new Date().getFullYear()}</span>
-              </div>
-              <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
+            <div className="px-4 sm:px-6 lg:px-8">
+              <span>© {new Date().getFullYear()} Vispix</span>
             </div>
           </footer>
         )}

@@ -2,7 +2,7 @@ import { File } from "@google-cloud/storage";
 
 const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
 
-// TargetVision serves photos as internal-team content: any signed-in member may
+// Vispix serves photos as internal-team content: any signed-in member may
 // read any object (see the GET /storage/objects route, which gates on auth only).
 // The only ACL fact still consulted is an object's public/private visibility,
 // used by downloadObject to choose the Cache-Control header. Per-owner/per-object

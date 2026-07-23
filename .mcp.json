@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "targetvision": {
+    "vispix": {
       "command": "pnpm",
       "args": [
         "--silent",

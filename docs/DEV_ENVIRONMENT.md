@@ -1,4 +1,4 @@
-# Dev preview environment (`targetvisiondev.shelbyklein.com`)
+# Dev preview environment (`vispixdev.shelbyklein.com`)
 
 A second copy of the app runs on this PC so you can preview any branch **without
 touching the live site**. Prod stays on `main`; dev tracks whatever branch you
@@ -9,16 +9,16 @@ check out in a separate git worktree.
 | Checkout | `C:\Vibes\Targetvision\Targetvision` (`main`) | `C:\Vibes\Targetvision\targetvision-dev` (worktree, any branch) |
 | Web (Vite) | 8083 | **8085** |
 | API | 8080 | **8084** |
-| Database | `targetvision` @ 5433 | **`targetvision_dev` @ 5433** (cloned from prod) |
+| Database | `vispix` @ 5433 | **`vispix_dev` @ 5433** (cloned from prod) |
 | Object storage | fake-gcs @ 4443 | same bucket (deletes disabled — see below) |
-| Public URL | targetvision.shelbyklein.com | **targetvisiondev.shelbyklein.com** |
+| Public URL | vispix.shelbyklein.com | **vispixdev.shelbyklein.com** |
 
 Both stacks share the Postgres + fake-gcs containers (started by the prod
-`scripts/start-targetvision.ps1`) and the same secrets. Dev has its **own
+`scripts/start-vispix.ps1`) and the same secrets. Dev has its **own
 database**, snapshot-cloned from prod (photos, users, sessions and all), so it
 renders the same library and your account works on both — but **schema changes,
 migrations, and destructive testing on dev are completely safe**: they only
-touch `targetvision_dev`.
+touch `vispix_dev`.
 
 > ⚠️ **One shared piece remains: the storage bucket.** Dev's photo rows reference
 > the same image objects as prod's, so the dev API runs with
@@ -44,7 +44,7 @@ pnpm install
 
 ### 2. Create the dev database
 
-Clone prod into `targetvision_dev` (also how you refresh dev data later):
+Clone prod into `vispix_dev` (also how you refresh dev data later):
 
 ```powershell
 scripts\clone-dev-db.ps1
@@ -64,10 +64,10 @@ Then edit `.env` in the worktree so these lines read:
 
 ```
 PORT=8084
-DATABASE_URL=postgres://postgres:postgres@localhost:5433/targetvision_dev
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/vispix_dev
 BETTER_AUTH_URL=http://localhost:8084/api/auth
-CORS_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
-TRUSTED_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
+CORS_ORIGINS=http://localhost:8085,https://vispixdev.shelbyklein.com
+TRUSTED_ORIGINS=http://localhost:8085,https://vispixdev.shelbyklein.com
 PHOTO_STORAGE_DELETE_DISABLED=true
 ```
 
@@ -80,12 +80,12 @@ The tunnel is dashboard-managed, so add the subdomain there (I can't change your
 DNS/account):
 
 1. Cloudflare **Zero Trust** → **Networks** → **Tunnels** → your tunnel → **Public Hostname** → **Add a public hostname**.
-2. Subdomain `targetvisiondev`, domain `shelbyklein.com`.
+2. Subdomain `vispixdev`, domain `shelbyklein.com`.
 3. Service: **HTTP** → `host.docker.internal:8085`.
    The `cloudflared` for this tunnel runs **inside a Docker container**
    (`homechart-cloudflared-1`, token-managed), so from its perspective the host's
    port 8085 is `host.docker.internal:8085` — **not** `localhost:8085` (that would
-   point at the container itself). Tip: open the existing `targetvision` public
+   point at the container itself). Tip: open the existing `vispix` public
    hostname to see exactly what host reference the prod entry uses for port 8083,
    and copy it verbatim with `8085`.
 4. Save. Cloudflare auto-creates the DNS record.
@@ -122,13 +122,13 @@ pnpm run dev:api             # API on 8084 (reads this worktree's .env)
 pnpm run dev:web:dev         # web on 8085, proxies /api -> 8084
 ```
 
-or run `scripts/start-targetvision-dev.ps1` (starts both if the ports are free;
+or run `scripts/start-vispix-dev.ps1` (starts both if the ports are free;
 does **not** touch Docker or the DB).
 
 Then open `http://localhost:8085` locally, or
-`https://targetvisiondev.shelbyklein.com` once the hostname is added. Sign in
+`https://vispixdev.shelbyklein.com` once the hostname is added. Sign in
 again on the dev origin (same account, separate cookie host). Prod at
-`targetvision.shelbyklein.com` is unaffected.
+`vispix.shelbyklein.com` is unaffected.
 
 **Stop the dev stack:** kill the two `node`/`vite` processes on 8084/8085 (e.g.
 close their windows, or `Get-NetTCPConnection -LocalPort 8085,8084 -State Listen`
@@ -136,13 +136,13 @@ close their windows, or `Get-NetTCPConnection -LocalPort 8085,8084 -State Listen
 
 ## Schema changes on dev
 
-Dev owns `targetvision_dev`, so the normal workflow just works here:
+Dev owns `vispix_dev`, so the normal workflow just works here:
 
 ```sh
 # in the dev worktree, after editing lib/db/src/schema/*
 pnpm --filter @workspace/db run generate    # writes the migration
-pnpm --filter @workspace/db run migrate     # applies it to targetvision_dev
-# restart the dev API (kill port 8084, re-run scripts/start-targetvision-dev.ps1)
+pnpm --filter @workspace/db run migrate     # applies it to vispix_dev
+# restart the dev API (kill port 8084, re-run scripts/start-vispix-dev.ps1)
 ```
 
 **At release**, after merging `dev` → `main` and pulling in the prod checkout,
@@ -150,7 +150,7 @@ apply the same migrations to prod:
 
 ```sh
 # in the PROD checkout
-pnpm --filter @workspace/db run migrate     # applies pending migrations to targetvision
+pnpm --filter @workspace/db run migrate     # applies pending migrations to vispix
 # restart the prod API
 ```
 
@@ -162,6 +162,6 @@ Dev's data is a point-in-time snapshot; prod moves on without it. To resync:
 scripts\clone-dev-db.ps1
 ```
 
-Drops and recreates `targetvision_dev` from a fresh prod dump (prod is only
+Drops and recreates `vispix_dev` from a fresh prod dump (prod is only
 read). If the dev branch carries migrations prod doesn't have yet, re-run
 `pnpm --filter @workspace/db run migrate` in the worktree afterwards.

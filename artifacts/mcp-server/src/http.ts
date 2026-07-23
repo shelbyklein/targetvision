@@ -1,4 +1,4 @@
-// Bootstrap for the TargetVision MCP server over streamable HTTP — remote
+// Bootstrap for the Vispix MCP server over streamable HTTP — remote
 // access for clients off this machine (claude.ai custom connectors, Claude
 // Code on other machines, etc.), fronted by the cloudflared tunnel.
 //
@@ -11,7 +11,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || "production";
 const { startHttpServer } = await import("./httpServer.js");
 
 startHttpServer().catch((err) => {
-  console.error("TargetVision MCP HTTP server failed to start:", err);
+  console.error("Vispix MCP HTTP server failed to start:", err);
   process.exit(1);
 });
 

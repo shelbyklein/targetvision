@@ -1,14 +1,14 @@
-# TargetVision
+# Vispix
 
 A pnpm-workspace monorepo photo album app: Express API + React web frontend + Expo mobile app, backed by Postgres/Drizzle, Better Auth (email/password), fake-gcs-server object storage (GCS-compatible), and pluggable AI providers (OpenAI/Anthropic/Gemini) for photo analysis. Everything runs locally — no cloud accounts required.
 
 ## Branch workflow (dev → main releases)
 
-- **All day-to-day work happens on the `dev` branch**, checked out in the dev worktree at `C:\Vibes\Targetvision\targetvision-dev` (served live at targetvisiondev.shelbyklein.com, web 8085 / API 8084). Edit and commit there — not in the prod checkout.
-- The prod checkout (`C:\Vibes\Targetvision\Targetvision`) stays on `main` and is the live site (targetvision.shelbyklein.com, web 8083 / API 8080). Don't switch its branch or leave its tree dirty.
+- **All day-to-day work happens on the `dev` branch**, checked out in the dev worktree at `C:\Vibes\Targetvision\targetvision-dev` (served live at vispixdev.shelbyklein.com, web 8085 / API 8084). Edit and commit there — not in the prod checkout.
+- The prod checkout (`C:\Vibes\Targetvision\Targetvision`) stays on `main` and is the live site (vispix.shelbyklein.com, web 8083 / API 8080). Don't switch its branch or leave its tree dirty.
 - **Release** (only when the user says so): open a PR `dev` → `main`, merge with a **merge commit** (not squash — keeps the long-lived `dev` history connected), then `git pull` in the prod checkout and restart the prod API if api-server code changed (the API is a prebuilt bundle, no watch; the web is Vite HMR and updates itself).
-- The web dev server picks up `dev` commits via HMR; **API changes need a dev API restart** (kill port 8084, re-run `pnpm run dev:api` in the worktree or `scripts/start-targetvision-dev.ps1`).
-- Dev has its **own database** (`targetvision_dev`, cloned from prod via `scripts/clone-dev-db.ps1`) — schema changes, migrations, and destructive testing on dev are safe. **At release, run `pnpm --filter @workspace/db run migrate` in the prod checkout** to apply any new migrations to the prod DB.
+- The web dev server picks up `dev` commits via HMR; **API changes need a dev API restart** (kill port 8084, re-run `pnpm run dev:api` in the worktree or `scripts/start-vispix-dev.ps1`).
+- Dev has its **own database** (`vispix_dev`, cloned from prod via `scripts/clone-dev-db.ps1`) — schema changes, migrations, and destructive testing on dev are safe. **At release, run `pnpm --filter @workspace/db run migrate` in the prod checkout** to apply any new migrations to the prod DB.
 - ⚠️ Dev still shares the prod **storage bucket**; the dev `.env` sets `PHOTO_STORAGE_DELETE_DISABLED=true` so dev photo deletes never remove image files prod references. Keep it set.
 
 ## Run & Operate
@@ -19,7 +19,7 @@ A pnpm-workspace monorepo photo album app: Express API + React web frontend + Ex
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from `lib/api-spec/openapi.yaml`
-- `pnpm run test` — run tests across packages (api-server integration tests need a Postgres `targetvision_test` DB; see Migrations)
+- `pnpm run test` — run tests across packages (api-server integration tests need a Postgres `vispix_test` DB; see Migrations)
 - Prerequisites: Node 24 (nvm), pnpm (corepack), PostgreSQL 16 on port 5433 (brew services), Docker Desktop (for fake-gcs-server)
 - Env vars load from a root `.env` file (see `.env.example`). The api-server reads it via `--env-file-if-exists`; `lib/db`'s scripts use `dotenv-cli` (`dotenv -e ../../.env -- <cmd>`).
 
@@ -30,7 +30,7 @@ A pnpm-workspace monorepo photo album app: Express API + React web frontend + Ex
 - **`pnpm --filter @workspace/db run push`** still works for quick local iteration but does not create migration files — prefer generate+migrate so schema history is captured.
 - **Existing databases** are baselined against `0000_secret_cable.sql` (the local dev DB already was), so `migrate` is a no-op there until a new migration is generated. A brand-new database gets the full schema from `migrate`.
 - The older hand-written `lib/db/migrations/*.sql` files predate this system and are historical only — not applied by `migrate`.
-- Tests: api-server integration tests run against a dedicated `targetvision_test` database (never the dev DB — `testDb.ts` refuses a non-"test" `DATABASE_URL`). Create it once with `createdb targetvision_test` (or the SQL equivalent) then `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5433/targetvision_test pnpm --filter @workspace/db exec tsx src/migrate.ts`.
+- Tests: api-server integration tests run against a dedicated `vispix_test` database (never the dev DB — `testDb.ts` refuses a non-"test" `DATABASE_URL`). Create it once with `createdb vispix_test` (or the SQL equivalent) then `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5433/vispix_test pnpm --filter @workspace/db exec tsx src/migrate.ts`.
 
 ## Auth (Better Auth)
 

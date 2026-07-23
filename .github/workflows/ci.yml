@@ -36,7 +36,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: targetvision_test
+          POSTGRES_DB: vispix_test
         ports:
           - 5432:5432
         options: >-
@@ -46,8 +46,8 @@ jobs:
           --health-retries 5
     env:
       # Route the db push + tests at the CI Postgres service.
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/targetvision_test
-      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/targetvision_test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/vispix_test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/vispix_test
       BETTER_AUTH_SECRET: ci-better-auth-secret-0000000000000000
       AI_KEY_ENCRYPTION_SECRET: ci-ai-key-encryption-secret-000000000000
     steps:

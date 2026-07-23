@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { generateAndStoreThumbnail } from "./lib/thumbnailGeneration";
 import { backfillContentHashes } from "./lib/contentHash";
 import { startAiAutoBackfillScheduler } from "./lib/aiAutoBackfillScheduler";
+import { startBillingReconcileScheduler } from "./lib/billing/reconcileScheduler";
 import { db, photosTable } from "@workspace/db";
 import { isNull, isNotNull, and, eq } from "drizzle-orm";
 
@@ -87,4 +88,5 @@ app.listen(port, (err) => {
   void backfillMissingThumbnails();
   void backfillMissingContentHashes();
   startAiAutoBackfillScheduler();
+  startBillingReconcileScheduler(); // no-op unless Stripe is configured
 });

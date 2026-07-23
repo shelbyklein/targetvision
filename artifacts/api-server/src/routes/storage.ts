@@ -9,6 +9,7 @@ import { db, organizationMembersTable, organizationsTable } from "@workspace/db"
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireOrgAuth } from "../middlewares/requireOrg";
+import { assertUploadAllowed } from "../lib/billing/subscriptions";
 
 // All private object routes require an authenticated user, and additionally
 // membership of the org that owns the object (#113). Org-prefixed keys
@@ -64,6 +65,21 @@ router.post("/storage/uploads/request-url", requireOrgAuth, async (req: Request,
 
     if (!contentType.startsWith("image/")) {
       res.status(400).json({ error: "Only image file types are allowed" });
+      return;
+    }
+
+    // Storage-quota pre-flight (#118): refuse to mint an upload URL when the
+    // file would cross the org's plan cap, so over-cap bytes never reach storage.
+    // The register route (POST /albums/:id/photos) re-checks authoritatively.
+    const quota = await assertUploadAllowed(req.org!, size ?? 0);
+    if (!quota.allowed) {
+      res.status(402).json({
+        error: "Storage limit reached — upgrade your plan to add more photos.",
+        code: "storage_limit_exceeded",
+        usageBytes: quota.usageBytes,
+        capBytes: quota.capBytes,
+        plan: req.org!.plan,
+      });
       return;
     }
 

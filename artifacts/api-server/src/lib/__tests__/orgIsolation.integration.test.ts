@@ -22,7 +22,9 @@ vi.mock("../auth", () => ({
 import type { Server } from "node:http";
 import app from "../../app";
 import { mayAccessObjectPath } from "../../routes/storage";
-import { db, pool, assetsTable, attributionTagsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { db, pool, assetsTable, attributionTagsTable, organizationsTable } from "@workspace/db";
+import { assertUploadAllowed } from "../billing/subscriptions";
 import {
   resetDb,
   createUser,
@@ -33,6 +35,12 @@ import {
   createCollection,
   createProject,
 } from "./testDb";
+
+const GB = 1024 * 1024 * 1024;
+async function orgRow(id: number) {
+  const [row] = await db.select().from(organizationsTable).where(eq(organizationsTable.id, id));
+  return row;
+}
 
 let server: Server;
 let baseUrl: string;
@@ -272,6 +280,158 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(after.name).toBe("Org A Renamed");
     const myOrgs = (await (await api("/api/organizations", { user: userA })).json()) as Array<{ name: string }>;
     expect(myOrgs[0].name).toBe("Org A Renamed");
+  });
+
+  it("billing status is per-org; gate enforces the plan cap; enterprise is unlimited (#118)", async () => {
+    const { orgA, userA, a } = await seedTwoOrgs(); // orgA defaults to the free plan (2 GB)
+    const member = await createUser({ name: "Viewer" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    // One 1 GB photo → under the 2 GB free cap.
+    await createPhoto(a.album.id, userA.id, { organizationId: orgA.id, filesize: 1 * GB });
+
+    // Status: owner sees plan/usage/cap and canManage; a plain member cannot manage.
+    const owner = (await (await api("/api/billing/status", { user: userA, orgId: orgA.id })).json()) as {
+      plan: string; usageBytes: number; capBytes: number; overLimit: boolean; canManage: boolean;
+    };
+    expect(owner.plan).toBe("free");
+    expect(owner.usageBytes).toBe(1 * GB);
+    expect(owner.capBytes).toBe(2 * GB);
+    expect(owner.overLimit).toBe(false);
+    expect(owner.canManage).toBe(true);
+    const viewer = (await (await api("/api/billing/status", { user: member, orgId: orgA.id })).json()) as { canManage: boolean };
+    expect(viewer.canManage).toBe(false);
+
+    // Checkout is unavailable until Stripe is configured (no keys in tests).
+    expect((await api("/api/billing/create-checkout-session", { user: userA, orgId: orgA.id, method: "POST", body: {} })).status).toBe(503);
+
+    // Push usage to the 2 GB cap → the upload gate refuses more.
+    await createPhoto(a.album.id, userA.id, { organizationId: orgA.id, filesize: 1 * GB });
+    const atCap = await assertUploadAllowed(await orgRow(orgA.id), 1);
+    expect(atCap.allowed).toBe(false);
+    expect(atCap.capBytes).toBe(2 * GB);
+
+    // ...and the presign route refuses to mint an upload URL with a 402 (#118),
+    // so over-cap bytes never reach storage.
+    const preflight = await api("/api/storage/uploads/request-url", {
+      user: userA,
+      orgId: orgA.id,
+      method: "POST",
+      body: { name: "next.jpg", size: 1024, contentType: "image/jpeg" },
+    });
+    expect(preflight.status).toBe(402);
+    expect(((await preflight.json()) as { code: string }).code).toBe("storage_limit_exceeded");
+
+    // Enterprise = unlimited → always allowed, regardless of usage.
+    await db.update(organizationsTable).set({ plan: "enterprise" }).where(eq(organizationsTable.id, orgA.id));
+    const ent = await assertUploadAllowed(await orgRow(orgA.id), 999 * GB);
+    expect(ent.allowed).toBe(true);
+    expect(ent.capBytes).toBeNull();
+  });
+
+  it("platform admin sees all orgs and can join one on demand; non-admins refused (#120)", async () => {
+    const { orgA, orgB, userA, a } = await seedTwoOrgs();
+    const platformAdmin = await createUser({ name: "Operator", role: "admin" });
+    await createPhoto(a.album.id, userA.id, { organizationId: orgA.id, filesize: 1024 });
+
+    // A regular org owner is NOT a platform admin → 403 on the overview.
+    expect((await api("/api/admin/organizations", { user: userA })).status).toBe(403);
+
+    // The platform admin sees every org with stats, without being a member.
+    const listRes = await api("/api/admin/organizations", { user: platformAdmin });
+    expect(listRes.status).toBe(200);
+    const list = (await listRes.json()) as {
+      id: number; plan: string; memberCount: number; photoCount: number; usageBytes: number; myRole: string | null;
+    }[];
+    const a1 = list.find((o) => o.id === orgA.id)!;
+    const b1 = list.find((o) => o.id === orgB.id)!;
+    expect(a1.photoCount).toBe(2); // seedTwoOrgs' photo (null filesize) + the 1024-byte one
+    expect(a1.usageBytes).toBe(1024);
+    expect(a1.myRole).toBeNull();
+    expect(b1.photoCount).toBe(1);
+
+    // Membership is still required to act inside the org (the tenancy wall holds).
+    expect((await api("/api/albums", { user: platformAdmin, orgId: orgA.id })).status).toBe(403);
+
+    // Join-on-demand: becomes an org-admin member, visible in the roster.
+    const join = await api(`/api/admin/organizations/${orgA.id}/join`, { user: platformAdmin, method: "POST", body: {} });
+    expect(join.status).toBe(200);
+    expect(((await join.json()) as { role: string }).role).toBe("admin");
+    expect((await api("/api/albums", { user: platformAdmin, orgId: orgA.id })).status).toBe(200);
+
+    // Idempotent — rejoining reports the existing membership, role unchanged.
+    const again = (await (
+      await api(`/api/admin/organizations/${orgA.id}/join`, { user: platformAdmin, method: "POST", body: {} })
+    ).json()) as { role: string; alreadyMember: boolean };
+    expect(again.role).toBe("admin");
+    expect(again.alreadyMember).toBe(true);
+
+    // The overview now reflects the membership.
+    const after = (await (await api("/api/admin/organizations", { user: platformAdmin })).json()) as {
+      id: number; myRole: string | null; memberCount: number;
+    }[];
+    expect(after.find((o) => o.id === orgA.id)!.myRole).toBe("admin");
+  });
+
+  it("platform admin can change a member's org role; last owner is protected (#120)", async () => {
+    const { orgA, userA } = await seedTwoOrgs(); // userA = sole owner of orgA
+    const platformAdmin = await createUser({ name: "Operator", role: "admin" });
+    const member = await createUser({ name: "Colleague" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    const setRole = (user: { authUserId: string }, userId: number, role: string) =>
+      api(`/api/admin/organizations/${orgA.id}/members/${userId}`, { user, method: "PATCH", body: { role } });
+
+    // Only platform admins may use the platform-level role route.
+    expect((await setRole(userA, member.id, "owner")).status).toBe(403);
+
+    // Promote the member to owner — without the caller being in the org at all.
+    expect((await setRole(platformAdmin, member.id, "owner")).status).toBe(204);
+
+    // Now the original owner can be demoted (another owner exists)...
+    expect((await setRole(platformAdmin, userA.id, "member")).status).toBe(204);
+
+    // ...but the last remaining owner cannot be.
+    const last = await setRole(platformAdmin, member.id, "admin");
+    expect(last.status).toBe(400);
+
+    // Unknown membership → 404.
+    expect((await setRole(platformAdmin, 99999, "member")).status).toBe(404);
+  });
+
+  it("instance-admin set-plan overrides a plan; non-admins are refused (#118)", async () => {
+    const { orgA, userA } = await seedTwoOrgs(); // orgA on the free plan; userA is its owner (not an instance admin)
+    const instanceAdmin = await createUser({ name: "Root", role: "admin" });
+
+    // An org owner who is not an instance admin cannot use the override.
+    const forbidden = await api("/api/billing/admin/set-plan", {
+      user: userA,
+      method: "POST",
+      body: { organizationId: orgA.id, plan: "enterprise" },
+    });
+    expect(forbidden.status).toBe(403);
+    expect((await orgRow(orgA.id)).plan).toBe("free");
+
+    // The instance admin flips it to Enterprise → unlimited.
+    const granted = await api("/api/billing/admin/set-plan", {
+      user: instanceAdmin,
+      method: "POST",
+      body: { organizationId: orgA.id, plan: "enterprise" },
+    });
+    expect(granted.status).toBe(200);
+    const body = (await granted.json()) as { plan: string; capBytes: number | null };
+    expect(body.plan).toBe("enterprise");
+    expect(body.capBytes).toBeNull();
+    expect((await orgRow(orgA.id)).plan).toBe("enterprise");
+    expect((await assertUploadAllowed(await orgRow(orgA.id), 999 * GB)).allowed).toBe(true);
+
+    // ...and back down to Free re-imposes the cap.
+    await api("/api/billing/admin/set-plan", {
+      user: instanceAdmin,
+      method: "POST",
+      body: { organizationId: orgA.id, plan: "free" },
+    });
+    expect((await orgRow(orgA.id)).plan).toBe("free");
   });
 
   it("requires authentication and org membership", async () => {

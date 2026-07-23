@@ -26,7 +26,7 @@ if (!/test/i.test(dbUrl)) {
 
 export async function resetDb(): Promise<void> {
   await db.execute(
-    sql`TRUNCATE TABLE near_duplicate_pairs, photo_embeddings, ai_analysis_events, photo_collections, collection_negative_photos, project_photos, projects, collections, ratings, photo_attribution_tags, attribution_tags, photos, albums, organization_invites, organization_settings, organization_members, organizations, "user", session, account, verification, users RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE near_duplicate_pairs, photo_embeddings, ai_analysis_events, photo_collections, collection_negative_photos, project_photos, projects, collections, ratings, photo_attribution_tags, attribution_tags, photos, albums, organization_invites, organization_subscriptions, organization_settings, organization_members, organizations, "user", session, account, verification, users RESTART IDENTITY CASCADE`,
   );
   cachedOrgId = null;
 }
@@ -97,6 +97,7 @@ export async function createPhoto(
     isHidden?: boolean;
     createdAt?: Date;
     organizationId?: number;
+    filesize?: number;
   } = {},
 ) {
   const [photo] = await db
@@ -108,6 +109,7 @@ export async function createPhoto(
       url: opts.url ?? `/api/storage/objects/uploads/${nextSeq()}`,
       aiDescription: opts.aiDescription ?? null,
       isHidden: opts.isHidden ?? false,
+      filesize: opts.filesize ?? null,
       ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
     })
     .returning();

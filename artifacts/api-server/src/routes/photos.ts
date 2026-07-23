@@ -49,6 +49,7 @@ import {
   BulkDeletePhotosResponse,
 } from "@workspace/api-zod";
 import { requireOrgAuth } from "../middlewares/requireOrg";
+import { assertUploadAllowed } from "../lib/billing/subscriptions";
 import { buildPhotoResponse, buildPhotosResponse, fetchAlbumPhotoPage, deletePhotoStorageObjects } from "../lib/photoHelpers";
 import { applyFiltersAndFetchIds } from "./search";
 
@@ -66,6 +67,20 @@ router.post("/albums/:id/photos", requireOrgAuth, async (req, res): Promise<void
   const body = UploadPhotoBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  // Storage-quota gate (#118): refuse the upload when it would cross the org's
+  // plan cap. Enterprise (unlimited) always passes; existing photos are untouched.
+  const quota = await assertUploadAllowed(req.org!, body.data.filesize ?? 0);
+  if (!quota.allowed) {
+    res.status(402).json({
+      error: "Storage limit reached — upgrade your plan to add more photos.",
+      code: "storage_limit_exceeded",
+      usageBytes: quota.usageBytes,
+      capBytes: quota.capBytes,
+      plan: req.org!.plan,
+    });
     return;
   }
 

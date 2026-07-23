@@ -1,9 +1,9 @@
 import { useGetMe, useAdminHubStatus, type AdminHubStatus } from "@workspace/api-client-react";
+import { useOrg } from "@/contexts/OrgContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Shield,
-  UserPlus,
   Bot,
   Sparkles,
   Braces,
@@ -19,6 +19,7 @@ import {
   CircleAlert,
   KeyRound,
   Building2,
+  CreditCard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
@@ -27,16 +28,22 @@ import { Button } from "@/components/ui/button";
 // The hub runs one aggregated count-only status call (see /admin/hub-status);
 // each section's heavier scans still only run on its own /admin/<slug> page.
 // `status` maps a hub-status count to the card's attention line; cards without
-// a meaningful count (Registration, Team, ...) have none. Near-Duplicates is
+// a meaningful count (Registration, Users, ...) have none. Near-Duplicates is
 // deliberately statusless — its clustering is too expensive for the hub.
-const SECTIONS: {
+type Section = {
   href: string;
   title: string;
   description: string;
   icon: LucideIcon;
   status?: { key: keyof AdminHubStatus; label: (n: number) => string };
-}[] = [
-  { href: "/admin/registration", title: "Registration", description: "Allow or pause new account sign-ups.", icon: UserPlus },
+};
+
+// Org level: settings and maintenance scoped to the org you're currently in.
+// Platform-level tools live on the separate /superadmin hub (issue #120).
+const ORG_SECTIONS: Section[] = [
+  { href: "/admin/organization", title: "Organization", description: "Name, description, and details of your current organization.", icon: Building2 },
+  { href: "/admin/members", title: "Members", description: "Invite teammates and manage roles in this organization.", icon: Users },
+  { href: "/admin/billing", title: "Billing", description: "Plan, storage usage, and subscription for this organization.", icon: CreditCard },
   { href: "/admin/ai-services", title: "AI Services", description: "Providers, API keys, models, and analysis events.", icon: Bot },
   {
     href: "/admin/ai-analysis", title: "AI Analysis", description: "Backfill photo descriptions and monitor runs.", icon: Sparkles,
@@ -62,9 +69,6 @@ const SECTIONS: {
   { href: "/admin/near-duplicates", title: "Near-Duplicates", description: "Visually similar photos — select and delete.", icon: CopyCheck },
   { href: "/admin/attribution-tags", title: "Attribution Tags", description: "Usage-rights tags photos can be cleared for.", icon: Copyright },
   { href: "/admin/mcp-tokens", title: "MCP Access Tokens", description: "Tokens for external AI clients to reach the photo library.", icon: KeyRound },
-  { href: "/admin/organization", title: "Organization", description: "Name, description, and details of your current organization.", icon: Building2 },
-  { href: "/admin/members", title: "Organization Members", description: "Invite teammates and manage roles in this organization.", icon: Users },
-  { href: "/admin/team", title: "Team Members", description: "Instance-wide member roles.", icon: Users },
 ];
 
 function CardStatus({
@@ -97,9 +101,16 @@ function CardStatus({
 
 export default function Admin() {
   const { data: me, isLoading: meLoading } = useGetMe();
-  const { data: hubStatus, isLoading: statusLoading } = useAdminHubStatus();
+  const { activeOrg, isLoading: orgLoading } = useOrg();
 
-  if (meLoading) {
+  // Org owners/admins manage their organization; platform admins see everything
+  // (issue #120). The hub-status call is org-scoped, so it's valid for both.
+  const isPlatformAdmin = me?.role === "admin";
+  const isOrgAdmin = activeOrg?.role === "owner" || activeOrg?.role === "admin";
+  const allowed = isPlatformAdmin || isOrgAdmin;
+  const { data: hubStatus, isLoading: statusLoading } = useAdminHubStatus({ enabled: allowed });
+
+  if (meLoading || orgLoading) {
     return (
       <AppLayout>
         <div className="space-y-6">
@@ -110,7 +121,7 @@ export default function Admin() {
     );
   }
 
-  if (!me || me.role !== "admin") {
+  if (!me || !allowed) {
     return (
       <AppLayout>
         <div className="text-center py-24">
@@ -130,12 +141,14 @@ export default function Admin() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-sm text-muted-foreground">Each area opens on its own page.</p>
+            <p className="text-sm text-muted-foreground">
+              Settings and maintenance for the organization you're currently in.
+            </p>
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="admin-hub-grid">
-          {SECTIONS.map((section) => {
+          {ORG_SECTIONS.map((section) => {
             const Icon = section.icon;
             return (
               <Link
@@ -148,10 +161,10 @@ export default function Admin() {
                   <Icon className="h-[18px] w-[18px] text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-1">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-1">
                     {section.title}
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
-                  </h2>
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
                   {section.status && (
                     <CardStatus

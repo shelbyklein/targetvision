@@ -39,7 +39,7 @@ export async function startHttpServer(): Promise<void> {
 
   const port = Number(process.env.MCP_HTTP_PORT) || 8086;
   // Public base for download links returned by get_photo, e.g.
-  // https://targetvision-mcp.shelbyklein.com — token prefix is appended here.
+  // https://vispixmcp.shelbyklein.com — token prefix is appended here.
   const publicUrl = process.env.MCP_PUBLIC_URL?.replace(/\/$/, "");
 
   const app = express();
@@ -174,5 +174,5 @@ export async function startHttpServer(): Promise<void> {
   await new Promise<void>((resolve) => {
     app.listen(port, () => resolve());
   });
-  console.error(`TargetVision MCP HTTP server listening on :${port} (public URL: ${publicUrl ?? "unset"})`);
+  console.error(`Vispix MCP HTTP server listening on :${port} (public URL: ${publicUrl ?? "unset"})`);
 }

@@ -15,6 +15,12 @@ export const organizationsTable = pgTable("organizations", {
   slug: text("slug").notNull().unique(),
   // Optional free-text description shown on the org settings page.
   description: text("description"),
+  // Subscription tier (issue #118): "free" | "pro" | "enterprise". Kept on the
+  // org row (loaded on every request via req.org) so feature-gating reads it
+  // with zero extra query; volatile Stripe state lives in
+  // organization_subscriptions. text (not enum) so future tiers / admin
+  // overrides need no enum migration — validated against PLAN_IDS in app code.
+  plan: text("plan").notNull().default("free"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -166,7 +166,7 @@ function AppRoutes() {
         {([
           ["/admin/duplicates", () => import("@/pages/admin-duplicates")],
           ["/admin/near-duplicates", () => import("@/pages/admin-near-duplicates")],
-          ["/admin/registration", () => import("@/pages/admin-registration")],
+          ["/superadmin/registration", () => import("@/pages/admin-registration")],
           ["/admin/ai-services", () => import("@/pages/admin-ai-services")],
           ["/admin/ai-analysis", () => import("@/pages/admin-ai-analysis")],
           ["/admin/embeddings", () => import("@/pages/admin-embeddings")],
@@ -175,9 +175,12 @@ function AppRoutes() {
           ["/admin/captured-dates", () => import("@/pages/admin-captured-dates")],
           ["/admin/attribution-tags", () => import("@/pages/admin-attribution-tags")],
           ["/admin/mcp-tokens", () => import("@/pages/admin-mcp-tokens")],
+          ["/superadmin/organizations", () => import("@/pages/admin-organizations")],
+          ["/superadmin", () => import("@/pages/superadmin")],
           ["/admin/organization", () => import("@/pages/admin-organization")],
+          ["/admin/billing", () => import("@/pages/admin-billing")],
           ["/admin/members", () => import("@/pages/admin-org-members")],
-          ["/admin/team", () => import("@/pages/admin-team")],
+          ["/superadmin/users", () => import("@/pages/admin-team")],
         ] as const).map(([path, load]) => (
           <Route key={path} path={path}>
             {() => (

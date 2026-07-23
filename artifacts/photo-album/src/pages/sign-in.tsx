@@ -8,27 +8,10 @@ import { Label } from "@/components/ui/label";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-export function PoweredByUSAA() {
-  return (
-    <div className="flex items-center justify-center gap-2 mt-5">
-      <span className="text-xs text-muted-foreground/70">a</span>
-      <a
-        href="https://www.usarchery.org"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center"
-      >
-        <img src={`${basePath}/usaa-horizontal.svg`} alt="USA Archery" className="h-5 w-auto opacity-70" />
-      </a>
-      <span className="text-xs text-muted-foreground/70">product</span>
-    </div>
-  );
-}
-
 export function AuthCardLogo() {
   return (
     <div className="flex justify-center mb-2">
-      <img src={`${basePath}/target-vision.svg`} alt="Target Vision" className="h-10 w-auto" />
+      <img src={`${basePath}/vispix.png`} alt="Vispix" className="h-10 w-auto rounded-md" />
     </div>
   );
 }
@@ -59,7 +42,7 @@ export default function SignInPage() {
       <Card className="w-[440px] max-w-full rounded-2xl shadow-md">
         <CardHeader className="text-center">
           <AuthCardLogo />
-          <CardTitle>Welcome back to Target Vision</CardTitle>
+          <CardTitle>Welcome back to Vispix</CardTitle>
           <CardDescription>Sign in to start picking photos for marketing</CardDescription>
         </CardHeader>
         <CardContent>
@@ -99,7 +82,6 @@ export default function SignInPage() {
           </form>
         </CardContent>
       </Card>
-      <PoweredByUSAA />
     </div>
   );
 }

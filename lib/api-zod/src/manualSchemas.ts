@@ -305,3 +305,62 @@ export const UpdateOrgBody = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   description: z.string().trim().max(500).nullable().optional(),
 });
+
+// --- Billing / subscription (issue #118) ---
+export const BillingStatusResponse = z.object({
+  plan: z.string(),
+  planLabel: z.string(),
+  capBytes: z.number().nullable(), // null = unlimited
+  usageBytes: z.number(),
+  ratio: z.number(),
+  nearLimit: z.boolean(),
+  overLimit: z.boolean(),
+  status: z.string(),
+  currentPeriodEnd: z.string().nullable(),
+  cancelAtPeriodEnd: z.boolean(),
+  hasStripeCustomer: z.boolean(),
+  canManage: z.boolean(),
+});
+
+export const CheckoutSessionResponse = z.object({ url: z.string() });
+export const PortalSessionResponse = z.object({ url: z.string() });
+
+// Platform-admin override to set an org's plan directly (Enterprise / manual).
+export const SetOrgPlanBody = z.object({
+  organizationId: z.number().int(),
+  plan: z.enum(["free", "pro", "enterprise"]),
+});
+
+// --- Platform superadmin (issue #120) ---
+// One row per organization in the platform-admin overview, with enough to
+// manage plans and spot growth without entering the org.
+export const AdminOrganizationSummary = z.object({
+  id: z.number(),
+  name: z.string(),
+  slug: z.string(),
+  plan: z.string(),
+  subscriptionStatus: z.string(),
+  memberCount: z.number(),
+  photoCount: z.number(),
+  usageBytes: z.number(),
+  capBytes: z.number().nullable(), // null = unlimited
+  createdAt: z.string(),
+  // The calling platform admin's own membership in this org (null if none) —
+  // drives the "Join as admin" vs "Member" affordance.
+  myRole: z.string().nullable(),
+  members: z.array(
+    z.object({
+      userId: z.number(),
+      name: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }),
+  ),
+});
+export const AdminOrganizationsResponse = z.array(AdminOrganizationSummary);
+
+export const JoinOrganizationResponse = z.object({
+  organizationId: z.number(),
+  role: z.string(),
+  alreadyMember: z.boolean(),
+});

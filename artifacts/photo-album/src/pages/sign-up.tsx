@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PoweredByUSAA, AuthCardLogo } from "@/pages/sign-in";
+import { AuthCardLogo } from "@/pages/sign-in";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -36,8 +36,8 @@ export default function SignUpPage() {
       <Card className="w-[440px] max-w-full rounded-2xl shadow-md">
         <CardHeader className="text-center">
           <AuthCardLogo />
-          <CardTitle>Join Target Vision</CardTitle>
-          <CardDescription>Create an account to help choose USA Archery&apos;s marketing photos</CardDescription>
+          <CardTitle>Join Vispix</CardTitle>
+          <CardDescription>Create an account to collaborate on your team&apos;s marketing photos</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -87,7 +87,6 @@ export default function SignUpPage() {
           </form>
         </CardContent>
       </Card>
-      <PoweredByUSAA />
     </div>
   );
 }

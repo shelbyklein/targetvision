@@ -2,10 +2,10 @@ import { defineConfig } from "vitest/config";
 
 // Integration tests talk to a real Postgres. Point them at a dedicated test
 // database (never the dev/prod DB). CI provides TEST_DATABASE_URL; locally we
-// default to the `targetvision_test` database on the docker Postgres (port 5433).
+// default to the `vispix_test` database on the docker Postgres (port 5433).
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
-  "postgres://postgres:postgres@localhost:5433/targetvision_test";
+  "postgres://postgres:postgres@localhost:5433/vispix_test";
 
 export default defineConfig({
   test: {

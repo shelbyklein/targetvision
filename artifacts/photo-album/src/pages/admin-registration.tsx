@@ -4,7 +4,7 @@ import { UserPlus } from "lucide-react";
 
 export default function AdminRegistrationPage() {
   return (
-    <AdminSectionShell title="Registration" icon={UserPlus}>
+    <AdminSectionShell title="Registration" scope="platform" icon={UserPlus}>
       <RegistrationSection />
     </AdminSectionShell>
   );
