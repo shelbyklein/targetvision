@@ -30,6 +30,10 @@ if (!basePath.startsWith("/")) {
 
 export default defineConfig({
   base: basePath,
+  // Load .env from the repo root (same file the API server reads) so flags
+  // like VITE_ENVIRONMENT can live alongside the rest of the env config.
+  // Only VITE_-prefixed vars are exposed to the client.
+  envDir: path.resolve(import.meta.dirname, "..", ".."),
   plugins: [
     react(),
     tailwindcss({ optimize: false }),
