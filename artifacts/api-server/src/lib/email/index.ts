@@ -49,9 +49,12 @@ export interface SendEmailInput {
 export async function sendEmail(input: SendEmailInput): Promise<boolean> {
   const transport = getTransport();
   if (!transport) {
+    // Dev fallback: with no SMTP configured, log the full text body (including
+    // any reset/verify links) so local flows are testable without a provider.
+    // In production SMTP is always configured, so this branch never runs.
     logger.warn(
-      { to: input.to, subject: input.subject },
-      "Email not sent: SMTP not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS)",
+      { to: input.to, subject: input.subject, body: input.text },
+      "Email not sent: SMTP not configured (set SMTP_HOST/SMTP_USER/SMTP_PASS) — logging body for local dev",
     );
     return false;
   }
