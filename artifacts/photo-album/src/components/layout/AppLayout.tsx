@@ -591,15 +591,9 @@ function AppSidebar({
   const [localNavOrder, setLocalNavOrder] = useState<string[] | null>(null);
 
   const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
-  // Superadmin (platform, amber shield) is pinned FIRST for platform admins
-  // (#135); the org Admin entry lives in the sidebar FOOTER (rendered below).
-  // Neither is reorderable.
-  const items: { href: string; to?: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
-    ...(isPlatformAdmin
-      ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
-      : []),
-    ...orderedNav,
-  ];
+  // Admin + Superadmin now live in the account menu (footer dropdown, below),
+  // so the main nav is just the user-orderable content items.
+  const items: { href: string; to?: string; label: string; icon: LucideIcon; iconClass?: string }[] = orderedNav;
 
   function navDragProps(href: string): React.LiHTMLAttributes<HTMLLIElement> {
     return {
@@ -663,8 +657,7 @@ function AppSidebar({
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarMenu data-testid="main-nav">
             {items.map((item) => {
-              const dragProps =
-                item.href === "/admin" || item.href === "/superadmin" ? undefined : navDragProps(item.href);
+              const dragProps = navDragProps(item.href);
               if (item.href === "/collections") {
                 return <CollectionsNav key={item.href} location={location} dragProps={dragProps} />;
               }
@@ -690,23 +683,6 @@ function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Org Admin lives at the very bottom of the sidebar, above the
-              theme/user controls. ?org=1 (platform admins) suppresses the
-              /admin → /superadmin default redirect. */}
-          {isAdmin && (
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={location === "/admin" || location.startsWith("/admin/")}
-                tooltip="Admin"
-              >
-                <Link href={isPlatformAdmin ? "/admin?org=1" : "/admin"} data-testid="nav-admin">
-                  <Shield />
-                  <span>Admin</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
           <SidebarMenuItem>
             <ThemeMenuButton />
           </SidebarMenuItem>
@@ -743,6 +719,35 @@ function AppSidebar({
                   )}
                 </div>
                 <DropdownMenuSeparator />
+                {/* Admin (org owners/admins + platform admins) and Superadmin
+                    (platform admins only) live here above Settings. ?org=1 keeps
+                    a platform admin on the org /admin panel instead of the
+                    /admin → /superadmin default redirect. */}
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={isPlatformAdmin ? "/admin?org=1" : "/admin"}
+                      className="flex items-center gap-2 cursor-pointer"
+                      data-testid="nav-admin"
+                    >
+                      <Shield className="h-4 w-4" />
+                      Admin
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {isPlatformAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/superadmin"
+                      className="flex items-center gap-2 cursor-pointer"
+                      data-testid="nav-superadmin"
+                    >
+                      <Shield className="h-4 w-4 text-amber-500" />
+                      Superadmin
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && <DropdownMenuSeparator />}
                 <DropdownMenuItem asChild>
                   <Link href="/settings" className="flex items-center gap-2 cursor-pointer" data-testid="settings-link">
                     <Settings className="h-4 w-4" />
