@@ -592,18 +592,13 @@ function AppSidebar({
 
   const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
   // Superadmin (platform, amber shield) is pinned FIRST for platform admins
-  // (#135); Admin (org-scoped) stays pinned last. Neither is reorderable. For
-  // platform admins, the Admin link carries ?org=1 so it opens the org panel
-  // instead of bouncing off the /admin → /superadmin default redirect; `to` is
-  // the link target, `href` stays the match path.
+  // (#135); the org Admin entry lives in the sidebar FOOTER (rendered below).
+  // Neither is reorderable.
   const items: { href: string; to?: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
     ...(isPlatformAdmin
       ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
       : []),
     ...orderedNav,
-    ...(isAdmin
-      ? [{ href: "/admin", to: isPlatformAdmin ? "/admin?org=1" : "/admin", label: "Admin", icon: Shield }]
-      : []),
   ];
 
   function navDragProps(href: string): React.LiHTMLAttributes<HTMLLIElement> {
@@ -695,6 +690,23 @@ function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
+          {/* Org Admin lives at the very bottom of the sidebar, above the
+              theme/user controls. ?org=1 (platform admins) suppresses the
+              /admin → /superadmin default redirect. */}
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={location === "/admin" || location.startsWith("/admin/")}
+                tooltip="Admin"
+              >
+                <Link href={isPlatformAdmin ? "/admin?org=1" : "/admin"} data-testid="nav-admin">
+                  <Shield />
+                  <span>Admin</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <ThemeMenuButton />
           </SidebarMenuItem>
