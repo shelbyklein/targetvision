@@ -52,6 +52,8 @@ Thumbs.db
 .env
 .env.local
 .env.dev
+deploy/.env.production
+deploy/secrets/gcp-sa.json
 .kanbots/
 
 # Local machine/tooling state

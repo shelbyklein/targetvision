@@ -1,0 +1,25 @@
+# Keep the build context lean and — critically — never copy host (Windows)
+# node_modules or dist into the Linux image, or native deps like sharp break.
+**/node_modules
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+.git
+.github
+**/*.log
+
+# Never bake secrets or local env into an image.
+.env
+.env.*
+deploy/.env.production
+deploy/secrets/
+
+# Expo/mobile build caches (the package source itself stays — the pnpm
+# workspace needs it — but its heavy caches are dropped).
+artifacts/mobile/.expo
+artifacts/mobile/android
+artifacts/mobile/ios
+
+# Local-only bits
+attached_assets
+scripts/fake-gcs/seed
