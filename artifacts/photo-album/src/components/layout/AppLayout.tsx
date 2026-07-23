@@ -55,6 +55,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useBulkUploadOptional } from "@/contexts/BulkUploadContext";
+import { DevEnvironmentBadge } from "@/components/DevEnvironmentBadge";
 import { usePhotoUploadOptional } from "@/contexts/PhotoUploadContext";
 import { PhotoUploadBanner } from "@/components/PhotoUploadBanner";
 
@@ -777,6 +778,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <img src="/vispix.png" alt="Vispix" className="h-7 w-7 rounded" />
           </Link>
           <GlobalSearchBar />
+          <DevEnvironmentBadge />
         </header>
 
         <main className={cn(
