@@ -180,36 +180,42 @@ export default function Admin() {
                 href={section.href}
                 className={cn(
                   "group rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/50",
-                  featured
-                    ? "sm:col-span-2 sm:row-span-2 flex flex-col justify-between gap-4"
-                    : "flex items-start gap-3",
+                  featured ? "sm:col-span-2 sm:row-span-2 flex gap-4" : "flex items-start gap-3",
                 )}
                 data-testid={`admin-card-${section.href.split("/").pop()}`}
               >
                 {featured ? (
                   <>
-                    <div className="space-y-3">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden">
-                        {activeOrg?.logoUrl ? (
-                          <img src={activeOrg.logoUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <Icon className="h-6 w-6 text-primary" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-1.5">
-                          {activeOrg?.name ?? section.title}
-                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
-                        </h3>
-                        {activeOrg && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {activeOrg.slug} · your role: {activeOrg.role}
-                          </p>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{section.description}</p>
+                    {/* Logo fills the card height; org info sits to its right. */}
+                    <div className="self-stretch aspect-square shrink-0 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
+                      {activeOrg?.logoUrl ? (
+                        <img
+                          src={activeOrg.logoUrl}
+                          alt={`${activeOrg.name} logo`}
+                          className="h-full w-full object-cover"
+                          data-testid="admin-org-card-logo"
+                        />
+                      ) : (
+                        <Icon className="h-10 w-10 text-primary" />
+                      )}
                     </div>
-                    <span className="text-xs font-medium text-primary">Open organization settings →</span>
+                    <div className="flex flex-col justify-between min-w-0 flex-1 py-1">
+                      <div className="space-y-2">
+                        <div>
+                          <h3 className="text-lg font-semibold text-foreground flex items-center gap-1.5">
+                            <span className="truncate">{activeOrg?.name ?? section.title}</span>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+                          </h3>
+                          {activeOrg && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {activeOrg.slug} · your role: {activeOrg.role}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{section.description}</p>
+                      </div>
+                      <span className="text-xs font-medium text-primary">Open organization settings →</span>
+                    </div>
                   </>
                 ) : (
                   <>
