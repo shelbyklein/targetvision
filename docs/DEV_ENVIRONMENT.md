@@ -9,7 +9,7 @@ check out in a separate git worktree.
 | Checkout | `C:\Vibes\Targetvision\Targetvision` (`main`) | `C:\Vibes\Targetvision\targetvision-dev` (worktree, any branch) |
 | Web (Vite) | 8083 | **8085** |
 | API | 8080 | **8084** |
-| Database | `targetvision` @ 5433 | **`vispix_dev` @ 5433** (cloned from prod) |
+| Database | `vispix` @ 5433 | **`vispix_dev` @ 5433** (cloned from prod) |
 | Object storage | fake-gcs @ 4443 | same bucket (deletes disabled — see below) |
 | Public URL | vispix.shelbyklein.com | **vispixdev.shelbyklein.com** |
 
@@ -150,7 +150,7 @@ apply the same migrations to prod:
 
 ```sh
 # in the PROD checkout
-pnpm --filter @workspace/db run migrate     # applies pending migrations to targetvision
+pnpm --filter @workspace/db run migrate     # applies pending migrations to vispix
 # restart the prod API
 ```
 

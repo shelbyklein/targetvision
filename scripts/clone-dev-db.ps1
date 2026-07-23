@@ -1,5 +1,5 @@
 # Refreshes the dev database (vispix_dev) from a fresh snapshot of prod
-# (still named "targetvision" until the prod DB is renamed at a release). Run whenever you want dev data to match prod again — e.g.
+# (vispix). Run whenever you want dev data to match prod again — e.g.
 # after prod grew new albums, or after destructive testing on dev.
 #
 # Safe for prod: pg_dump reads the live prod DB without locking it.
@@ -20,7 +20,7 @@ docker exec $container dropdb -U postgres --if-exists vispix_dev
 docker exec $container createdb -U postgres vispix_dev
 
 Write-Host "Cloning prod -> dev (pg_dump | pg_restore)..."
-docker exec $container sh -c "pg_dump -U postgres -Fc targetvision -f /tmp/tv.dump && pg_restore -U postgres -d vispix_dev --no-owner /tmp/tv.dump; rc=`$?; rm -f /tmp/tv.dump; exit `$rc"
+docker exec $container sh -c "pg_dump -U postgres -Fc vispix -f /tmp/tv.dump && pg_restore -U postgres -d vispix_dev --no-owner /tmp/tv.dump; rc=`$?; rm -f /tmp/tv.dump; exit `$rc"
 
 Write-Host "Verifying..."
 docker exec $container psql -U postgres -d vispix_dev -t -c "SELECT count(*) || ' photos' FROM photos;"
