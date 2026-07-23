@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { FadeImage } from "@/components/ui/fade-image";
-import { useListAlbums, useCreateAlbum, useReorderAlbums, getListAlbumsQueryKey, type Album } from "@workspace/api-client-react";
+import { useListAlbums, useCreateAlbum, useReorderAlbums, useUpdateAlbum, getListAlbumsQueryKey, type Album } from "@workspace/api-client-react";
 import { useCardReorder } from "@/hooks/useCardReorder";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -155,11 +155,13 @@ function AlbumGrid({
   albums,
   isAdmin,
   onCommit,
+  onMove,
   testId,
 }: {
   albums: AlbumItem[];
   isAdmin: boolean;
   onCommit: (orderedIds: number[]) => void;
+  onMove: (album: AlbumItem) => void;
   testId?: string;
 }) {
   const reorder = useCardReorder({
@@ -171,7 +173,24 @@ function AlbumGrid({
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid={testId ?? "albums-grid"}>
       {reorder.arrange(albums, (a) => a.id).map((album) => (
         <Link key={album.id} href={`/albums/${album.id}`} {...reorder.handlers(album.id)}>
-          <div className={`rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow${reorder.draggingId === album.id ? " opacity-50" : ""}`} data-testid="album-card">
+          <div className={`relative rounded-xl overflow-hidden border border-border bg-card group cursor-pointer hover:shadow-md transition-shadow${reorder.draggingId === album.id ? " opacity-50" : ""}`} data-testid="album-card">
+            {/* Quick "move to folder" without opening the album (#149). Stops
+                the click so the card's Link doesn't navigate. */}
+            <button
+              type="button"
+              className="absolute right-2 top-2 z-10 rounded-md bg-background/80 p-1.5 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+              title="Move to folder"
+              aria-label={`Move "${album.title}" to a folder`}
+              data-testid={`move-album-${album.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onMove(album);
+              }}
+              draggable={false}
+            >
+              <Folder className="h-3.5 w-3.5" />
+            </button>
             <div className="aspect-[4/3] bg-muted overflow-hidden">
               {album.coverPhotoUrl ? (
                 <FadeImage
@@ -256,6 +275,39 @@ export default function Albums() {
   }
 
   const reorderMutation = useReorderAlbums();
+  const { toast } = useToast();
+
+  // "Move to folder" quick action from a card (#149). moveAlbum is the album
+  // being moved; the dialog seeds its input from the album's current folder.
+  const [moveAlbum, setMoveAlbum] = useState<AlbumItem | null>(null);
+  const [moveFolder, setMoveFolder] = useState("");
+  const { mutate: updateAlbum, isPending: isMoving } = useUpdateAlbum();
+
+  function openMove(album: AlbumItem) {
+    setMoveAlbum(album);
+    setMoveFolder(album.folder ?? "");
+  }
+
+  function handleMoveSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!moveAlbum) return;
+    const target = moveFolder.trim() || null;
+    updateAlbum(
+      { id: moveAlbum.id, data: { folder: target } },
+      {
+        onSuccess: () => {
+          setMoveAlbum(null);
+          refetch();
+          toast({
+            title: target ? `Moved to "${target}"` : "Removed from folder",
+            description: `"${moveAlbum.title}"`,
+          });
+        },
+        // PATCH /albums/:id is owner-or-platform-admin; surface the 403 plainly.
+        onError: () => toast({ title: "Failed to move album", description: "Only the album's owner or a platform admin can move it.", variant: "destructive" }),
+      },
+    );
+  }
 
   // A section commits its own new order; persist the full flat order with the
   // other sections (and any albums beyond the flat-view window) unchanged.
@@ -318,6 +370,7 @@ export default function Albums() {
                     albums={section.albums}
                     isAdmin={isAdmin}
                     onCommit={(ids) => commitSectionOrder(section.label, ids)}
+                    onMove={openMove}
                     testId={section.label ? undefined : "albums-grid"}
                   />
                 </div>
@@ -328,6 +381,7 @@ export default function Albums() {
               albums={visibleAlbums}
               isAdmin={isAdmin}
               onCommit={(ids) => commitSectionOrder(null, ids)}
+              onMove={openMove}
             />
           )}
           {hasMore && (
@@ -352,6 +406,42 @@ export default function Albums() {
             <CreateAlbumDialog onCreated={refetch} folderSuggestions={folders} />
           </div>
         )}
+
+        {/* Move-to-folder dialog for the card quick action. */}
+        <Dialog open={moveAlbum !== null} onOpenChange={(open) => { if (!open) setMoveAlbum(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Move to folder</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleMoveSubmit} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="move-album-folder">
+                  Folder for <span className="font-medium">{moveAlbum?.title}</span>
+                </Label>
+                <Input
+                  id="move-album-folder"
+                  value={moveFolder}
+                  onChange={(e) => setMoveFolder(e.target.value)}
+                  placeholder='e.g. "2026" — leave empty to ungroup'
+                  list="move-album-folder-options"
+                  autoFocus
+                  data-testid="move-album-folder-input"
+                />
+                <datalist id="move-album-folder-options">
+                  {folders.map((f) => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setMoveAlbum(null)}>Cancel</Button>
+                <Button type="submit" disabled={isMoving} data-testid="move-album-submit">
+                  {isMoving ? "Moving..." : "Move"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
