@@ -1,54 +1,11 @@
-import { useGetMe, useServiceStatus } from "@workspace/api-client-react";
+import { useGetMe } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, UserPlus, Users, ChevronRight, Building2, CircleCheck, CircleAlert, CircleMinus } from "lucide-react";
+import { Shield, UserPlus, Users, ChevronRight, Building2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-
-// Per-service readiness rows + overall checkmark (issue #122).
-function ServiceReadinessCard({ enabled }: { enabled: boolean }) {
-  const { data, isLoading } = useServiceStatus({ enabled });
-
-  if (isLoading || !data) {
-    return <Skeleton className="h-24 w-full rounded-xl" data-testid="service-readiness-loading" />;
-  }
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4" data-testid="service-readiness">
-      <div className="flex items-center gap-2">
-        {data.ready ? (
-          <CircleCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-500 shrink-0" />
-        ) : (
-          <CircleAlert className="h-5 w-5 text-amber-500 shrink-0" />
-        )}
-        <h3 className="text-sm font-semibold text-foreground">
-          {data.ready ? "Platform ready — all required services configured" : "Setup incomplete"}
-        </h3>
-      </div>
-      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-        {data.services.map((s) => (
-          <div key={s.key} className="flex items-start gap-1.5 text-xs" data-testid={`service-${s.key}`}>
-            {s.ok ? (
-              <CircleCheck className="h-3.5 w-3.5 mt-0.5 text-emerald-600 dark:text-emerald-500 shrink-0" />
-            ) : s.optional ? (
-              <CircleMinus className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
-            ) : (
-              <CircleAlert className="h-3.5 w-3.5 mt-0.5 text-amber-500 shrink-0" />
-            )}
-            <span>
-              <span className="font-medium text-foreground">
-                {s.label}
-                {s.optional && <span className="text-muted-foreground font-normal"> (optional)</span>}
-              </span>{" "}
-              <span className="text-muted-foreground">— {s.detail}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+import { ServiceReadinessCard } from "@/components/admin/ServiceReadinessCard";
 
 // Superadmin hub (issue #120): the platform operator's cross-organization
 // tools, split out from the org-scoped /admin area. Platform admins only.
@@ -96,7 +53,7 @@ export default function Superadmin() {
           </div>
         </div>
 
-        <ServiceReadinessCard enabled={me.role === "admin"} />
+        <ServiceReadinessCard variant="platform" enabled={me.role === "admin"} />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="superadmin-grid">
           {SECTIONS.map((section) => {

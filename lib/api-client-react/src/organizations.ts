@@ -7,6 +7,7 @@ export type MyOrganization = {
   name: string;
   slug: string;
   role: string; // "owner" | "admin" | "member"
+  logoUrl: string | null;
 };
 
 const MY_ORGS_KEY = ["organizations", "mine"] as const;
@@ -60,6 +61,7 @@ export type OrgDetails = {
   createdAt: string;
   role: string;
   memberCount: number;
+  logoUrl: string | null;
 };
 
 const CURRENT_ORG_KEY = ["organizations", "current"] as const;
@@ -74,7 +76,7 @@ export function useOrgDetails() {
 export function useUpdateOrg() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name?: string; description?: string | null }) =>
+    mutationFn: (input: { name?: string; description?: string | null; logoKey?: string | null }) =>
       customFetch<OrgDetails>("/api/organizations/current", {
         method: "PATCH",
         body: JSON.stringify(input),

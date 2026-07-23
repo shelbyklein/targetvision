@@ -183,6 +183,13 @@
       "when": 1784779398878,
       "tag": "0025_premium_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784782493396,
+      "tag": "0026_chubby_hitman",
+      "breakpoints": true
     }
   ]
 }

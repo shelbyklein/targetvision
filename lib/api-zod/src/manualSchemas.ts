@@ -254,6 +254,7 @@ export const MyOrganization = z.object({
   name: z.string(),
   slug: z.string(),
   role: z.string(), // "owner" | "admin" | "member"
+  logoUrl: z.string().nullable(), // servable URL for the org logo (issue #121)
 });
 
 export const ListMyOrganizationsResponse = z.array(MyOrganization);
@@ -309,11 +310,15 @@ export const OrgDetailsResponse = z.object({
   createdAt: z.string(),
   role: z.string(), // the caller's role in this org
   memberCount: z.number(),
+  logoUrl: z.string().nullable(), // servable URL for the org logo (issue #121)
 });
 
 export const UpdateOrgBody = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   description: z.string().trim().max(500).nullable().optional(),
+  // Org logo (issue #121): an /objects/ key from the upload flow, or null to
+  // remove the logo. Prefix-validated route-side like asset storageKeys.
+  logoKey: z.string().nullable().optional(),
 });
 
 // --- Billing / subscription (issue #118) ---

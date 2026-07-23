@@ -93,3 +93,14 @@ export function useServiceStatus(opts: { enabled?: boolean } = {}) {
     staleTime: 60 * 1000,
   });
 }
+
+// Org-scoped readiness (issue #122): same shape, but the AI row reflects
+// whether the ACTIVE org can analyse photos. Accessible to org owners/admins.
+export function useOrgServiceStatus(opts: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: ["admin", "org-service-status"],
+    queryFn: () => customFetch<ServiceStatus>("/api/admin/org-service-status"),
+    enabled: opts.enabled ?? true,
+    staleTime: 60 * 1000,
+  });
+}
