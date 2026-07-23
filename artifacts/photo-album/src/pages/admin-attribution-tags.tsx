@@ -90,7 +90,7 @@ export default function AdminAttributionTagsPage() {
     <AdminSectionShell
       title="Attribution Tags"
       icon={Copyright}
-      description="User-defined usage-rights tags (e.g. USA Archery, World Archery, Social). Photos marked with a tag are cleared for that kind of use."
+      description="User-defined usage-rights tags (e.g. Web, Print, Social). Photos marked with a tag are cleared for that kind of use."
     >
       <div className="rounded-xl border border-border bg-card overflow-hidden max-w-2xl">
         <div className="px-5 py-4 border-b border-border">
@@ -98,7 +98,7 @@ export default function AdminAttributionTagsPage() {
             <Input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="New tag name (e.g. USA Archery)…"
+              placeholder="New tag name (e.g. Social)…"
               className="h-9 flex-1"
               disabled={creating}
               data-testid="new-attribution-tag-input"

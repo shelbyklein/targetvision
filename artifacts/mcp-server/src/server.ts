@@ -56,7 +56,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       title: "Search photos semantically",
       description:
         "Find photos in the Vispix photo library that match a natural-language description " +
-        "(e.g. 'athlete celebrating a win', 'close-up of an arrow hitting the target'). Results are ranked " +
+        "(e.g. 'person celebrating a win', 'close-up of hands at work'). Results are ranked " +
         "by semantic similarity and include inline thumbnails so you can judge visual fit. " +
         "Use one focused concept per call; make multiple calls for multiple concepts.",
       inputSchema: {
@@ -198,7 +198,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     {
       title: "List people",
       description:
-        "List the people (athletes etc.) photos can be tagged to, with tagged-photo counts. Pass a name " +
+        "List the people photos can be tagged to, with tagged-photo counts. Pass a name " +
         "as search_photos' person to restrict results to that person's photos.",
       inputSchema: {},
     },
@@ -216,8 +216,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
     {
       title: "List usage-rights tags",
       description:
-        "List the attribution / usage-rights tags photos can be cleared for (e.g. social media, USA Archery, " +
-        "World Archery). Pass a tag name as search_photos' rightsTag to restrict results to cleared photos.",
+        "List the attribution / usage-rights tags photos can be cleared for (e.g. web, print, " +
+        "social media). Pass a tag name as search_photos' rightsTag to restrict results to cleared photos.",
       inputSchema: {},
     },
     async () => {

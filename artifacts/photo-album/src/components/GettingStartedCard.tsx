@@ -92,7 +92,7 @@ export function GettingStartedCard() {
     {
       key: "person",
       label: "Add a person",
-      blurb: "People group photos by who's in them — every shot of one athlete under their name.",
+      blurb: "People group photos by who's in them — every shot of one person under their name.",
       href: "/people",
       done: status.hasTaggedPerson,
     },

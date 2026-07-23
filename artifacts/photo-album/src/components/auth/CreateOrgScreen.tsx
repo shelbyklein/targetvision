@@ -42,7 +42,7 @@ export function CreateOrgScreen() {
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Organization name (e.g. USA Archery)"
+            placeholder="Organization name"
             maxLength={80}
             autoFocus
             disabled={isPending}
