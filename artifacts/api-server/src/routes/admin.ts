@@ -109,6 +109,8 @@ import { getEmbeddingConfigStatus } from "../lib/aiEmbedding";
 import { IMAGE_OPTIMIZATION_SETTINGS } from "../lib/imageOptimization";
 import { countPhotosNeedingEmbedding, backfillEmbeddings } from "../lib/embeddingBackfill";
 import { logger } from "../lib/logger";
+import { sendEmail, isEmailConfigured } from "../lib/email";
+import { testEmail } from "../lib/email/templates";
 
 const router: IRouter = Router();
 
@@ -136,6 +138,17 @@ router.patch("/admin/registration-settings", requireAdmin, async (req, res): Pro
     .returning();
 
   res.json(UpdateRegistrationSettingsResponse.parse({ registrationEnabled: updated.registrationEnabled }));
+});
+
+// Platform-admin diagnostic: email the signed-in admin a test message so they
+// can confirm SMTP delivery end-to-end from the Superadmin page. `configured`
+// lets the UI distinguish "no SMTP set up" from "configured but send failed".
+router.post("/admin/test-email", requireAdmin, async (req, res): Promise<void> => {
+  const to = req.dbUser!.email;
+  const configured = isEmailConfigured();
+  const { subject, html, text } = testEmail();
+  const ok = await sendEmail({ to, subject, html, text });
+  res.json({ ok, to, configured });
 });
 
 router.get("/admin/ai-settings", ...requireOrgAdmin, async (req, res): Promise<void> => {
