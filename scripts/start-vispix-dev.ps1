@@ -1,4 +1,4 @@
-# Starts the DEV preview stack (branch previews at targetvisiondev.shelbyklein.com).
+# Starts the DEV preview stack (branch previews at vispixdev.shelbyklein.com).
 #
 # Runs the API (8084) and web dev server (8085) from the SEPARATE dev worktree at
 # C:\Vibes\Targetvision\targetvision-dev. See docs/DEV_ENVIRONMENT.md for setup.

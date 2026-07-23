@@ -1,4 +1,4 @@
-# Dev preview environment (`targetvisiondev.shelbyklein.com`)
+# Dev preview environment (`vispixdev.shelbyklein.com`)
 
 A second copy of the app runs on this PC so you can preview any branch **without
 touching the live site**. Prod stays on `main`; dev tracks whatever branch you
@@ -11,7 +11,7 @@ check out in a separate git worktree.
 | API | 8080 | **8084** |
 | Database | `targetvision` @ 5433 | **`vispix_dev` @ 5433** (cloned from prod) |
 | Object storage | fake-gcs @ 4443 | same bucket (deletes disabled — see below) |
-| Public URL | targetvision.shelbyklein.com | **targetvisiondev.shelbyklein.com** |
+| Public URL | vispix.shelbyklein.com | **vispixdev.shelbyklein.com** |
 
 Both stacks share the Postgres + fake-gcs containers (started by the prod
 `scripts/start-vispix.ps1`) and the same secrets. Dev has its **own
@@ -66,8 +66,8 @@ Then edit `.env` in the worktree so these lines read:
 PORT=8084
 DATABASE_URL=postgres://postgres:postgres@localhost:5433/vispix_dev
 BETTER_AUTH_URL=http://localhost:8084/api/auth
-CORS_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
-TRUSTED_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
+CORS_ORIGINS=http://localhost:8085,https://vispixdev.shelbyklein.com
+TRUSTED_ORIGINS=http://localhost:8085,https://vispixdev.shelbyklein.com
 PHOTO_STORAGE_DELETE_DISABLED=true
 ```
 
@@ -80,12 +80,12 @@ The tunnel is dashboard-managed, so add the subdomain there (I can't change your
 DNS/account):
 
 1. Cloudflare **Zero Trust** → **Networks** → **Tunnels** → your tunnel → **Public Hostname** → **Add a public hostname**.
-2. Subdomain `targetvisiondev`, domain `shelbyklein.com`.
+2. Subdomain `vispixdev`, domain `shelbyklein.com`.
 3. Service: **HTTP** → `host.docker.internal:8085`.
    The `cloudflared` for this tunnel runs **inside a Docker container**
    (`homechart-cloudflared-1`, token-managed), so from its perspective the host's
    port 8085 is `host.docker.internal:8085` — **not** `localhost:8085` (that would
-   point at the container itself). Tip: open the existing `targetvision` public
+   point at the container itself). Tip: open the existing `vispix` public
    hostname to see exactly what host reference the prod entry uses for port 8083,
    and copy it verbatim with `8085`.
 4. Save. Cloudflare auto-creates the DNS record.
@@ -126,9 +126,9 @@ or run `scripts/start-vispix-dev.ps1` (starts both if the ports are free;
 does **not** touch Docker or the DB).
 
 Then open `http://localhost:8085` locally, or
-`https://targetvisiondev.shelbyklein.com` once the hostname is added. Sign in
+`https://vispixdev.shelbyklein.com` once the hostname is added. Sign in
 again on the dev origin (same account, separate cookie host). Prod at
-`targetvision.shelbyklein.com` is unaffected.
+`vispix.shelbyklein.com` is unaffected.
 
 **Stop the dev stack:** kill the two `node`/`vite` processes on 8084/8085 (e.g.
 close their windows, or `Get-NetTCPConnection -LocalPort 8085,8084 -State Listen`
