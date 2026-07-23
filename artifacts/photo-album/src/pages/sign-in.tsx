@@ -21,6 +21,8 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Set by the email-verification link's callbackURL after a successful confirm.
+  const justVerified = new URLSearchParams(window.location.search).get("verified") === "1";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +48,11 @@ export default function SignInPage() {
           <CardDescription>Sign in to start picking photos for marketing</CardDescription>
         </CardHeader>
         <CardContent>
+          {justVerified && (
+            <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-center text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+              Email confirmed — you can sign in now.
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>

@@ -18,20 +18,27 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [verifySent, setVerifySent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const { error: signUpError } = await signUp.email({ name, email, password });
+    // Email verification is required, so signUp creates the account and sends a
+    // verification email but does NOT sign the user in. callbackURL is where the
+    // verify link lands after confirming.
+    const { error: signUpError } = await signUp.email({
+      name,
+      email,
+      password,
+      callbackURL: `${basePath}/sign-in?verified=1`,
+    });
     setSubmitting(false);
     if (signUpError) {
       setError(signUpError.message ?? "Sign up failed");
       return;
     }
-    // Full-page navigation so the session cookie is picked up fresh —
-    // a client-side route change can race the useSession store update.
-    window.location.assign(`${basePath}/`);
+    setVerifySent(true);
   }
 
   return (
@@ -39,10 +46,25 @@ export default function SignUpPage() {
       <Card className="w-[440px] max-w-full rounded-2xl shadow-md">
         <CardHeader className="text-center">
           <AuthCardLogo />
-          <CardTitle>Join Vispix</CardTitle>
-          <CardDescription>Create an account to collaborate on your team&apos;s marketing photos</CardDescription>
+          <CardTitle>{verifySent ? "Confirm your email" : "Join Vispix"}</CardTitle>
+          <CardDescription>
+            {verifySent
+              ? "One more step to activate your account"
+              : "Create an account to collaborate on your team's marketing photos"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
+          {verifySent ? (
+            <div className="flex flex-col gap-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                We sent a confirmation link to <span className="font-medium">{email}</span>. Click it
+                to activate your account, then sign in.
+              </p>
+              <Link href="/sign-in" className="text-sm font-medium text-primary hover:text-primary/80">
+                Back to sign in
+              </Link>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Name</Label>
@@ -88,6 +110,7 @@ export default function SignUpPage() {
               </Link>
             </p>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

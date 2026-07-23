@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db, user, session, account, verification, organizationInvitesTable } from "@workspace/db";
 import { loadAppSettings } from "./aiProviders";
 import { sendEmail, appUrl, adminAlertEmail } from "./email";
-import { passwordResetEmail, adminNewSignupEmail } from "./email/templates";
+import { passwordResetEmail, adminNewSignupEmail, emailVerificationEmail } from "./email/templates";
 import { logger } from "./logger";
 
 export const auth = betterAuth({
@@ -18,12 +18,27 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   emailAndPassword: {
     enabled: true,
+    // New signups must confirm their email before they can sign in. Existing
+    // users are grandfathered by migration 0027 (email_verified backfilled to
+    // true), so this only gates genuinely new accounts.
+    requireEmailVerification: true,
     // Send the reset link to our own frontend page (which calls the Better Auth
     // client's resetPassword with the token), not Better Auth's default handler
     // URL. Best-effort: if SMTP is unconfigured, sendEmail logs and no-ops.
     sendResetPassword: async ({ user, token }) => {
       const url = appUrl(`/reset-password?token=${encodeURIComponent(token)}`);
       const { subject, html, text } = passwordResetEmail(url);
+      await sendEmail({ to: user.email, subject, html, text });
+    },
+  },
+  emailVerification: {
+    // Fire a verification email automatically on signup, and again if an
+    // unverified user tries to sign in (Better Auth re-sends). The `url` Better
+    // Auth builds verifies the token then redirects to the callbackURL.
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      const { subject, html, text } = emailVerificationEmail(url);
       await sendEmail({ to: user.email, subject, html, text });
     },
   },

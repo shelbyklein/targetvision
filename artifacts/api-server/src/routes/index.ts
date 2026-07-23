@@ -16,10 +16,12 @@ import bulkUploadBatchesRouter from "./bulkUploadBatches";
 import attributionTagsRouter from "./attributionTags";
 import billingRouter from "./billing";
 import adminOrganizationsRouter from "./adminOrganizations";
+import contactRouter from "./contact";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(contactRouter);
 router.use(usersRouter);
 router.use(organizationsRouter);
 router.use(albumsRouter);
