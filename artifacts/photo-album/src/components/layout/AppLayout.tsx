@@ -529,7 +529,11 @@ function OrgSwitcher() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton tooltip={activeOrg?.name ?? "Organization"} data-testid="org-switcher">
-              <Building2 />
+              {activeOrg?.logoUrl ? (
+                <img src={activeOrg.logoUrl} alt="" className="size-4 shrink-0 rounded-sm object-cover" />
+              ) : (
+                <Building2 />
+              )}
               <div className="grid flex-1 text-left leading-tight min-w-0">
                 <span className="truncate font-medium">{activeOrg?.name ?? "Select organization"}</span>
                 {activeOrg?.role && <span className="truncate text-xs text-muted-foreground">{activeOrg.role}</span>}
@@ -548,6 +552,11 @@ function OrgSwitcher() {
                 data-testid={`org-option-${o.id}`}
               >
                 <Check className={cn("h-4 w-4 shrink-0", o.id === activeOrg?.id ? "opacity-100" : "opacity-0")} />
+                {o.logoUrl ? (
+                  <img src={o.logoUrl} alt="" className="h-4 w-4 shrink-0 rounded-sm object-cover" />
+                ) : (
+                  <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
                 <span className="truncate flex-1">{o.name}</span>
                 <span className="text-xs text-muted-foreground">{o.role}</span>
               </DropdownMenuItem>

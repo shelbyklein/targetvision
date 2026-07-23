@@ -21,6 +21,9 @@ export const organizationsTable = pgTable("organizations", {
   // organization_subscriptions. text (not enum) so future tiers / admin
   // overrides need no enum migration — validated against PLAN_IDS in app code.
   plan: text("plan").notNull().default("free"),
+  // Org logo (issue #121): an /objects/ storage key from the upload flow, or
+  // null for the default building mark. Served via /api/storage (member-gated).
+  logoKey: text("logo_key"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

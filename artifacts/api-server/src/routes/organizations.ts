@@ -74,7 +74,13 @@ const myOrgColumns = {
   name: organizationsTable.name,
   slug: organizationsTable.slug,
   role: organizationMembersTable.role,
+  logoKey: organizationsTable.logoKey,
 };
+
+// Org logos are plain objects in the member-gated storage (issue #121).
+export function orgLogoUrl(logoKey: string | null): string | null {
+  return logoKey ? `/api/storage${logoKey}` : null;
+}
 
 // GET /organizations — every org the current user belongs to. The web client
 // uses this to populate its org switcher; the chosen id goes back as the
@@ -86,7 +92,11 @@ router.get("/organizations", requireAuth, async (req, res): Promise<void> => {
     .innerJoin(organizationsTable, eq(organizationMembersTable.organizationId, organizationsTable.id))
     .where(eq(organizationMembersTable.userId, req.dbUser!.id))
     .orderBy(asc(organizationMembersTable.createdAt), asc(organizationsTable.id));
-  res.json(ListMyOrganizationsResponse.parse(rows));
+  res.json(
+    ListMyOrganizationsResponse.parse(
+      rows.map(({ logoKey, ...row }) => ({ ...row, logoUrl: orgLogoUrl(logoKey) })),
+    ),
+  );
 });
 
 // POST /organizations — create a new org; the caller becomes its owner and it
@@ -114,7 +124,7 @@ router.post("/organizations", requireAuth, async (req, res): Promise<void> => {
   });
 
   res.status(201).json(
-    CreateOrganizationResponse.parse({ id: created.id, name: created.name, slug: created.slug, role: "owner" }),
+    CreateOrganizationResponse.parse({ id: created.id, name: created.name, slug: created.slug, role: "owner", logoUrl: null }),
   );
 });
 
@@ -148,7 +158,7 @@ router.post("/organizations/switch", requireAuth, async (req, res): Promise<void
     .set({ lastActiveOrgId: membership.id })
     .where(eq(usersTable.id, req.dbUser!.id));
 
-  res.json(SwitchOrganizationResponse.parse(membership));
+  res.json(SwitchOrganizationResponse.parse({ ...membership, logoUrl: orgLogoUrl(membership.logoKey) }));
 });
 
 // --- Active org details / settings (Phase 4d) ---
@@ -169,21 +179,29 @@ router.get("/organizations/current", requireOrgAuth, async (req, res): Promise<v
       createdAt: org.createdAt.toISOString(),
       role: req.orgRole ?? "member",
       memberCount: Number(n),
+      logoUrl: orgLogoUrl(org.logoKey),
     }),
   );
 });
 
-// PATCH /organizations/current — rename / re-describe the active org. Slug is
-// immutable (baked into token/handle semantics). Owner/admin only.
+// PATCH /organizations/current — rename / re-describe / re-logo the active org.
+// Slug is immutable (baked into token/handle semantics). Owner/admin only.
 router.patch("/organizations/current", ...requireOrgAdmin, async (req, res): Promise<void> => {
   const body = UpdateOrgBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const updates: { name?: string; description?: string | null } = {};
+  // Only accept logo keys minted by our own upload flow, never arbitrary paths
+  // (mirrors the assets route).
+  if (body.data.logoKey != null && !body.data.logoKey.startsWith("/objects/")) {
+    res.status(400).json({ error: "logoKey must be an /objects/ path from the upload flow" });
+    return;
+  }
+  const updates: { name?: string; description?: string | null; logoKey?: string | null } = {};
   if (body.data.name !== undefined) updates.name = body.data.name;
   if (body.data.description !== undefined) updates.description = body.data.description === "" ? null : body.data.description;
+  if (body.data.logoKey !== undefined) updates.logoKey = body.data.logoKey;
 
   const [org] = Object.keys(updates).length
     ? await db.update(organizationsTable).set(updates).where(eq(organizationsTable.id, req.org!.id)).returning()
@@ -203,6 +221,7 @@ router.patch("/organizations/current", ...requireOrgAdmin, async (req, res): Pro
       createdAt: org.createdAt.toISOString(),
       role: req.orgRole ?? "member",
       memberCount: Number(n),
+      logoUrl: orgLogoUrl(org.logoKey),
     }),
   );
 });

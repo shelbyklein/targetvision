@@ -458,6 +458,35 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect((await setRole(platformAdmin, 99999, "member")).status).toBe(404);
   });
 
+  it("org owners can set, serve, and remove an org logo (#121)", async () => {
+    const { orgA, userA } = await seedTwoOrgs();
+    const member = await createUser({ name: "Plain member" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    // Members can't manage settings; arbitrary (non-upload-flow) keys refused.
+    expect(
+      (await api("/api/organizations/current", { user: member, orgId: orgA.id, method: "PATCH", body: { logoKey: "/objects/uploads/x" } })).status,
+    ).toBe(403);
+    expect(
+      (await api("/api/organizations/current", { user: userA, orgId: orgA.id, method: "PATCH", body: { logoKey: "../../etc/passwd" } })).status,
+    ).toBe(400);
+
+    // Owner sets a logo → logoUrl appears on details and the org-switcher list.
+    const set = await api("/api/organizations/current", {
+      user: userA, orgId: orgA.id, method: "PATCH", body: { logoKey: "/objects/uploads/logo-1" },
+    });
+    expect(set.status).toBe(200);
+    expect(((await set.json()) as { logoUrl: string | null }).logoUrl).toBe("/api/storage/objects/uploads/logo-1");
+    const mine = (await (await api("/api/organizations", { user: userA })).json()) as { id: number; logoUrl: string | null }[];
+    expect(mine.find((o) => o.id === orgA.id)!.logoUrl).toBe("/api/storage/objects/uploads/logo-1");
+
+    // Removal nulls it out.
+    const removed = await api("/api/organizations/current", {
+      user: userA, orgId: orgA.id, method: "PATCH", body: { logoKey: null },
+    });
+    expect(((await removed.json()) as { logoUrl: string | null }).logoUrl).toBeNull();
+  });
+
   it("instance-admin set-plan overrides a plan; non-admins are refused (#118)", async () => {
     const { orgA, userA } = await seedTwoOrgs(); // orgA on the free plan; userA is its owner (not an instance admin)
     const instanceAdmin = await createUser({ name: "Root", role: "admin" });

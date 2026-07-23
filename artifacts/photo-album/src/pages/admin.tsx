@@ -189,8 +189,12 @@ export default function Admin() {
                 {featured ? (
                   <>
                     <div className="space-y-3">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Icon className="h-6 w-6 text-primary" />
+                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden">
+                        {activeOrg?.logoUrl ? (
+                          <img src={activeOrg.logoUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <Icon className="h-6 w-6 text-primary" />
+                        )}
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-foreground flex items-center gap-1.5">
