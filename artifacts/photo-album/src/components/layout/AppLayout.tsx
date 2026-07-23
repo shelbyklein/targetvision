@@ -735,8 +735,12 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: me } = useGetMe();
+  const { activeOrg } = useOrg();
   const bannerVisible = useBannerVisible();
-  const isAdmin = me?.role === "admin";
+  // The Admin area serves both platform admins and the active org's own
+  // owners/admins (issue #120) — the hub scopes what each actually sees.
+  const isAdmin =
+    me?.role === "admin" || activeOrg?.role === "owner" || activeOrg?.role === "admin";
 
   return (
     <SidebarProvider defaultOpen={getInitialSidebarOpen()} data-testid="app-layout">

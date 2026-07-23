@@ -10,9 +10,10 @@ export type AdminHubStatus = {
 };
 
 /** At-a-glance counts for the admin hub cards (one aggregated cheap call). */
-export function useAdminHubStatus() {
+export function useAdminHubStatus(opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["admin", "hub-status"],
     queryFn: () => customFetch<AdminHubStatus>("/api/admin/hub-status"),
+    enabled: opts.enabled ?? true,
   });
 }

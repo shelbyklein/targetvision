@@ -118,6 +118,7 @@ export default function AdminOrganizationsPage() {
   return (
     <AdminSectionShell
       title="Organizations"
+      scope="platform"
       icon={Building2}
       description="Every organization on the platform — plans, usage, and support access."
     >

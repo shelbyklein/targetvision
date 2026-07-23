@@ -1,4 +1,5 @@
 import { useGetMe, useAdminHubStatus, type AdminHubStatus } from "@workspace/api-client-react";
+import { useOrg } from "@/contexts/OrgContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -108,9 +109,16 @@ function CardStatus({
 
 export default function Admin() {
   const { data: me, isLoading: meLoading } = useGetMe();
-  const { data: hubStatus, isLoading: statusLoading } = useAdminHubStatus();
+  const { activeOrg, isLoading: orgLoading } = useOrg();
 
-  if (meLoading) {
+  // Org owners/admins manage their organization; platform admins see everything
+  // (issue #120). The hub-status call is org-scoped, so it's valid for both.
+  const isPlatformAdmin = me?.role === "admin";
+  const isOrgAdmin = activeOrg?.role === "owner" || activeOrg?.role === "admin";
+  const allowed = isPlatformAdmin || isOrgAdmin;
+  const { data: hubStatus, isLoading: statusLoading } = useAdminHubStatus({ enabled: allowed });
+
+  if (meLoading || orgLoading) {
     return (
       <AppLayout>
         <div className="space-y-6">
@@ -121,7 +129,7 @@ export default function Admin() {
     );
   }
 
-  if (!me || me.role !== "admin") {
+  if (!me || !allowed) {
     return (
       <AppLayout>
         <div className="text-center py-24">
@@ -131,6 +139,13 @@ export default function Admin() {
       </AppLayout>
     );
   }
+
+  const groups = [
+    ...(isPlatformAdmin
+      ? ([["Platform", "Cross-organization tools for the Vispix operator.", PLATFORM_SECTIONS]] as const)
+      : []),
+    ["This organization", "Settings and maintenance for the organization you're currently in.", ORG_SECTIONS] as const,
+  ];
 
   return (
     <AppLayout>
@@ -145,10 +160,7 @@ export default function Admin() {
           </div>
         </div>
 
-        {([
-          ["Platform", "Cross-organization tools for the Vispix operator.", PLATFORM_SECTIONS],
-          ["This organization", "Settings and maintenance for the organization you're currently in.", ORG_SECTIONS],
-        ] as const).map(([groupTitle, groupBlurb, sections]) => (
+        {groups.map(([groupTitle, groupBlurb, sections]) => (
           <div key={groupTitle} className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{groupTitle}</h2>

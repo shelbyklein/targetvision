@@ -60,6 +60,7 @@ export default function AdminTeamPage() {
   return (
     <AdminSectionShell
       title="Users"
+      scope="platform"
       icon={Users}
       description="Every registered account on the platform, across all organizations."
     >
