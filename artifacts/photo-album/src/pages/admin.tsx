@@ -40,38 +40,56 @@ type Section = {
   status?: { key: keyof AdminHubStatus; label: (n: number) => string };
 };
 
-// Org level: settings and maintenance scoped to the org you're currently in.
-// Platform-level tools live on the separate /superadmin hub (issue #120).
-const ORG_SECTIONS: Section[] = [
-  { href: "/admin/organization", title: "Organization", description: "Name, description, and details of your current organization.", icon: Building2 },
-  { href: "/admin/members", title: "Members", description: "Invite teammates and manage roles in this organization.", icon: Users },
-  { href: "/admin/billing", title: "Billing", description: "Plan, storage usage, and subscription for this organization.", icon: CreditCard },
-  { href: "/admin/ai-services", title: "AI Services", description: "Providers, API keys, models, and analysis events.", icon: Bot },
+// Org level: settings and maintenance scoped to the org you're currently in,
+// grouped like-with-like. Platform-level tools live on /superadmin (#120).
+const ORG_GROUPS: { title: string; sections: Section[] }[] = [
   {
-    href: "/admin/ai-analysis", title: "AI Analysis", description: "Backfill photo descriptions and monitor runs.", icon: Sparkles,
-    status: { key: "aiAnalysisPending", label: (n) => `${n.toLocaleString()} photo${n !== 1 ? "s" : ""} not yet analysed` },
+    title: "Organization",
+    sections: [
+      { href: "/admin/organization", title: "Organization", description: "Name, description, and details of your current organization.", icon: Building2 },
+      { href: "/admin/members", title: "Members", description: "Invite teammates and manage roles in this organization.", icon: Users },
+      { href: "/admin/billing", title: "Billing", description: "Plan, storage usage, and subscription for this organization.", icon: CreditCard },
+      { href: "/admin/attribution-tags", title: "Attribution Tags", description: "Usage-rights tags photos can be cleared for.", icon: Copyright },
+    ],
   },
   {
-    href: "/admin/embeddings", title: "Embeddings", description: "Semantic-search embeddings status and backfill.", icon: Braces,
-    status: { key: "embeddingsPending", label: (n) => `${n.toLocaleString()} pending` },
+    title: "Photo management",
+    sections: [
+      { href: "/admin/image-optimization", title: "Image Optimization", description: "Resize/compress settings for uploads.", icon: ImageDown },
+      {
+        href: "/admin/thumbnails", title: "Thumbnails", description: "Generate missing photo thumbnails.", icon: ImageIcon,
+        status: { key: "thumbnailsMissing", label: (n) => `${n.toLocaleString()} missing` },
+      },
+      {
+        href: "/admin/captured-dates", title: "Captured Dates", description: "Fill missing capture dates from EXIF data.", icon: CalendarDays,
+        status: { key: "capturedDatesMissing", label: (n) => `${n.toLocaleString()} missing` },
+      },
+      {
+        href: "/admin/duplicates", title: "Duplicates", description: "Byte-identical copies — review or bulk-delete extras.", icon: Copy,
+        status: { key: "duplicateGroups", label: (n) => `${n.toLocaleString()} group${n !== 1 ? "s" : ""}` },
+      },
+      { href: "/admin/near-duplicates", title: "Near-Duplicates", description: "Visually similar photos — select and delete.", icon: CopyCheck },
+    ],
   },
-  { href: "/admin/image-optimization", title: "Image Optimization", description: "Resize/compress settings for uploads.", icon: ImageDown },
   {
-    href: "/admin/thumbnails", title: "Thumbnails", description: "Generate missing photo thumbnails.", icon: ImageIcon,
-    status: { key: "thumbnailsMissing", label: (n) => `${n.toLocaleString()} missing` },
+    title: "AI",
+    sections: [
+      { href: "/admin/ai-services", title: "AI Services", description: "Providers, API keys, models, and analysis events.", icon: Bot },
+      {
+        href: "/admin/ai-analysis", title: "AI Analysis", description: "Backfill photo descriptions and monitor runs.", icon: Sparkles,
+        status: { key: "aiAnalysisPending", label: (n) => `${n.toLocaleString()} photo${n !== 1 ? "s" : ""} not yet analysed` },
+      },
+      {
+        href: "/admin/embeddings", title: "Embeddings", description: "Semantic-search embeddings status and backfill.", icon: Braces,
+        status: { key: "embeddingsPending", label: (n) => `${n.toLocaleString()} pending` },
+      },
+      { href: "/admin/mcp-tokens", title: "MCP Access Tokens", description: "Tokens for external AI clients to reach the photo library.", icon: KeyRound },
+    ],
   },
-  {
-    href: "/admin/captured-dates", title: "Captured Dates", description: "Fill missing capture dates from EXIF data.", icon: CalendarDays,
-    status: { key: "capturedDatesMissing", label: (n) => `${n.toLocaleString()} missing` },
-  },
-  {
-    href: "/admin/duplicates", title: "Duplicates", description: "Byte-identical copies — review or bulk-delete extras.", icon: Copy,
-    status: { key: "duplicateGroups", label: (n) => `${n.toLocaleString()} group${n !== 1 ? "s" : ""}` },
-  },
-  { href: "/admin/near-duplicates", title: "Near-Duplicates", description: "Visually similar photos — select and delete.", icon: CopyCheck },
-  { href: "/admin/attribution-tags", title: "Attribution Tags", description: "Usage-rights tags photos can be cleared for.", icon: Copyright },
-  { href: "/admin/mcp-tokens", title: "MCP Access Tokens", description: "Tokens for external AI clients to reach the photo library.", icon: KeyRound },
 ];
+
+// Flat view for the notifications panel's action-item derivation.
+const ORG_SECTIONS: Section[] = ORG_GROUPS.flatMap((g) => g.sections);
 
 function CardStatus({
   count,
@@ -177,9 +195,13 @@ export default function Admin() {
           dismissKey="vispix-admin-notices-dismissed"
         />
 
-        {/* 4-column grid; the Organization card is featured at 2x2. */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="admin-hub-grid">
-          {ORG_SECTIONS.map((section) => {
+        {/* Sections grouped like-with-like; 4-column grids with the
+            Organization card featured at 2x2 in its group. */}
+        {ORG_GROUPS.map((groupDef) => (
+        <div key={groupDef.title} className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{groupDef.title}</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid={`admin-hub-grid-${groupDef.title.toLowerCase().replace(/\s+/g, "-")}`}>
+          {groupDef.sections.map((section) => {
             const Icon = section.icon;
             const featured = section.href === "/admin/organization";
             return (
@@ -264,7 +286,9 @@ export default function Admin() {
               </Link>
             );
           })}
+          </div>
         </div>
+        ))}
       </div>
     </AppLayout>
   );
