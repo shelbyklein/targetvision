@@ -34,7 +34,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     bytes: 50 * GB,
     label: "Pro",
     blurb: "For active teams — 50 GB of photos.",
-    priceDisplay: "$—/mo",
+    priceDisplay: "$19.99/mo",
   },
   enterprise: {
     bytes: null,

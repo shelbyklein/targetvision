@@ -27,7 +27,7 @@ const ENTERPRISE_CONTACT = "mailto:hello@vispix.ai?subject=Vispix%20Enterprise";
 // @workspace/api-zod), surfaced per-org via capBytes in the billing status.
 const PLAN_CARDS: Record<"free" | "pro" | "enterprise", { label: string; priceDisplay: string; blurb: string }> = {
   free: { label: "Free", priceDisplay: "Free", blurb: "Get started — up to 2 GB of photos." },
-  pro: { label: "Pro", priceDisplay: "$—/mo", blurb: "For active teams — 50 GB of photos." },
+  pro: { label: "Pro", priceDisplay: "$19.99/mo", blurb: "For active teams — 50 GB of photos." },
   enterprise: { label: "Enterprise", priceDisplay: "Contact us", blurb: "Unlimited storage and priority support." },
 };
 
