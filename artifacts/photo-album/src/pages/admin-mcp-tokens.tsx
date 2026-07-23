@@ -60,7 +60,7 @@ function NewTokenReveal({
 }) {
   const urlForm = publicBaseUrl ? `${publicBaseUrl}/${token}/mcp` : null;
   const bearerCmd = publicBaseUrl
-    ? `claude mcp add --scope user --transport http targetvision ${publicBaseUrl}/mcp --header "Authorization: Bearer ${token}"`
+    ? `claude mcp add --scope user --transport http vispix ${publicBaseUrl}/mcp --header "Authorization: Bearer ${token}"`
     : null;
 
   return (

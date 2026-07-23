@@ -43,7 +43,7 @@ Complete inventory, verified by grepping `process.env` across the repo:
 ```sh
 # --- Required to boot the API server ---
 PORT=8080                          # api-server throws without it (artifacts/api-server/src/index.ts)
-DATABASE_URL=postgres://localhost:5432/targetvision   # lib/db/src/index.ts throws without it
+DATABASE_URL=postgres://localhost:5432/vispix   # lib/db/src/index.ts throws without it
 SESSION_SECRET=<generate: openssl rand -hex 32>
 CLERK_PUBLISHABLE_KEY=pk_test_...  # from a Clerk dev instance (clerk.com)
 CLERK_SECRET_KEY=sk_test_...
@@ -82,7 +82,7 @@ Wire up loading: the simplest zero-dependency approach is `node --env-file`. Edi
 ## Step 3 — PostgreSQL
 
 ```sh
-createdb targetvision            # or via Docker
+createdb vispix            # or via Docker
 pnpm --filter @workspace/db run push    # push Drizzle schema (dev workflow — no migration files needed)
 pnpm --filter @workspace/db run seed    # optional; check lib/db/src/seed.ts first
 ```

@@ -37,7 +37,7 @@ export interface ServerOptions {
 
 export function createServer(options: ServerOptions = {}): McpServer {
   const server = new McpServer({
-    name: "targetvision",
+    name: "vispix",
     version: "1.0.0",
   });
 
@@ -46,7 +46,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     {
       title: "Search photos semantically",
       description:
-        "Find photos in the TargetVision archery photo library that match a natural-language description " +
+        "Find photos in the Vispix photo library that match a natural-language description " +
         "(e.g. 'athlete celebrating a win', 'close-up of an arrow hitting the target'). Results are ranked " +
         "by semantic similarity and include inline thumbnails so you can judge visual fit. " +
         "Use one focused concept per call; make multiple calls for multiple concepts.",

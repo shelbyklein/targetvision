@@ -28,7 +28,7 @@ export function PoweredByUSAA() {
 export function AuthCardLogo() {
   return (
     <div className="flex justify-center mb-2">
-      <img src={`${basePath}/target-vision.svg`} alt="Target Vision" className="h-10 w-auto" />
+      <img src={`${basePath}/vispix.png`} alt="Vispix" className="h-10 w-auto rounded-md" />
     </div>
   );
 }
@@ -59,7 +59,7 @@ export default function SignInPage() {
       <Card className="w-[440px] max-w-full rounded-2xl shadow-md">
         <CardHeader className="text-center">
           <AuthCardLogo />
-          <CardTitle>Welcome back to Target Vision</CardTitle>
+          <CardTitle>Welcome back to Vispix</CardTitle>
           <CardDescription>Sign in to start picking photos for marketing</CardDescription>
         </CardHeader>
         <CardContent>

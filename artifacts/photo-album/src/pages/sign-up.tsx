@@ -36,7 +36,7 @@ export default function SignUpPage() {
       <Card className="w-[440px] max-w-full rounded-2xl shadow-md">
         <CardHeader className="text-center">
           <AuthCardLogo />
-          <CardTitle>Join Target Vision</CardTitle>
+          <CardTitle>Join Vispix</CardTitle>
           <CardDescription>Create an account to help choose USA Archery&apos;s marketing photos</CardDescription>
         </CardHeader>
         <CardContent>

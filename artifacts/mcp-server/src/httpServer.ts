@@ -174,5 +174,5 @@ export async function startHttpServer(): Promise<void> {
   await new Promise<void>((resolve) => {
     app.listen(port, () => resolve());
   });
-  console.error(`TargetVision MCP HTTP server listening on :${port} (public URL: ${publicUrl ?? "unset"})`);
+  console.error(`Vispix MCP HTTP server listening on :${port} (public URL: ${publicUrl ?? "unset"})`);
 }

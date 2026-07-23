@@ -1,4 +1,4 @@
-# Starts the full TargetVision stack: Docker containers (postgres + fake-gcs),
+# Starts the full Vispix stack: Docker containers (postgres + fake-gcs),
 # API server (8080), and web dev server (8083). Safe to re-run; used by the
 # Startup-folder launcher so the app comes back after a reboot/logon.
 

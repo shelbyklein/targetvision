@@ -1,6 +1,6 @@
 # @workspace/mcp-server
 
-MCP server exposing the TargetVision photo library to AI clients, so a model
+MCP server exposing the Vispix photo library to AI clients, so a model
 given marketing copy can pull candidate photos that fit each described concept
 and judge them visually (results include inline thumbnails).
 
@@ -42,7 +42,7 @@ serve the dev database instead):
 ```json
 {
   "mcpServers": {
-    "targetvision": {
+    "vispix": {
       "command": "pnpm",
       "args": [
         "--dir", "C:/Vibes/Targetvision/Targetvision",
@@ -67,7 +67,7 @@ the server refuses to start without it, since the tunnel makes it public.
 Auth is accepted two ways:
 
 - `Authorization: Bearer <token>` header — e.g. Claude Code on another machine:
-  `claude mcp add --scope user --transport http targetvision
+  `claude mcp add --scope user --transport http vispix
   https://targetvisionmcp.shelbyklein.com/mcp --header "Authorization: Bearer <token>"`
 - Token as the first URL path segment — for clients whose connector UI only
   accepts a URL (claude.ai custom connectors):

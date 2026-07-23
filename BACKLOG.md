@@ -1,4 +1,4 @@
-# TargetVision backlog
+# Vispix backlog
 
 Open work is tracked in **GitHub Issues** → https://github.com/shelbyklein/targetvision/issues
 

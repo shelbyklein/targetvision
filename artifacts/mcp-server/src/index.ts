@@ -1,4 +1,4 @@
-// Bootstrap for the TargetVision MCP server (stdio transport).
+// Bootstrap for the Vispix MCP server (stdio transport).
 //
 // stdout IS the MCP protocol channel, so nothing else may write to it. The
 // api-server libs we reuse log through pino (stdout by default), so silence
@@ -11,7 +11,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || "production";
 const { startServer } = await import("./server.js");
 
 startServer().catch((err) => {
-  console.error("TargetVision MCP server failed to start:", err);
+  console.error("Vispix MCP server failed to start:", err);
   process.exit(1);
 });
 

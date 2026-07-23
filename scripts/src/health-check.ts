@@ -3,9 +3,9 @@
  * Post-publish smoke test.
  *
  * Usage:
- *   pnpm --filter @workspace/scripts run health-check https://targetvision.example.com
+ *   pnpm --filter @workspace/scripts run health-check https://vispix.example.com
  *   # or
- *   BASE_URL=https://targetvision.example.com pnpm --filter @workspace/scripts run health-check
+ *   BASE_URL=https://vispix.example.com pnpm --filter @workspace/scripts run health-check
  *
  * Exit codes:
  *   0 — all checks passed
@@ -75,8 +75,8 @@ async function main(): Promise<void> {
   if (!baseUrl) {
     console.error(
       "Usage: health-check <BASE_URL>\n" +
-        "  e.g. health-check https://targetvision.example.com\n" +
-        "  or   BASE_URL=https://targetvision.example.com health-check",
+        "  e.g. health-check https://vispix.example.com\n" +
+        "  or   BASE_URL=https://vispix.example.com health-check",
     );
     process.exit(1);
   }

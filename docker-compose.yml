@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: targetvision
+      POSTGRES_DB: vispix  # fresh volumes only; the existing prod DB is renamed at release
     ports:
       - "5433:5432"
     volumes:

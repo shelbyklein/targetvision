@@ -14,8 +14,8 @@ export default function Home() {
     <div className="min-h-screen bg-background" data-testid="home-page">
       <header className="border-b border-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <img src="/target-vision.svg" alt="Target Vision" className="h-8 w-8" />
-          <span className="text-xl font-semibold tracking-tight text-foreground">Target Vision</span>
+          <img src="/vispix.png" alt="Vispix" className="h-8 w-8 rounded" />
+          <span className="text-xl font-semibold tracking-tight text-foreground">Vispix</span>
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
@@ -37,7 +37,7 @@ export default function Home() {
         </h1>
 
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          Target Vision is USA Archery's internal workspace for staff to collaborate on choosing
+          Vispix is USA Archery's internal workspace for staff to collaborate on choosing
           photos for marketing. Browse event albums, rate candidates, and shortlist the shots
           that belong on the next campaign — together, in one place.
         </p>

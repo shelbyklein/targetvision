@@ -74,7 +74,7 @@ const navItems = [
 
 // Drag type for reordering the top-level nav; distinct from PHOTO_DND_MIME so
 // nav reordering and photo-onto-collection drags never interfere.
-const NAV_DND_MIME = "application/x-targetvision-nav";
+const NAV_DND_MIME = "application/x-vispix-nav";
 
 // Apply the user's saved order (array of hrefs) to navItems. Hrefs that no
 // longer exist are dropped; nav items missing from the saved order (added
@@ -625,10 +625,10 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="Target Vision">
+            <SidebarMenuButton size="lg" asChild tooltip="Vispix">
               <Link href="/dashboard" data-testid="sidebar-brand">
-                <img src="/target-vision.svg" alt="Target Vision" className="size-6 shrink-0" />
-                <span className="font-semibold tracking-tight">Target Vision</span>
+                <img src="/vispix.png" alt="Vispix" className="size-6 shrink-0 rounded" />
+                <span className="font-semibold tracking-tight">Vispix</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -746,8 +746,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset className="min-h-svh">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 sm:gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1" data-testid="sidebar-toggle" />
-          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Target Vision">
-            <img src="/target-vision.svg" alt="Target Vision" className="h-7 w-7" />
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Vispix">
+            <img src="/vispix.png" alt="Vispix" className="h-7 w-7 rounded" />
           </Link>
           <GlobalSearchBar />
         </header>

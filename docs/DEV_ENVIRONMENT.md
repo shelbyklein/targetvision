@@ -9,16 +9,16 @@ check out in a separate git worktree.
 | Checkout | `C:\Vibes\Targetvision\Targetvision` (`main`) | `C:\Vibes\Targetvision\targetvision-dev` (worktree, any branch) |
 | Web (Vite) | 8083 | **8085** |
 | API | 8080 | **8084** |
-| Database | `targetvision` @ 5433 | **`targetvision_dev` @ 5433** (cloned from prod) |
+| Database | `targetvision` @ 5433 | **`vispix_dev` @ 5433** (cloned from prod) |
 | Object storage | fake-gcs @ 4443 | same bucket (deletes disabled — see below) |
 | Public URL | targetvision.shelbyklein.com | **targetvisiondev.shelbyklein.com** |
 
 Both stacks share the Postgres + fake-gcs containers (started by the prod
-`scripts/start-targetvision.ps1`) and the same secrets. Dev has its **own
+`scripts/start-vispix.ps1`) and the same secrets. Dev has its **own
 database**, snapshot-cloned from prod (photos, users, sessions and all), so it
 renders the same library and your account works on both — but **schema changes,
 migrations, and destructive testing on dev are completely safe**: they only
-touch `targetvision_dev`.
+touch `vispix_dev`.
 
 > ⚠️ **One shared piece remains: the storage bucket.** Dev's photo rows reference
 > the same image objects as prod's, so the dev API runs with
@@ -44,7 +44,7 @@ pnpm install
 
 ### 2. Create the dev database
 
-Clone prod into `targetvision_dev` (also how you refresh dev data later):
+Clone prod into `vispix_dev` (also how you refresh dev data later):
 
 ```powershell
 scripts\clone-dev-db.ps1
@@ -64,7 +64,7 @@ Then edit `.env` in the worktree so these lines read:
 
 ```
 PORT=8084
-DATABASE_URL=postgres://postgres:postgres@localhost:5433/targetvision_dev
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/vispix_dev
 BETTER_AUTH_URL=http://localhost:8084/api/auth
 CORS_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
 TRUSTED_ORIGINS=http://localhost:8085,https://targetvisiondev.shelbyklein.com
@@ -122,7 +122,7 @@ pnpm run dev:api             # API on 8084 (reads this worktree's .env)
 pnpm run dev:web:dev         # web on 8085, proxies /api -> 8084
 ```
 
-or run `scripts/start-targetvision-dev.ps1` (starts both if the ports are free;
+or run `scripts/start-vispix-dev.ps1` (starts both if the ports are free;
 does **not** touch Docker or the DB).
 
 Then open `http://localhost:8085` locally, or
@@ -136,13 +136,13 @@ close their windows, or `Get-NetTCPConnection -LocalPort 8085,8084 -State Listen
 
 ## Schema changes on dev
 
-Dev owns `targetvision_dev`, so the normal workflow just works here:
+Dev owns `vispix_dev`, so the normal workflow just works here:
 
 ```sh
 # in the dev worktree, after editing lib/db/src/schema/*
 pnpm --filter @workspace/db run generate    # writes the migration
-pnpm --filter @workspace/db run migrate     # applies it to targetvision_dev
-# restart the dev API (kill port 8084, re-run scripts/start-targetvision-dev.ps1)
+pnpm --filter @workspace/db run migrate     # applies it to vispix_dev
+# restart the dev API (kill port 8084, re-run scripts/start-vispix-dev.ps1)
 ```
 
 **At release**, after merging `dev` → `main` and pulling in the prod checkout,
@@ -162,6 +162,6 @@ Dev's data is a point-in-time snapshot; prod moves on without it. To resync:
 scripts\clone-dev-db.ps1
 ```
 
-Drops and recreates `targetvision_dev` from a fresh prod dump (prod is only
+Drops and recreates `vispix_dev` from a fresh prod dump (prod is only
 read). If the dev branch carries migrations prod doesn't have yet, re-run
 `pnpm --filter @workspace/db run migrate` in the worktree afterwards.
