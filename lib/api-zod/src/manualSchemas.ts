@@ -129,10 +129,20 @@ const NearDuplicatePhotoSchema = z.object({
   albumTitle: z.string().nullable(),
   filename: z.string().nullable(),
   thumbnailUrl: z.string().nullable(),
+  // Full-size image URL — the cleanup modal's side-by-side and diff overlay
+  // (issues #123/#125) need more resolution than the grid thumbnails.
+  imageUrl: z.string(),
   createdAt: z.string(),
   isAlbumCover: z.boolean(),
   collectionCount: z.number(),
 });
+
+// Dismiss a near-duplicate comparison (issue #124): every pair among these
+// photos is recorded as ignored so the group stops resurfacing.
+export const IgnoreNearDuplicatesBody = z.object({
+  photoIds: z.array(z.number().int()).min(2).max(100),
+});
+export const IgnoreNearDuplicatesResponse = z.object({ ignoredPairs: z.number() });
 
 export const NearDuplicateIndexStatusResponse = z.object({
   pairCount: z.number(),
@@ -363,4 +373,19 @@ export const JoinOrganizationResponse = z.object({
   organizationId: z.number(),
   role: z.string(),
   alreadyMember: z.boolean(),
+});
+
+// Platform service readiness (issue #122): per-service status + an overall
+// ready flag. Optional services (e.g. billing) don't count against readiness.
+export const ServiceStatusResponse = z.object({
+  ready: z.boolean(),
+  services: z.array(
+    z.object({
+      key: z.string(),
+      label: z.string(),
+      ok: z.boolean(),
+      optional: z.boolean(),
+      detail: z.string(),
+    }),
+  ),
 });

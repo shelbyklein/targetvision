@@ -17,5 +17,6 @@ export * from "./aiBackfillRuns";
 export * from "./bulkUploadBatches";
 export * from "./attributionTags";
 export * from "./nearDuplicatePairs";
+export * from "./nearDuplicateIgnores";
 export * from "./mcpTokens";
 export * from "./assets";

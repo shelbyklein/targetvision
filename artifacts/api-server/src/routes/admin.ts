@@ -49,6 +49,8 @@ import {
   NearDuplicatePhotoGroupsResponse,
   NearDuplicateIndexStatusResponse,
   RebuildNearDuplicateIndexResponse,
+  IgnoreNearDuplicatesBody,
+  IgnoreNearDuplicatesResponse,
   ListAiBackfillRunsResponse,
   GetAiAutoBackfillSettingsResponse,
   UpdateAiAutoBackfillSettingsBody,
@@ -93,6 +95,7 @@ import {
   countPhotosWithoutPerceptualHash,
   backfillPerceptualHashes,
   listNearDuplicatePhotoGroups,
+  ignoreNearDuplicatePhotos,
   getNearDuplicateIndexStatus,
   rebuildNearDuplicatePairs,
   DEFAULT_NEAR_DUP_THRESHOLD,
@@ -738,6 +741,7 @@ router.get("/admin/photos/near-duplicates", ...requireOrgAdmin, async (req, res)
           albumTitle: p.albumTitle,
           filename: p.filename,
           thumbnailUrl: resolvePhotoThumbnailUrl({ url: p.url, thumbnailKey: p.thumbnailKey }),
+          imageUrl: p.url,
           createdAt: p.createdAt.toISOString(),
           isAlbumCover: p.isAlbumCover,
           collectionCount: p.collectionCount,
@@ -745,6 +749,18 @@ router.get("/admin/photos/near-duplicates", ...requireOrgAdmin, async (req, res)
       })),
     }),
   );
+});
+
+// Dismiss a near-duplicate comparison as not-duplicates (issue #124). The
+// ignored pairs persist across index rebuilds, so the group never resurfaces.
+router.post("/admin/photos/near-duplicates/ignore", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  const body = IgnoreNearDuplicatesBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const result = await ignoreNearDuplicatePhotos(req.org!.id, body.data.photoIds);
+  res.json(IgnoreNearDuplicatesResponse.parse(result));
 });
 
 router.get("/admin/photos/near-duplicate-index-status", ...requireOrgAdmin, async (req, res): Promise<void> => {

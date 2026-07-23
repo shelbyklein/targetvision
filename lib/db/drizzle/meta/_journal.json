@@ -176,6 +176,13 @@
       "when": 1784762356435,
       "tag": "0024_magenta_forgotten_one",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784779398878,
+      "tag": "0025_premium_polaris",
+      "breakpoints": true
     }
   ]
 }
