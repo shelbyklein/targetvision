@@ -778,7 +778,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <img src="/vispix.png" alt="Vispix" className="h-7 w-7 rounded" />
           </Link>
           <GlobalSearchBar />
-          <DevEnvironmentBadge />
+          <div className="ml-auto">
+            <DevEnvironmentBadge />
+          </div>
         </header>
 
         <main className={cn(
