@@ -55,6 +55,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useBulkUploadOptional } from "@/contexts/BulkUploadContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DevEnvironmentBadge } from "@/components/DevEnvironmentBadge";
 import { usePhotoUploadOptional } from "@/contexts/PhotoUploadContext";
 import { PhotoUploadBanner } from "@/components/PhotoUploadBanner";
@@ -522,6 +523,7 @@ function CollectionsNav({ location, dragProps }: { location: string; dragProps?:
 // single org (nothing to switch), so single-tenant deployments see no change.
 function OrgSwitcher() {
   const { orgs, activeOrg, switchOrg } = useOrg();
+  const isMobile = useIsMobile();
   if (orgs.length <= 1) return null;
 
   return (
@@ -542,7 +544,7 @@ function OrgSwitcher() {
               <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="w-56">
+          <DropdownMenuContent side={isMobile ? "bottom" : "right"} align="start" className="w-56">
             <div className="px-2 py-1.5 text-xs text-muted-foreground">Organizations</div>
             <DropdownMenuSeparator />
             {orgs.map((o) => (
@@ -582,6 +584,7 @@ function AppSidebar({
   const user = session?.user;
   const firstName = user?.name?.split(" ")[0];
   const { data: me } = useGetMe();
+  const isMobile = useIsMobile();
   const qc = useQueryClient();
   const { mutate: saveNavOrder } = useUpdateNavOrder();
 
@@ -705,7 +708,7 @@ function AppSidebar({
                   <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="end" className="w-52">
+              <DropdownMenuContent side={isMobile ? "bottom" : "right"} align="end" className="w-52">
                 <div className="px-3 py-2">
                   <p className="text-sm font-medium text-foreground truncate">{user?.name ?? "Team Member"}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>

@@ -65,11 +65,20 @@ Then edit `.env` in the worktree so these lines read:
 ```
 PORT=8084
 DATABASE_URL=postgres://postgres:postgres@localhost:5433/vispix_dev
-BETTER_AUTH_URL=http://localhost:8084/api/auth
+# Anchor auth + email links to the PUBLIC dev URL, not the API bind port. Better
+# Auth builds email-verification links from BETTER_AUTH_URL and reset links from
+# APP_PUBLIC_URL — if these point at localhost:8084/8085, verify/reset links in
+# emails are unclickable from other devices. Use dev.vispix.dev for both.
+BETTER_AUTH_URL=https://dev.vispix.dev/api/auth
+APP_PUBLIC_URL=https://dev.vispix.dev
 CORS_ORIGINS=http://localhost:8085,https://dev.vispix.dev
 TRUSTED_ORIGINS=http://localhost:8085,https://dev.vispix.dev
 PHOTO_STORAGE_DELETE_DISABLED=true
 ```
+
+For transactional email on dev, also copy the `SMTP_*` / `EMAIL_FROM` /
+`ADMIN_ALERT_EMAIL` lines from prod (or leave them unset — email then just logs
+instead of sending, and the app still boots).
 
 Leave `GCS_*`, `BETTER_AUTH_SECRET`, and `AI_KEY_ENCRYPTION_SECRET` identical to
 prod (shared storage + the cloned sessions/AI keys must still validate).
