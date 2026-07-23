@@ -4,6 +4,7 @@ import {
   getListUsersQueryKey,
   useGetMe,
   useAdminOrganizations,
+  useAdminSetOrgMemberRole,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminSectionShell } from "@/components/admin/AdminSectionShell";
@@ -33,16 +34,32 @@ export default function AdminTeamPage() {
   const { data: orgs } = useAdminOrganizations({ enabled: isAdmin });
 
   // userId → their org memberships, derived from the org overview's rosters.
-  const membershipsByUser = new Map<number, { orgName: string; role: string }[]>();
+  const membershipsByUser = new Map<number, { orgId: number; orgName: string; role: string }[]>();
   for (const org of orgs ?? []) {
     for (const m of org.members) {
       const list = membershipsByUser.get(m.userId) ?? [];
-      list.push({ orgName: org.name, role: m.role });
+      list.push({ orgId: org.id, orgName: org.name, role: m.role });
       membershipsByUser.set(m.userId, list);
     }
   }
 
   const { mutate: updateRole } = useUpdateUserRole();
+  const { mutate: setOrgRole } = useAdminSetOrgMemberRole();
+
+  function handleOrgRoleChange(organizationId: number, orgName: string, userId: number, role: "owner" | "admin" | "member") {
+    setOrgRole(
+      { organizationId, userId, role },
+      {
+        onSuccess: () => toast({ title: `Role in ${orgName} updated` }),
+        onError: (err) =>
+          toast({
+            title: "Couldn't change the role",
+            description: err instanceof Error && err.message.includes("last owner") ? "An org must keep at least one owner." : undefined,
+            variant: "destructive",
+          }),
+      },
+    );
+  }
 
   function handleRoleChange(userId: number, role: "admin" | "member") {
     updateRole(
@@ -94,11 +111,35 @@ export default function AdminTeamPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                    <p className="text-xs text-muted-foreground/80 mt-0.5 truncate">
-                      {memberships.length > 0
-                        ? memberships.map((m) => `${m.orgName} (${m.role})`).join(", ")
-                        : "No organization"}
-                    </p>
+                    {memberships.length > 0 ? (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                        {memberships.map((m) => (
+                          <span key={m.orgId} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {m.orgName}
+                            <Select
+                              value={m.role}
+                              onValueChange={(val) =>
+                                handleOrgRoleChange(m.orgId, m.orgName, user.id, val as "owner" | "admin" | "member")
+                              }
+                            >
+                              <SelectTrigger
+                                className="h-6 w-24 text-xs"
+                                data-testid={`org-role-select-${user.id}-${m.orgId}`}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="owner">Owner</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="member">Member</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground/80 mt-0.5">No organization</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <Select

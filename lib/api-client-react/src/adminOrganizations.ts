@@ -46,6 +46,23 @@ export function useJoinOrganization() {
   });
 }
 
+// Platform-level org-role change: set any member's role in any org without
+// being inside it (last-owner demotion is refused server-side).
+export function useAdminSetOrgMemberRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { organizationId: number; userId: number; role: "owner" | "admin" | "member" }) =>
+      customFetch<void>(`/api/admin/organizations/${input.organizationId}/members/${input.userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ role: input.role }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_ORGS_KEY });
+      queryClient.invalidateQueries({ queryKey: ["organizations", "members"] });
+    },
+  });
+}
+
 // Platform-admin plan override (billing #118's set-plan route).
 export function useSetOrgPlan() {
   const queryClient = useQueryClient();

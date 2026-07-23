@@ -4,7 +4,6 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Shield,
-  UserPlus,
   Bot,
   Sparkles,
   Braces,
@@ -39,15 +38,8 @@ type Section = {
   status?: { key: keyof AdminHubStatus; label: (n: number) => string };
 };
 
-// Platform level (issue #120): the operator's cross-org tools — every
-// organization and every user on the platform, plus global sign-up policy.
-const PLATFORM_SECTIONS: Section[] = [
-  { href: "/admin/organizations", title: "Organizations", description: "All organizations — plans, usage, and support access.", icon: Building2 },
-  { href: "/admin/team", title: "Users", description: "Every registered account and platform-admin roles.", icon: Users },
-  { href: "/admin/registration", title: "Registration", description: "Allow or pause new account sign-ups.", icon: UserPlus },
-];
-
 // Org level: settings and maintenance scoped to the org you're currently in.
+// Platform-level tools live on the separate /superadmin hub (issue #120).
 const ORG_SECTIONS: Section[] = [
   { href: "/admin/organization", title: "Organization", description: "Name, description, and details of your current organization.", icon: Building2 },
   { href: "/admin/members", title: "Members", description: "Invite teammates and manage roles in this organization.", icon: Users },
@@ -140,13 +132,6 @@ export default function Admin() {
     );
   }
 
-  const groups = [
-    ...(isPlatformAdmin
-      ? ([["Platform", "Cross-organization tools for the Vispix operator.", PLATFORM_SECTIONS]] as const)
-      : []),
-    ["This organization", "Settings and maintenance for the organization you're currently in.", ORG_SECTIONS] as const,
-  ];
-
   return (
     <AppLayout>
       <div className="space-y-8" data-testid="admin-page">
@@ -156,49 +141,43 @@ export default function Admin() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-sm text-muted-foreground">Each area opens on its own page.</p>
+            <p className="text-sm text-muted-foreground">
+              Settings and maintenance for the organization you're currently in.
+            </p>
           </div>
         </div>
 
-        {groups.map(([groupTitle, groupBlurb, sections]) => (
-          <div key={groupTitle} className="space-y-3">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{groupTitle}</h2>
-              <p className="text-xs text-muted-foreground/80 mt-0.5">{groupBlurb}</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid={`admin-hub-grid-${groupTitle === "Platform" ? "platform" : "org"}`}>
-              {sections.map((section) => {
-                const Icon = section.icon;
-                return (
-                  <Link
-                    key={section.href}
-                    href={section.href}
-                    className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/50"
-                    data-testid={`admin-card-${section.href.split("/").pop()}`}
-                  >
-                    <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Icon className="h-[18px] w-[18px] text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-foreground flex items-center gap-1">
-                        {section.title}
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
-                      {section.status && (
-                        <CardStatus
-                          count={hubStatus?.[section.status.key]}
-                          label={section.status.label}
-                          loading={statusLoading}
-                        />
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="admin-hub-grid">
+          {ORG_SECTIONS.map((section) => {
+            const Icon = section.icon;
+            return (
+              <Link
+                key={section.href}
+                href={section.href}
+                className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/50"
+                data-testid={`admin-card-${section.href.split("/").pop()}`}
+              >
+                <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon className="h-[18px] w-[18px] text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-1">
+                    {section.title}
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
+                  {section.status && (
+                    <CardStatus
+                      count={hubStatus?.[section.status.key]}
+                      label={section.status.label}
+                      loading={statusLoading}
+                    />
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </AppLayout>
   );

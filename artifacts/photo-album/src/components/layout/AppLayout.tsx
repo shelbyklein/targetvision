@@ -18,6 +18,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { LayoutDashboard, Images, Shield, LogOut, ChevronsUpDown, Search, Grid2x2, FolderOpen, FolderKanban, Settings, Upload, Pause, Play, CheckCircle2, X, Sparkles, Sun, Moon, ChevronRight, Users, Palette, Building2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { LucideIcon } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useToast } from "@/hooks/use-toast";
@@ -558,7 +559,15 @@ function OrgSwitcher() {
   );
 }
 
-function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean }) {
+function AppSidebar({
+  location,
+  isAdmin,
+  isPlatformAdmin,
+}: {
+  location: string;
+  isAdmin: boolean;
+  isPlatformAdmin: boolean;
+}) {
   const { data: session } = useSession();
   const user = session?.user;
   const firstName = user?.name?.split(" ")[0];
@@ -572,10 +581,14 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
   const [localNavOrder, setLocalNavOrder] = useState<string[] | null>(null);
 
   const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
-  const items = [
+  // Admin (org-scoped) and Superadmin (platform, amber shield) are pinned last
+  // and not reorderable.
+  const items: { href: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
     ...orderedNav,
-    // Admin is pinned last and not reorderable.
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
+    ...(isPlatformAdmin
+      ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
+      : []),
   ];
 
   function navDragProps(href: string): React.LiHTMLAttributes<HTMLLIElement> {
@@ -640,7 +653,8 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarMenu data-testid="main-nav">
             {items.map((item) => {
-              const dragProps = item.href === "/admin" ? undefined : navDragProps(item.href);
+              const dragProps =
+                item.href === "/admin" || item.href === "/superadmin" ? undefined : navDragProps(item.href);
               if (item.href === "/collections") {
                 return <CollectionsNav key={item.href} location={location} dragProps={dragProps} />;
               }
@@ -653,7 +667,7 @@ function AppSidebar({ location, isAdmin }: { location: string; isAdmin: boolean 
                 <SidebarMenuItem key={item.href} {...dragProps}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
                     <Link href={item.href} data-testid={`nav-${item.label.toLowerCase()}`}>
-                      <Icon />
+                      <Icon className={item.iconClass} />
                       <span>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -737,14 +751,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: me } = useGetMe();
   const { activeOrg } = useOrg();
   const bannerVisible = useBannerVisible();
-  // The Admin area serves both platform admins and the active org's own
-  // owners/admins (issue #120) — the hub scopes what each actually sees.
+  // Admin = the active org's own owners/admins (plus platform admins);
+  // Superadmin = platform admins only (issue #120).
+  const isPlatformAdmin = me?.role === "admin";
   const isAdmin =
-    me?.role === "admin" || activeOrg?.role === "owner" || activeOrg?.role === "admin";
+    isPlatformAdmin || activeOrg?.role === "owner" || activeOrg?.role === "admin";
 
   return (
     <SidebarProvider defaultOpen={getInitialSidebarOpen()} data-testid="app-layout">
-      <AppSidebar location={location} isAdmin={isAdmin} />
+      <AppSidebar location={location} isAdmin={isAdmin} isPlatformAdmin={isPlatformAdmin} />
 
       <SidebarInset className="min-h-svh">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 sm:gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm">

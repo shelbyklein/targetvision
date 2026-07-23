@@ -373,6 +373,32 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(after.find((o) => o.id === orgA.id)!.myRole).toBe("admin");
   });
 
+  it("platform admin can change a member's org role; last owner is protected (#120)", async () => {
+    const { orgA, userA } = await seedTwoOrgs(); // userA = sole owner of orgA
+    const platformAdmin = await createUser({ name: "Operator", role: "admin" });
+    const member = await createUser({ name: "Colleague" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    const setRole = (user: { authUserId: string }, userId: number, role: string) =>
+      api(`/api/admin/organizations/${orgA.id}/members/${userId}`, { user, method: "PATCH", body: { role } });
+
+    // Only platform admins may use the platform-level role route.
+    expect((await setRole(userA, member.id, "owner")).status).toBe(403);
+
+    // Promote the member to owner — without the caller being in the org at all.
+    expect((await setRole(platformAdmin, member.id, "owner")).status).toBe(204);
+
+    // Now the original owner can be demoted (another owner exists)...
+    expect((await setRole(platformAdmin, userA.id, "member")).status).toBe(204);
+
+    // ...but the last remaining owner cannot be.
+    const last = await setRole(platformAdmin, member.id, "admin");
+    expect(last.status).toBe(400);
+
+    // Unknown membership → 404.
+    expect((await setRole(platformAdmin, 99999, "member")).status).toBe(404);
+  });
+
   it("instance-admin set-plan overrides a plan; non-admins are refused (#118)", async () => {
     const { orgA, userA } = await seedTwoOrgs(); // orgA on the free plan; userA is its owner (not an instance admin)
     const instanceAdmin = await createUser({ name: "Root", role: "admin" });

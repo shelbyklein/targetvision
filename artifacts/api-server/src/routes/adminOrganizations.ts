@@ -8,7 +8,12 @@ import {
   photosTable,
   usersTable,
 } from "@workspace/db";
-import { AdminOrganizationsResponse, JoinOrganizationResponse, planCapBytes } from "@workspace/api-zod";
+import {
+  AdminOrganizationsResponse,
+  JoinOrganizationResponse,
+  UpdateOrgMemberRoleBody,
+  planCapBytes,
+} from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
 
 // Platform superadmin routes (issue #120): the operator's cross-org view.
@@ -118,6 +123,58 @@ router.post("/admin/organizations/:id/join", requireAdmin, async (req, res): Pro
     .onConflictDoNothing();
 
   res.json(JoinOrganizationResponse.parse({ organizationId: orgId, role: "admin", alreadyMember: false }));
+});
+
+// PATCH /admin/organizations/:id/members/:userId — platform-level org-role
+// change: set any member's role in any org (owner/admin/member) without the
+// caller needing to be inside that org. Mirrors the org-scoped route's
+// last-owner guard so an org can never end up ownerless.
+router.patch("/admin/organizations/:id/members/:userId", requireAdmin, async (req, res): Promise<void> => {
+  const rawOrg = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawUser = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+  const orgId = Number.parseInt(rawOrg, 10);
+  const userId = Number.parseInt(rawUser, 10);
+  if (!Number.isInteger(orgId) || !Number.isInteger(userId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const body = UpdateOrgMemberRoleBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ role: organizationMembersTable.role })
+    .from(organizationMembersTable)
+    .where(
+      sql`${organizationMembersTable.organizationId} = ${orgId} and ${organizationMembersTable.userId} = ${userId}`,
+    );
+  if (!existing) {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+
+  if (existing.role === "owner" && body.data.role !== "owner") {
+    const [{ others }] = await db
+      .select({ others: sql<number>`count(*)::int` })
+      .from(organizationMembersTable)
+      .where(
+        sql`${organizationMembersTable.organizationId} = ${orgId} and ${organizationMembersTable.userId} <> ${userId} and ${organizationMembersTable.role} = 'owner'`,
+      );
+    if (others === 0) {
+      res.status(400).json({ error: "Cannot demote the last owner" });
+      return;
+    }
+  }
+
+  await db
+    .update(organizationMembersTable)
+    .set({ role: body.data.role })
+    .where(
+      sql`${organizationMembersTable.organizationId} = ${orgId} and ${organizationMembersTable.userId} = ${userId}`,
+    );
+  res.sendStatus(204);
 });
 
 export default router;

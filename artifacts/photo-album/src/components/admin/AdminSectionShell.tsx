@@ -63,7 +63,7 @@ export function AdminSectionShell({
     <AppLayout>
       <div className="space-y-6" data-testid={`admin-section-${title.toLowerCase().replace(/\s+/g, "-")}`}>
         <div className="flex items-start gap-3">
-          <Link href="/admin">
+          <Link href={scope === "platform" ? "/superadmin" : "/admin"}>
             <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" data-testid="back-to-admin">
               <ArrowLeft className="h-4 w-4" />
             </Button>

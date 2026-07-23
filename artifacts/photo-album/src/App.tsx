@@ -176,6 +176,7 @@ function AppRoutes() {
           ["/admin/attribution-tags", () => import("@/pages/admin-attribution-tags")],
           ["/admin/mcp-tokens", () => import("@/pages/admin-mcp-tokens")],
           ["/admin/organizations", () => import("@/pages/admin-organizations")],
+          ["/superadmin", () => import("@/pages/superadmin")],
           ["/admin/organization", () => import("@/pages/admin-organization")],
           ["/admin/billing", () => import("@/pages/admin-billing")],
           ["/admin/members", () => import("@/pages/admin-org-members")],
