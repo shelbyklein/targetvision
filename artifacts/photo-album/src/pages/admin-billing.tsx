@@ -20,7 +20,7 @@ function formatBytes(bytes: number): string {
 }
 
 // Contact address for Enterprise enquiries.
-const ENTERPRISE_CONTACT = "mailto:hello@vispix.ai?subject=Vispix%20Enterprise";
+const ENTERPRISE_CONTACT = "mailto:hello@vispix.dev?subject=Vispix%20Enterprise";
 
 // Display copy for the plan-comparison cards. This is marketing text only —
 // the enforced caps are the backend's source of truth (PLAN_LIMITS in
