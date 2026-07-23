@@ -1,7 +1,8 @@
-import { useGetMe, useAdminHubStatus, type AdminHubStatus } from "@workspace/api-client-react";
+import { useGetMe, useAdminHubStatus, useOrgServiceStatus, type AdminHubStatus } from "@workspace/api-client-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { ServiceReadinessCard } from "@/components/admin/ServiceReadinessCard";
+import { ServiceReadinessCard, type ActionItem } from "@/components/admin/ServiceReadinessCard";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Shield,
@@ -110,6 +111,19 @@ export default function Admin() {
   const isOrgAdmin = activeOrg?.role === "owner" || activeOrg?.role === "admin";
   const allowed = isPlatformAdmin || isOrgAdmin;
   const { data: hubStatus, isLoading: statusLoading } = useAdminHubStatus({ enabled: allowed });
+  // Also used inside ServiceReadinessCard — React Query dedupes the fetch.
+  const { data: orgServiceStatus } = useOrgServiceStatus({ enabled: allowed });
+  const aiConfigured = orgServiceStatus?.services.find((s) => s.key === "ai")?.ok;
+
+  // Maintenance work worth surfacing in the notifications panel: every section
+  // whose hub-status count is non-zero, labeled with its section name.
+  const actionItems: ActionItem[] = ORG_SECTIONS.filter(
+    (s) => s.status && (hubStatus?.[s.status.key] ?? 0) > 0,
+  ).map((s) => ({
+    key: s.href.split("/").pop()!,
+    label: `${s.title}: ${s.status!.label(hubStatus![s.status!.key])}`,
+    href: s.href,
+  }));
 
   if (meLoading || orgLoading) {
     return (
@@ -148,35 +162,85 @@ export default function Admin() {
           </div>
         </div>
 
-        <ServiceReadinessCard variant="org" enabled={allowed} />
+        <ServiceReadinessCard
+          variant="org"
+          enabled={allowed}
+          actionItems={actionItems}
+          dismissKey="vispix-admin-notices-dismissed"
+        />
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="admin-hub-grid">
+        {/* 4-column grid; the Organization card is featured at 2x2. */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="admin-hub-grid">
           {ORG_SECTIONS.map((section) => {
             const Icon = section.icon;
+            const featured = section.href === "/admin/organization";
             return (
               <Link
                 key={section.href}
                 href={section.href}
-                className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/50"
+                className={cn(
+                  "group rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/50",
+                  featured
+                    ? "sm:col-span-2 sm:row-span-2 flex flex-col justify-between gap-4"
+                    : "flex items-start gap-3",
+                )}
                 data-testid={`admin-card-${section.href.split("/").pop()}`}
               >
-                <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Icon className="h-[18px] w-[18px] text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-1">
-                    {section.title}
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
-                  {section.status && (
-                    <CardStatus
-                      count={hubStatus?.[section.status.key]}
-                      label={section.status.label}
-                      loading={statusLoading}
-                    />
-                  )}
-                </div>
+                {featured ? (
+                  <>
+                    <div className="space-y-3">
+                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-1.5">
+                          {activeOrg?.name ?? section.title}
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+                        </h3>
+                        {activeOrg && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {activeOrg.slug} · your role: {activeOrg.role}
+                          </p>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{section.description}</p>
+                    </div>
+                    <span className="text-xs font-medium text-primary">Open organization settings →</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Icon className="h-[18px] w-[18px] text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-foreground flex items-center gap-1">
+                        {section.title}
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 -translate-x-1 transition-all group-hover:opacity-100 group-hover:translate-x-0" />
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
+                      {section.href === "/admin/ai-services" && aiConfigured != null && (
+                        aiConfigured ? (
+                          <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-500" data-testid="ai-configured-status">
+                            <CircleCheck className="h-3.5 w-3.5 shrink-0" />
+                            AI provider configured
+                          </p>
+                        ) : (
+                          <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-500" data-testid="ai-configured-status">
+                            <CircleAlert className="h-3.5 w-3.5 shrink-0" />
+                            No provider key yet
+                          </p>
+                        )
+                      )}
+                      {section.status && (
+                        <CardStatus
+                          count={hubStatus?.[section.status.key]}
+                          label={section.status.label}
+                          loading={statusLoading}
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
               </Link>
             );
           })}
