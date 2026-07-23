@@ -13,6 +13,8 @@ const SECTIONS: { href: string; title: string; description: string; icon: Lucide
   { href: "/superadmin/organizations", title: "Organizations", description: "All organizations — plans, usage, and support access.", icon: Building2 },
   { href: "/superadmin/users", title: "Users", description: "Every registered account, platform roles, and org memberships.", icon: Users },
   { href: "/superadmin/registration", title: "Registration", description: "Allow or pause new account sign-ups.", icon: UserPlus },
+  // ?org=1 suppresses the platform-admin → /superadmin default redirect.
+  { href: "/admin?org=1", title: "This organization", description: "Org-scoped admin for the organization you're currently in.", icon: Shield },
 ];
 
 export default function Superadmin() {

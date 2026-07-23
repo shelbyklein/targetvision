@@ -592,10 +592,14 @@ function AppSidebar({
 
   const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
   // Admin (org-scoped) and Superadmin (platform, amber shield) are pinned last
-  // and not reorderable.
-  const items: { href: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
+  // and not reorderable. For platform admins, the Admin link carries ?org=1 so
+  // it opens the org panel instead of bouncing off the /admin → /superadmin
+  // default redirect; `to` is the link target, `href` stays the match path.
+  const items: { href: string; to?: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
     ...orderedNav,
-    ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
+    ...(isAdmin
+      ? [{ href: "/admin", to: isPlatformAdmin ? "/admin?org=1" : "/admin", label: "Admin", icon: Shield }]
+      : []),
     ...(isPlatformAdmin
       ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
       : []),
@@ -676,7 +680,7 @@ function AppSidebar({
               return (
                 <SidebarMenuItem key={item.href} {...dragProps}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                    <Link href={item.href} data-testid={`nav-${item.label.toLowerCase()}`}>
+                    <Link href={item.to ?? item.href} data-testid={`nav-${item.label.toLowerCase()}`}>
                       <Icon className={item.iconClass} />
                       <span>{item.label}</span>
                     </Link>
