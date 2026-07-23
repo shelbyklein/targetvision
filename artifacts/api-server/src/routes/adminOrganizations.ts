@@ -4,7 +4,6 @@ import {
   db,
   organizationsTable,
   organizationMembersTable,
-  organizationSettingsTable,
   organizationSubscriptionsTable,
   photosTable,
   usersTable,
@@ -17,8 +16,7 @@ import {
   planCapBytes,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
-import { objectStorageClient, parseObjectPath, getPrivateObjectDir } from "../lib/objectStorage";
-import { isStripeConfigured } from "../lib/stripe";
+import { buildServiceStatus } from "../lib/serviceStatus";
 
 // Platform superadmin routes (issue #120): the operator's cross-org view.
 // requireAdmin only — these deliberately do NOT go through requireOrg, because
@@ -130,83 +128,10 @@ router.post("/admin/organizations/:id/join", requireAdmin, async (req, res): Pro
 });
 
 // GET /admin/service-status — platform readiness at a glance (issue #122):
-// can the deployment actually serve end to end? Database, object storage, and
-// at least one AI provider are required; billing is optional (the app degrades
-// gracefully without Stripe).
+// can the deployment actually serve end to end? The org-scoped variant lives
+// with the other org admin routes in routes/admin.ts.
 router.get("/admin/service-status", requireAdmin, async (req, res): Promise<void> => {
-  // Database: a trivial round-trip (if this fails we likely never got here,
-  // but the row keeps the checklist honest).
-  let dbOk = false;
-  let dbDetail = "";
-  try {
-    await db.execute(sql`select 1`);
-    dbOk = true;
-    dbDetail = "Connected";
-  } catch (err) {
-    dbDetail = err instanceof Error ? err.message : "Query failed";
-  }
-
-  // Object storage: the private objects dir must be configured and its bucket
-  // reachable — uploads and photo serving depend on it.
-  let storageOk = false;
-  let storageDetail = "";
-  try {
-    const privateDir = getPrivateObjectDir();
-    const { bucketName } = parseObjectPath(privateDir);
-    const [exists] = await objectStorageClient.bucket(bucketName).exists();
-    storageOk = exists;
-    storageDetail = exists ? `Bucket "${bucketName}" reachable` : `Bucket "${bucketName}" not found`;
-  } catch (err) {
-    storageDetail = err instanceof Error ? err.message : "PRIVATE_OBJECT_DIR not configured";
-  }
-
-  // AI: at least one org has a stored provider key, or an env-level fallback
-  // (AI_INTEGRATIONS_*) exists — photo analysis works either way.
-  const envAi = Boolean(
-    process.env.AI_INTEGRATIONS_OPENAI_API_KEY ||
-      process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ||
-      process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-  );
-  const [aiRow] = await db
-    .select({ id: organizationSettingsTable.id })
-    .from(organizationSettingsTable)
-    .where(
-      sql`${organizationSettingsTable.openaiKeyCiphertext} is not null or ${organizationSettingsTable.anthropicKeyCiphertext} is not null or ${organizationSettingsTable.geminiKeyCiphertext} is not null`,
-    )
-    .limit(1);
-  const aiOk = envAi || Boolean(aiRow);
-
-  const billingOk = isStripeConfigured();
-
-  const services = [
-    { key: "database", label: "Database", ok: dbOk, optional: false, detail: dbDetail },
-    { key: "storage", label: "Object storage", ok: storageOk, optional: false, detail: storageDetail },
-    {
-      key: "ai",
-      label: "AI provider",
-      ok: aiOk,
-      optional: false,
-      detail: aiOk
-        ? envAi
-          ? "Environment fallback key configured"
-          : "At least one organization has a provider key"
-        : "No org has an AI provider key and no environment fallback is set",
-    },
-    {
-      key: "billing",
-      label: "Billing (Stripe)",
-      ok: billingOk,
-      optional: true,
-      detail: billingOk ? "Stripe configured" : "No Stripe keys — billing routes return 503",
-    },
-  ];
-
-  res.json(
-    ServiceStatusResponse.parse({
-      ready: services.filter((s) => !s.optional).every((s) => s.ok),
-      services,
-    }),
-  );
+  res.json(ServiceStatusResponse.parse(await buildServiceStatus()));
 });
 
 // PATCH /admin/organizations/:id/members/:userId — platform-level org-role

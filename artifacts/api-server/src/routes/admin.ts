@@ -51,6 +51,7 @@ import {
   RebuildNearDuplicateIndexResponse,
   IgnoreNearDuplicatesBody,
   IgnoreNearDuplicatesResponse,
+  ServiceStatusResponse,
   ListAiBackfillRunsResponse,
   GetAiAutoBackfillSettingsResponse,
   UpdateAiAutoBackfillSettingsBody,
@@ -63,6 +64,7 @@ import {
   UpdateImageOptimizationSettingsBody,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middlewares/requireAuth";
+import { buildServiceStatus } from "../lib/serviceStatus";
 import { requireOrgAuth, requireOrgRole } from "../middlewares/requireOrg";
 import {
   loadAppSettings,
@@ -749,6 +751,12 @@ router.get("/admin/photos/near-duplicates", ...requireOrgAdmin, async (req, res)
       })),
     }),
   );
+});
+
+// Org-scoped service readiness (issue #122): same checks as the platform
+// variant, but the AI row reflects whether THIS org can analyse photos.
+router.get("/admin/org-service-status", ...requireOrgAdmin, async (req, res): Promise<void> => {
+  res.json(ServiceStatusResponse.parse(await buildServiceStatus({ organizationId: req.org!.id })));
 });
 
 // Dismiss a near-duplicate comparison as not-duplicates (issue #124). The

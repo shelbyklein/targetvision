@@ -416,6 +416,22 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     expect(typeof body.ready).toBe("boolean");
   });
 
+  it("org-scoped service readiness admits org admins, refuses members (#122)", async () => {
+    const { orgA, userA } = await seedTwoOrgs(); // userA = org owner, NOT a platform admin
+    const member = await createUser({ name: "Plain member" });
+    await addOrganizationMember(orgA.id, member.id, "member");
+
+    // Plain member → refused; org owner → allowed, same four services.
+    expect((await api("/api/admin/org-service-status", { user: member, orgId: orgA.id })).status).toBe(403);
+    const res = await api("/api/admin/org-service-status", { user: userA, orgId: orgA.id });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { services: { key: string; ok: boolean }[] };
+    expect(body.services.map((s) => s.key).sort()).toEqual(["ai", "billing", "database", "storage"]);
+    expect(body.services.find((s) => s.key === "database")!.ok).toBe(true);
+    // No AI key stored for this org and no env fallback in tests → not ok.
+    expect(body.services.find((s) => s.key === "ai")!.ok).toBe(false);
+  });
+
   it("platform admin can change a member's org role; last owner is protected (#120)", async () => {
     const { orgA, userA } = await seedTwoOrgs(); // userA = sole owner of orgA
     const platformAdmin = await createUser({ name: "Operator", role: "admin" });

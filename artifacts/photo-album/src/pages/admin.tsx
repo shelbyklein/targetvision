@@ -1,6 +1,7 @@
 import { useGetMe, useAdminHubStatus, type AdminHubStatus } from "@workspace/api-client-react";
 import { useOrg } from "@/contexts/OrgContext";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ServiceReadinessCard } from "@/components/admin/ServiceReadinessCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Shield,
@@ -146,6 +147,8 @@ export default function Admin() {
             </p>
           </div>
         </div>
+
+        <ServiceReadinessCard variant="org" enabled={allowed} />
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="admin-hub-grid">
           {ORG_SECTIONS.map((section) => {
