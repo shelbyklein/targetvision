@@ -186,13 +186,15 @@ export default function Admin() {
               >
                 {featured ? (
                   <>
-                    {/* Logo fills the card height; org info sits to its right. */}
-                    <div className="self-stretch aspect-square shrink-0 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
+                    {/* Logo square matches the card height (2 grid rows) — the
+                        image is absolutely positioned so its intrinsic size
+                        can't inflate the card or the grid's row tracks. */}
+                    <div className="relative self-stretch aspect-square shrink-0 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
                       {activeOrg?.logoUrl ? (
                         <img
                           src={activeOrg.logoUrl}
                           alt={`${activeOrg.name} logo`}
-                          className="h-full w-full object-cover"
+                          className="absolute inset-0 h-full w-full object-cover"
                           data-testid="admin-org-card-logo"
                         />
                       ) : (
