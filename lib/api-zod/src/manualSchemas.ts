@@ -212,6 +212,18 @@ export const UpdateAiAutoBackfillSettingsBody = z.object({
 export const UpdateAiAutoBackfillSettingsResponse = AiAutoBackfillSettings;
 
 // --- Image embeddings (Vertex AI) ---
+// Live/last state of the cancellable backfill job (#31); null when none has run.
+export const EmbeddingJobSchema = z.object({
+  running: z.boolean(),
+  total: z.number(),
+  processed: z.number(),
+  succeeded: z.number(),
+  failed: z.number(),
+  stopped: z.boolean(),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+});
+
 export const EmbeddingStatusResponse = z.object({
   enabled: z.boolean(),
   projectConfigured: z.boolean(),
@@ -220,6 +232,7 @@ export const EmbeddingStatusResponse = z.object({
   location: z.string(),
   embeddedCount: z.number(),
   missingCount: z.number(),
+  job: EmbeddingJobSchema.nullable(),
 });
 
 export const UpdateEmbeddingSettingsBody = z.object({
