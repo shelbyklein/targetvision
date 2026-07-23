@@ -19,6 +19,14 @@ function textBlock(text: string): { type: "text"; text: string } {
   return { type: "text", text };
 }
 
+// One tool result can mix prose, inline images, and typed download links.
+// resource_link is the spec's typed pointer: clients that understand it can
+// render a download card or fetch lazily; others still see the URL in the text.
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string }
+  | { type: "resource_link"; uri: string; name: string; description?: string; mimeType?: string };
+
 export interface ServerOptions {
   /**
    * Base URL of the HTTP gateway (including any auth prefix). When set,
@@ -79,9 +87,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         return bits.join(" | ") + desc;
       });
 
-      const content: Array<
-        { type: "text"; text: string } | { type: "image"; data: string; mimeType: string }
-      > = [textBlock(`${results.length} photos for "${query}":\n\n${lines.join("\n")}${note ? `\n\n${note}` : ""}`)];
+      const content: ContentBlock[] = [textBlock(`${results.length} photos for "${query}":\n\n${lines.join("\n")}${note ? `\n\n${note}` : ""}`)];
 
       if (includeImages) {
         const withImages = results.slice(0, MAX_INLINE_IMAGES);
@@ -133,9 +139,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
         fullResUrl && `full-resolution download (valid ~1h): ${fullResUrl}`,
       ].filter(Boolean);
 
-      const content: Array<
-        { type: "text"; text: string } | { type: "image"; data: string; mimeType: string }
-      > = [textBlock(lines.join("\n"))];
+      const content: ContentBlock[] = [textBlock(lines.join("\n"))];
+      if (fullResUrl) {
+        content.push({
+          type: "resource_link",
+          uri: fullResUrl,
+          name: photo.filename || `photo-${photo.id}`,
+          description: "Full-resolution original (link valid ~1h)",
+        });
+      }
       const img = await loadThumbnailImage(photo.thumbnailKey);
       if (img) content.push({ type: "image", data: img.base64, mimeType: img.mimeType });
       return { content };
@@ -255,9 +267,16 @@ export function createServer(options: ServerOptions = {}): McpServer {
         downloadUrl && `original download (valid ~1h): ${downloadUrl}`,
       ].filter(Boolean) as string[];
 
-      const content: Array<
-        { type: "text"; text: string } | { type: "image"; data: string; mimeType: string }
-      > = [textBlock(lines.join("\n"))];
+      const content: ContentBlock[] = [textBlock(lines.join("\n"))];
+      if (downloadUrl) {
+        content.push({
+          type: "resource_link",
+          uri: downloadUrl,
+          name: asset.filename || asset.name,
+          description: "Original file (link valid ~1h)",
+          ...(asset.contentType ? { mimeType: asset.contentType } : {}),
+        });
+      }
       const img = await loadAssetImage(asset);
       if (img) content.push({ type: "image", data: img.base64, mimeType: img.mimeType });
       return { content };
