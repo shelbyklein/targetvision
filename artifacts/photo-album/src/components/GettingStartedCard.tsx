@@ -56,7 +56,7 @@ export function GettingStartedCard() {
     {
       key: "collection",
       label: "Curate a collection",
-      blurb: "Collections are hand-picked sets of your best photos — e.g. for a campaign or channel.",
+      blurb: "Group photos by what they are — a campaign, an event, a theme.",
       href: "/collections",
       done: status.hasCollectionPhotos,
     },
@@ -84,15 +84,15 @@ export function GettingStartedCard() {
     },
     {
       key: "tags",
-      label: "Categorize with tags",
-      blurb: "Tag collections so they're easy to filter and find.",
+      label: "Label your collections",
+      blurb: "Add tags to collections so you can filter them by theme.",
       href: "/collections",
       done: status.hasCollectionTag,
     },
     {
       key: "person",
-      label: "Tag a person",
-      blurb: "People group one athlete's photos under their name, with AI suggestions.",
+      label: "Add a person",
+      blurb: "People group photos by who's in them — every shot of one athlete under their name.",
       href: "/people",
       done: status.hasTaggedPerson,
     },
