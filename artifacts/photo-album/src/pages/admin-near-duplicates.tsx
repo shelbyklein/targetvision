@@ -6,6 +6,7 @@ import {
   useBackfillPerceptualHashes,
   useNearDuplicateIndexStatus,
   useRebuildNearDuplicateIndex,
+  useIgnoreNearDuplicates,
   useDeletePhoto,
   useBulkDeletePhotos,
   getGetRecentPhotosQueryKey,
@@ -38,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { cn } from "@/lib/utils";
 import { DuplicatePhotoCard } from "@/components/admin/DuplicatePhotoCard";
+import { NearDuplicateCleanupModal } from "@/components/admin/NearDuplicateCleanupModal";
 
 type BackfillResult = {
   processed: number;
@@ -74,6 +76,8 @@ export default function AdminNearDuplicatesPage() {
   const { data: page, isLoading: pageLoading, isFetching } = useNearDuplicatePhotoGroups(params);
   const { mutate: deletePhoto, isPending: isDeleting } = useDeletePhoto();
   const { mutate: bulkDelete, isPending: isBulkDeleting } = useBulkDeletePhotos();
+  const { mutate: ignoreGroupPhotos, isPending: isIgnoring } = useIgnoreNearDuplicates();
+  const [cleanupOpen, setCleanupOpen] = useState(false);
 
   const missingCount = statusData?.missingCount ?? null;
   const totalGroups = page?.totalGroups ?? null;
@@ -162,6 +166,21 @@ export default function AdminNearDuplicatesPage() {
           invalidateAfterDelete();
         },
         onError: () => toast({ title: "Bulk delete failed", variant: "destructive" }),
+      },
+    );
+  }
+
+  // Dismiss a comparison as not-duplicates (#124): persisted server-side so the
+  // group never resurfaces; removed locally so the modal advances immediately.
+  function handleIgnoreGroup(group: NearDuplicateGroup) {
+    ignoreGroupPhotos(
+      group.photos.map((p) => p.id),
+      {
+        onSuccess: () => {
+          toast({ title: "Comparison ignored", description: "These photos won't be flagged as near-duplicates again." });
+          setAllGroups((prev) => prev.filter((g) => g.key !== group.key));
+        },
+        onError: () => toast({ title: "Failed to ignore the comparison", variant: "destructive" }),
       },
     );
   }
@@ -325,7 +344,22 @@ export default function AdminNearDuplicatesPage() {
             {totalGroups} group{totalGroups !== 1 ? "s" : ""} at this sensitivity
           </span>
         )}
+        {allGroups.length > 0 && (
+          <Button size="sm" onClick={() => setCleanupOpen(true)} data-testid="interactive-cleanup-btn">
+            <CopyCheck className="h-4 w-4 mr-1.5" /> Interactive cleanup
+          </Button>
+        )}
       </div>
+
+      <NearDuplicateCleanupModal
+        open={cleanupOpen}
+        onOpenChange={setCleanupOpen}
+        groups={allGroups}
+        onDeletePhoto={handleDelete}
+        onIgnoreGroup={handleIgnoreGroup}
+        isDeleting={isDeleting}
+        isIgnoring={isIgnoring}
+      />
 
       {/* Groups */}
       {initialLoading ? (

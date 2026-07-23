@@ -23,8 +23,9 @@ import type { Server } from "node:http";
 import app from "../../app";
 import { mayAccessObjectPath } from "../../routes/storage";
 import { eq } from "drizzle-orm";
-import { db, pool, assetsTable, attributionTagsTable, organizationsTable } from "@workspace/db";
+import { db, pool, assetsTable, attributionTagsTable, organizationsTable, nearDuplicatePairsTable } from "@workspace/db";
 import { assertUploadAllowed } from "../billing/subscriptions";
+import { listNearDuplicatePhotoGroups } from "../perceptualHash";
 import {
   resetDb,
   createUser,
@@ -371,6 +372,48 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
       id: number; myRole: string | null; memberCount: number;
     }[];
     expect(after.find((o) => o.id === orgA.id)!.myRole).toBe("admin");
+  });
+
+  it("ignoring a near-duplicate comparison persists across index rebuilds (#124)", async () => {
+    const { orgA, userA, a } = await seedTwoOrgs();
+    const p1 = await createPhoto(a.album.id, userA.id, { organizationId: orgA.id });
+    const p2 = await createPhoto(a.album.id, userA.id, { organizationId: orgA.id });
+    const [lo, hi] = [Math.min(p1.id, p2.id), Math.max(p1.id, p2.id)];
+    await db.insert(nearDuplicatePairsTable).values({ organizationId: orgA.id, photoA: lo, photoB: hi, distance: 2 });
+
+    // The pair groups...
+    expect((await listNearDuplicatePhotoGroups(6, orgA.id)).length).toBe(1);
+
+    // ...until it's ignored via the route (org-admin only).
+    const ignore = await api("/api/admin/photos/near-duplicates/ignore", {
+      user: userA,
+      orgId: orgA.id,
+      method: "POST",
+      body: { photoIds: [p1.id, p2.id] },
+    });
+    expect(ignore.status).toBe(200);
+    expect(((await ignore.json()) as { ignoredPairs: number }).ignoredPairs).toBe(1);
+    expect((await listNearDuplicatePhotoGroups(6, orgA.id)).length).toBe(0);
+
+    // Simulate an index rebuild re-inserting the same pair: still ignored.
+    await db.insert(nearDuplicatePairsTable).values({ organizationId: orgA.id, photoA: lo, photoB: hi, distance: 2 }).onConflictDoNothing();
+    expect((await listNearDuplicatePhotoGroups(6, orgA.id)).length).toBe(0);
+  });
+
+  it("service readiness endpoint is platform-admin only and reports all services (#122)", async () => {
+    const { userA } = await seedTwoOrgs();
+    const platformAdmin = await createUser({ name: "Operator", role: "admin" });
+
+    expect((await api("/api/admin/service-status", { user: userA })).status).toBe(403);
+
+    const res = await api("/api/admin/service-status", { user: platformAdmin });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ready: boolean; services: { key: string; ok: boolean; optional: boolean }[] };
+    expect(body.services.map((s) => s.key).sort()).toEqual(["ai", "billing", "database", "storage"]);
+    // The database check must pass (we're talking to it right now); overall
+    // readiness reflects only required services.
+    expect(body.services.find((s) => s.key === "database")!.ok).toBe(true);
+    expect(typeof body.ready).toBe("boolean");
   });
 
   it("platform admin can change a member's org role; last owner is protected (#120)", async () => {

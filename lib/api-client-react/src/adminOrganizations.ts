@@ -78,3 +78,18 @@ export function useSetOrgPlan() {
     },
   });
 }
+
+// Platform service readiness (issue #122): per-service status + overall flag.
+export type ServiceStatus = {
+  ready: boolean;
+  services: { key: string; label: string; ok: boolean; optional: boolean; detail: string }[];
+};
+
+export function useServiceStatus(opts: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: ["admin", "service-status"],
+    queryFn: () => customFetch<ServiceStatus>("/api/admin/service-status"),
+    enabled: opts.enabled ?? true,
+    staleTime: 60 * 1000,
+  });
+}

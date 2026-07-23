@@ -99,3 +99,23 @@ export function useNearDuplicatePhotoGroups(params: NearDuplicatePhotoGroupsPara
       ),
   });
 }
+
+// The cleanup modal (issues #123/#125) needs full-res image URLs on top of the
+// DuplicatePhoto card shape; the near-duplicates route provides imageUrl.
+export type NearDuplicateModalPhoto = DuplicatePhoto & { imageUrl: string };
+
+// Dismiss a comparison as not-duplicates (issue #124): every pair among the
+// given photos is persisted as ignored and the group stops resurfacing.
+export function useIgnoreNearDuplicates() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (photoIds: number[]) =>
+      customFetch<{ ignoredPairs: number }>("/api/admin/photos/near-duplicates/ignore", {
+        method: "POST",
+        body: JSON.stringify({ photoIds }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "photos", "near-duplicates"] });
+    },
+  });
+}

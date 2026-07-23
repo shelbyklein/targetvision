@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { and, eq, isNull, isNotNull, inArray, lte, sql } from "drizzle-orm";
-import { db, photosTable, albumsTable, photoCollectionsTable, nearDuplicatePairsTable } from "@workspace/db";
+import { db, photosTable, albumsTable, photoCollectionsTable, nearDuplicatePairsTable, nearDuplicateIgnoresTable } from "@workspace/db";
 import { objectStorageClient, parseObjectPath, getPrivateObjectDir } from "./objectStorage";
 import { logger } from "./logger";
 import { createLimiter } from "./concurrencyLimit";
@@ -304,7 +304,7 @@ export async function listNearDuplicatePhotoGroups(
   threshold: number = DEFAULT_NEAR_DUP_THRESHOLD,
   organizationId?: number,
 ): Promise<NearDuplicateGroup[]> {
-  const pairs = await db
+  const rawPairs = await db
     .select({
       a: nearDuplicatePairsTable.photoA,
       b: nearDuplicatePairsTable.photoB,
@@ -317,6 +317,17 @@ export async function listNearDuplicatePhotoGroups(
         organizationId != null ? eq(nearDuplicatePairsTable.organizationId, organizationId) : undefined,
       ),
     );
+
+  if (rawPairs.length === 0) return [];
+
+  // Drop pairs the user has dismissed as not-duplicates (issue #124) — they
+  // live in a separate table so index rebuilds can't resurrect them.
+  const ignoreRows = await db
+    .select({ a: nearDuplicateIgnoresTable.photoA, b: nearDuplicateIgnoresTable.photoB })
+    .from(nearDuplicateIgnoresTable)
+    .where(organizationId != null ? eq(nearDuplicateIgnoresTable.organizationId, organizationId) : undefined);
+  const ignored = new Set(ignoreRows.map((r) => `${r.a}:${r.b}`));
+  const pairs = ignored.size === 0 ? rawPairs : rawPairs.filter((p) => !ignored.has(`${p.a}:${p.b}`));
 
   if (pairs.length === 0) return [];
 
@@ -403,4 +414,30 @@ export async function listNearDuplicatePhotoGroups(
   // Largest / most-similar groups first.
   groups.sort((a, b) => b.photos.length - a.photos.length || a.distance - b.distance);
   return groups;
+}
+
+// Dismiss a near-duplicate comparison (issue #124): record every pair among the
+// given photos as ignored so the group never resurfaces — including after an
+// index rebuild, and even if a future rescan connects only a subset of them.
+// Only photos belonging to the org are recorded (a stray id from another tenant
+// is silently dropped rather than leaking a cross-org row).
+export async function ignoreNearDuplicatePhotos(
+  organizationId: number,
+  photoIds: number[],
+): Promise<{ ignoredPairs: number }> {
+  const owned = await db
+    .select({ id: photosTable.id })
+    .from(photosTable)
+    .where(and(inArray(photosTable.id, photoIds), eq(photosTable.organizationId, organizationId)));
+  const ids = [...new Set(owned.map((r) => r.id))].sort((x, y) => x - y);
+  if (ids.length < 2) return { ignoredPairs: 0 };
+
+  const values: { organizationId: number; photoA: number; photoB: number }[] = [];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      values.push({ organizationId, photoA: ids[i], photoB: ids[j] });
+    }
+  }
+  await db.insert(nearDuplicateIgnoresTable).values(values).onConflictDoNothing();
+  return { ignoredPairs: values.length };
 }
