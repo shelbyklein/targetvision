@@ -9,6 +9,7 @@ import {
   useListProjects,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { GettingStartedCard } from "@/components/GettingStartedCard";
 import { CrossfadeThumb } from "@/components/CrossfadeThumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -611,6 +612,8 @@ export default function Dashboard() {
           </div>
           <CustomizeDialog layout={layout} onChange={setLayout} />
         </div>
+
+        <GettingStartedCard />
 
         {visibleSections.map((id) => (
           <Fragment key={id}>{sectionRenderers[id]()}</Fragment>

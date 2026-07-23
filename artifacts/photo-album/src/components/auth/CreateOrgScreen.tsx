@@ -30,9 +30,11 @@ export function CreateOrgScreen() {
           <div className="mx-auto h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
             <Building2 className="h-6 w-6 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Create your organization</h1>
+          <h1 className="text-2xl font-bold text-foreground">Welcome to Vispix</h1>
           <p className="text-sm text-muted-foreground">
-            You're not part of an organization yet. Create one to start building your photo library.
+            Vispix is your team's photo library — upload event photos, rate and curate the best,
+            and find anything with AI search. Start by naming your organization; you'll be its owner
+            and can invite teammates later.
           </p>
         </div>
 

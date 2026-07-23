@@ -204,6 +204,13 @@
       "when": 1784842841828,
       "tag": "0028_mixed_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1784844127121,
+      "tag": "0029_marvelous_white_queen",
+      "breakpoints": true
     }
   ]
 }
