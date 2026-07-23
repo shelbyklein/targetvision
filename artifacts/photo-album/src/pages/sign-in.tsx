@@ -34,7 +34,7 @@ export default function SignInPage() {
     }
     // Full-page navigation so the session cookie is picked up fresh —
     // a client-side route change can race the useSession store update.
-    window.location.assign(`${basePath}/dashboard`);
+    window.location.assign(`${basePath}/`);
   }
 
   return (

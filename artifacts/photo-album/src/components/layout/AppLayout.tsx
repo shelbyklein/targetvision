@@ -591,17 +591,18 @@ function AppSidebar({
   const [localNavOrder, setLocalNavOrder] = useState<string[] | null>(null);
 
   const orderedNav = applyNavOrder(localNavOrder ?? me?.navOrder);
-  // Admin (org-scoped) and Superadmin (platform, amber shield) are pinned last
-  // and not reorderable. For platform admins, the Admin link carries ?org=1 so
-  // it opens the org panel instead of bouncing off the /admin → /superadmin
-  // default redirect; `to` is the link target, `href` stays the match path.
+  // Superadmin (platform, amber shield) is pinned FIRST for platform admins
+  // (#135); Admin (org-scoped) stays pinned last. Neither is reorderable. For
+  // platform admins, the Admin link carries ?org=1 so it opens the org panel
+  // instead of bouncing off the /admin → /superadmin default redirect; `to` is
+  // the link target, `href` stays the match path.
   const items: { href: string; to?: string; label: string; icon: LucideIcon; iconClass?: string }[] = [
+    ...(isPlatformAdmin
+      ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
+      : []),
     ...orderedNav,
     ...(isAdmin
       ? [{ href: "/admin", to: isPlatformAdmin ? "/admin?org=1" : "/admin", label: "Admin", icon: Shield }]
-      : []),
-    ...(isPlatformAdmin
-      ? [{ href: "/superadmin", label: "Superadmin", icon: Shield, iconClass: "text-amber-500" }]
       : []),
   ];
 
@@ -652,7 +653,7 @@ function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip="Vispix">
-              <Link href="/dashboard" data-testid="sidebar-brand">
+              <Link href={isPlatformAdmin ? "/superadmin" : "/dashboard"} data-testid="sidebar-brand">
                 <img src="/vispix.png" alt="Vispix" className="size-6 shrink-0 rounded" />
                 <span className="font-semibold tracking-tight">Vispix</span>
               </Link>
@@ -778,7 +779,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset className="min-h-svh">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 sm:gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1" data-testid="sidebar-toggle" />
-          <Link href="/dashboard" className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Vispix">
+          <Link href={isPlatformAdmin ? "/superadmin" : "/dashboard"} className="flex items-center gap-2 shrink-0 md:hidden" aria-label="Vispix">
             <img src="/vispix.png" alt="Vispix" className="h-7 w-7 rounded" />
           </Link>
           <GlobalSearchBar />
