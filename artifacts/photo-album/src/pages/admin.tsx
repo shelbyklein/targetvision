@@ -24,7 +24,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Link } from "wouter";
+import { Link, Redirect, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 
 // The hub runs one aggregated count-only status call (see /admin/hub-status);
@@ -104,6 +104,7 @@ function CardStatus({
 export default function Admin() {
   const { data: me, isLoading: meLoading } = useGetMe();
   const { activeOrg, isLoading: orgLoading } = useOrg();
+  const search = useSearch();
 
   // Org owners/admins manage their organization; platform admins see everything
   // (issue #120). The hub-status call is org-scoped, so it's valid for both.
@@ -134,6 +135,13 @@ export default function Admin() {
         </div>
       </AppLayout>
     );
+  }
+
+  // Platform admins default to the superadmin panel; the org-scoped panel
+  // stays reachable via the "This organization" card there (?org=1 suppresses
+  // the redirect). Org owners/admins are unaffected.
+  if (isPlatformAdmin && !new URLSearchParams(search).has("org")) {
+    return <Redirect to="/superadmin" />;
   }
 
   if (!me || !allowed) {
@@ -186,13 +194,15 @@ export default function Admin() {
               >
                 {featured ? (
                   <>
-                    {/* Logo fills the card height; org info sits to its right. */}
-                    <div className="self-stretch aspect-square shrink-0 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
+                    {/* Logo square matches the card height (2 grid rows) — the
+                        image is absolutely positioned so its intrinsic size
+                        can't inflate the card or the grid's row tracks. */}
+                    <div className="relative self-stretch aspect-square shrink-0 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
                       {activeOrg?.logoUrl ? (
                         <img
                           src={activeOrg.logoUrl}
                           alt={`${activeOrg.name} logo`}
-                          className="h-full w-full object-cover"
+                          className="absolute inset-0 h-full w-full object-cover"
                           data-testid="admin-org-card-logo"
                         />
                       ) : (

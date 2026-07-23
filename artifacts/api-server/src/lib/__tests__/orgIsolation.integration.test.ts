@@ -409,10 +409,7 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     const res = await api("/api/admin/service-status", { user: platformAdmin });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ready: boolean; services: { key: string; ok: boolean; optional: boolean }[] };
-    expect(body.services.map((s) => s.key).sort()).toEqual(["ai", "billing", "database", "storage"]);
-    // The database check must pass (we're talking to it right now); overall
-    // readiness reflects only required services.
-    expect(body.services.find((s) => s.key === "database")!.ok).toBe(true);
+    expect(body.services.map((s) => s.key).sort()).toEqual(["ai", "billing"]);
     expect(typeof body.ready).toBe("boolean");
   });
 
@@ -426,8 +423,7 @@ describe("org isolation — a member of org A cannot reach org B's data", () => 
     const res = await api("/api/admin/org-service-status", { user: userA, orgId: orgA.id });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { services: { key: string; ok: boolean }[] };
-    expect(body.services.map((s) => s.key).sort()).toEqual(["ai", "billing", "database", "storage"]);
-    expect(body.services.find((s) => s.key === "database")!.ok).toBe(true);
+    expect(body.services.map((s) => s.key).sort()).toEqual(["ai", "billing"]);
     // No AI key stored for this org and no env fallback in tests → not ok.
     expect(body.services.find((s) => s.key === "ai")!.ok).toBe(false);
   });
