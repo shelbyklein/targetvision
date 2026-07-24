@@ -1,7 +1,7 @@
 import { useGetMe } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, UserPlus, Users, ChevronRight, Building2 } from "lucide-react";
+import { Shield, UserPlus, Users, ChevronRight, Building2, BarChart3 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { SendTestEmailCard } from "@/components/admin/SendTestEmailCard";
 // Superadmin hub (issue #120): the platform operator's cross-organization
 // tools, split out from the org-scoped /admin area. Platform admins only.
 const SECTIONS: { href: string; title: string; description: string; icon: LucideIcon }[] = [
+  { href: "/superadmin/analytics", title: "Analytics", description: "Platform usage across every organization — growth, activity, revenue.", icon: BarChart3 },
   { href: "/superadmin/organizations", title: "Organizations", description: "All organizations — plans, usage, and support access.", icon: Building2 },
   { href: "/superadmin/users", title: "Users", description: "Every registered account, platform roles, and org memberships.", icon: Users },
   { href: "/superadmin/registration", title: "Registration", description: "Allow or pause new account sign-ups.", icon: UserPlus },

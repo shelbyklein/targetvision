@@ -18,6 +18,7 @@ import billingRouter from "./billing";
 import adminOrganizationsRouter from "./adminOrganizations";
 import contactRouter from "./contact";
 import onboardingRouter from "./onboarding";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -41,5 +42,6 @@ router.use(adminRouter);
 router.use(bulkUploadBatchesRouter);
 router.use(billingRouter);
 router.use(adminOrganizationsRouter);
+router.use(analyticsRouter);
 
 export default router;
